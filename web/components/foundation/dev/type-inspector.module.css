@@ -14,7 +14,7 @@
 
 /* Edit text: a panel fixed at the lower left, clear of the dev button, so the edited text stays in view. A header with
    Reset this text and close, then the rule it edits and its controls, scrolling inside. */
-.editor { position: fixed; z-index: var(--layer-popover); bottom: var(--space-inset); left: var(--space-inset); display: grid; grid-template-rows: auto minmax(0, 1fr); width: min(calc(100vw - var(--space-block)), 20rem); max-height: calc(100dvh - var(--space-screen) * 2); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-container); background: var(--surface); box-shadow: var(--shadow-floating); color: var(--foreground); font-size: var(--text-sm); line-height: var(--leading-body); }
+.editor { position: fixed; z-index: var(--layer-popover); pointer-events: auto; bottom: var(--space-inset); left: var(--space-inset); display: grid; grid-template-rows: auto minmax(0, 1fr); width: min(calc(100vw - var(--space-block)), 20rem); max-height: calc(100dvh - var(--space-screen) * 2); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-container); background: var(--surface); box-shadow: var(--shadow-floating); color: var(--foreground); font-size: var(--text-sm); line-height: var(--leading-body); }
 .head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-related); padding: var(--space-related) var(--space-related) var(--space-related) var(--space-group); border-bottom: 1px solid var(--border-subtle); }
 .actions { display: flex; align-items: center; gap: var(--space-hair); }
 .title { margin: 0; font-size: var(--text-sm); font-weight: 500; }

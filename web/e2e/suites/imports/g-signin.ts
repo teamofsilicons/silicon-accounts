@@ -51,7 +51,7 @@ async function importOne(ctx: Ctx, app: FakeApp, row: Record<string, unknown>, o
 
 /** The sign-up step's prefilled fields. */
 async function prefill(page: Page) {
-  const id = page.getByRole("textbox", { name: "Your id" });
+  const id = page.getByRole("textbox", { name: "Your CarbonID" });
   await id.waitFor({ timeout: 20_000 });
   await sleep(700);
   return {
@@ -121,7 +121,7 @@ export const journeys: Journey[] = [
       results.check("it is prefilled with what legacy-crm imported: id, name, timezone, date of birth", seen.id === `fin_${t}` && seen.name === "Fin Ward" && /Paris/.test(seen.timezone) && /March 14, 1991/.test(seen.dob), JSON.stringify({ ...seen, text: undefined }));
       const flow = await flowView(page);
       results.check("the flow (API) is at signup with finishing_import true and the imported details", flow?.step === "signup" && flow.signup?.finishing_import === true && flow.signup.id === `c:fin_${t}` && flow.signup.display_name === "Fin Ward" && flow.signup.timezone === "Europe/Paris" && flow.signup.dob === "1991-03-14", JSON.stringify(flow?.signup ?? flow).slice(0, 400));
-      results.check("…and names the app that imported them (imported_by legacy-crm), which the page repeats for the id (\"This is the id Legacy CRM set up for you.\")", flow?.signup?.imported_by?.app_id === "legacy-crm" && flow.signup.imported_by.name === "Legacy CRM" && seen.text.includes("This is the id Legacy CRM set up for you."), `${JSON.stringify(flow?.signup?.imported_by)}; ${/This is the id[^.]*\./.exec(seen.text)?.[0] ?? seen.text.slice(0, 200)}`);
+      results.check("…and names the app that imported them (imported_by legacy-crm), which the page repeats for the id (\"This is the CarbonID Legacy CRM set up for you.\")", flow?.signup?.imported_by?.app_id === "legacy-crm" && flow.signup.imported_by.name === "Legacy CRM" && seen.text.includes("This is the CarbonID Legacy CRM set up for you."), `${JSON.stringify(flow?.signup?.imported_by)}; ${/This is the (?:CarbonID|id)[^.]*\./.exec(seen.text)?.[0] ?? seen.text.slice(0, 200)}`);
       await page.getByRole("button", { name: "Finish setup" }).click();
       const walk = await completeDetails(env, page, "legacy-crm", { shotName: "imports-signin-02" });
       const details = walk.pages[0];
@@ -261,7 +261,7 @@ export const journeys: Journey[] = [
       await shot(env, page, "imports-signin-05-intent-signup");
       results.check("an imported Carbon who came to sign up finishes the account legacy-crm imported (\"Finish setting up your account\", its id and name)", seen.heading === 1 && seen.id === `sana_${t}` && seen.name === "Sana Signup" && /Asia.Dubai|Dubai/.test(seen.timezone), JSON.stringify({ ...seen, text: seen.text.slice(0, 160) }));
       // The prefill is the Carbon's to change: another id and name than the ones legacy-crm chose.
-      await page.getByRole("textbox", { name: "Your id" }).fill(`sana_own_${t}`);
+      await page.getByRole("textbox", { name: "Your CarbonID" }).fill(`sana_own_${t}`);
       await page.getByRole("textbox", { name: "Display name" }).fill("Sana Her Own Name");
       await sleep(900);
       await page.getByRole("button", { name: "Finish setup" }).click();

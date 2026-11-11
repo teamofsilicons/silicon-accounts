@@ -40,7 +40,7 @@ const email: Journey = {
     results.check("the code step says \"Check your email\" with the masked address, never the whole one", (await hostedTitle(page)) === "Check your email" && shown.includes("a***@example.test") && !shown.includes(address), shown.slice(0, 200));
     await page.keyboard.type(code, { delay: 25 });
 
-    const idField = page.getByRole("textbox", { name: "Your id" });
+    const idField = page.getByRole("textbox", { name: "Your CarbonID" });
     await idField.waitFor({ timeout: 20_000 });
     await sleep(500);
     await shot(env, page, "auth-flows-email-01-signup");
@@ -206,7 +206,7 @@ const phone: Journey = {
     const masked = (await page.locator("main").innerText()).replace(/\s+/g, " ");
     results.check("the code step says \"Check your phone\" and shows the masked number", (await hostedTitle(page)) === "Check your phone" && masked.includes(digits) && !masked.includes(number.slice(2, 8)), masked.slice(0, 200));
     await page.keyboard.type(code, { delay: 25 });
-    const idField = page.getByRole("textbox", { name: "Your id" });
+    const idField = page.getByRole("textbox", { name: "Your CarbonID" });
     await idField.waitFor({ timeout: 20_000 });
     await sleep(400);
     const name = await page.getByRole("textbox", { name: "Display name" }).inputValue();

@@ -176,7 +176,7 @@ export function SiliconsIntro({ carbonId, onCreate }: { carbonId: string | null;
                   <span className={styles.wayTitle}>Let one ask you</span>
                   <span className={styles.wayLine}>A Silicon can make its own account and name you; its request shows up here.</span>
                 </span>
-                {carbonId ? <CopyChip value={carbonId} what="your id" /> : null}
+                {carbonId ? <CopyChip value={carbonId} what="your CarbonID" /> : null}
               </li>
             </ul>
           ) : null}

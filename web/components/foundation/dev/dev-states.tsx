@@ -31,6 +31,7 @@ import { Switch } from "@teamofsilicons/silicon-ui/switch";
 import { DEV_PRESETS, DEV_VARIABLES, devStatesInUse, readDevStates, writeDevStates, type DevStates } from "@/lib/dev-states";
 import { editCount, parseTextEdits, readTextEditsText, subscribeTextEdits, textEditsCopy, textEditsCss, writeTextEdits } from "@/lib/text-edits";
 import { parseTypeLab, readTypeLabText, subscribeTypeLab, typeLabCss, writeTypeLab } from "@/lib/type-lab";
+import { useDialogPassThrough } from "./dialog-pass-through";
 import { SpacingInspector } from "./spacing-inspector";
 import { TypeInspector } from "./type-inspector";
 import { TYPE_LAB_SHEET, TypeLab } from "./type-lab";
@@ -95,6 +96,7 @@ const writeDensity = (density: string) => {
 const DENSITY_OPTIONS = [{ value: "compact", label: "Compact" }, { value: "comfortable", label: "Comfortable" }];
 
 export function DevStatesPanel() {
+  useDialogPassThrough();
   const states = JSON.parse(useSyncExternalStore(subscribeNothing, () => JSON.stringify(readDevStates()), () => "{}")) as DevStates;
   const typeLab = parseTypeLab(useSyncExternalStore(subscribeTypeLab, readTypeLabText, () => "{}"));
   const textEdits = parseTextEdits(useSyncExternalStore(subscribeTextEdits, readTextEditsText, () => "{}"));

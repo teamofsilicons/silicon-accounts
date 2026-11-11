@@ -117,8 +117,10 @@
      Compact (branch compact, Anil 2026-11-10): one step down from comfortable, which was display 36, h1 28, h2 22,
      h3 18 (the density block below keeps those).
      label   14 sm  medium                buttons, inputs, a row's title
-     small   14 sm  regular               descriptions, meta, timestamps, hints
+     small   14 sm  regular               descriptions, meta, timestamps
      caption 12 xs  medium                small labels and ids
+     hint    12 xs  regular               a field's hint and error (Anil 2026-11-10: the dialog hierarchy; Silicon UI's
+                                          fields take it through --field-hint-size)
      A rule that sets a family after `font:` (mono, the story serif) keeps the role's size and line. */
   --display: var(--weight-title) var(--text-2xl)/var(--leading-display) var(--font-display);
   --display-tracking: var(--tracking-display);
@@ -136,6 +138,14 @@
   --small-tracking: var(--tracking-body);
   --caption: var(--weight-medium) var(--text-xs)/var(--leading-body) var(--font-body);
   --caption-tracking: var(--tracking-body);
+  --hint: var(--weight-regular) var(--text-xs)/var(--leading-body) var(--font-body);
+  --hint-tracking: var(--tracking-body);
+  /* Silicon UI's fields (local patch): what you type is body (16, which also keeps iOS from zooming into a field) and a
+     field's hint and error are the hint role (12/400). Anil 2026-11-10: the dialog hierarchy, on every form. */
+  --field-text-size: var(--text-base);
+  /* Inline mono (.mono in base.css) relative to the text around it: 14px text gets 13px code. */
+  --mono-inline-scale: .93em;
+  --field-hint-size: var(--text-xs);
 
   /* The older pages' steps, until each moves to a role above. */
   --tracking-heading: var(--tracking-display);
@@ -261,6 +271,16 @@
   --h1: var(--weight-title) var(--text-2xl)/var(--leading-display) var(--font-display);
   --h2: var(--weight-title) var(--text-xl)/var(--leading-body) var(--font-display);
   --h3: var(--weight-medium) var(--text-lg)/var(--leading-body) var(--font-body);
+}
+
+/* Dialogs (Anil, 2026-11-11: the CarbonID dialog's fixes, for every dialog): the description under the title is
+   --text-soft; what sits under a field (its hint, its live status, a note) is small, 14/400, in --text-secondary. Set
+   here through Silicon UI's Dialog and Input variables (local patch), so a new dialog follows without asking. The
+   full list of dialog rules is in redesign/decisions.md ("Dialog rules"). */
+[role="dialog"] {
+  --dialog-description-colour: var(--text-soft);
+  --field-hint-size: var(--text-sm);
+  --field-hint-colour: var(--text-secondary);
 }
 
 /* The dev tools' own text (development only: the dev panel, the type lab, the inspectors, all marked

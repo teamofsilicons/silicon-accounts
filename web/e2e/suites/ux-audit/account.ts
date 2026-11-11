@@ -207,8 +207,8 @@ export const journeys: Journey[] = [
         await click("Change your date of birth");
       });
       await state("states-change-id-taken", "/", /./, async () => {
-        await click("Change id");
-        await page.getByRole("dialog", { name: "Change your id" }).waitFor({ timeout: 10_000 });
+        await page.goto(`${env.site}/personal?edit=id`);
+        await page.getByRole("dialog", { name: "CarbonID" }).waitFor({ timeout: 10_000 });
         await page.keyboard.type("saket", { delay: 30 });
         await sleep(1_200);
       }, /not available|taken|in use|reserved/i);
@@ -223,9 +223,13 @@ export const journeys: Journey[] = [
         await page.getByRole("group", { name: /code/i }).first().waitFor({ timeout: 20_000 });
       });
       await state("states-remove-email", "/sign-in-methods", /Email|email/, () => page.getByRole("button", { name: "Remove", exact: true }).filter({ visible: true }).nth(1).click({ timeout: 15_000 }));
-      await state("states-remove-app", "/apps", /App|app/, () => click("Remove access"));
-      await state("states-revoke-proof", "/proofs", /[Pp]roof/, () => click("Revoke"));
-      await state("states-proofs-ended", "/proofs", /[Pp]roof/, () => page.getByRole("button", { name: /^Ended/ }).or(page.getByRole("radio", { name: /^Ended/ })).first().click({ timeout: 15_000 }));
+      await state("states-remove-app", "/apps", /App|app/, async () => {
+        await page.getByRole("region", { name: "Your apps" }).getByRole("link").first().click({ timeout: 15_000 });
+        await page.getByRole("heading", { name: "What it can see about you" }).waitFor({ timeout: 20_000 });
+        await page.locator("main").getByRole("button", { name: "Remove", exact: true }).click({ timeout: 15_000 });
+      });
+      await state("states-revoke-proof", "/proofs", /[Pp]ermission/, () => page.getByRole("button", { name: /^Stop / }).first().click({ timeout: 15_000 }));
+      await state("states-proofs-ended", "/proofs", /[Pp]ermission/, () => page.getByRole("region", { name: "Ended", exact: true }).scrollIntoViewIfNeeded({ timeout: 15_000 }));
       await state("states-delete-blocked", "/settings", /./, async () => {
         await page.getByRole("button", { name: "Hold to delete your account" }).scrollIntoViewIfNeeded();
       }, /Silicon/);

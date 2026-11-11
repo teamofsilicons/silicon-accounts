@@ -166,9 +166,11 @@ export class Results {
  * a full navigation) as "access control checks", the mock providers' redirect chains as an interrupted frame load, and
  * — when the app's page navigates away while the embed iframe is still settling — the iframe's "ResizeObserver loop
  * completed with undelivered notifications" (the spec's benign notice that some resize observations moved to the next
- * frame; it never reproduces with the embed on its own, resized or removed).
+ * frame; it never reproduces with the embed on its own, resized or removed). Also Home's popular apps
+ * (components/account/home-sections.tsx POPULAR_APPS, 2026-10-31): it reads each one's public page, and an app the
+ * stack doesn't register (Ting is not among the testkit's fake apps) answers 404, which Home handles by leaving it out.
  */
-const BENIGN = [/_rsc=.* due to access control checks/, /Frame load interrupted/, /ResizeObserver loop completed with undelivered notifications/];
+const BENIGN = [/_rsc=.* due to access control checks/, /Frame load interrupted/, /ResizeObserver loop completed with undelivered notifications/, /status of 404 \(Not Found\) @ \S+\/v1\/apps\/ting\/public$/];
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Browsers                                                                                                            */
@@ -1026,7 +1028,8 @@ export async function completeDetails(env: Env, page: Page, app: string, answers
         await page.getByRole("button", { name: "Cancel signing in" }).click();
         walk.cancelled = true;
       } else {
-        await page.getByRole("button", { name: "Share and continue", exact: true }).click();
+        // The review page's button is title case ("Share and Continue"); a details page's last button isn't.
+        await page.getByRole("button", { name: "Share and Continue", exact: true }).click();
       }
       await page.waitForURL(appUrl(env, app), { timeout: timeoutMs });
       break;

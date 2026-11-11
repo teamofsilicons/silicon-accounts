@@ -180,7 +180,7 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   `--leading-display` 1.1 and `--leading-body` 1.4; ours adds `--weight-title` 600, `--weight-medium` 500 and
   `--weight-regular` 400. Eight roles are built on them, each a `font` shorthand with its tracking beside it
   (`font: var(--h1); letter-spacing: var(--h1-tracking);`): display 36, h1 28, h2 22 (title weight), h3 18 (medium,
-  Silicon UI's card titles), body 16, label 14 (medium), small 14, caption 12 (medium). The roles are declared once on
+  Silicon UI's card titles), body 16, label 14 (medium), small 14, caption 12 (medium), hint 12 (a field's hint, since 2026-11-10). The roles are declared once on
   `:root`, so changing a token changes every role and every Silicon UI component. Use a role, never a raw size; a family
   set after `font:` (mono, the story serif) keeps the role's size and line. Silicon UI's components keep fixed weights
   (500, 400): `redesign/prototype-differences.md`. Colours are ours: #FCFCFC, Silicon UI's greys, the blue accent.
@@ -325,6 +325,9 @@ All edits are of four kinds, and keep Arc's look and motion:
 - **Behaviour** (integration round): keyboard and layer rules Arc got wrong, fixed where they live so no area needs a
   wrapper: the Combobox follows the WAI-ARIA combobox pattern, Escape inside a layer goes to the open control first,
   PhoneInput takes a whole number typed after "+", the Timeline announces only news, OTP cells fit narrow containers.
+- **Silicon UI #28/#29 (2026-11-10):** the account site's existing 0.4.0 pnpm package patch now includes PhoneInput's flag/code gap and chevron clearance and Dialog's borderless ghost close control, alongside the earlier Select fix. The shared source changes are saved in `redesign/silicon-ui-issues-28-29.patch` for the deferred release; `components/account/screens.ts` captures the Security phone dialog in both themes and at phone and desktop widths.
+- **PhoneInput audit (2026-11-10):** the same package patch now preserves unsupported and overlong international input instead of changing its digits, rejects invalid native form submission, chooses an allowed default when countries are restricted, and keeps its error description and disabled form value correct. Security screenshots also cover an unsupported number moving to PhoneField's plain international mode without losing its digits.
+- **PhoneInput picker in dialogs (2026-11-10):** the shared country list floats beyond scrollable dialog bounds while remaining attached to the field, and uses the field's radius and corner shape. `components/account/screens.ts` checks the open list's visible bounds and radius and exercises a pointer choice below the dialog plus a keyboard choice at desktop and phone widths.
 
 | Component | What changed |
 | --- | --- |
@@ -378,6 +381,8 @@ under 1024 px. The choices live in the address
 
 `/__text` (2026-11-10) compares text grey ladders with a step between the text and the secondary text (Now, A to E, from Refactoring UI's palette), on a Home column beside today's greys (`components/kitchen/text/`, the ladders in `lib/text-ladders.ts`).
 `/__cards` (2026-11-11) compares card systems for Your Silicons and Your apps (tile, tile + footer, picture, stacked), both sections in one anatomy, and Home's app card in six paddings (`components/kitchen/cards/`).
+`/__links` (2026-11-10) compares the phone field's switches as Silicon UI Button's `link` variant (local patch), underlined at rest or on hover only, beside today's ghost xs button (`components/kitchen/links/`).
+`/__dialog` (2026-11-10) shows the Text code dialog now beside the same dialog on four tiers (title; the field and Send Code; the description; the hint and the way out), set with Silicon UI's field size variables `--field-text-size` and `--field-hint-size` (local patch) (`components/kitchen/dialog/`).
 
 `/__banner` (2026-11-10) is the introduction banner's lab. Its main view is `IntroBanner`
 (`components/kitchen/banner/intro-banner.tsx`), a prototype proposed to Silicon UI
@@ -736,7 +741,7 @@ in `redesign/api-gaps.md`).
   answers with made-up data, changes the API's answer, delays or fails it. Writes always go to the API. Kept in
   localStorage `accounts.dev.states`; a change reloads the page. To add a variable, add it to `DEV_VARIABLES` and answer
   it in `devAnswer`. **Look**: Typography (the type lab, ⌥F) and Text edits (their count, Copy CSS and Clear).
-  **Inspect**: Edit text (⌥I) and Spacing (⌥S). Reset all clears data, the type lab and text edits. The dev tools'
+  **Inspect**: Edit text (⌥I) and Spacing (⌥S). Reset all clears data, the type lab and text edits. They work over an open modal dialog too (above its layer, and `dialog-pass-through.ts` stops the dialog's outside-press, focus-trap and scroll-lock listeners for presses, focus and scrolling on a dev surface, `[data-type-inspect-exempt]`). The dev tools'
   own text keeps Silicon UI's shipped type (`[data-type-inspect-exempt]` in `styles/tokens.css`), so it doesn't move
   while the page's type changes.
 - **Type lab** (`components/foundation/dev/type-lab.tsx`, `lib/type-lab.ts`, 2026-11-09, the font lab grown): Open
@@ -839,3 +844,5 @@ in `redesign/api-gaps.md`).
   returns focus on Close or Escape. Silicons opens a Silicon and Create a Silicon this way; the right-hand drawers are
   gone. Page titles are at Home's size (`--text-2xl`), section titles at `--text-base`, and `Surface` and
   `SettingsGroup` are tiles.
+
+- **Account rows** (`components/account/parts/rows.tsx`, 2026-11-11): Section, Row, LinkItem, LinkRow, Tile and Strong, the boxed lists on Home's rules, shared by Security and Connected apps (`/apps`, `/apps/[id]`).

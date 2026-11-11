@@ -88,7 +88,7 @@ export function AvatarEditor({ me, onDone }: { me: CarbonMe; onDone: () => void 
       />
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.actions}>
-        <Button type="button" variant="secondary" onClick={onDone} disabled={pending}>Cancel</Button>
+        <Button type="button" variant="ghost" onClick={onDone} disabled={pending}>Cancel</Button>
         <Button type="button" loading={pending} disabled={unchanged} onClick={() => void save()}>Save Avatar</Button>
       </div>
     </div>

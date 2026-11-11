@@ -120,7 +120,7 @@ const prefillBrowser: Journey = {
     const code = await codeFor(env, address, after);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code, { delay: 25 });
-    const idField = page.getByRole("textbox", { name: "Your id" });
+    const idField = page.getByRole("textbox", { name: "Your CarbonID" });
     await idField.waitFor({ timeout: 20_000 });
     await sleep(400);
     results.check("the prefilled id skips the taken one", (await idField.inputValue()) === `pick-${t}-2`, await idField.inputValue());
@@ -129,12 +129,12 @@ const prefillBrowser: Journey = {
     await suggestions.waitFor({ timeout: 10_000 }).catch(() => undefined);
     const offered = (await suggestions.innerText().catch(() => "")).replace(/\s+/g, " ");
     const note = (await page.locator("main").innerText()).replace(/\s+/g, " ");
-    results.check("a taken id is flagged and free ids are offered", /taken|not available|already/i.test(note) && /c:pick-/.test(offered), `${offered} | ${note.slice(note.indexOf("Your id"), note.indexOf("Your id") + 160)}`);
+    results.check("a taken id is flagged and free ids are offered", /taken|not available|already/i.test(note) && /c:pick-/.test(offered), `${offered} | ${note.slice(note.indexOf("Your CarbonID"), note.indexOf("Your CarbonID") + 160)}`);
     await shot(env, page, "auth-flows-signup-ids-01-taken");
     await idField.fill("a!");
     await sleep(500);
     const invalid = (await page.locator("main").innerText()).replace(/\s+/g, " ");
-    results.check("a malformed id says which character is wrong, before asking the server", invalid.includes('"!" can\'t be in an id'), invalid.slice(invalid.indexOf("Your id"), invalid.indexOf("Your id") + 160));
+    results.check("a malformed id says which character is wrong, before asking the server", invalid.includes('"!" can\'t be in a CarbonID'), invalid.slice(invalid.indexOf("Your CarbonID"), invalid.indexOf("Your CarbonID") + 160));
     await idField.fill(`pick-${t}`);
     await suggestions.waitFor({ timeout: 10_000 });
     const first = suggestions.getByRole("button").first();

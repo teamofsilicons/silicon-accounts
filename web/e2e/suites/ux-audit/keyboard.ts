@@ -156,7 +156,7 @@ export const journeys: Journey[] = [
       // Setting up by keys: the timezone combobox and the date of birth, then Create account.
       await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
       await focusAfterStep(ctx, page, "setting up");
-      await walkStep(ctx, page, findings, "keyboard-hosted signup", [/Not you/, /Display name/, /Your id/, /Timezone/, /Date of birth/, /Create account/, /Silicon Accounts/]);
+      await walkStep(ctx, page, findings, "keyboard-hosted signup", [/Not you/, /Display name/, /Your CarbonID/, /Timezone/, /Date of birth/, /Create account/, /Silicon Accounts/]);
       if (await tabAndPress(ctx, page, "the timezone combobox", stop => stop.role === "combobox" && /Timezone/i.test(stop.name ?? ""), "ArrowDown")) {
         await sleep(300);
         const combo = page.getByRole("combobox", { name: "Timezone" });
@@ -239,7 +239,7 @@ export const journeys: Journey[] = [
       await page.keyboard.type(code, { delay: 40 });
       await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
       await focusAfterStep(ctx, page, "setting up (390)");
-      await walkStep(ctx, page, findings, "keyboard-first-party signup", [/Display name/, /Your id/, /Timezone/, /Date of birth/, /Create account/]);
+      await walkStep(ctx, page, findings, "keyboard-first-party signup", [/Display name/, /Your CarbonID/, /Timezone/, /Date of birth/, /Create account/]);
       await tabAndPress(ctx, page, "Create account", stop => /^Create account$/.test(stop.name ?? ""));
       await page.waitForURL(`${env.site}/`, { timeout: 30_000 });
       await page.locator("main").first().waitFor({ timeout: 30_000 });

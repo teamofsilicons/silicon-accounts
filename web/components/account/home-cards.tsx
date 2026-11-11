@@ -66,7 +66,7 @@ export function HomeCards() {
   if (hasSilicon && usesAnApp) return null;
   return (
     <PictureCards className={styles.place} title="One Account for Your Silicons & Apps" onDismiss={dismiss} cards={[
-      { id: "you", picture: { src: "/banner/bg-110.webp" }, title: "You", line: account.id ? `Your id across apps: ${account.id}` : "Your id across apps." },
+      { id: "you", picture: { src: "/banner/bg-110.webp" }, title: "You", line: account.id ? `Your CarbonID across apps: ${account.id}` : "Your CarbonID across apps." },
       { id: "silicons", picture: { src: "/banner/bg-102.webp", focus: "right center" }, title: "Silicons", line: "Give an AI agent its own account." },
       { id: "apps", picture: { src: "/banner/bg-127.webp", focus: "center 70%" }, title: "Apps", line: "Apps for delightful agent creation and interaction." },
     ]} />
@@ -98,7 +98,7 @@ export function HomeCardsView({ account, onDismiss, onYou }: { account: { uuid: 
       </div>
       <ul className={styles.items}>
         <Card className={styles.you} style={youStyle} onDark={youOnDark} picture={avatar} label="You" onClick={onYou}
-          line={account.id ? <>Your id across apps: <span className={styles.id}>{account.id}</span></> : "Your id across apps."} />
+          line={account.id ? <>Your CarbonID across apps: <span className={styles.id}>{account.id}</span></> : "Your CarbonID across apps."} />
         <Card className={styles.silicons} onDark picture={<Sparkle className={styles.siliconsSpark} fill="currentColor" strokeWidth={1} aria-hidden="true" />}
           label="Silicons" line="Give an AI agent its own account." />
         <Card className={styles.apps} onDark picture={<LayoutGrid className={styles.appsGrid} fill="currentColor" strokeWidth={1} aria-hidden="true" />}

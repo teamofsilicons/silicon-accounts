@@ -1,5 +1,6 @@
 /**
- * /apps: every app the Carbon signed into and what each can see (with the values): exactly what the Carbon shared on
+ * /apps and /apps/[id] (the prototype's layout, 2026-11-11): every app the Carbon signed into is a row on /apps that
+ * opens its page, and the page shows what it can see (with the values): exactly what the Carbon shared on
  * the app's details page (UNDERSTANDING.md "What's shared with the app": required details always, optional ones only
  * when ticked). Removing an app's access: the app is told (membership.access_removed, signed), its refresh and access
  * token stop working, its user base shows nothing about the Carbon any more, it hears nothing more about the account,
@@ -7,7 +8,8 @@
  */
 import type { Journey } from "../../context";
 import { api, shot, sleep, sql, type DetailRowSeen } from "../../lib";
-import { appAuth, appName, appRefresh, appUserinfo, call, codeOf, confirmMorph, deliveredAfter, formatDate, getMe, inbox, newCarbon, queuedEvents, requestSent, rowsSeen, signIntoAppSeen, timezoneLabel, until, userBaseRow, waitEvent } from "./_helpers";
+import type { Page } from "@playwright/test";
+import { appAuth, appName, appRefresh, appUserinfo, call, codeOf, deliveredAfter, formatDate, getMe, inbox, newCarbon, queuedEvents, requestSent, rowsSeen, signIntoAppSeen, timezoneLabel, until, userBaseRow, waitEvent } from "./_helpers";
 
 interface MyApp {
   app: { app_id: string; name: string };
@@ -20,9 +22,30 @@ interface MyApp {
   last_signed_in_at: string | null;
 }
 
+/** /apps's list of the apps with access, and the "Access removed" list under it. */
+const yourApps = (page: Page) => page.getByRole("region", { name: "Your apps" });
+const removedApps = (page: Page) => page.getByRole("region", { name: "Access removed" });
+const textOf = async (page: Page) => (await page.locator("main").innerText()).replace(/\s+/g, " ");
+
+/** Opens an app's page (/apps/[id]) and waits for it to show what the app can see (or that it can't). */
+async function openApp(page: Page, site: string, appId: string): Promise<string> {
+  await page.goto(`${site}/apps/${appId}`);
+  await page.getByRole("heading", { name: "What it can see about you" }).waitFor({ timeout: 30_000 });
+  await sleep(500);
+  return textOf(page);
+}
+
+/** Removes an app's access from its page: Remove, then Remove Access in the dialog that asks. */
+async function removeOnPage(page: Page, site: string, appId: string): Promise<void> {
+  await openApp(page, site, appId);
+  await page.locator("main").getByRole("button", { name: "Remove", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Remove Access", exact: true }).click({ timeout: 10_000 });
+}
+
 const apps: Journey = {
   name: "account-site-apps",
-  title: "apps on /apps: what each app can see is what was shared on its details page (Briefcase's optional timezone left unticked, Commit's ticked), removing Briefcase's access (told, refresh and token die, its user base shows nothing about the Carbon, it hears nothing more; Commit keeps working), refusals, signing in again asks again and restores access, an importing app listed and removable",
+  title: "apps on /apps and /apps/[id]: what each app can see is what was shared on its details page (Briefcase's optional timezone left unticked, Commit's ticked), removing Briefcase's access (told, refresh and token die, its user base shows nothing about the Carbon, it hears nothing more; Commit keeps working), refusals, signing in again asks again and restores access, an importing app listed and removable",
   async run(ctx) {
     const { env, results } = ctx;
     const carbon = await newCarbon(ctx, "acct-apps");
@@ -48,25 +71,30 @@ const apps: Journey = {
     const list = async () => (await call<{ items: MyApp[] }>(probe, "/v1/me/apps")).body.items;
     const started = Date.now();
     await page.goto(`${env.site}/apps`);
-    const withAccess = page.getByRole("list", { name: "Apps with access" });
+    const withAccess = yourApps(page);
     await withAccess.waitFor({ timeout: 30_000 });
     results.metric("/apps list visible after navigation", Date.now() - started);
     await sleep(900);
     await shot(env, page, "acct-apps-01-list", true);
-    results.check("the switch counts 2 apps with access and none removed", (await page.getByRole("button", { name: "With access (2)" }).getAttribute("aria-pressed")) === "true" && (await page.getByRole("button", { name: "Access removed (0)" }).count()) === 1);
-    const card = page.locator("#app-briefcase");
-    const cardText = (await card.innerText()).replace(/\s+/g, " ");
-    results.check("Briefcase's card: what it can see, with the values it gets (no timezone: left unticked)", cardText.includes("It can see") && cardText.includes("Name, id and photo") && cardText.includes(`${me.display_name} · ${me.id}`) && cardText.includes("Email") && cardText.includes(carbon.email) && !cardText.includes("Timezone"), cardText.slice(0, 300));
-    results.check("…signed in, one active session, its membership id", /Signed in/.test(cardText) && /1 active session/.test(cardText) && cardText.includes(`briefcase:${uuid}`), cardText.slice(-200));
-    results.check("…first and last sign-in", cardText.includes(`First signed in ${formatDate(Date.now())}`) && /Last signed in (just now|\d+ (second|minute)s? ago)/.test(cardText), cardText.match(/Last signed in [^F]*/)?.[0] ?? "");
+    const rowNames = async () => withAccess.getByRole("link").evaluateAll(links => links.map(link => (link.textContent ?? "").replace(/\s+/g, " ").trim()));
+    const listed = await rowNames();
+    results.check("/apps lists 2 apps, each a row with when it signed you in, and no Access removed list", listed.length === 2 && listed.every(text => /Signed in/.test(text)) && (await removedApps(page).count()) === 0, JSON.stringify(listed));
+    await withAccess.getByRole("link", { name: new RegExp(`^${appName("briefcase")}`) }).click();
+    await page.waitForURL(url => url.pathname === "/apps/briefcase", { timeout: 15_000 });
+    await page.getByRole("heading", { name: "What it can see about you" }).waitFor({ timeout: 30_000 });
+    await sleep(500);
+    await shot(env, page, "acct-apps-01b-briefcase", true);
+    const cardText = await textOf(page);
+    results.check("Briefcase's row opens its page: what it can see, with the values it gets (no timezone: left unticked)", cardText.includes("Name, photo and CarbonID") && cardText.includes(`${me.display_name} · ${me.id}`) && cardText.includes("Email") && cardText.includes(carbon.email) && !cardText.includes("Timezone"), cardText.slice(0, 400));
+    results.check("…who uses it: you, signed in just now, one active session", /You Signed in (just now|\d+ (second|minute)s? ago) · 1 active session/.test(cardText), cardText.match(/Who uses it.{0,80}/)?.[0] ?? "");
+    results.check("…and since when (its first sign-in)", cardText.includes(`Since ${formatDate(Date.now())}`), cardText.slice(0, 200));
 
     // The optional timezone is shared only with Commit, which then hears its changes; Briefcase never does.
     const scopesOf = (items: MyApp[], app: string) => items.find(item => item.app.app_id === app)?.granted_scopes ?? [];
     const granted = await list();
     results.check("the optional timezone was granted to Commit (ticked) and not to Briefcase (left unticked)", scopesOf(granted, "commit").includes("timezone") && !scopesOf(granted, "briefcase").includes("timezone"), `commit: ${scopesOf(granted, "commit").join(" ")}; briefcase: ${scopesOf(granted, "briefcase").join(" ")}`);
-    const commitCard = page.locator("#app-commit");
-    const commitText = (await commitCard.innerText()).replace(/\s+/g, " ");
-    results.check("Commit's card lists the timezone with its value; Briefcase's does not", commitText.includes("Timezone") && commitText.includes(timezoneLabel(me.timezone)) && !cardText.includes("Timezone"), commitText.slice(0, 300));
+    const commitText = await openApp(page, env.site, "commit");
+    results.check("Commit's page lists the timezone with its value; Briefcase's does not", commitText.includes("Timezone") && commitText.includes(timezoneLabel(me.timezone)) && !cardText.includes("Timezone"), commitText.slice(0, 300));
     const commitRow = await userBaseRow(ctx, "commit", uuid);
     const briefcaseRow = await userBaseRow(ctx, "briefcase", uuid);
     results.check("the apps' user bases agree: Commit sees the email and the timezone, Briefcase the email only", commitRow.row?.email === carbon.email && commitRow.row?.timezone === me.timezone && briefcaseRow.row?.email === carbon.email && !briefcaseRow.row?.timezone, `commit ${commitRow.status} ${JSON.stringify({ email: commitRow.row?.email, timezone: commitRow.row?.timezone })}; briefcase ${briefcaseRow.status} ${JSON.stringify({ email: briefcaseRow.row?.email, timezone: briefcaseRow.row?.timezone })}`);
@@ -76,19 +104,16 @@ const apps: Journey = {
     const zoneData = zoneEvent?.payload.data as { changed?: string[]; account?: { timezone?: string } } | undefined;
     results.check("a timezone change tells Commit (account.updated, changed [timezone], the new zone) and nothing goes to Briefcase", zoned.status === 200 && JSON.stringify(zoneData?.changed) === '["timezone"]' && zoneData?.account?.timezone === "America/Sao_Paulo" && (await queuedEvents(env, "briefcase", uuid, "account.updated", "and payload->'data'->'changed' ? 'timezone'")) === 0, `${zoned.status} ${JSON.stringify(zoneData ?? null).slice(0, 200)}`);
     await page.reload();
-    await withAccess.waitFor({ timeout: 30_000 });
-    const shownZone = await until(async () => (await commitCard.innerText().catch(() => "")).replace(/\s+/g, " "), text => text.includes(timezoneLabel("America/Sao_Paulo")), 10_000);
-    results.check("…and Commit's card shows the new timezone", shownZone.includes(timezoneLabel("America/Sao_Paulo")), shownZone.slice(0, 300));
+    await page.getByRole("heading", { name: "What it can see about you" }).waitFor({ timeout: 30_000 });
+    const shownZone = await until(async () => textOf(page).catch(() => ""), text => text.includes(timezoneLabel("America/Sao_Paulo")), 10_000);
+    results.check("…and Commit's page shows the new timezone", shownZone.includes(timezoneLabel("America/Sao_Paulo")), shownZone.slice(0, 300));
     const zoneBack = await call(probe, "/v1/me", { method: "PATCH", json: { timezone: me.timezone } });
     results.check("setup: the timezone is back", zoneBack.status === 200);
-    await page.reload();
-    await withAccess.waitFor({ timeout: 30_000 });
-    await sleep(600);
 
     // Remove Briefcase's access.
     const before = (await inbox(env, "briefcase")).last_seq;
     const removeSent = requestSent(page, "DELETE", "/v1/me/apps/briefcase");
-    await confirmMorph(card, "Remove access", "Remove");
+    await removeOnPage(page, env.site, "briefcase");
     const event = await waitEvent(env, "briefcase", "membership.access_removed", uuid, { after: before });
     results.metric("remove-access DELETE sent → Briefcase received membership.access_removed", deliveredAfter(event, await removeSent));
     results.check("Briefcase got membership.access_removed (signed) for this membership", !!event && event.payload.data.membership_id === `briefcase:${uuid}` && event.payload.app_id === "briefcase", JSON.stringify(event?.payload ?? null).slice(0, 240));
@@ -118,23 +143,23 @@ const apps: Journey = {
     const c = items.find(item => item.app.app_id === "commit");
     results.check("/v1/me/apps: Briefcase access_removed (with when, no sessions), Commit active", b?.status === "access_removed" && !!b.access_removed_at && b.active_sessions === 0 && c?.status === "active", JSON.stringify({ b: b && { status: b.status, at: b.access_removed_at, sessions: b.active_sessions }, c: c?.status }));
 
-    // The page: the card leaves "With access" for "Access removed".
-    await until(async () => page.getByRole("button", { name: "Access removed (1)" }).count(), n => n === 1, 8_000);
-    results.check("the switch now counts 1 with access, 1 removed", (await page.getByRole("button", { name: "With access (1)" }).count()) === 1 && (await page.getByRole("button", { name: "Access removed (1)" }).count()) === 1);
-    await page.getByRole("button", { name: "Access removed (1)" }).click();
-    const removedList = page.getByRole("list", { name: "Apps whose access you removed" });
-    await removedList.waitFor({ timeout: 10_000 });
+    // The page: removing goes back to /apps, where Briefcase has left the list for "Access removed".
+    await page.waitForURL(url => url.pathname === "/apps", { timeout: 15_000 });
+    const removedList = removedApps(page);
+    await removedList.waitFor({ timeout: 15_000 });
     await sleep(800);
     await shot(env, page, "acct-apps-02-removed", true);
-    const removedText = (await removedList.innerText()).replace(/\s+/g, " ");
-    results.check("the removed view: Briefcase can no longer see anything, since when, and how to give access back", removedText.includes("Briefcase") && removedText.includes(`It can no longer see anything about you, since ${formatDate(b?.access_removed_at ?? Date.now())}. Sign in to it again to give it access.`) && (await removedList.getByRole("button", { name: "Remove access" }).count()) === 0, removedText.slice(0, 260));
+    const removedRows = (await removedList.innerText()).replace(/\s+/g, " ");
+    results.check("/apps: Commit alone in the list, Briefcase under Access removed with the date", (await rowNames()).length === 1 && removedRows.includes(appName("briefcase")) && removedRows.includes(`Access removed ${formatDate(b?.access_removed_at ?? Date.now())}`), `${JSON.stringify(await rowNames())}; ${removedRows.slice(0, 200)}`);
+    const removedText = await openApp(page, env.site, "briefcase");
+    results.check("Briefcase's page: it can see nothing, how to give access back, and no Remove or Open", removedText.includes("Nothing") && removedText.includes("Sign in to it again to give it access.") && (await page.locator("main").getByRole("button", { name: "Remove", exact: true }).count()) === 0 && (await page.getByRole("link", { name: "Open" }).count()) === 0, removedText.slice(0, 300));
 
-    // The identity card keeps a stamp only for apps with access.
+    // Home's Your apps opens only the apps with access (Briefcase isn't signed in any more).
     await page.goto(`${env.site}/`);
-    const stamps = page.getByRole("list", { name: "Apps you have signed into" });
-    await stamps.waitFor({ timeout: 30_000 });
-    const names = await stamps.getByRole("link").evaluateAll(links => links.map(link => link.getAttribute("aria-label")));
-    results.check("the identity card has a stamp for Commit only", JSON.stringify(names) === '["Commit"]', JSON.stringify(names));
+    const homeApps = page.getByRole("region", { name: "Your apps", exact: true });
+    await homeApps.waitFor({ timeout: 30_000 });
+    const opens = await homeApps.getByRole("link", { name: /^Open / }).evaluateAll(links => links.map(link => link.getAttribute("aria-label")));
+    results.check("Home's Your apps offers Open for Commit only", JSON.stringify(opens) === '["Open Commit"]', JSON.stringify(opens));
 
     // It hears nothing more: an id change and a name change reach Commit, not Briefcase; its user base stays blank.
     const beforeCommit = (await inbox(env, "commit")).last_seq;
@@ -174,7 +199,7 @@ const apps: Journey = {
     await page.goto(`${env.site}/apps`);
     await withAccess.waitFor({ timeout: 30_000 });
     await sleep(600);
-    results.check("/apps lists both with access again", (await page.getByRole("button", { name: "With access (2)" }).count()) === 1 && (await page.locator("#app-briefcase").count()) === 1);
+    results.check("/apps lists both with access again, and nothing under Access removed", (await rowNames()).length === 2 && (await removedApps(page).count()) === 0, JSON.stringify(await rowNames()));
 
     // An app that imported the Carbon (Legacy CRM's import of its old records matched the email) is listed too: it
     // holds data about the Carbon, so its access can be removed like any other's.
@@ -187,16 +212,17 @@ const apps: Journey = {
     await page.reload();
     await withAccess.waitFor({ timeout: 30_000 });
     await sleep(800);
-    const crmCard = page.locator("#app-legacy-crm");
-    const crmText = (await crmCard.innerText().catch(() => "")).replace(/\s+/g, " ");
+    const crmRow = (await withAccess.getByRole("link", { name: new RegExp(`^${crm}`) }).innerText().catch(() => "")).replace(/\s+/g, " ");
     await shot(env, page, "acct-apps-04-imported", true);
-    results.check("its card says it imported you, holds what it imported, and gets nothing more until you sign in", crmText.includes("Imported you") && crmText.includes(`${crm} imported your account, so it holds what it imported. It gets nothing more until you sign in to it.`) && /Last signed in Never/.test(crmText), crmText.slice(0, 300));
+    results.check("its row says it imported you and that you haven't signed in", crmRow.includes("Imported you") && crmRow.includes("You haven\u2019t signed in yet"), crmRow);
+    const crmText = await openApp(page, env.site, "legacy-crm");
+    results.check("…and its page says so under Who uses it", crmText.includes(`${crm} imported you. You haven\u2019t signed in yet.`), crmText.slice(0, 300));
     const beforeCrm = (await inbox(env, "legacy-crm")).last_seq;
-    await confirmMorph(crmCard, "Remove access", "Remove");
+    await removeOnPage(page, env.site, "legacy-crm");
     const crmRemoved = await waitEvent(env, "legacy-crm", "membership.access_removed", uuid, { after: beforeCrm });
     results.check("removing the importing app's access tells it too (membership.access_removed)", !!crmRemoved && (await list()).find(item => item.app.app_id === "legacy-crm")?.status === "access_removed", JSON.stringify(crmRemoved?.payload.data ?? null));
-    const crmRow = await userBaseRow(ctx, "legacy-crm", uuid);
-    results.check("…and its user base drops what it imported about the Carbon too (no name, no email)", crmRow.row?.status === "access_removed" && crmRow.row.display_name === "Access removed" && !crmRow.row.email && !crmRow.row.phone, JSON.stringify({ status: crmRow.row?.status, display_name: crmRow.row?.display_name, email: crmRow.row?.email, phone: crmRow.row?.phone, external_id: crmRow.row?.external_id }));
+    const crmBase = await userBaseRow(ctx, "legacy-crm", uuid);
+    results.check("…and its user base drops what it imported about the Carbon too (no name, no email)", crmBase.row?.status === "access_removed" && crmBase.row.display_name === "Access removed" && !crmBase.row.email && !crmBase.row.phone, JSON.stringify({ status: crmBase.row?.status, display_name: crmBase.row?.display_name, email: crmBase.row?.email, phone: crmBase.row?.phone, external_id: crmBase.row?.external_id }));
     const [[signins] = []] = await sql(env, `select count(*) from signin_history where account_uuid = '${uuid}' and app_id = 'briefcase' and outcome = 'success'`);
     results.check("the sign-in history per app has both Briefcase sign-ins", Number(signins) >= 2, String(signins));
 

@@ -52,3 +52,5 @@ Build every screen with `@teamofsilicons/silicon-ui`. Rules: https://github.com/
 - Older code is tolerated by `eslint-suppressions.json` and `silicon-ui-baseline.json`; both may only shrink. A file
   you redesign leaves both entirely.
 - Before finishing: `pnpm lint` (ESLint and `silicon-ui-check`) passes.
+- Dialogs follow the "Dialog rules" in `redesign/decisions.md` (type roles, colours, copy, actions, width). Their
+  type and colours come from `[role="dialog"]` in `styles/tokens.css`; do not set them per dialog.

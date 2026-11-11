@@ -24,16 +24,20 @@ export const journey: Journey = {
     const sid = `si:site-${t}`;
     const stored = page.getByRole("button", { name: "I've stored it" }).first();
 
-    // 1. Create it in the drawer: the generated STK comes back once.
-    await page.goto(`${env.site}/silicons`);
-    await page.getByRole("button", { name: "Create a Silicon" }).first().click({ timeout: 30_000 });
-    let drawer = page.getByRole("dialog", { name: "Create a Silicon" });
-    await drawer.getByRole("textbox", { name: "Display name" }).fill(`Site ${t}`);
-    await drawer.getByRole("textbox", { name: "Id" }).fill(`site-${t}`);
-    // The form refuses to submit while the id is still being checked ("Still checking the id; try again in a moment").
-    await drawer.getByText(`${sid} is available.`).waitFor({ timeout: 30_000 });
+    // 1. Create it on /silicons/new (three steps: Name and id, Timezone, STK): the generated STK comes back once, on the
+    // new Silicon's page.
+    await page.goto(`${env.site}/silicons/new`);
+    let drawer = page.locator("main");
+    await drawer.getByRole("textbox", { name: "Name" }).fill(`Site ${t}`, { timeout: 30_000 });
+    await drawer.getByRole("textbox", { name: "Id" }).fill(sid);
+    // The form refuses to go on while the id is still being checked.
+    await drawer.getByText(`${sid} is available.`).first().waitFor({ timeout: 30_000 });
+    await drawer.getByRole("button", { name: "Continue", exact: true }).click();
+    await drawer.getByRole("button", { name: "Continue", exact: true }).click({ timeout: 10_000 });
     const created = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === "/v1/me/silicons", { timeout: 30_000 }).catch(() => null);
-    await drawer.getByRole("button", { name: "Create Silicon" }).click();
+    // Create Silicon ignores a press right after its step opens (ARRIVAL_PAUSE: a double-click never creates one).
+    await sleep(900);
+    await drawer.getByRole("button", { name: "Create Silicon", exact: true }).click({ timeout: 10_000 });
     const createdAnswer = await created;
     await stored.waitFor({ timeout: 20_000 });
     const stk = await revealedStk(page);
@@ -57,19 +61,16 @@ export const journey: Journey = {
     await stored.click();
     await sleep(500);
     await page.reload();
-    await page.getByRole("button", { name: new RegExp(`^Manage ${sid}`) }).waitFor({ timeout: 30_000 });
+    await page.getByRole("region", { name: "Secret key", exact: true }).waitFor({ timeout: 30_000 });
     await sleep(800);
     const after = `${await page.content()}\n${(await page.locator(".sr-only, [class*=srOnly]").allInnerTexts()).join("\n")}`;
     results.check("after storing it and reloading, the STK is shown nowhere (shown exactly once)", !!stk && !after.includes(stk), "");
-    await page.getByRole("button", { name: new RegExp(`^Manage ${sid}`) }).click();
-    const manage = page.getByRole("dialog").filter({ hasText: sid }).first();
-    await manage.waitFor({ timeout: 10_000 });
-    await sleep(700);
-    const drawerText = `${await manage.innerText()}\n${await manage.innerHTML()}`;
-    results.check("its drawer does not show the STK either", !!stk && !drawerText.includes(stk));
+    await page.getByRole("tab", { name: "Settings" }).click();
+    await page.getByRole("region", { name: "About", exact: true }).waitFor({ timeout: 10_000 });
+    await sleep(500);
+    const settingsText = `${await page.locator("main").innerText()}\n${await page.locator("main").innerHTML()}`;
+    results.check("its Settings tab does not show the STK either", !!stk && !settingsText.includes(stk));
     await shot(env, page, "scli-site-02-drawer");
-    await page.keyboard.press("Escape");
-    await sleep(400);
 
     // 3. The STK signs the Silicon in with the CLI; the CLI shows its custodian's c:id.
     const home = freshDir();
@@ -92,16 +93,20 @@ export const journey: Journey = {
       if (request.method() === "POST" && new URL(request.url()).pathname === "/v1/me/silicons") posts.push(request.url());
     });
     const own = `own-${t}`;
-    await page.getByRole("button", { name: "Create a Silicon" }).first().click({ timeout: 30_000 });
-    drawer = page.getByRole("dialog", { name: "Create a Silicon" });
-    await drawer.getByRole("textbox", { name: "Display name" }).fill(`Own ${t}`);
-    await drawer.getByRole("textbox", { name: "Id" }).fill(own);
-    await drawer.getByRole("checkbox", { name: /Choose its STK yourself/ }).click();
+    await page.goto(`${env.site}/silicons/new`);
+    drawer = page.locator("main");
+    await drawer.getByRole("textbox", { name: "Name" }).fill(`Own ${t}`, { timeout: 30_000 });
+    await drawer.getByRole("textbox", { name: "Id" }).fill(`si:${own}`);
+    await drawer.getByText(`si:${own} is available.`).first().waitFor({ timeout: 30_000 });
+    await drawer.getByRole("button", { name: "Continue", exact: true }).click();
+    await drawer.getByRole("button", { name: "Continue", exact: true }).click({ timeout: 10_000 });
+    await drawer.getByRole("checkbox", { name: /Choose its STK yourself/ }).click({ timeout: 10_000 });
     const stkField = drawer.getByRole("textbox", { name: "STK" });
-    await drawer.getByText(`si:${own} is available.`).waitFor({ timeout: 30_000 });
     for (const length of [7, 33]) {
       await stkField.fill(`stk-${"a1".repeat(17).slice(0, length)}`);
-      await drawer.getByRole("button", { name: "Create Silicon" }).click();
+      // Create Silicon ignores a press right after its step opens (ARRIVAL_PAUSE: a double-click never creates one).
+      await sleep(900);
+      await drawer.getByRole("button", { name: "Create Silicon", exact: true }).click();
       await sleep(600);
       const text = await drawer.innerText();
       results.check(`the site refuses a chosen STK of ${length} hex digits and says why`, text.includes(`this one has ${length}`), short(text.match(/An STK[^.]*\./)?.[0] ?? text, 200));
@@ -111,7 +116,9 @@ export const journey: Journey = {
     const chosen = `stk-${"0123456789abcdef".repeat(2)}`;
     await stkField.fill(chosen.toUpperCase().replace("STK-", "stk-"));
     const second = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === "/v1/me/silicons", { timeout: 30_000 }).catch(() => null);
-    await drawer.getByRole("button", { name: "Create Silicon" }).click();
+    // Create Silicon ignores a press right after its step opens (ARRIVAL_PAUSE: a double-click never creates one).
+    await sleep(900);
+    await drawer.getByRole("button", { name: "Create Silicon", exact: true }).click();
     const secondAnswer = await second;
     const secondBody = obj(await secondAnswer?.json().catch(() => ({})));
     results.check("a chosen STK of 32 hex digits is accepted, and never echoed back", secondAnswer?.status() === 201 && secondBody.stk === null && !JSON.stringify(secondBody).includes(chosen), `${secondAnswer?.status()} ${short(secondBody, 200)}`);

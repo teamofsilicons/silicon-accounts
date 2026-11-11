@@ -265,7 +265,7 @@ export function PhoneField({ label, hideLabel, initial, error, description, defa
             error={error ?? undefined}
             description={description}
           />
-          <Button type="button" variant="ghost" size="xs" className={styles.fieldLink} onClick={() => toInternational("+")}>Country Not in the List?</Button>
+          <Button type="button" variant="link" size="sm" className={styles.fieldLink} onClick={() => toInternational("+")}>Enter the Country Code Yourself</Button>
         </>
       ) : (
         <>
@@ -285,7 +285,7 @@ export function PhoneField({ label, hideLabel, initial, error, description, defa
               description={error ? undefined : typedDescription}
             />
           </div>
-          <Button type="button" variant="ghost" size="xs" className={styles.fieldLink} onClick={toPicker}>Choose the Country From the List</Button>
+          <Button type="button" variant="link" size="sm" className={styles.fieldLink} onClick={toPicker}>Choose the Country From the List</Button>
         </>
       )}
     </div>

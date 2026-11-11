@@ -54,7 +54,7 @@ export const journeys: Journey[] = [
       await page.locator('#new-identity input[name="_auto"]').fill(email);
       await page.locator('#new-identity input[name="_name"]').fill("Gina From Google");
       await page.locator('#new-identity button[data-action="use-another"]').click();
-      const idField = page.getByRole("textbox", { name: "Your id" });
+      const idField = page.getByRole("textbox", { name: "Your CarbonID" });
       await idField.waitFor({ timeout: 30_000 });
       await sleep(700);
       const text = await pageText(page);
@@ -67,11 +67,11 @@ export const journeys: Journey[] = [
       };
       results.check("Google with the imported email at briefcase leads to \"Finish setting up your account\", not a new sign-up", /Finish setting up your account/.test(text) && (await page.getByRole("button", { name: "Finish setup" }).count()) === 1, text.slice(0, 300));
       results.check("…prefilled with what legacy-crm imported (not Google's name)", seen.id === `gina_${t}` && seen.name === "Gina Imported" && /Tokyo/.test(seen.timezone) && /May 5, 1985/.test(seen.dob), JSON.stringify(seen));
-      results.check("…and it doesn't say Briefcase added them: legacy-crm did", !/Briefcase added you/.test(text) && !/id Briefcase set up for you/.test(text), text.match(/[^.]*added you[^.]*\.|This is the id[^.]*\./g)?.join(" | ") ?? text.slice(0, 200));
+      results.check("…and it doesn't say Briefcase added them: legacy-crm did", !/Briefcase added you/.test(text) && !/CarbonID Briefcase set up for you/.test(text), text.match(/[^.]*added you[^.]*\.|This is the (?:CarbonID|id)[^.]*\./g)?.join(" | ") ?? text.slice(0, 200));
       results.check(
-        "…it names legacy-crm and where they are going: \"Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.\" and \"This is the id Legacy CRM set up for you.\"",
-        text.includes("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.") && text.includes("This is the id Legacy CRM set up for you."),
-        text.match(/[^.]*added you[^.]*\.[^.]*\.|This is the id[^.]*\./g)?.join(" | ") ?? text.slice(0, 200),
+        "…it names legacy-crm and where they are going: \"Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.\" and \"This is the CarbonID Legacy CRM set up for you.\"",
+        text.includes("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.") && text.includes("This is the CarbonID Legacy CRM set up for you."),
+        text.match(/[^.]*added you[^.]*\.[^.]*\.|This is the (?:CarbonID|id)[^.]*\./g)?.join(" | ") ?? text.slice(0, 200),
       );
       const flow = await flowView(page);
       results.check("the flow (API) at briefcase says who imported them: imported_by legacy-crm (Legacy CRM)", flow?.signup?.finishing_import === true && flow.signup.imported_by?.app_id === "legacy-crm" && flow.signup.imported_by.name === "Legacy CRM", JSON.stringify(flow?.signup ?? flow).slice(0, 300));
@@ -195,7 +195,7 @@ export const journeys: Journey[] = [
       const code = await codeFor(env, email, after);
       await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
       await page.keyboard.type(code, { delay: 30 });
-      const idField = page.getByRole("textbox", { name: "Your id" });
+      const idField = page.getByRole("textbox", { name: "Your CarbonID" });
       await idField.waitFor({ timeout: 30_000 });
       await sleep(700);
       const text = await pageText(page);
@@ -204,8 +204,8 @@ export const journeys: Journey[] = [
       results.check("at pixel-studio, the email code leads to \"Finish setting up your account\" prefilled with the account's details (legacy-crm's import)", /Finish setting up your account/.test(text) && (await idField.inputValue()) === `xena_${t}` && (await page.getByRole("textbox", { name: "Display name" }).inputValue()) === "Xena From The CRM", text.slice(0, 300));
       results.check(
         "…and names the app whose import created the account: \"Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Pixel Studio.\" (flow imported_by legacy-crm)",
-        text.includes("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Pixel Studio.") && text.includes("This is the id Legacy CRM set up for you.") && !/Pixel Studio added you/.test(text) && flow?.signup?.imported_by?.app_id === "legacy-crm",
-        `${text.match(/[^.]*added you[^.]*\.[^.]*\.|This is the id[^.]*\./g)?.join(" | ") ?? text.slice(0, 200)}; imported_by ${JSON.stringify(flow?.signup?.imported_by)}`,
+        text.includes("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Pixel Studio.") && text.includes("This is the CarbonID Legacy CRM set up for you.") && !/Pixel Studio added you/.test(text) && flow?.signup?.imported_by?.app_id === "legacy-crm",
+        `${text.match(/[^.]*added you[^.]*\.[^.]*\.|This is the (?:CarbonID|id)[^.]*\./g)?.join(" | ") ?? text.slice(0, 200)}; imported_by ${JSON.stringify(flow?.signup?.imported_by)}`,
       );
       await page.getByRole("button", { name: "Finish setup" }).click();
       await afterConsent(env, page, "pixel-studio", "imports-claim-05");
@@ -239,7 +239,7 @@ export const journeys: Journey[] = [
       results.watch(page, "imports-claim-dm");
       await startAtApp(env, page, "dm");
       await signInWithEmailCode(env, page, email);
-      const idField = page.getByRole("textbox", { name: "Your id" });
+      const idField = page.getByRole("textbox", { name: "Your CarbonID" });
       await idField.waitFor({ timeout: 30_000 });
       await sleep(700);
       const text = await pageText(page);
@@ -293,7 +293,7 @@ export const journeys: Journey[] = [
       results.watch(page, "imports-claim-ledgerly");
       await startAtApp(env, page, "ledgerly");
       await signInWithEmailCode(env, page, email);
-      const idField = page.getByRole("textbox", { name: "Your id" });
+      const idField = page.getByRole("textbox", { name: "Your CarbonID" });
       await idField.waitFor({ timeout: 30_000 });
       await sleep(700);
       const text = await pageText(page);

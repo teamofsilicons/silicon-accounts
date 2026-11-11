@@ -8,15 +8,12 @@ import type { Journey } from "../../context";
 import { api, shot, sleep, sql, tag } from "../../lib";
 import { appAuth, appUserinfo, call, codeOf, deliveredAfter, formatDate, getMe, idStatus, inbox, messageOf, newCarbon, requestSent, signIntoApp, until, waitEvent } from "./_helpers";
 
-/** Opens the "Change your id" dialog from the card and returns it with its field and submit button. */
-async function openDialog(page: Page, site: string, id: string): Promise<{ dialog: Locator; field: Locator; submit: Locator }> {
-  await page.goto(`${site}/`);
-  const front = page.getByRole("region", { name: `Identity card of ${id}`, exact: true });
-  await front.waitFor({ timeout: 30_000 });
-  await front.getByRole("button", { name: "Change id", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Change your id" });
-  await dialog.waitFor({ timeout: 10_000 });
-  return { dialog, field: dialog.getByRole("textbox", { name: "New id" }), submit: dialog.locator('button[type="submit"]') };
+/** Opens Personal info's CarbonID dialog (/personal?edit=id) and returns it with its field and submit button. */
+async function openDialog(page: Page, site: string): Promise<{ dialog: Locator; field: Locator; submit: Locator }> {
+  await page.goto(`${site}/personal?edit=id`);
+  const dialog = page.getByRole("dialog", { name: "CarbonID" });
+  await dialog.waitFor({ timeout: 30_000 });
+  return { dialog, field: dialog.getByRole("textbox", { name: "New CarbonID" }), submit: dialog.locator('button[type="submit"]') };
 }
 
 /** Types a handle into the dialog's field (replacing what is there) and returns the settled status line. */
@@ -40,7 +37,7 @@ const changeId: Journey = {
     const moved = `c:acct-moved-${t}`;
 
     // 1. Every refusal is explained in the field, as it is typed.
-    let { dialog, field, submit } = await openDialog(owner.page, env.site, original);
+    let { dialog, field, submit } = await openDialog(owner.page, env.site);
     await sleep(400);
     const rules: Array<[string, RegExp, string]> = [
       ["ab", /at least 3 characters after c: \(this one has 2\)/, "too short"],
@@ -49,7 +46,7 @@ const changeId: Journey = {
       ["si:robot", /si: ids belong to Silicons/, "a Silicon's prefix"],
       ["admin", /'admin' is a reserved word/, "a reserved word"],
       [other.id.slice(2), /taken by another account/, "another Carbon's id"],
-      [original.slice(2), /is the id now/, "the current id"],
+      [original.slice(2), /is the CarbonID now/, "the current id"],
     ];
     for (const [typed, expected, what] of rules) {
       const status = await typeHandle(dialog, field, typed);
@@ -82,15 +79,16 @@ const changeId: Journey = {
     const idSent = requestSent(owner.page, "POST", "/v1/me/id");
     await submit.click();
     await dialog.waitFor({ state: "hidden", timeout: 10_000 });
-    const front = owner.page.getByRole("region", { name: `Identity card of ${moved}`, exact: true });
-    await front.waitFor({ timeout: 10_000 });
+    // Personal info's CarbonID row (the dialog closes onto it) says where the old one stays reserved.
+    const front = owner.page.locator('main [data-edit="id"]').first();
+    await until(async () => (await front.innerText().catch(() => "")).includes(moved), ok => ok, 10_000);
     await sleep(900);
     await shot(env, owner.page, "acct-id-01-changed");
     const meMoved = await getMe(owner.probe);
     results.check("the account's id is the new one, the uuid unchanged", meMoved.id === moved && meMoved.uuid === owner.uuid, `${meMoved.id} ${meMoved.uuid}`);
     const until10 = formatDate(Date.now() + 10 * 86_400_000);
     const cardText = (await front.innerText()).replace(/\s+/g, " ");
-    results.check("the card says the old id is reserved for you until 10 days from now", cardText.includes(`${original} is reserved for you until ${until10}`), cardText.match(/c:\S+ is reserved[^.]*\./)?.[0] ?? cardText.slice(0, 160));
+    results.check("Personal info says the old CarbonID stays reserved for you until 10 days from now", cardText.includes(`${original} stays reserved for you until ${until10}`), cardText.match(/c:\S+ stays reserved[^.]*\./)?.[0] ?? cardText.slice(0, 160));
     const [[holder, days] = []] = await sql(env, `select account_uuid, round(extract(epoch from reserved_until - now()) / 86400.0, 2) from handle_reservations where handle = '${original}'`);
     results.check("the reservation is the owner's, for 10 days", holder === owner.uuid && Math.abs(Number(days) - 10) < 0.01, `${holder} ${days} days`);
     const [[oldHandle, newHandle] = []] = await sql(env, `select old_handle, new_handle from handle_history where account_uuid = '${owner.uuid}' order by changed_at desc limit 1`);
@@ -107,7 +105,7 @@ const changeId: Journey = {
     // 3. Another Carbon can't take it: the field says it is reserved, the API refuses.
     const anon = await api<{ available: boolean; reason: string | null; message: string }>(ctx, `/v1/ids/available?id=${encodeURIComponent(original)}`);
     results.check("for anyone else the old id is reserved (available: false, reason reserved)", anon.body.available === false && anon.body.reason === "reserved" && /reserved for its previous owner/.test(anon.body.message), JSON.stringify(anon.body).slice(0, 200));
-    const theirs = await openDialog(other.page, env.site, other.id);
+    const theirs = await openDialog(other.page, env.site);
     const otherStatus = await typeHandle(theirs.dialog, theirs.field, original.slice(2));
     results.check("the other Carbon's field says the id is reserved for its previous owner, button off", /reserved for its previous owner/.test(otherStatus) && (await theirs.submit.isDisabled()), otherStatus);
     await shot(env, other.page, "acct-id-02-reserved-for-another");
@@ -116,9 +114,9 @@ const changeId: Journey = {
     await other.page.keyboard.press("Escape");
 
     // 4. The owner takes it back within the 10 days; the id it leaves is reserved for it in turn.
-    ({ dialog, field, submit } = await openDialog(owner.page, env.site, moved));
+    ({ dialog, field, submit } = await openDialog(owner.page, env.site));
     const reclaimStatus = await typeHandle(dialog, field, original.slice(2));
-    results.check("the owner's field offers to take the old id back", reclaimStatus.includes(`${original} was your id and is still reserved for you, so you can take it back.`), reclaimStatus);
+    results.check("the owner's field offers to take the old id back", reclaimStatus.includes(`${original} was your CarbonID and is still reserved for you, so you can take it back.`), reclaimStatus);
     const label = await until(async () => (await submit.innerText()).replace(/\s+/g, " ").trim(), text => text === `Take back ${original}`, 4_000);
     results.check("…with a button that says so", label === `Take back ${original}`, JSON.stringify(label));
     const mine = await call<{ available: boolean; reclaimable: boolean }>(owner.probe, `/v1/ids/available?id=${encodeURIComponent(original)}`);
@@ -141,7 +139,7 @@ const changeId: Journey = {
     const lastMinute = await call(other.probe, "/v1/me/id", { method: "POST", json: { id: moved } });
     results.check("a minute before the reservation ends, the other Carbon is still refused (409 id_reserved)", lastMinute.status === 409 && codeOf(lastMinute.body) === "id_reserved", `${lastMinute.status} ${codeOf(lastMinute.body)}`);
     await sql(env, `update handle_reservations set reserved_until = now() - interval '1 second' where handle = '${moved}'`);
-    const theirs2 = await openDialog(other.page, env.site, other.id);
+    const theirs2 = await openDialog(other.page, env.site);
     const freeNow = await typeHandle(theirs2.dialog, theirs2.field, moved.slice(2));
     results.check("after the 10 days the other Carbon's field says it is available", freeNow.includes(`${moved} is available`) && !(await theirs2.submit.isDisabled()), freeNow);
     await theirs2.submit.click();
@@ -157,7 +155,7 @@ const changeId: Journey = {
     const made: number[] = [];
     for (const id of steps) made.push((await call(owner.probe, "/v1/me/id", { method: "POST", json: { id } })).status);
     results.check("changes 3, 4 and 5 of the day go through", made.every(status => status === 200), made.join(","));
-    ({ dialog, field, submit } = await openDialog(owner.page, env.site, steps[2]!));
+    ({ dialog, field, submit } = await openDialog(owner.page, env.site));
     const sixth = `acct-r4-${t}`;
     await typeHandle(dialog, field, sixth, text => text.includes("available"));
     await submit.click();

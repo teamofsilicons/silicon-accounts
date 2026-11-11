@@ -1,16 +1,10 @@
-/* Personal info (Anil, 2026-11-09): the page bar, then a Silicon UI Card per group (Profile, Contact) holding the
-   prototype's rows (.srow): a label column, the value, a chevron; the whole row opens its editor. Silicon UI has no
-   settings row yet (redesign/requests/silicon-ui-settings-list.md), so they are drawn here on tokens and the type roles,
-   inset in the Card's padding with a hover fill, and go once it ships. */
-.rows { display: grid; margin-top: var(--space-related); }
-.row { --row-pad: var(--space-related); display: flex; min-width: 0; min-height: var(--control-height-md); align-items: center; gap: var(--space-group); margin-inline: calc(var(--row-pad) * -1); padding: var(--space-related) var(--row-pad); border-radius: var(--radius-control); color: var(--foreground); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
-/* The line between rows is its own straight 1px element, not the row's edge: the row is rounded for its hover fill, and
-   an edge would bend with those corners. It spans the Card's content (the row's inset), and hides beside a hovered row. */
-.row { position: relative; }
-.row + .row::before { position: absolute; top: 0; inset-inline: var(--row-pad); height: 1px; background: var(--border-subtle); content: ""; }
-.row:hover::before, .row:hover + .row::before { opacity: 0; }
-.row:hover { background: var(--surface-muted); color: var(--foreground); }
-.row:active { background: var(--surface-pressed); }
+/* Personal info (Anil, 2026-11-09; on the account pages' sections 2026-11-12, parts/rows.tsx): the page bar, then an
+   h2 over a boxed list per group (Profile, Contact) holding the prototype's rows (.srow): a label column, the value, a
+   chevron; the whole row opens its editor. Rows 8px high and 12px at the sides with straight dividers, as on Security. */
+.item + .item { border-top: 1px solid var(--border-subtle); }
+.row { display: flex; min-width: 0; min-height: var(--control-height-md); align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); color: var(--foreground); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+@media (hover: hover) and (pointer: fine) { .row:hover { background: var(--neutral-1); color: var(--foreground); } }
+.row:active { background: var(--surface-muted); }
 .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .label { width: 9rem; flex: none; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
 .value { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); font: var(--small); letter-spacing: var(--small-tracking); overflow-wrap: anywhere; }
@@ -37,3 +31,9 @@
 .avatarStage { display: grid; grid-template-columns: auto auto auto; align-items: center; justify-content: center; gap: var(--space-section); padding: var(--space-related) 0; }
 .avatarArrows { display: grid; gap: var(--space-section); }
 .srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* The date of birth dialog fits Silicon UI's Calendar (at most 328px wide) inside the body's padding and the dialog's
+   1px border, so the calendar, the Year field and the dialog share their edges instead of leaving a gap at the right
+   (Anil, 2026-11-10: "weird gaps"). --dialog-width is Silicon UI Dialog's width variable (local patch). */
+.calendarDialog { --dialog-width: calc(328px + 2 * var(--space-section) + 2px); }
+

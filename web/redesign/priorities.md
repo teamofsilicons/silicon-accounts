@@ -5,10 +5,10 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-11-09
+Last updated: 2026-11-10
 
 ## Now
-1. **Silicons, layout B** (web/blank-canvas): list and /silicons/[uuid] built 2026-11-01; next, review them with Anil, then the request and offer pages.
+1. **Silicons on the prototype** (2026-11-12, uncommitted): /silicons, /silicons/[uuid] (Access, Settings) and /silicons/requests/[id] rebuilt; review with Anil; e2e journeys for the older pages updated 2026-11-12.
 ## Next
 1a. Redesign Your Silicons and Your apps on Home on the chosen type set (Anil, 2026-11-08); the introduction banner is Anil's to redesign.
 2. **Prototype v7, phase 4: Silicons.** List, `/silicons/[uuid]` with Access and Settings tabs (replacing the drawer),
@@ -19,7 +19,9 @@ Last updated: 2026-11-09
    list).
 4. Account command menu on Silicon UI Dialog instead of direct Radix, if Dialog can hold the palette without its own
    title row (else report what is missing).
-5. Connected apps: list, `/apps/[id]`, Permissions between apps (`/proofs`).
+5. Connected apps redesigned (2026-11-11, uncommitted): `/apps` and `/apps/[id]` built on the prototype; review with
+   Anil; rewrite the e2e suites written for the old cards (account-site/apps.ts, imports/k-consent.ts,
+   account-site/scope.ts); Permissions between apps (`/proofs`) redesigned on the same rows (2026-11-12).
 6. Security redesigned on Home's rules (2026-11-10, uncommitted): review with Anil (its email and phone list restyled
    too); update the e2e suites written for the old page; then `/security` (`/sign-in-methods` redirects)
    and Activity.
@@ -34,7 +36,7 @@ Last updated: 2026-11-09
   stats, wrong-keys alerts, automation, cloud services, per-field sharing.
 
 ## Later
-- Publish Silicon UI 0.4.1 and update this site's package dependency when Anil resumes the release. Deferred at his request (2026-11-08). The prepared upstream patch is `silicon-ui-select-0.4.1.patch`; the site uses the tested pnpm patch for 0.4.0 in the meantime.
+- Publish Silicon UI and update this site's package dependency when Anil resumes the release. Deferred at his request (2026-11-08). The prepared upstream patches are `silicon-ui-select-0.4.1.patch` and `silicon-ui-issues-28-29.patch`; the site uses the tested pnpm patch for 0.4.0 in the meantime.
 - Add a Silicon's chevron: Silicon UI's DropdownMenuTrigger draws it at stroke 1.8 (about 1.13 px at 15 px) with no prop, while our icons are at 2. Anil wants 2 everywhere; choose between our own Button trigger via `asChild` (loses the flip on open) or a Silicon UI request for a chevron stroke option (2026-11-07).
 - Make a Silicon's optional webhook URL easy to find now it's out of the create wizard; it lives in the Silicon page's settings (decisions.md, 2026-11-07).
 - Move `components/foundation/layout` (Page, PageHeader, Section) to silicon-ui's page layout if #24 ships.
@@ -58,6 +60,9 @@ Last updated: 2026-11-09
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-11-10 PhoneInput country picker no longer clips inside the Security dialog and matches the field radius and corner shape; local patch and upstream artifact refreshed (uncommitted)
+- 2026-11-10 PhoneInput audit: unsupported and overlong numbers preserved with validation, restricted default and form/accessibility fixes; local Silicon UI package patch refreshed (uncommitted)
+- 2026-11-10 Silicon UI #28 PhoneInput spacing and #29 quiet Dialog close fixed in source and the account site's patched package; release deferred (uncommitted)
 - 2026-11-09 Personal info on the page bar and Silicon UI Cards; a settings list request drafted for Silicon UI (uncommitted, web/radix-type)
 - 2026-11-09 Radix undone: Silicon UI's typography in Hanken everywhere with our colours, no [data-silicon-ui] wrapper; the type lab and Edit text in the dev panel replace the type sets and the font lab (uncommitted, web/radix-type)
 - 2026-11-09 Radix Themes' scale and light Slate in Inter made the site's system in styles/tokens.css (uncommitted, web/radix-type)

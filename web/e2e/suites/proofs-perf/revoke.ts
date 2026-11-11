@@ -120,14 +120,15 @@ export const journeys: Journey[] = [
       results.watch(page, "revoke-on-site");
       const outside = watchOutside(page);
       await page.goto(`${env.site}/proofs`);
-      const cardOf = (scope: string) => page.getByRole("article", { name: "DM acts at Briefcase for you" }).filter({ hasText: scope });
-      const target = cardOf(`pp.revoke.${mark}`);
+      const activeList = page.getByRole("region", { name: "Active", exact: true });
+      const endedList = page.getByRole("region", { name: "Ended", exact: true });
+      const target = activeList.getByRole("listitem").filter({ hasText: "DM in Briefcase" }).filter({ hasText: `pp.revoke.${mark}` });
       await target.waitFor({ timeout: 30_000 });
       await sleep(600);
-      results.check("/proofs shows two active DM → Briefcase cards", (await page.getByRole("article", { name: "DM acts at Briefcase for you" }).count()) === 2 && /Active \(2\)/.test(await page.locator("main").innerText()));
+      results.check("/proofs lists two active DM in Briefcase rows", (await activeList.getByRole("listitem").filter({ hasText: "DM in Briefcase" }).count()) === 2);
       await shot(env, page, "proofs-perf-revoke-01-before", true);
-      await target.getByRole("button", { name: /^Revoke/ }).click();
-      await target.getByRole("group", { name: /^Revoke .*\?$/ }).getByRole("button", { name: "Revoke", exact: true }).click({ timeout: 10_000 });
+      await target.getByRole("button", { name: "Stop DM acting in Briefcase" }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Stop", exact: true }).click({ timeout: 10_000 });
       const started = Date.now();
       let verdict = await verifyAs(ctx, "briefcase", gone.proof_token);
       for (let i = 0; i < 60 && !isExactlyInvalid(verdict.body); i++) {
@@ -144,13 +145,12 @@ export const journeys: Journey[] = [
       const dmView = await appListing(ctx, "dm", gone.proof_id);
       results.check("dm's own listing shows the Carbon revoked it", dmView?.status === "revoked" && dmView.revoke_reason === "revoked_by_account", short(dmView));
 
-      // The card moves to Ended with its reason.
-      await page.getByRole("button", { name: /^Ended \(1\)/ }).click({ timeout: 15_000 });
-      const ended = cardOf(`pp.revoke.${mark}`);
-      await ended.waitFor({ timeout: 10_000 });
-      await sleep(1500); // the view switch animates; read and shoot the settled card
+      // The row moves to Ended with its reason.
+      const ended = endedList.getByRole("listitem").filter({ hasText: "DM in Briefcase" }).first();
+      await ended.waitFor({ timeout: 15_000 });
+      await sleep(800);
       const endedText = (await ended.innerText()).replace(/\s+/g, " ");
-      results.check("the Ended view shows the card: Revoked, \"You revoked it\", no Revoke button", /You revoked it/.test(endedText) && /Revoked/.test(endedText) && (await ended.getByRole("button", { name: /^Revoke/ }).count()) === 0, endedText.slice(0, 240));
+      results.check("the Ended list shows the row: \"You stopped it\", no Stop button", /You stopped it/.test(endedText) && (await ended.getByRole("button").count()) === 0, endedText.slice(0, 240));
       await shot(env, page, "proofs-perf-revoke-02-ended", true);
       const history = (await carbon.session.call<{ items: Array<{ id: string; title: string }> }>("GET", "/v1/me/history?kind=proof&limit=50")).body.items ?? [];
       results.check("the Carbon's history has the revocation", history.some(item => item.id === `proof:${gone.proof_id}:revoked`), history.map(item => item.id).join(", ").slice(0, 300));

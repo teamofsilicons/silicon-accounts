@@ -29,11 +29,11 @@ export function cleanHandle(input: string): string {
 
 /** The server's format rules, in the same words, so most slips never cost a request. */
 export function handleProblem(handle: string): string | null {
-  if (!handle) return "Choose an id: 3 to 30 characters of a to z, 0 to 9, - and _.";
+  if (!handle) return "Choose a CarbonID: 3 to 30 characters of a to z, 0 to 9, - and _.";
   const bad = [...handle].find(char => !HANDLE.test(char));
-  if (bad) return `"${bad === " " ? "space" : bad}" can't be in an id. Use a to z, 0 to 9, - and _.`;
-  if (handle.length < 3) return `c:${handle} is too short: an id needs at least 3 characters after c:.`;
-  if (handle.length > 30) return `That id is ${handle.length} characters: an id can have at most 30 after c:.`;
+  if (bad) return `"${bad === " " ? "space" : bad}" can't be in a CarbonID. Use a to z, 0 to 9, - and _.`;
+  if (handle.length < 3) return `c:${handle} is too short: a CarbonID needs at least 3 characters after c:.`;
+  if (handle.length > 30) return `That CarbonID is ${handle.length} characters: a CarbonID can have at most 30 after c:.`;
   return null;
 }
 

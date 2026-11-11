@@ -153,7 +153,7 @@ const interactionScreens: ScreenSpec[] = [
     routes: flowRoutes,
     waitFor: READY,
     prepare: async page => {
-      await page.getByRole("textbox", { name: "Your id" }).fill("saket");
+      await page.getByRole("textbox", { name: "Your CarbonID" }).fill("saket");
       await page.waitForTimeout(1200);
     },
   },

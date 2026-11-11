@@ -23,7 +23,6 @@ import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Calendar } from "@teamofsilicons/silicon-ui/calendar";
-import { Card } from "@teamofsilicons/silicon-ui/card";
 import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
 import { Input } from "@teamofsilicons/silicon-ui/input";
 import { Select } from "@teamofsilicons/silicon-ui/select";
@@ -44,6 +43,7 @@ import { PhotoControl } from "../parts/photo-control";
 import { useChangeOwnId } from "../parts/queries";
 import { ContactList } from "../sign-in-methods/sign-in-methods";
 import { AvatarEditor } from "./avatar-editor";
+import { Section } from "../parts/rows";
 import styles from "./identity.module.css";
 
 const RESERVED_DAYS = 10;
@@ -67,7 +67,7 @@ export function Identity() {
   const [reserved, setReserved] = useState<{ id: string; until: number } | null>(null);
 
   useRegisterCommands(() => [
-    { id: "identity.change-id", label: "Change your id", description: "Pick a new id; the old one stays reserved for you for 10 days", group: "Identity", icon: <AtSign size={16} strokeWidth={1.75} />, keywords: ["id", "handle", "username", "rename"], run: () => router.push(editHref("id"), { scroll: false }) },
+    { id: "identity.change-id", label: "Change your CarbonID", description: "Pick a new CarbonID; the old one stays reserved for you for 10 days", group: "Identity", icon: <AtSign size={16} strokeWidth={1.75} />, keywords: ["id", "handle", "username", "rename"], run: () => router.push(editHref("id"), { scroll: false }) },
   ], [router]);
 
   const account = me.data;
@@ -92,7 +92,7 @@ export function Identity() {
               <Row label="Photo" edit="photo"><Avatar name={account.display_name} src={picture?.src ?? account.pfp_url} size="md" /></Row>
               <Row label="Name" edit="name">{account.display_name}</Row>
               <Row
-                label="Public id"
+                label="CarbonID"
                 edit="id"
                 detail={reserved ? <><span className="mono">{reserved.id}</span> stays reserved for you until {formatDate(reserved.until)}.</> : undefined}
               >
@@ -128,27 +128,25 @@ function ContactBox({ carbon }: { carbon: CarbonMe }) {
   );
 }
 
-/** The prototype's .scard: Silicon UI's Card, its title the group's, then its rows. */
+/** The prototype's .scard as the account pages' section (parts/rows.tsx, 2026-11-12): an h2 over a boxed list of rows. */
 function Box({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Card title={title}>
-      <div className={styles.rows}>{children}</div>
-    </Card>
-  );
+  return <Section id={`personal-${title.toLowerCase()}`} title={title}>{children}</Section>;
 }
 
 /** The prototype's .srow: the whole row opens its editor (a link to ?edit=…), label, value, chevron. */
 function Row({ label, edit, detail, end, children }: { label: string; edit: Editor; detail?: ReactNode; end?: ReactNode; children: ReactNode }) {
   return (
-    <Link href={editHref(edit)} replace scroll={false} className={styles.row} data-edit={edit}>
-      <span className={styles.label}>{label}</span>
-      <span className={styles.value}>
-        {children}
-        {detail ? <span className={styles.detail}>{detail}</span> : null}
-      </span>
-      {end}
-      <ChevronRight className={styles.chevron} size={16} strokeWidth={1.75} aria-hidden="true" />
-    </Link>
+    <li className={styles.item}>
+      <Link href={editHref(edit)} replace scroll={false} className={styles.row} data-edit={edit}>
+        <span className={styles.label}>{label}</span>
+        <span className={styles.value}>
+          {children}
+          {detail ? <span className={styles.detail}>{detail}</span> : null}
+        </span>
+        {end}
+        <ChevronRight className={styles.chevron} size={16} strokeWidth={1.75} aria-hidden="true" />
+      </Link>
+    </li>
   );
 }
 
@@ -202,16 +200,16 @@ function Editors({ me, editing, onClose, onReserved }: EditorsProps) {
       </Dialog>
 
       <Dialog {...dialog("name")}>
-        <DialogContent title="Name" onCloseAutoFocus={backToRow("name")} description="Shown in every app next to your files and messages. Up to 100 characters.">
+        <DialogContent title="Name" onCloseAutoFocus={backToRow("name")} description={me.display_name ? <>Apps show <strong>{me.display_name}</strong> next to your files and messages.</> : "Apps show it next to your files and messages."}>
           {editing === "name" ? <NameForm value={me.display_name} onSave={display_name => update.mutateAsync({ display_name })} onDone={onClose} /> : null}
         </DialogContent>
       </Dialog>
 
       <Dialog {...dialog("id")}>
         <DialogContent
-          title="Public id"
+          title="CarbonID"
           onCloseAutoFocus={backToRow("id")}
-          description={me.id ? `Your id now is ${me.id}. Others find you by it.` : "Pick the id Carbons and Silicons will type to find you."}
+          description={me.id ? <>Your CarbonID is <strong>{me.id}</strong>. It’s how people and Silicons find you.</> : "Pick the CarbonID Carbons and Silicons will type to find you."}
           onOpenAutoFocus={event => {
             event.preventDefault();
             requestAnimationFrame(() => idInput.current?.focus());
@@ -234,7 +232,7 @@ function Editors({ me, editing, onClose, onReserved }: EditorsProps) {
       </Dialog>
 
       <Dialog {...dialog("dob")}>
-        <DialogContent title="Date of birth" onCloseAutoFocus={backToRow("dob")} description="Only apps you allow can see it. Some apps need it to check your age.">
+        <DialogContent title="Date of birth" className={styles.calendarDialog} onCloseAutoFocus={backToRow("dob")} description="Only apps you allow can see it. Some apps need it to check your age.">
           {editing === "dob" ? <DobCalendarForm value={me.dob} onSave={dob => update.mutateAsync({ dob })} onDone={onClose} /> : null}
         </DialogContent>
       </Dialog>
@@ -248,15 +246,23 @@ function Editors({ me, editing, onClose, onReserved }: EditorsProps) {
       {carbon ? (
         <>
           <Dialog {...dialog("emails")}>
-            <DialogContent title="Email addresses" onCloseAutoFocus={backToRow("emails")} description="Once verified, an email can sign you in with a code. The primary one can't be removed; make another primary first.">
+            <DialogContent title="Email addresses" onCloseAutoFocus={backToRow("emails")} description="Once verified, an email can sign you in with a code.">
               <ContactList channel="email" carbon={carbon} />
               <div className={styles.actions}><Button variant="secondary" onClick={onClose}>Close</Button></div>
             </DialogContent>
           </Dialog>
           <Dialog {...dialog("phones")}>
-            <DialogContent title={carbon.phones.length ? "Phone numbers" : "Add a phone number"} onCloseAutoFocus={backToRow("phones")} description="Once verified, a number can sign you in with a text code. The primary one can't be removed; make another primary first.">
+            {/* With no number the dialog is the add form: copy B, as on Security, and its Cancel and the close button are the
+                ways out (Anil, 2026-11-10). With numbers it lists them, and Close ends it. */}
+            <DialogContent
+              title={carbon.phones.length ? "Phone numbers" : "Add a phone number"}
+              onCloseAutoFocus={backToRow("phones")}
+              description={carbon.phones.length
+                ? "Once verified, a number can sign you in with a code texted to it."
+                : "Once it\u2019s verified, you can sign in with a code texted to it."}
+            >
               <ContactList channel="phone" carbon={carbon} />
-              <div className={styles.actions}><Button variant="secondary" onClick={onClose}>Close</Button></div>
+              {carbon.phones.length ? <div className={styles.actions}><Button variant="secondary" onClick={onClose}>Close</Button></div> : null}
             </DialogContent>
           </Dialog>
         </>
@@ -287,9 +293,9 @@ function NameForm({ value, onSave, onDone }: { value: string; onSave: (name: str
   };
   return (
     <form className={styles.form} onSubmit={event => void submit(event)} noValidate>
-      <Input label="Name" value={draft} maxLength={100} autoComplete="off" autoFocus onChange={event => { setDraft(event.target.value); setError(null); }} error={error ?? undefined} />
+      <Input label="Your name" value={draft} maxLength={100} autoComplete="off" autoFocus onChange={event => { setDraft(event.target.value); setError(null); }} description="Up to 100 characters." error={error ?? undefined} />
       <div className={styles.actions}>
-        <Button type="button" variant="secondary" onClick={onDone} disabled={pending}>Cancel</Button>
+        <Button type="button" variant="ghost" onClick={onDone} disabled={pending}>Cancel</Button>
         <Button type="submit" loading={pending} disabled={!draft.trim()}>Save</Button>
       </div>
     </form>
@@ -358,7 +364,7 @@ function DobCalendarForm({ value, onSave, onDone }: { value: string; onSave: (do
       <Calendar value={draft} onChange={date => { setDraft(date); setError(null); }} month={month} onMonthChange={setMonth} minDate={MIN_DOB} maxDate={max} />
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.actions}>
-        <Button type="button" variant="secondary" onClick={onDone} disabled={pending}>Cancel</Button>
+        <Button type="button" variant="ghost" onClick={onDone} disabled={pending}>Cancel</Button>
         <Button type="button" loading={pending} disabled={!changed} onClick={() => void save()}>Save</Button>
       </div>
     </div>

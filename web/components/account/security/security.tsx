@@ -17,9 +17,8 @@
  * 32px apart with their heading 16px above.
  */
 import Image from "next/image";
-import Link from "next/link";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { AtSign, ChevronRight, History, KeyRound, Laptop, Phone, SquareTerminal, Code } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
+import { AtSign, History, KeyRound, Laptop, Phone, SquareTerminal, Code } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
@@ -42,6 +41,7 @@ import { SiliconMark } from "../parts/silicon-mark";
 import { siliconHref } from "../silicons/silicons";
 import { ContactList, LinkResult, PROVIDER_NAMES, ProviderMark } from "../sign-in-methods/sign-in-methods";
 import { sessionName } from "./sessions";
+import { LinkRow, Row, Section, Tile } from "../parts/rows";
 import styles from "./security.module.css";
 
 export function Security() {
@@ -76,10 +76,13 @@ export function Security() {
           <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(null); }}>
             {editing ? (
               <DialogContent
-                title={editing === "email" ? "Email code" : "Text code"}
+                // With no number yet the dialog opens on the form, so it says what it's for (Anil, 2026-11-10, copy B).
+                title={editing === "email" ? "Email code" : carbon.phones.length === 0 ? "Add a phone number" : "Text code"}
                 description={editing === "email"
                   ? "A code sent to any of these emails signs you in. Apps that can see your email get the primary one."
-                  : "A code texted to any of these numbers signs you in. Apps that can see your phone number get the primary one."}
+                  : carbon.phones.length === 0
+                    ? "Once it’s verified, you can sign in with a code texted to it."
+                    : "A code texted to any of these numbers signs you in. Apps that can see your phone number get the primary one."}
               >
                 <ContactList channel={editing} carbon={carbon} />
               </DialogContent>
@@ -95,36 +98,6 @@ export function Security() {
     </div>
   );
 }
-
-/* Shared: a section and its boxed list ------------------------------------------------------------------------------ */
-
-function Section({ id, title, count, children }: { id: string; title: string; count?: number; children: ReactNode }) {
-  return (
-    <section className={styles.section} aria-labelledby={id}>
-      <div className={styles.head}>
-        <h2 id={id} className={styles.title}>{title}</h2>
-        {count ? <Badge size="sm" tone="neutral">{count}</Badge> : null}
-      </div>
-      <ul data-sq="surface" className={styles.rows}>{children}</ul>
-    </section>
-  );
-}
-
-function Row({ lead, title, detail, error, wide, children }: { lead: ReactNode; title: ReactNode; detail?: ReactNode; error?: string | null; wide?: boolean; children?: ReactNode }) {
-  return (
-    <li className={styles.row} data-wide={wide ? "" : undefined}>
-      {lead}
-      <span className={styles.text}>
-        <span className={styles.rowTitle}>{title}</span>
-        {detail ? <span className={styles.rowDetail}>{detail}</span> : null}
-        {error ? <span className={styles.rowError} role="alert">{error}</span> : null}
-      </span>
-      {children ? <span className={styles.actions}>{children}</span> : null}
-    </li>
-  );
-}
-
-const Tile = ({ children }: { children: ReactNode }) => <span data-sq="surface" className={styles.icon} aria-hidden="true">{children}</span>;
 
 /* Checkup ------------------------------------------------------------------------------------------------------------ */
 
@@ -330,16 +303,5 @@ function DeviceIcon({ session }: { session: SessionInfo }) {
 /* Activity ----------------------------------------------------------------------------------------------------------- */
 
 function ActivityRow() {
-  return (
-    <section className={styles.section} aria-label="Activity">
-      <Link href={paths.activity} data-sq="surface" className={styles.linkRow}>
-        <Tile><History size={16} strokeWidth={2} /></Tile>
-        <span className={styles.text}>
-          <span className={styles.rowTitle}>Activity</span>
-          <span className={styles.rowDetail}>Every sign-in and change, by day</span>
-        </span>
-        <ChevronRight className={styles.chevron} size={16} strokeWidth={2} aria-hidden="true" />
-      </Link>
-    </section>
-  );
+  return <LinkRow href={paths.activity} lead={<Tile><History size={16} strokeWidth={2} /></Tile>} title="Activity" detail="Every sign-in and change, by day" />;
 }

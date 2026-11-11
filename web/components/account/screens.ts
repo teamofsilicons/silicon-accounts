@@ -65,6 +65,12 @@ const longSilicon = { ...data.silicons[0], uuid: "Lng", id: "si:a_very_long_sili
 
 const click = async (page: Page, name: string | RegExp) => { await page.getByRole("button", { name }).first().click(); };
 const wait = (page: Page, ms = 700) => page.waitForTimeout(ms);
+const openSecurityPhone = async (page: Page) => {
+  await page.getByText("Text code", { exact: true }).locator("xpath=ancestor::li").getByRole("button").click();
+  const add = page.getByRole("button", { name: "Add a Phone Number" });
+  if (await add.isVisible()) await add.click();
+  await page.getByRole("textbox", { name: "Phone number" }).waitFor();
+};
 /** A Silicon's panel: the side column from 1024px (SidePanel), the bottom drawer under it. */
 const drawer = "[role='dialog'], [data-side-panel][data-open]";
 
@@ -178,6 +184,55 @@ const shown: ScreenSpec[] = [
 
   // Sign-in methods: the lists, adding an email up to the code, and the remove question.
   { name: "account-sign-in-methods", path: "/sign-in-methods" },
+  { name: "account-security-phone-dialog", path: "/sign-in-methods", fullPage: false, prepare: async page => {
+    await openSecurityPhone(page);
+    await wait(page, 600);
+  } },
+  { name: "account-security-country-picker", path: "/sign-in-methods", fullPage: false, prepare: async page => {
+    await openSecurityPhone(page);
+    await page.getByRole("button", { name: /^Country,/ }).click();
+    await page.getByRole("listbox", { name: "Countries" }).waitFor();
+    await wait(page, 800);
+    const geometry = await page.getByRole("listbox", { name: "Countries" }).evaluate(node => {
+      const field = node.closest("[data-open]") as HTMLElement;
+      const shape = field.querySelector('[class*="shape"]') as HTMLElement;
+      const control = field.querySelector('input[type="tel"]')!.parentElement!.parentElement as HTMLElement;
+      const scroll = node.parentElement as HTMLElement;
+      const clip = scroll.getBoundingClientRect();
+      const first = [...node.querySelectorAll('[role="option"]')].find(option => option.getBoundingClientRect().bottom > clip.top) as HTMLElement;
+      const rect = shape.getBoundingClientRect();
+      return {
+        hit: shape.contains(document.elementFromPoint(rect.left + 20, rect.bottom - 12)),
+        bottom: rect.bottom,
+        viewportBottom: window.innerHeight,
+        radius: getComputedStyle(shape).borderTopLeftRadius,
+        controlRadius: getComputedStyle(control).borderTopLeftRadius,
+        firstTop: first.getBoundingClientRect().top,
+        scrollTop: clip.top,
+      };
+    });
+    expect(geometry.hit).toBe(true);
+    expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportBottom);
+    expect(geometry.radius).toBe(geometry.controlRadius);
+    expect(geometry.firstTop).toBeGreaterThanOrEqual(geometry.scrollTop - 1);
+  } },
+  { name: "account-security-country-choice", path: "/sign-in-methods", fullPage: false, prepare: async page => {
+    await openSecurityPhone(page);
+    await page.getByRole("button", { name: /^Country,/ }).click();
+    await page.getByRole("option", { name: /India/ }).click();
+    await expect(page.getByRole("button", { name: "Country, India +91" })).toHaveAttribute("aria-expanded", "false");
+    await page.getByRole("button", { name: "Country, India +91" }).click();
+    const search = page.getByRole("combobox", { name: "Search countries or calling codes" });
+    await search.fill("Germany");
+    await search.press("Enter");
+    await expect(page.getByRole("button", { name: "Country, Germany +49" })).toHaveAttribute("aria-expanded", "false");
+  } },
+  { name: "account-security-unsupported-phone", path: "/sign-in-methods", fullPage: false, prepare: async page => {
+    await openSecurityPhone(page);
+    await page.getByRole("textbox", { name: "Phone number" }).fill("+40755345678");
+    await page.locator('[data-phone-mode="international"]').waitFor();
+    await wait(page, 600);
+  } },
   { name: "account-sign-in-methods-add", path: "/sign-in-methods", prepare: async page => {
     await click(page, "Add an email");
     await wait(page);
@@ -190,7 +245,8 @@ const shown: ScreenSpec[] = [
 
   // Apps: with access, the remove question, the removed ones.
   { name: "account-apps", path: "/apps" },
-  { name: "account-apps-remove", path: "/apps", prepare: async page => { await click(page, "Remove access"); await wait(page, 600); } },
+  { name: "account-app-page", path: "/apps/briefcase" },
+  { name: "account-apps-remove", path: "/apps/briefcase", prepare: async page => { await click(page, "Remove"); await wait(page, 600); } },
   { name: "account-apps-removed", path: "/apps", prepare: async page => { await click(page, /^Access removed/); await wait(page, 900); } },
 
   // Proofs: the active one with its ring, the revoke question, the ended ones.

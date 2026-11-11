@@ -107,10 +107,9 @@ export const journey: Journey = {
     await shot(env, page, "e-01-proofs", true);
     const text = (await page.locator("main").innerText()).replace(/\s+/g, " ");
     results.check("/proofs lists dm → briefcase", /DM/.test(text) && /Briefcase/.test(text));
-    // Cards are newest first: the first Revoke is the proof issued last.
-    await page.getByRole("button", { name: /^Revoke/ }).first().click();
-    // The card asks in place ("Revoke DM's proof?"); its own Revoke confirms.
-    await page.getByRole("group", { name: /^Revoke .*\?$/ }).getByRole("button", { name: "Revoke", exact: true }).click({ timeout: 10_000 });
+    // Rows are newest first: the first Stop is the permission issued last; a dialog asks, and its Stop confirms.
+    await page.getByRole("button", { name: /^Stop DM acting in Briefcase/ }).first().click();
+    await page.getByRole("dialog").getByRole("button", { name: "Stop", exact: true }).click({ timeout: 10_000 });
     await sleep(1500);
     const proofs = (await (await page.request.get(`${env.site}/v1/me/proofs?limit=200`)).json()) as { items: Array<{ proof_id: string; status: string }> };
     const mine = proofs.items.find(item => item.proof_id === proofId);

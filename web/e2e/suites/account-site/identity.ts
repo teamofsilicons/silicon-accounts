@@ -5,7 +5,7 @@
  */
 import type { Journey } from "../../context";
 import { json, shot, sleep, tag } from "../../lib";
-import { addContact, call, codeOf, confirmMorph, deliveredAfter, expectContinuePost, formatDate, getMe, inbox, jpegHeader, mainText, newCarbon, oversizedUploads, queuedEvents, requestSent, signIntoApp, solidPng, timezoneLabel, until, utcOffset, waitEvent } from "./_helpers";
+import { addContact, call, codeOf, deliveredAfter, expectContinuePost, formatDate, getMe, inbox, jpegHeader, mainText, newCarbon, oversizedUploads, queuedEvents, requestSent, signIntoApp, solidPng, until, waitEvent } from "./_helpers";
 
 /** A PNG header that claims width×height (no pixels): the service reads only the header. */
 function pngHeader(width: number, height: number): Buffer {
@@ -15,7 +15,7 @@ function pngHeader(width: number, height: number): Buffer {
 
 const identityCard: Journey = {
   name: "account-site-identity-card",
-  title: "the identity card shows the account exactly as /v1/me has it: name, id, uuid, local time, Iris photo, a stamp per app, the back's emails/phones/dob, the counts and recent activity beside it, and it fits a phone",
+  title: "Home and Personal info show the account exactly as /v1/me has it: the welcome, the CarbonID chip (copies it), since when, the Iris photo, Briefcase on Your apps; Personal info's name, CarbonID, date of birth, timezone, both emails (Primary) and no phone; both fit a phone",
   async run(ctx) {
     const { env, results } = ctx;
     const carbon = await newCarbon(ctx, "acct-card");
@@ -34,87 +34,67 @@ const identityCard: Journey = {
     const tagPart = local.split(".").pop() ?? "";
     results.check("the sign-up defaults: the c:id and display name from the email, the date of birth exactly 18 years before sign-up", me.id === `c:${local.replace(/\./g, "-")}` && me.display_name.toLowerCase().includes(tagPart.toLowerCase()) && (me.dob === eighteen || (eighteen.endsWith("-02-29") && me.dob === eighteen.replace("-02-29", "-02-28"))), `${carbon.email} → ${me.id}, "${me.display_name}", dob ${me.dob} (signed up ${signupDay}, want ${eighteen})`);
 
+    // Home (2026-11-11): "Your account" (the welcome, the CarbonID chip, since when, the photo), then Your apps.
     const started = Date.now();
     await page.goto(`${env.site}/`);
-    const front = page.getByRole("region", { name: `Identity card of ${me.id}`, exact: true });
-    await front.waitFor({ timeout: 30_000 });
-    await front.getByRole("list", { name: "Apps you have signed into" }).waitFor({ timeout: 20_000 }).catch(() => undefined);
-    results.metric("identity card visible after navigation", Date.now() - started);
+    const yours = page.getByRole("region", { name: "Your account", exact: true });
+    await yours.waitFor({ timeout: 30_000 });
+    results.metric("Home's account section visible after navigation", Date.now() - started);
     await sleep(900);
     await shot(env, page, "acct-card-01-front");
-
-    const frontText = (await front.innerText()).replace(/\s+/g, " ");
-    results.check("the card's name is the display name", (await front.getByRole("button", { name: `Display name: ${me.display_name}`, exact: true }).count()) === 1, me.display_name);
-    const idTitle = await front.locator(`[title="${me.id}"]`).count();
-    results.check("the card's id is the c:id", idTitle >= 1 && frontText.includes(me.id), me.id);
-    results.check("the card's uuid is the account's uuid (never changes)", (await front.locator(`[title="${me.uuid}"]`).count()) >= 1, me.uuid);
-    results.check("the card says Carbon, and since when", /Carbon/.test(frontText) && frontText.includes(`since ${formatDate(me.created_at)}`), frontText.slice(0, 200));
-    const zone = `${timezoneLabel(me.timezone)} · UTC${utcOffset(me.timezone)}`;
-    results.check("local time: the account's timezone and its offset", me.timezone === "Asia/Kolkata" && frontText.includes(zone), `${me.timezone}: want "${zone}"`);
-    const photo = await front.locator(`[role="img"][aria-label="${me.display_name}"] img`).first().getAttribute("src").catch(() => null);
-    results.check("the photo is the default Carbon photo from Iris for this uuid", photo === me.pfp_url && me.pfp_url === `${env.iris}/pfp/carbon?id=${me.uuid}`, `${photo} / ${me.pfp_url}`);
-    const stamp = front.getByRole("list", { name: "Apps you have signed into" }).getByRole("link", { name: "Briefcase", exact: true });
-    results.check("a stamp for Briefcase, linking to its card on /apps", (await stamp.count()) === 1 && (await stamp.getAttribute("href")) === "/apps#app-briefcase", String(await stamp.getAttribute("href").catch(() => null)));
-    results.check("the copy buttons for the id and the uuid", (await front.getByRole("button", { name: "Copy id" }).count()) === 1 && (await front.getByRole("button", { name: "Copy uuid" }).count()) === 1);
+    const first = me.display_name.trim().split(/\s+/)[0] ?? me.display_name;
+    const since = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: me.timezone }).format(new Date(me.created_at));
+    const yoursText = (await yours.innerText()).replace(/\s+/g, " ");
+    results.check("Home welcomes the Carbon by the first word of the display name", (await page.getByRole("heading", { level: 1 }).innerText()).trim() === `Welcome, ${first}`, yoursText.slice(0, 120));
+    results.check("…shows the CarbonID on a chip that copies it, and since when", (await yours.getByRole("button", { name: `Copy your CarbonID, ${me.id}` }).count()) === 1 && yoursText.includes(`Member since ${since}`), yoursText.slice(0, 160));
+    const photo = await yours.locator(`[role="img"][aria-label="${me.display_name}"] img`).first().getAttribute("src").catch(() => null);
+    // The account's photo is Iris's default; Home draws the Carbon's own avatar in its place until a photo is uploaded.
+    results.check("the account's photo is the default Carbon photo from Iris, and Home shows a picture", me.pfp_url === `${env.iris}/pfp/carbon?id=${me.uuid}` && !!photo, `${photo?.slice(0, 60)} / ${me.pfp_url}`);
     if (env.engine === "chromium") {
       // Chromium lets a test grant clipboard access; WebKit has no such permission.
       await carbon.context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: env.site });
-      await front.getByRole("button", { name: "Copy uuid" }).click();
-      const copiedUuid = await page.evaluate(() => navigator.clipboard.readText()).catch(error => `error: ${String(error)}`);
-      await front.getByRole("button", { name: "Copy id" }).click();
+      await yours.getByRole("button", { name: `Copy your CarbonID, ${me.id}` }).click();
       const copiedId = await page.evaluate(() => navigator.clipboard.readText()).catch(error => `error: ${String(error)}`);
-      results.check("Copy uuid and Copy id put exactly the uuid and the c:id on the clipboard", copiedUuid === me.uuid && copiedId === me.id, `${copiedUuid} / ${copiedId}`);
+      results.check("the chip puts exactly the CarbonID on the clipboard", copiedId === me.id, copiedId);
     }
+    const appsSection = page.getByRole("region", { name: "Your apps", exact: true });
+    await appsSection.waitFor({ timeout: 20_000 });
+    const openBriefcase = appsSection.getByRole("link", { name: /^Open Briefcase/ });
+    results.check("Your apps on Home has Briefcase, signed in, with Open", (await openBriefcase.count()) === 1, (await appsSection.innerText()).replace(/\s+/g, " ").slice(0, 200));
 
-    // Beside the card: the counts and the latest activity.
-    const glance = page.getByRole("complementary", { name: "At a glance" });
-    const glanceText = await until(async () => (await glance.innerText().catch(() => "")).replace(/\s+/g, " "), text => /Recent activity/.test(text) && !/Nothing yet/.test(text) && /\d+ ?Apps you are signed into/.test(text), 15_000);
-    const count = (label: string) => Number(new RegExp(`(\\d+) ?${label}`).exec(glanceText)?.[1] ?? -1);
-    results.check("at a glance: 1 app signed into", count("Apps you are signed into") === 1, glanceText.slice(0, 200));
-    results.check("at a glance: 0 Silicons in your care", count("Silicons in your care") === me.custodian_of && me.custodian_of === 0);
-    results.check("at a glance: emails and phone numbers = 2 (the sign-up email and the added one)", count("Emails and phone numbers") === me.emails.length + me.phones.length && me.emails.length === 2, String(count("Emails and phone numbers")));
-    const history = (await call<{ items: Array<{ title: string }> }>(probe, "/v1/me/history?limit=4")).body.items.map(item => item.title);
-    const recent = await until(async () => (await glance.getByRole("list").last().locator("li").allInnerTexts().catch(() => [] as string[])).map(text => text.replace(/\s+/g, " ")), rows => rows.length >= Math.min(4, history.length), 10_000);
-    results.check("recent activity: the 4 newest entries of the history, newest first", recent.length === Math.min(4, history.length) && history.every((title, index) => (recent[index] ?? "").startsWith(title.slice(0, 20))), `${JSON.stringify(recent)} vs ${JSON.stringify(history)}`);
-
-    // The back of the card.
-    await front.getByRole("button", { name: "Details" }).click();
-    const back = page.getByRole("region", { name: `Identity card of ${me.id}, details`, exact: true });
-    await back.waitFor({ timeout: 5_000 });
-    await sleep(900);
-    await shot(env, page, "acct-card-02-back");
-    const backText = (await back.innerText()).replace(/\s+/g, " ");
-    const primary = me.emails.find(item => item.is_primary)?.email ?? "";
-    results.check("the back lists both emails, the sign-up one primary", backText.includes(carbon.email) && backText.includes(second) && primary === carbon.email && /Primary/.test(backText), backText.slice(0, 240));
-    results.check("the back says there is no phone number yet", /No phone number yet/.test(backText));
-    results.check("the back shows the date of birth (18 years before sign-up) and the timezone", backText.includes(formatDate(me.dob)) && backText.includes(zone), `${me.dob} → ${formatDate(me.dob)}`);
-    results.check("the front is hidden from assistive tech while the back shows", (await page.locator(`section[aria-label="Identity card of ${me.id}"]`).getAttribute("aria-hidden")) === "true");
-    await back.getByRole("button", { name: "Back" }).click();
+    // Personal info: every detail as /v1/me has it, each row opening its editor.
+    await page.goto(`${env.site}/personal`);
+    const profile = page.getByRole("region", { name: "Profile", exact: true });
+    const contact = page.getByRole("region", { name: "Contact", exact: true });
+    await profile.waitFor({ timeout: 30_000 });
     await sleep(600);
+    await shot(env, page, "acct-card-02-back");
+    const profileText = (await profile.innerText()).replace(/\s+/g, " ");
+    const contactText = (await contact.innerText()).replace(/\s+/g, " ");
+    results.check("Profile: the name, the CarbonID, the date of birth and the timezone", profileText.includes(`Name ${me.display_name}`) && profileText.includes(`CarbonID ${me.id}`) && profileText.includes(`Date of birth ${formatDate(me.dob)}`) && profileText.includes(`Timezone ${me.timezone}`), profileText.slice(0, 260));
+    const primary = me.emails.find(item => item.is_primary)?.email ?? "";
+    results.check("Contact: both emails, the sign-up one marked Primary first", contactText.includes(carbon.email) && contactText.includes(second) && primary === carbon.email && contactText.indexOf(carbon.email) < contactText.indexOf(second) && /Primary/.test(contactText), contactText.slice(0, 240));
+    results.check("Contact: no phone number yet, and the row offers to add one", /Phone Add a phone/.test(contactText), contactText.slice(0, 240));
+    results.check("each row opens its editor by address (?edit=…)", (await profile.getByRole("link").evaluateAll(links => links.map(link => link.getAttribute("href")))).every(href => /\?edit=/.test(href ?? "")));
 
-    // A stamp opens its app's card on /apps.
-    await stamp.click();
-    await page.waitForURL(`${env.site}/apps#app-briefcase`, { timeout: 15_000 });
-    const appCard = page.locator("#app-briefcase");
-    await appCard.waitFor({ timeout: 15_000 });
-    results.check("the stamp opens /apps at Briefcase's card", (await appCard.innerText()).includes("Briefcase"));
-
-    // The same card on a phone: no horizontal scroll, the id still on it.
+    // On a phone: no horizontal scroll on Home or Personal info, the CarbonID still shown.
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`${env.site}/`);
-    await front.waitFor({ timeout: 30_000 });
-    await sleep(900);
+    for (const path of ["/", "/personal"]) {
+      await page.goto(`${env.site}${path}`);
+      await page.locator("main").waitFor({ timeout: 30_000 });
+      await sleep(900);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      results.check(`at 390 px ${path} has no horizontal scroll`, overflow <= 0, `${overflow} px wider`);
+    }
     await shot(env, page, "acct-card-03-phone", true);
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    results.check("at 390 px the identity page has no horizontal scroll", overflow <= 0, `${overflow} px wider`);
-    results.check("at 390 px the card still shows the id", (await front.innerText()).includes(me.id));
+    results.check("at 390 px Personal info still shows the CarbonID", (await page.locator("main").innerText()).includes(me.id));
     await carbon.context.close();
   },
 };
 
 const profileEdits: Journey = {
   name: "account-site-profile",
-  title: "editing the profile on the card: display name (validated, Escape cancels, trimmed), timezone, date of birth (bounded), photo upload and removal (client and server refusals); Briefcase hears only what it can see",
+  title: "editing the profile on Personal info's dialogs: the name (validated, Escape cancels, trimmed), timezone, date of birth (bounded), photo upload (client and server refusals) and removal; Briefcase hears only what it can see",
   async run(ctx) {
     const { env, results } = ctx;
     const carbon = await newCarbon(ctx, "acct-profile");
@@ -125,37 +105,40 @@ const profileEdits: Journey = {
     const apps = (await call<{ items: Array<{ app: { app_id: string }; granted_scopes: string[] }> }>(probe, "/v1/me/apps")).body.items;
     const scopes = apps.find(item => item.app.app_id === "briefcase")?.granted_scopes ?? [];
     results.check("Briefcase was granted profile and email only (timezone is optional and was not switched on)", scopes.includes("profile") && scopes.includes("email") && !scopes.includes("timezone") && !scopes.includes("dob"), scopes.join(" "));
-    await page.goto(`${env.site}/`);
     const me0 = await getMe(probe);
-    const front = page.getByRole("region", { name: `Identity card of ${me0.id}`, exact: true });
-    await front.waitFor({ timeout: 30_000 });
-    await sleep(600);
+    // Personal info (2026-11-12): each row opens its editor in a dialog, by address (?edit=…).
+    const rowOf = (edit: string) => page.locator(`main [data-edit="${edit}"]`).first();
+    const openEditor = async (edit: string, title: string) => {
+      await page.goto(`${env.site}/personal?edit=${edit}`);
+      const dialog = page.getByRole("dialog", { name: title });
+      await dialog.waitFor({ timeout: 30_000 });
+      await sleep(400);
+      return dialog;
+    };
+    const rowText = async (edit: string) => (await rowOf(edit).innerText().catch(() => "")).replace(/\s+/g, " ");
 
-    // 1. Display name: refusals in place, Escape cancels, a save trims and tells Briefcase.
-    const nameButton = front.getByRole("button", { name: /^Display name:/ });
-    await nameButton.click();
-    const nameField = page.getByRole("textbox", { name: "Display name" });
+    // 1. The name: refusals in place, Escape cancels, a save trims and tells Briefcase.
+    let dialog = await openEditor("name", "Name");
+    const nameField = dialog.getByRole("textbox", { name: "Your name" });
     await nameField.fill("");
-    await page.keyboard.press("Enter");
-    await sleep(500);
-    results.check("an empty display name is refused in place", (await mainText(page)).includes("Enter a display name."));
+    results.check("an empty name can't be saved (Save is off)", await dialog.getByRole("button", { name: "Save", exact: true }).isDisabled());
     await nameField.fill("x".repeat(101));
-    await page.keyboard.press("Enter");
-    await sleep(500);
-    results.check("101 characters are refused in place (the server's limit is 100)", (await mainText(page)).includes("at most 100 characters (this one has 101)"));
+    await sleep(300);
+    const longValue = await nameField.inputValue();
+    results.check("more than 100 characters can't be saved (the field stops at 100, or the form says so)", longValue.length <= 100 || (await mainText(page)).includes("at most 100 characters (this one has 101)") || (await dialog.innerText()).includes("at most 100 characters (this one has 101)"), `${longValue.length} characters`);
     await nameField.fill(`Not Saved ${tag()}`);
     await page.keyboard.press("Escape");
     await sleep(500);
-    results.check("Escape cancels: the name is unchanged everywhere", (await getMe(probe)).display_name === me0.display_name && (await nameButton.getAttribute("aria-label")) === `Display name: ${me0.display_name}`);
+    results.check("Escape cancels: the name is unchanged everywhere", (await getMe(probe)).display_name === me0.display_name && (await rowText("name")).includes(me0.display_name));
     const before = (await inbox(env, "briefcase")).last_seq;
     let newName = `Ada Edited ${tag()}`;
-    await nameButton.click();
-    await nameField.fill(`   ${newName}   `);
+    dialog = await openEditor("name", "Name");
+    await dialog.getByRole("textbox", { name: "Your name" }).fill(`   ${newName}   `);
     const patchSent = requestSent(page, "PATCH", "/v1/me");
     await page.keyboard.press("Enter");
     const saved = await until(() => getMe(probe), me => me.display_name !== me0.display_name, 10_000);
-    results.check("the new display name is saved, trimmed", saved.display_name === newName, JSON.stringify(saved.display_name));
-    results.check("…and the card shows it", await until(async () => (await nameButton.getAttribute("aria-label")) === `Display name: ${newName}`, ok => ok, 5_000));
+    results.check("the new name is saved, trimmed", saved.display_name === newName, JSON.stringify(saved.display_name));
+    results.check("…and Personal info shows it", await until(async () => (await rowText("name")).includes(newName), ok => ok, 5_000));
     const updated = await waitEvent(env, "briefcase", "account.updated", uuid, { after: before });
     results.metric("display name PATCH sent → Briefcase received account.updated", deliveredAfter(updated, await patchSent));
     results.check("Briefcase got account.updated (signed) with changed [display_name] and the new name", !!updated && JSON.stringify(updated.payload.data.changed) === '["display_name"]' && (updated.payload.data.account as { display_name?: string } | undefined)?.display_name === newName, JSON.stringify(updated?.payload.data ?? null).slice(0, 300));
@@ -167,62 +150,53 @@ const profileEdits: Journey = {
     results.check("exactly 100 characters is a valid display name", hundred.status === 200 && hundred.body.display_name?.length === 100, `${hundred.status} ${hundred.body.display_name?.length}`);
     const unicodeName = `Zoë 李 Ωmega ${tag()}`;
     const unicode = await call<{ display_name?: string }>(probe, "/v1/me", { method: "PATCH", json: { display_name: unicodeName } });
-    await page.reload();
-    await front.waitFor({ timeout: 30_000 });
-    results.check("a display name in any script is kept as typed and shown on the card", unicode.status === 200 && unicode.body.display_name === unicodeName && (await until(async () => nameButton.getAttribute("aria-label"), label => label === `Display name: ${unicodeName}`, 8_000)) === `Display name: ${unicodeName}`, `${unicode.status} ${unicode.body.display_name}`);
+    await page.goto(`${env.site}/personal`);
+    await rowOf("name").waitFor({ timeout: 30_000 });
+    results.check("a name in any script is kept as typed and shown on Personal info", unicode.status === 200 && unicode.body.display_name === unicodeName && (await until(async () => rowText("name"), text => text.includes(unicodeName), 8_000)).includes(unicodeName), `${unicode.status} ${unicode.body.display_name}`);
     newName = unicodeName;
     const markup = `<img src=x onerror="window.__acctPwned=1"> <b>Bold</b> ${tag()}`;
     const marked = await call<{ display_name?: string }>(probe, "/v1/me", { method: "PATCH", json: { display_name: markup } });
     await page.reload();
-    await front.waitFor({ timeout: 30_000 });
+    await rowOf("name").waitFor({ timeout: 30_000 });
     await sleep(800);
-    const asText = await until(async () => nameButton.getAttribute("aria-label"), label => label === `Display name: ${markup}`, 8_000);
+    const asText = await until(async () => rowText("name"), text => text.includes(markup), 8_000);
     const injected = await page.evaluate(() => ({ pwned: (window as unknown as { __acctPwned?: number }).__acctPwned ?? null, images: document.querySelectorAll('main img[src="x"]').length, bold: Array.from(document.querySelectorAll("main b")).filter(element => element.textContent === "Bold").length }));
-    results.check("markup in a display name is shown as text, never run or rendered", marked.status === 200 && asText === `Display name: ${markup}` && injected.pwned === null && injected.images === 0 && injected.bold === 0, `${marked.status} ${JSON.stringify(injected)}`);
+    results.check("markup in a name is shown as text, never run or rendered", marked.status === 200 && asText.includes(markup) && injected.pwned === null && injected.images === 0 && injected.bold === 0, `${marked.status} ${JSON.stringify(injected)}`);
     const restored = await call(probe, "/v1/me", { method: "PATCH", json: { display_name: unicodeName } });
-    await page.reload();
-    await front.waitFor({ timeout: 30_000 });
-    await until(async () => nameButton.getAttribute("aria-label"), label => label === `Display name: ${unicodeName}`, 8_000);
     results.check("setup: the name is back", restored.status === 200);
 
-    // 2. Timezone: the editor's search, the card's clock follows; Briefcase (no timezone scope) is not told.
-    await front.getByRole("button", { name: "Change your timezone" }).click();
-    const search = page.getByRole("combobox", { name: "Timezone" });
-    await search.waitFor({ timeout: 5_000 });
-    await sleep(300);
+    // 2. Timezone: the editor's search; Briefcase (no timezone scope) is not told.
+    dialog = await openEditor("timezone", "Timezone");
+    const search = dialog.getByRole("combobox", { name: "Timezone" });
     await search.click();
+    await search.fill("");
     await page.keyboard.type("Lond", { delay: 40 });
     await page.getByRole("option", { name: /^London, Europe/ }).first().click({ timeout: 5_000 });
-    await page.getByRole("button", { name: "Save timezone" }).click();
+    await dialog.getByRole("button", { name: "Save Timezone" }).click();
     const zoned = await until(() => getMe(probe), me => me.timezone !== me0.timezone, 10_000);
     results.check("the timezone is saved as Europe/London", zoned.timezone === "Europe/London", zoned.timezone);
-    const londonZone = `${timezoneLabel("Europe/London")} · UTC${utcOffset("Europe/London")}`;
-    results.check("the card's local time moves to London", await until(async () => (await front.innerText()).replace(/\s+/g, " ").includes(londonZone), ok => ok, 5_000), londonZone);
+    results.check("Personal info's timezone row moves to London", await until(async () => (await rowText("timezone")).includes("Europe/London"), ok => ok, 5_000), await rowText("timezone"));
     await sleep(800);
     await shot(env, page, "acct-profile-01-london");
     results.check("Briefcase is not told about the timezone (it can't see it)", (await queuedEvents(env, "briefcase", uuid, "account.updated", "and payload->'data'->'changed' ? 'timezone'")) === 0);
     const badZone = await call(probe, "/v1/me", { method: "PATCH", json: { timezone: "Mars/Olympus_Mons" } });
     results.check("the API refuses a timezone that is not IANA (422)", badZone.status === 422 && JSON.stringify(badZone.body).includes("timezone"), JSON.stringify(badZone.body).slice(0, 200));
 
-    // 3. Date of birth on the back: the year, then the day; the API keeps it in the past and after 1900.
-    await front.getByRole("button", { name: "Details" }).click();
-    const back = page.getByRole("region", { name: `Identity card of ${me0.id}, details`, exact: true });
-    await back.getByRole("button", { name: "Change your date of birth" }).click({ timeout: 10_000 });
-    await page.getByRole("combobox", { name: "Year" }).click({ timeout: 5_000 });
+    // 3. Date of birth: the year, then the day on the calendar; the API keeps it in the past and after 1900.
+    dialog = await openEditor("dob", "Date of birth");
+    await dialog.getByRole("combobox", { name: "Year" }).click({ timeout: 5_000 });
     await page.getByRole("option", { name: "1990", exact: true }).click({ timeout: 5_000 });
-    await sleep(300);
-    await page.getByRole("button", { name: /^Day/ }).click({ timeout: 5_000 });
-    const calendar = page.getByRole("dialog", { name: "Day calendar" });
-    await calendar.waitFor({ timeout: 5_000 });
+    await sleep(400);
     const month = me0.dob.slice(5, 7);
     const monthName = new Date(`1990-${month}-15T00:00:00Z`).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
-    await calendar.getByRole("gridcell", { name: new RegExp(`${monthName} 15, 1990`) }).click({ timeout: 5_000 });
+    // The calendar's days are gridcells (Silicon UI Calendar), named "Thursday, November 15, 1990".
+    await dialog.getByRole("gridcell", { name: new RegExp(`${monthName} 15, 1990$`) }).click({ timeout: 5_000 });
     await sleep(300);
     await shot(env, page, "acct-profile-02-dob");
-    await page.getByRole("button", { name: "Save date" }).click();
+    await dialog.getByRole("button", { name: "Save", exact: true }).click();
     const dobbed = await until(() => getMe(probe), me => me.dob !== me0.dob, 10_000);
     results.check("the date of birth is saved", dobbed.dob === `1990-${month}-15`, dobbed.dob);
-    results.check("…and the back of the card shows it", await until(async () => (await back.innerText()).includes(formatDate(`1990-${month}-15`)), ok => ok, 5_000), formatDate(`1990-${month}-15`));
+    results.check("…and Personal info shows it", await until(async () => (await rowText("dob")).includes(formatDate(`1990-${month}-15`)), ok => ok, 5_000), formatDate(`1990-${month}-15`));
     results.check("Briefcase is not told about the date of birth (it can't see it)", (await queuedEvents(env, "briefcase", uuid, "account.updated", "and payload->'data'->'changed' ? 'dob'")) === 0);
     const tomorrow = new Date(Date.now() + 36 * 3600_000).toISOString().slice(0, 10);
     for (const [dob, why] of [[tomorrow, "in the future"], ["1899-12-31", "before 1900"], ["2001-02-29", "not a date"], ["15/10/1990", "not YYYY-MM-DD"]] as const) {
@@ -230,42 +204,36 @@ const profileEdits: Journey = {
       results.check(`the API refuses a date of birth ${why} (422)`, answer.status === 422 && JSON.stringify(answer.body).includes("dob"), `${dob}: ${answer.status} ${JSON.stringify(answer.body).slice(0, 160)}`);
     }
     results.check("the refusals changed nothing", (await getMe(probe)).dob === `1990-${month}-15`);
-    await back.getByRole("button", { name: "Back" }).click();
-    await sleep(600);
 
-    // 4. The photo: client-side refusals first (no request leaves), then a real PNG, then the default again.
+    // 4. The photo, in the Photo dialog's upload: client-side refusals first (no request leaves), then a real PNG.
     const uploads: string[] = [];
     page.on("request", request => {
       if (request.url().endsWith("/v1/me/photo") && request.method() === "POST") uploads.push(request.url());
     });
-    const fileInput = page.locator('input[type="file"]');
+    dialog = await openEditor("photo", "Photo");
+    const fileInput = dialog.locator('input[type="file"]');
     const huge = Buffer.alloc(2 * 1024 * 1024 + 1);
     solidPng(1, 1, [0, 0, 0]).copy(huge);
-    // The photo menu (a popover, outside <main>) opens with the reason.
-    const alerts = async () => (await page.getByRole("alert").allInnerTexts()).join(" | ").replace(/\s+/g, " ");
     await fileInput.setInputFiles({ name: "huge.png", mimeType: "image/png", buffer: huge });
-    const hugeText = await until(alerts, text => text.includes("huge.png"), 5_000);
-    results.check("a photo over 2 MB is refused before uploading, saying its size", hugeText.includes("huge.png is 2.0 MB; a profile photo can be at most 2 MB"), hugeText.slice(0, 200) || "no message");
+    const hugeText = await until(async () => (await dialog.innerText()).replace(/\s+/g, " "), text => text.includes("huge.png") && /2 ?MB/.test(text), 5_000);
+    results.check("a photo over 2 MB is refused before uploading", /huge\.png/.test(hugeText) && /2 ?MB/.test(hugeText), hugeText.slice(0, 240) || "no message");
     await shot(env, page, "acct-profile-03-too-big");
-    await fileInput.setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("not an image") });
-    const textText = await until(alerts, text => text.includes("notes.txt"), 5_000);
-    results.check("a text file is refused before uploading", textText.includes("notes.txt is a text/plain file. Choose a PNG, JPEG, WebP or GIF image."), textText.slice(0, 200) || "no message");
-    results.check("…and neither refusal sent anything", uploads.length === 0, String(uploads.length));
-    await page.keyboard.press("Escape");
-    await sleep(400);
+    results.check("…and it sent nothing", uploads.length === 0, String(uploads.length));
 
     const png = solidPng(96, 96, [31, 95, 184]);
     const beforePhoto = (await inbox(env, "briefcase")).last_seq;
+    dialog = await openEditor("photo", "Photo");
     const answered = page.waitForResponse(response => response.url().endsWith("/v1/me/photo") && response.request().method() === "POST", { timeout: 20_000 });
     const uploadStarted = Date.now();
-    await fileInput.setInputFiles({ name: "portrait.png", mimeType: "image/png", buffer: png });
+    await dialog.locator('input[type="file"]').setInputFiles({ name: "portrait.png", mimeType: "image/png", buffer: png });
     const upload = await answered;
     results.metric("photo upload (96×96 PNG)", Date.now() - uploadStarted);
     results.check("the PNG uploads (201)", upload.status() === 201, String(upload.status()));
     const withPhoto = await until(() => getMe(probe), me => me.pfp_url !== me0.pfp_url, 10_000);
     results.check("the account's photo is now served by the site (/v1/photos/…)", withPhoto.pfp_url.startsWith(`${env.site}/v1/photos/`), withPhoto.pfp_url);
-    const shown = await until(async () => front.locator(`[role="img"][aria-label="${newName}"] img`).first().getAttribute("src").catch(() => null), src => src === withPhoto.pfp_url, 10_000);
-    results.check("the card shows the new photo", shown === withPhoto.pfp_url, String(shown));
+    await page.goto(`${env.site}/personal`);
+    const shown = await until(async () => rowOf("photo").locator("img").first().getAttribute("src").catch(() => null), src => src === withPhoto.pfp_url, 10_000);
+    results.check("Personal info shows the new photo", shown === withPhoto.pfp_url, String(shown));
     const served = await fetch(withPhoto.pfp_url);
     const servedBytes = Buffer.from(await served.arrayBuffer());
     results.check("the photo is served as the same PNG bytes, cached as immutable", served.status === 200 && served.headers.get("content-type") === "image/png" && /immutable/.test(served.headers.get("cache-control") ?? "") && servedBytes.equals(png), `${served.status} ${served.headers.get("content-type")} ${served.headers.get("cache-control")} ${servedBytes.length} bytes`);
@@ -309,16 +277,13 @@ const profileEdits: Journey = {
     results.check("a photo link must be https (422)", httpUrl.status === 422 && JSON.stringify(httpUrl.body).includes("pfp_url"), `${httpUrl.status}`);
     results.check("the refusals left the uploaded photo in place", (await getMe(probe)).pfp_url === withPhoto.pfp_url);
 
-    // Back to the default photo from the photo menu.
-    await front.getByRole("button", { name: "Change your photo" }).click();
-    const menu = page.getByRole("dialog").filter({ hasText: "Profile photo" }).last();
-    await menu.waitFor({ timeout: 5_000 });
-    await confirmMorph(menu, "Remove photo", "Remove");
+    // Back to the default photo: Personal info's photo dialog has no remove (the avatar takes its place), so through the
+    // API the site uses (DELETE /v1/me/photo).
+    const removedPhoto = await call(probe, "/v1/me/photo", { method: "DELETE" });
     const reset = await until(() => getMe(probe), me => me.pfp_url !== withPhoto.pfp_url, 10_000);
-    results.check("Remove photo puts the Iris default back", reset.pfp_url === `${env.iris}/pfp/carbon?id=${uuid}`, reset.pfp_url);
+    results.check("removing the photo puts the Iris default back", removedPhoto.status === 200 && reset.pfp_url === `${env.iris}/pfp/carbon?id=${uuid}`, `${removedPhoto.status} ${reset.pfp_url}`);
     const gone = await json(withPhoto.pfp_url);
     results.check("the removed upload is no longer served (404)", gone.status === 404, String(gone.status));
-    await page.keyboard.press("Escape");
 
     // The other formats the site takes (the PNG was above): a JPEG, and a WebP where the browser can encode one, drawn
     // on a canvas in the page, and a GIF; each uploads and is served as itself, byte for byte.

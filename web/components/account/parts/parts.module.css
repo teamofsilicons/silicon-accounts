@@ -1,4 +1,4 @@
-/* Shared pieces of the account pages: app marks, the id field, the id change form and the reveal-once card. */
+/* Shared pieces of the account pages: app marks and the reveal-once card (the id field and id change form are in id-field.module.css). */
 
 /* ---------------------------------------------------- app mark --------------------------------------------------- */
 .appMark {
@@ -16,49 +16,6 @@
 }
 .appMark img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .appInitials { font-size: calc(var(--mark-size, 40px) * .36); font-weight: 500; letter-spacing: 0; line-height: 1; }
-
-/* ---------------------------------------------------- id field --------------------------------------------------- */
-.idField { display: grid; min-width: 0; gap: var(--space-2); }
-/* The prefix and the status glyph sit inside the input's box: the input is the last thing the Arc field renders (its
-   own description and error rows stay empty; this field writes its status line below), so they align to the bottom. */
-.idControl { position: relative; min-width: 0; }
-.idInput.idInput { padding-inline: calc(var(--space-3) + var(--prefix-width, 2ch)) calc(var(--space-3) + 24px); font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; }
-.idPrefix { position: absolute; bottom: 0; left: var(--space-3); display: flex; height: var(--control-height-md); align-items: center; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: 0; pointer-events: none; }
-.idSuffix { position: absolute; right: var(--space-3); bottom: 0; display: flex; width: 16px; height: var(--control-height-md); align-items: center; justify-content: center; color: var(--text-muted); pointer-events: none; }
-.idSuffix[data-tone="success"] { color: var(--success); }
-.idSuffix[data-tone="danger"] { color: var(--danger); }
-.idStatus { min-height: calc(var(--text-sm) * var(--leading-body)); margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); overflow-wrap: anywhere; }
-.idStatus[data-tone="success"] { color: var(--success); }
-.idStatus[data-tone="danger"] { color: var(--danger); }
-.idDescription { margin: 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); }
-.suggestions { display: grid; gap: var(--space-2); }
-.suggestionsLabel { color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
-.suggestionList { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.suggestion {
-  --sq-r: var(--radius-pill);
-  --sq-fill: var(--surface);
-  --sq-stroke: var(--border-strong);
-  position: relative;
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--sq-stroke);
-  background: var(--sq-fill);
-  color: var(--foreground);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0;
-  cursor: pointer;
-  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
-}
-.suggestion:hover, .suggestion:focus-visible { --sq-fill: var(--surface-muted); --sq-stroke: var(--accent); outline: none; }
-
-.spin { animation: spin 900ms linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ------------------------------------------------- id change form ------------------------------------------------- */
-.idForm { display: grid; min-width: 0; gap: var(--space-5); }
-.formNote { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); overflow-wrap: anywhere; }
-.formActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-3); }
 
 /* -------------------------------------------------- secret reveal ------------------------------------------------- */
 .reveal {
@@ -164,8 +121,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spin { animation: none; }
-  .suggestion, .iconButton, .textAction { transition: none; }
+  .iconButton, .textAction { transition: none; }
 }
 
 /* A Silicon's mark (silicon-mark.tsx): a rounded square in its own gradient with a white spark, as in the prototype. */

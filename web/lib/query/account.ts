@@ -55,7 +55,7 @@ export function useChangeId() {
       setMe(client, me);
       void client.invalidateQueries({ queryKey: queryKeys.me.historyRoot });
     },
-    meta: { errorTitle: "Could not change your id" },
+    meta: { errorTitle: "Could not change your CarbonID" },
   });
 }
 

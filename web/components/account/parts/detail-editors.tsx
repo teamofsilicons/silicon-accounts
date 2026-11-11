@@ -120,8 +120,8 @@ export function TimezoneForm({ value, onSave, onDone, autoFocus }: TimezoneFormP
       <Combobox label="Timezone" options={options} value={draft} onValueChange={next => { setDraft(next); setError(null); }} placeholder="Search a city or an offset" />
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.actions}>
-        <Button variant="ghost" size="sm" onClick={onDone} disabled={pending}>Cancel</Button>
-        <Button size="sm" onClick={() => void save()} loading={pending} disabled={!draft || draft === value}>Save Timezone</Button>
+        <Button variant="ghost" onClick={onDone} disabled={pending}>Cancel</Button>
+        <Button onClick={() => void save()} loading={pending} disabled={!draft || draft === value}>Save Timezone</Button>
       </div>
     </div>
   );

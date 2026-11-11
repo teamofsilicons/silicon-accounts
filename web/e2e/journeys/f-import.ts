@@ -123,7 +123,7 @@ export const journey: Journey = {
       const walk = await completeDetails(env, p, "legacy-crm");
       results.check("the imported Carbon (set up on the first walk) signs straight back in", walk.pages.length === 0, `${walk.pages.length} details pages`);
     } else {
-      const id = p.getByRole("textbox", { name: "Your id" });
+      const id = p.getByRole("textbox", { name: "Your CarbonID" });
       await id.waitFor({ timeout: 20_000 });
       await sleep(700);
       await shot(env, p, "f-03-finish-import");

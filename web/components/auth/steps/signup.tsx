@@ -188,9 +188,9 @@ function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: Flo
       case "checking":
         return `Checking c:${handle}…`;
       case "own":
-        return importer ? `This is the id ${importer} set up for you. Keep it, or pick another.` : "This is the id set up for you when you were added. Keep it, or pick another.";
+        return importer ? `This is the CarbonID ${importer} set up for you. Keep it, or pick another.` : "This is the CarbonID set up for you when you were added. Keep it, or pick another.";
       case "unknown":
-        return ids.message ?? "Your id is how people find you. You can change it later.";
+        return ids.message ?? "Your CarbonID is how people find you. You can change it later.";
       default:
         return null;
     }
@@ -337,7 +337,7 @@ function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: Flo
         />
 
         <IdField
-          label="Your id"
+          label="Your CarbonID"
           value={handle}
           onChange={value => {
             setHandle(cleanHandle(value));

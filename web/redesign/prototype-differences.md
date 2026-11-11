@@ -59,7 +59,7 @@ marked "check" is a first guess, to be confirmed against Silicon UI's code befor
 | Silicon avatar | Gradient rounded square (30%) with a spark | SiliconMark on Home (parts/silicon-mark.tsx, colours in tokens); the Silicons page still shows photos | 2 | asking (photos or marks everywhere?) |
 | App mark | Dark rounded square with the app's icon | AppMark | 2 (check) | open |
 | Person avatar | Initials on a hue-tinted circle | A Carbon's pixel avatar (Anil's avatar customizer) or their photo | kept (Anil) | done |
-| Type scale | Page title 26 px, card title 16 px, body 14 px, detail 13 px | Silicon UI's typography (2026-11-09), compact on branch compact (2026-11-10): display 28, h1 22, h2 18, h3 16, body 16, small 14; Silicon UI components keep fixed weights (500, 400), which the type lab's weights don't reach. Inside Silicon UI: controls and labels 14/1.4/500 (label says 1.2), typed text 400 (label says 500), hints 12/1.4/400 (caption says 500, .02em), component text 14 (body says 16) | 3 | open |
+| Type scale | Page title 26 px, card title 16 px, body 14 px, detail 13 px | Silicon UI's typography (2026-11-09), compact on branch compact (2026-11-10): display 28, h1 22, h2 18, h3 16, body 16, small 14; Silicon UI components keep fixed weights (500, 400), which the type lab's weights don't reach. Inside Silicon UI: controls and labels 14/1.4/500 (label says 1.2), typed text 400 (label says 500), hints 12/1.4/400 (caption says 500, .02em; now 14/400 small in the local patch, 2026-11-10), component text 14 (body says 16) | 3 | open |
 | Field | 42 px, 10 px radius, accent focus ring | Silicon UI Input; focus without a ring (2026-10-17) | 3, 7 | open |
 | Dialog | 18 px radius, 480 px, 22/24 px padding | Silicon UI Dialog | 3 (check) | open |
 | Toast | Dark, 14 px radius | ToastStack | 3 (check) | open |
@@ -132,6 +132,37 @@ Silicon's activity, automation, cloud services, per-field sharing.
 - **Devices** show when each was last active and its IP; the prototype shows a place ("Kolkata, India"), which the API
   doesn't give. Category: API gap.
 - **Sign Out of All Other Devices** signs each session out one by one; the API has no single call. Category: API gap.
-- **The phone field's arrow overlaps the calling code** and **the dialog's close button is a bordered square**: both
+- **The phone field's arrow overlapped the calling code** and **the dialog's close button was a bordered square**: both
   are Silicon UI's (PhoneInput, Dialog). Category: Silicon UI; filed as
-  teamofsilicons/silicon-ui#28 (PhoneInput) and #29 (Dialog close). The dialog title keeps Silicon UI's fixed 500 weight.
+  teamofsilicons/silicon-ui#28 (PhoneInput) and #29 (Dialog close), fixed in source and the account site's local package
+  patch on 2026-11-10. The upstream release is pending. The dialog title is h2 (18/600) and field hints and errors are small (14/400) since 2026-11-10, in the local patch only (request §3 in requests/silicon-ui-phone-input-dialog-close.md).
+- **The PhoneInput country list was cropped by the Security dialog and had a different corner shape and radius from the field.** Category: Silicon UI; fixed in shared source and the account site's local package patch on 2026-11-10. The list now floats beyond the dialog's scroll boundary and uses the control's corner tokens. The upstream release is pending.
+
+## Connected apps (2026-11-11)
+
+- **Who uses it lists only you.** The prototype also lists your Silicons that use the app. Category: API gap (no call
+  says which of your Silicons an app knows).
+- **What it can see has no switches.** The prototype lets you stop sharing an optional detail. Category: API gap (scopes
+  can't be changed from the account site); each detail shows its value instead.
+- **The list's line is when it signed you in** ("Signed in 2 weeks ago"), where the prototype says who uses it ("You,
+  Scout"). Category: API gap, as above.
+- **Apps whose access you removed are listed** under "Access removed", which the prototype doesn't show. Category:
+  kept from the site (the API returns them; they can be signed in to again).
+- **The "Making an app?" footnote** is the site's, not the prototype's. Category: kept from the site.
+
+## Permissions between apps (2026-11-12)
+
+- **Ended permissions show the date and the reason in words** ("You stopped it", "Ended when Briefcase's access was
+  removed"), where the prototype shows its reason and when. Same content; the wording is the site's.
+- **The line under the title adds** "Stop one and the other app's next check fails at once." Category: kept from the
+  site (what stopping does, from the contract).
+
+## Silicons (2026-11-12)
+
+- **No stats, Activity tab, Apps it may use, Automation or Cloud services** on a Silicon's page, and no sign-in sparkline
+  on its tile. Category: API gap (no call gives a Silicon's last sign-in, its apps, its sign-in counts or its activity;
+  api-gaps.md).
+- **A tile's line is when its key last changed**, where the prototype shows when it last signed in. Category: API gap.
+- **Access also has the Webhook**, which the prototype doesn't show. Category: kept from the site.
+- **About also has Timezone and Photo.** Category: kept from the site (the API has them).
+- **The id row is "Id"** until a Silicon's id has a name (CarbonID's counterpart is undecided).

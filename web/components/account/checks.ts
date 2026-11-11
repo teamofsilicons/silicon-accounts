@@ -387,11 +387,11 @@ const checks: Check[] = [
       await look("/silicons, Create a Silicon");
       await page.keyboard.press("Escape");
       await visit(page, `${env.base}/personal`, "Personal info");
-      await page.getByRole("button", { name: "Change id" }).first().click();
-      const change = page.getByRole("dialog", { name: "Change your id" });
+      await page.getByRole("button", { name: /CarbonID/ }).first().click();
+      const change = page.getByRole("dialog", { name: "CarbonID" });
       await change.waitFor({ timeout: 10_000 });
       await settle(page, 300);
-      await look("/personal, Change your id");
+      await look("/personal, Change your CarbonID");
       await page.keyboard.press("Escape");
       expect(found.length === 0, `"people" words: ${found.join("; ")}`);
     },

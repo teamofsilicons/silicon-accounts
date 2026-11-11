@@ -18,8 +18,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpRight, Cpu, Plus } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Button } from "@teamofsilicons/silicon-ui/button";
-import { ButtonLink } from "@teamofsilicons/silicon-ui/button-link";
-import { Card } from "@teamofsilicons/silicon-ui/card";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuRoot, DropdownMenuTrigger } from "@teamofsilicons/silicon-ui/dropdown-menu";
 import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
 import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
@@ -124,10 +123,7 @@ export function Silicons() {
                 <CardsSkeleton />
               ) : (
                 <ul className={styles.cards}>
-                  {list.map(item => <li key={item.uuid}><SiliconCard silicon={item} now={now} /></li>)}
-                  <li>
-                    <Card title="New Silicon" action={<ButtonLink as={Link} href={NEW_SILICON_HREF} variant="secondary" size="sm" data-create-silicon="">Create a Silicon</ButtonLink>} />
-                  </li>
+                  {list.map(item => <li key={item.uuid}><SiliconTile silicon={item} now={now} /></li>)}
                 </ul>
               )}
               <ListCap page={silicons.data} noun="Silicons" command="silicon-accounts silicon list" />
@@ -160,24 +156,30 @@ function AddSilicon({ onCreate }: { onCreate: () => void }) {
 }
 
 /**
- * One Silicon as a card in its own colour pair (its mark's, picked from its uuid), deepened at the top left so its
- * words read in white: its name, its si:id, and when its key last changed; a status when it is not simply active. The
- * Silicon spark stands at the lower right. The whole card opens its page.
+ * One Silicon as a tile, as the prototype draws it and as Home does (Anil, 2026-11-12): its mark, its name and si:id,
+ * then its status and when its key last changed (or who it is being handed to). The whole tile opens its page.
  */
-function SiliconCard({ silicon, now }: { silicon: ManagedSilicon; now: number }) {
+function SiliconTile({ silicon, now }: { silicon: ManagedSilicon; now: number }) {
   const rotated = stkRotatedAt(silicon);
-  const status = silicon.status === "pending_custodian" ? "Waiting for a custodian"
-    : silicon.pending_transfer ? `Handing over to ${personLabel(silicon.pending_transfer.to)}`
-      : null;
+  const status = silicon.status === "pending_custodian" ? { tone: "warning" as const, text: "Waiting for a custodian" }
+    : silicon.pending_transfer ? { tone: "info" as const, text: "Handing over" }
+      : { tone: "success" as const, text: "Active" };
+  const line = silicon.pending_transfer ? `to ${personLabel(silicon.pending_transfer.to)}`
+    : rotated ? `Key changed ${formatRelative(rotated, now)}` : `Key made ${formatRelative(silicon.created_at, now)}`;
   return (
-    <Card
-      title={silicon.display_name || silicon.id || "A Silicon"}
-      description={silicon.id ?? undefined}
-      avatar={<SiliconMark seed={silicon.uuid} size={32} />}
-      meta={status ?? undefined}
-      status={rotated ? `Key changed ${formatRelative(rotated, now)}` : "Key never changed"}
-      action={<ButtonLink as={Link} href={siliconHref(silicon)} variant="secondary" size="sm" data-silicon-card="">Open</ButtonLink>}
-    />
+    <Link href={siliconHref(silicon)} data-sq="surface" className={styles.tile} data-silicon-card="">
+      <span className={styles.tileTop}>
+        <SiliconMark seed={silicon.uuid} size={28} />
+        <span className={styles.tileWords}>
+          <span className={styles.tileTitle}>{silicon.display_name || silicon.id || "A Silicon"}</span>
+          {silicon.id ? <span className={styles.tileId}>{silicon.id}</span> : null}
+        </span>
+      </span>
+      <span className={styles.tileFoot}>
+        <Badge size="sm" tone={status.tone}>{status.text}</Badge>
+        <span className={styles.tileLine}>{line}</span>
+      </span>
+    </Link>
   );
 }
 

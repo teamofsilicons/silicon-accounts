@@ -16,17 +16,11 @@
     "components/account/parts/photo.module.css": {
       "spacing": 2
     },
-    "components/account/proofs/proofs.module.css": {
-      "spacing": 7
-    },
     "components/account/settings/settings.module.css": {
       "spacing": 2
     },
     "components/account/silicons/request-deck.module.css": {
       "spacing": 1
-    },
-    "components/account/silicons/silicon-drawer.module.css": {
-      "spacing": 3
     },
     "components/account/silicons/silicons.module.css": {
       "spacing": 1

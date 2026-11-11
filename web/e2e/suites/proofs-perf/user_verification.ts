@@ -115,11 +115,11 @@ export const journeys: Journey[] = [
       const item = mine.items.find(entry => entry.proof_id === proofId);
       results.check("GET /v1/me/proofs lists it as active: DM acting at Briefcase with files.write", item?.status === "active" && item.issuing_app.app_id === "dm" && item.receiving_app.app_id === "briefcase" && JSON.stringify(item.scopes) === '["files.write"]', short(item));
       await page.goto(`${env.site}/proofs`);
-      const card = page.getByRole("article", { name: "DM acts at Briefcase for you" });
+      const card = page.getByRole("region", { name: "Active", exact: true }).getByRole("listitem").filter({ hasText: "DM in Briefcase" });
       await card.first().waitFor({ timeout: 30_000 });
       await sleep(800);
       const cardText = (await card.first().innerText()).replace(/\s+/g, " ");
-      results.check("/proofs shows the card \"DM acts at Briefcase for you\" with its scope and the Active badge", /files\.write/.test(cardText) && /Active/.test(cardText) && /Revoke/.test(cardText), cardText.slice(0, 300));
+      results.check("/proofs lists \"DM in Briefcase\" under Active with its scope and Stop", /files\.write/.test(cardText) && /Stop/.test(cardText), cardText.slice(0, 300));
       await shot(env, page, "proofs-perf-user_verification-03-proofs-page", true);
 
       // History: the issue is in the audit log under the account, and in the account's history.

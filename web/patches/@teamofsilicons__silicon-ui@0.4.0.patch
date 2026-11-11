@@ -1,3 +1,892 @@
+diff --git a/components/button/button.d.ts b/components/button/button.d.ts
+index 3c667455f5d7d833977e70856fc32788267ef6ed..f7b9ad31f4e1ba94c0a06e3c30f5497a7ca04e56 100644
+--- a/components/button/button.d.ts
++++ b/components/button/button.d.ts
+@@ -1,10 +1,11 @@
+ import type { ButtonHTMLAttributes } from "react";
+-/** `soft` is filled and borderless, for controls in a bar (experimental). */
+-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "soft";
++/** `soft` is filled and borderless, for controls in a bar (experimental). `link` is text with an underline, for an action
++ * among words (a switch under a field); `--button-link-underline` sets the resting underline (transparent: on hover only). */
++export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "soft" | "link";
+ /** `xs` (24px) is for dense UI such as tree rows and toolbars, usually icon-only with an aria-label. */
+ export type ButtonSize = "xs" | "sm" | "md" | "lg";
+ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onDrag" | "onDragEnd" | "onDragStart" | "onAnimationStart"> {
+-    /** The look: `primary` (default) for the main action, `secondary` bordered, `ghost` quiet, `danger` destructive, `soft` filled for bars. */
++    /** The look: `primary` (default) for the main action, `secondary` bordered, `ghost` quiet, `danger` destructive, `soft` filled for bars, `link` underlined text. */
+     variant?: ButtonVariant;
+     /** Height: `xs` 24px, `sm` 36px, `md` 44px (default), `lg` 50px. */
+     size?: ButtonSize;
+diff --git a/components/button/button.module.css b/components/button/button.module.css
+index 1772ae16e1f50531afa8f88bfda226f6c6854b8f..27b59c0561b9253bd4f484ad617c5a970f96ae62 100644
+--- a/components/button/button.module.css
++++ b/components/button/button.module.css
+@@ -1,5 +1,5 @@
+ /* Press scale is driven by Motion (whileTap) alone, so transform never gets a CSS transition here. */
+-.button { position: relative; display: inline-flex; min-height: var(--control-height-md); align-items: center; justify-content: center; gap: var(--space-related); border: 1px solid transparent; border-radius: var(--radius-control); corner-shape: var(--corner-shape); padding: 0 var(--space-inset); font: inherit; font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
++.button { position: relative; display: inline-flex; min-height: var(--control-height-md); align-items: center; justify-content: center; gap: var(--space-related); border: 1px solid transparent; border-radius: var(--radius-control); corner-shape: var(--corner-shape); padding: 0 var(--space-inset); font: inherit; font-size: var(--text-sm); font-weight: 500; letter-spacing: var(--tracking-body); line-height: var(--leading-body); white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), opacity var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
+ .button:disabled { cursor: not-allowed; opacity: .52; }
+ .button[aria-busy="true"] { cursor: progress; }
+ /* Anchors of floating layers never scale: Radix opens on pointerdown and would measure a shrunken trigger. */
+@@ -34,13 +34,22 @@
+ .secondary:active:not(:disabled), .ghost:active:not(:disabled) { color: var(--foreground); background: var(--surface-muted); }
+ .danger:active:not(:disabled) { border-color: var(--danger); background: var(--surface-muted); }
+ .soft:active:not(:disabled) { background: var(--surface-pressed); }
+-.xs { min-height: var(--control-height-xs); gap: var(--space-tight); padding-inline: var(--space-related); font-size: var(--text-xs); }
++.xs { min-height: var(--control-height-xs); gap: var(--space-tight); padding-inline: var(--space-related); font-size: var(--text-xs); letter-spacing: var(--tracking-body); }
+ /* A compact icon-only button is a square, with the icon at its usual 16px. */
+ .xs[data-icon-only] { min-width: var(--control-height-xs); padding-inline: 0; }
+ .xs svg { width: 16px; height: 16px; }
+ .sm { min-height: var(--control-height-sm); padding-inline: var(--space-group); font-size: var(--text-sm); }
+ .md { min-height: var(--control-height-md); }
+ .lg { min-height: var(--control-height-lg); padding-inline: var(--space-comfort); font-size: var(--text-sm); }
++/* link: text with an underline, no box. The underline is light at rest (--button-link-underline, default --border-strong;
++   transparent shows it on hover only) and takes the text's colour on hover and focus. After the sizes, so it drops their
++   height and padding but keeps their font size. */
++.button.link { min-width: 0; min-height: 0; padding: 0; gap: var(--space-tight); border: 0; background: transparent; color: var(--text-secondary); }
++.link .labelPhase { text-decoration-line: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: var(--button-link-underline, var(--border-strong)); transition: text-decoration-color var(--duration-fast) var(--ease-standard); }
++@media (hover: hover) and (pointer: fine) { .link:hover:not(:disabled) { color: var(--foreground); } .link:hover:not(:disabled) .labelPhase { text-decoration-color: currentColor; } }
++.link:focus-visible, .link:active:not(:disabled) { color: var(--foreground); }
++.link:focus-visible .labelPhase, .link:active:not(:disabled) .labelPhase { text-decoration-color: currentColor; }
++.link:disabled { opacity: 1; color: var(--text-muted); }
+ .loader { position: absolute; left: 50%; top: 50%; display: grid; width: var(--space-inset); height: var(--space-inset); margin: calc(var(--space-inset) / -2); }
+ .spinner { border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; corner-shape: round; animation: spin .7s linear infinite; }
+ .loadingLabel { opacity: 0; }
+diff --git a/components/color-picker/color-picker.module.css b/components/color-picker/color-picker.module.css
+index d341e3a71a534b012a78947934cbb406e9129abb..79d4771a9bb28a4a5494b3c628b6933494fcfb57 100644
+--- a/components/color-picker/color-picker.module.css
++++ b/components/color-picker/color-picker.module.css
+@@ -72,7 +72,7 @@
+ .input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--foreground); caret-color: var(--foreground); }
+ .input[data-morphing] { color: transparent; }
+ .morph { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; color: var(--foreground); pointer-events: none; white-space: nowrap; }
+-.error { min-height: 0; margin: calc(var(--space-group) * -1) var(--space-hair) calc(var(--space-tight) * -1); color: var(--danger); font-size: var(--text-xs); }
++.error { min-height: 0; margin: calc(var(--space-group) * -1) var(--space-hair) calc(var(--space-tight) * -1); color: var(--danger); font-size: var(--field-hint-size, var(--text-sm)); letter-spacing: var(--tracking-body); }
+ .error:empty { display: none; }
+ 
+ .contrast { display: flex; align-items: center; gap: var(--space-group); font-size: var(--text-sm); }
+diff --git a/components/combobox/combobox.module.css b/components/combobox/combobox.module.css
+index 94d7790dfb565740ea5f13a70ae4f51e92f6b527..ed7e8807e40fa64606bb90e476079afb9ac489df 100644
+--- a/components/combobox/combobox.module.css
++++ b/components/combobox/combobox.module.css
+@@ -1,12 +1,12 @@
+ .field { position: relative; display: grid; gap: var(--space-related); min-width: 0; }
+-.field label { font-size: var(--text-sm); font-weight: 500; }
++.field label { font-size: var(--text-sm); font-weight: 500; letter-spacing: var(--tracking-body); }
+ .control { position: relative; z-index: 2; display: flex; min-height: var(--control-height-md); align-items: center; gap: var(--space-related); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 0 var(--space-group); background: var(--surface); color: var(--foreground); transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
+ @media (hover: hover) and (pointer: fine) { .control:hover:not(.disabled) { border-color: var(--border-strong); background: var(--surface-muted); } }
+ .control:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
+ .control.open { border-color: var(--border-strong); background: var(--surface-muted); }
+ .control.disabled { opacity: .5; cursor: not-allowed; }
+ .searchIcon { flex: 0 0 auto; color: var(--text-muted); }
+-.control input { width: 100%; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-sm); }
++.control input { width: 100%; min-width: 0; border: 0; outline: 0; padding: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); }
+ .control input:focus-visible { outline: none; }
+ .control input::placeholder { color: var(--text-muted); }
+ .chevron { flex: 0 0 auto; color: var(--text-muted); transition: transform var(--duration-spring) var(--ease-spring); }
+@@ -14,7 +14,7 @@
+ .clear { display: grid; width: 22px; height: 22px; flex: 0 0 auto; place-items: center; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-muted); cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard); }
+ @media (hover: hover) and (pointer: fine) { .clear:hover { background: var(--surface-muted); color: var(--foreground); } }
+ .clear:focus-visible { --focus-outline-offset: 1px; }
+-.hint { color: var(--text-muted); font-size: var(--text-xs); }
++.hint { color: var(--field-hint-colour, var(--text-muted)); font-size: var(--field-hint-size, var(--text-sm)); letter-spacing: var(--tracking-body); }
+ .popover { position: absolute; z-index: var(--layer-dropdown); top: calc(100% + var(--space-related)); right: 0; left: 0; overflow: hidden; transform-origin: top center; border: 1px solid var(--border); border-radius: var(--radius-container); padding: var(--space-tight); background: var(--surface-raised); color: var(--foreground); box-shadow: var(--shadow-floating); will-change: transform, opacity; }
+ .autoHeight { overflow: hidden; }
+ .listbox { max-height: min(300px, 40vh); overflow-y: auto; overscroll-behavior: contain; }
+diff --git a/components/date-picker/date-picker.module.css b/components/date-picker/date-picker.module.css
+index 1b7e47a832b2732b0c1edb2e7e193fafbb4c8cf9..3e09377a1a455369f6a9933f98b80f3c699f303c 100644
+--- a/components/date-picker/date-picker.module.css
++++ b/components/date-picker/date-picker.module.css
+@@ -1,8 +1,8 @@
+ .field { display: grid; gap: var(--space-related); min-width: 0; }
+-.label { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
++.label { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ .anchor { position: relative; min-width: 0; }
+ /* The trigger anchors the calendar, so press feedback stays in color; it never scales. */
+-.trigger { position: relative; display: flex; width: 100%; min-height: var(--control-height-md); align-items: center; gap: var(--space-related); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 0 var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
++.trigger { position: relative; display: flex; width: 100%; min-height: var(--control-height-md); align-items: center; gap: var(--space-related); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 0 var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); text-align: left; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
+ @media (hover: hover) and (pointer: fine) { .trigger:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-muted); } }
+ .trigger:active:not(:disabled), .trigger[aria-expanded="true"] { border-color: var(--border-strong); background: var(--surface-muted); }
+ .trigger:disabled { cursor: not-allowed; opacity: .5; }
+@@ -28,7 +28,7 @@
+ @media (hover: hover) and (pointer: fine) { .footer button:hover:not(:disabled) { background: var(--surface-muted); color: var(--foreground); } }
+ .footer button:active:not(:disabled) { transform: scale(.97); transition-duration: var(--duration-fast), var(--duration-fast), var(--duration-fast); transition-timing-function: var(--ease-standard); }
+ .footer button:disabled { cursor: not-allowed; opacity: .4; }
+-.description { color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); transition: opacity var(--duration-fast) var(--ease-standard); }
++.description { color: var(--field-hint-colour, var(--text-muted)); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); transition: opacity var(--duration-fast) var(--ease-standard); letter-spacing: var(--tracking-body); }
+ /* The open calendar covers the hint; fading it keeps its first letters from peeking past the popover's rounded corner. */
+ .anchor:has(.popover) + .description { opacity: 0; }
+ @media (prefers-reduced-motion: reduce) { .trigger, .chevron, .footer button, .description { transition: none; } .footer button:active:not(:disabled) { transform: none; } }
+diff --git a/components/dialog/dialog.d.ts b/components/dialog/dialog.d.ts
+index 8451dd1adb9640174faa1ea3778bc5395f20ddc2..0193f02895e408615476ce2d3ce4eda76cfad299 100644
+--- a/components/dialog/dialog.d.ts
++++ b/components/dialog/dialog.d.ts
+@@ -5,7 +5,8 @@ export declare const DialogTrigger: import("react").ForwardRefExoticComponent<Di
+ export declare const DialogClose: import("react").ForwardRefExoticComponent<DialogPrimitive.DialogCloseProps & import("react").RefAttributes<HTMLButtonElement>>;
+ export interface DialogContentProps extends ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+     title: string;
+-    description?: string;
++    /** Plain text swaps in with a rise when it changes; markup (a bold id) is shown as given. */
++    description?: ReactNode;
+     children: ReactNode;
+ }
+ export declare function DialogContent({ title, description, children, className, onPointerDownOutside, onEscapeKeyDown, onOpenAutoFocus, onCloseAutoFocus, ...props }: DialogContentProps): import("react").JSX.Element;
+diff --git a/components/dialog/dialog.js b/components/dialog/dialog.js
+index 939ef0adf755907cdc610fe1f0be700cfe2f79c6..22ae789b7f9c0284a1518e12ed2f6ce00d26b2db 100644
+--- a/components/dialog/dialog.js
++++ b/components/dialog/dialog.js
+@@ -43,7 +43,7 @@ export function DialogContent({ title, description, children, className, onPoint
+             event.preventDefault();
+     };
+     const classes = [styles.content, className].filter(Boolean).join(" ");
+-    const inner = _jsxs(_Fragment, { children: [_jsxs("div", { className: styles.header, children: [_jsxs("div", { children: [_jsx(DialogPrimitive.Title, { className: styles.title, children: _jsx(SwapText, { text: title }) }), description ? _jsx(DialogPrimitive.Description, { className: styles.description, children: _jsx(SwapText, { text: description }) }) : null] }), _jsx(DialogPrimitive.Close, { className: styles.close, "aria-label": "Close dialog", children: _jsx(X, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) })] }), _jsx("div", { className: styles.body, children: children })] });
++    const inner = _jsxs(_Fragment, { children: [_jsxs("div", { className: styles.header, children: [_jsxs("div", { children: [_jsx(DialogPrimitive.Title, { className: styles.title, children: _jsx(SwapText, { text: title }) }), description ? _jsx(DialogPrimitive.Description, { className: styles.description, children: typeof description === "string" ? _jsx(SwapText, { text: description }) : _jsx("span", { className: styles.swap, children: description }) }) : null] }), _jsx(DialogPrimitive.Close, { className: styles.close, "aria-label": "Close dialog", children: _jsx(X, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) })] }), _jsx("div", { className: styles.body, children: children })] });
+     // Under a bare Radix root the open state is unknown here, so CSS keyframes keyed off data-state animate the layers instead.
+     if (open === null)
+         return _jsxs(DialogPrimitive.Portal, { children: [_jsx(DialogPrimitive.Overlay, { className: `${styles.overlay} ${styles.keyframes}` }), _jsx(DialogPrimitive.Content, { ...props, ...escape, onPointerDownOutside: pressOutside, className: `${classes} ${styles.keyframes}`, children: inner })] });
+diff --git a/components/dialog/dialog.module.css b/components/dialog/dialog.module.css
+index 762839c7344708d2c17044ab84ef1a88561c8015..45d3dc608a5c254e5352c40b342f51deb4b1cbcf 100644
+--- a/components/dialog/dialog.module.css
++++ b/components/dialog/dialog.module.css
+@@ -1,6 +1,6 @@
+ .overlay { position: fixed; inset: 0; z-index: var(--layer-overlay); background: var(--scrim); backdrop-filter: blur(7px); }
+ /* Centered with auto margins (like a native modal dialog) so transform stays free for the entrance spring. */
+-.content { position: fixed; z-index: var(--layer-dialog); inset: 0; width: min(calc(100vw - var(--space-block)), 440px); height: fit-content; max-height: calc(100vh - var(--space-block)); max-height: calc(100dvh - var(--space-block)); margin: auto; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-overlay); background: var(--surface-raised); color: var(--foreground); box-shadow: var(--shadow-floating); }
++.content { position: fixed; z-index: var(--layer-dialog); inset: 0; width: min(calc(100vw - var(--space-block)), var(--dialog-width, 440px)); height: fit-content; max-height: calc(100vh - var(--space-block)); max-height: calc(100dvh - var(--space-block)); margin: auto; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-overlay); background: var(--surface-raised); color: var(--foreground); box-shadow: var(--shadow-floating); }
+ /* Motion animates both layers. Keyframes only run when DialogContent sits under a bare Radix root. */
+ .keyframes.overlay[data-state="open"] { animation: overlay-in var(--duration-standard) var(--ease-enter) both; }
+ .keyframes.overlay[data-state="closed"] { animation: overlay-out var(--duration-fast) var(--ease-standard) both; }
+@@ -10,16 +10,17 @@
+ /* While the layers leave, clicks pass through, so the trigger can reopen the dialog mid-exit. Radix sets pointer-events inline on the overlay. */
+ .overlay[data-state="closed"], .content[data-state="closed"] { pointer-events: none !important; }
+ .header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-comfort); padding: var(--space-section); border-bottom: 1px solid var(--border); }
+-.title { margin: 0; font-family: var(--font-body); font-size: var(--text-lg); font-weight: 500; letter-spacing: var(--tracking-body); line-height: var(--leading-body); }
+-.description { margin: var(--space-related) 0 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
++.title { margin: 0; font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; letter-spacing: var(--tracking-display); line-height: var(--leading-body); }
++.description { margin: var(--space-related) 0 0; color: var(--dialog-description-colour, var(--text-secondary)); font-size: var(--text-sm); letter-spacing: var(--tracking-body); line-height: var(--leading-body); }
+ .title, .description { position: relative; overflow-wrap: anywhere; }
+ .swap { display: block; }
+ /* Line height sits on the text itself, so a page-level heading reset cannot shrink the title and pull the close button off its line. */
+ .title .swap { line-height: var(--leading-body); }
+-/* A compact icon button: quick press, spring release. The negative margin centres it on the title's first line. */
+-.close { flex: 0 0 auto; margin-block: calc((var(--text-lg) * var(--leading-body) - var(--space-block)) / 2); display: grid; place-items: center; width: var(--space-block); height: var(--space-block); border: 1px solid var(--border); border-radius: var(--radius-control); background: color-mix(in oklab, var(--surface-muted) 50%, transparent); color: var(--text-secondary); cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-spring) var(--ease-spring); }
++/* A ghost icon button at Button's xs size; the negative margin centres it on the title's first line. */
++.close { flex: 0 0 auto; margin-block: calc((var(--text-lg) * var(--leading-body) - var(--control-height-xs)) / 2); display: grid; place-items: center; width: var(--control-height-xs); height: var(--control-height-xs); padding: 0; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); cursor: pointer; transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-spring) var(--ease-spring); }
+ @media (hover: hover) and (pointer: fine) { .close:hover { background: var(--surface-muted); color: var(--foreground); } }
+-.close:active { transform: scale(.96); transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard); }
++.close:focus-visible { outline: none; background: var(--surface-muted); color: var(--foreground); }
++.close:active { background: var(--surface-muted); color: var(--foreground); transform: scale(.96); transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard); }
+ .body { padding: var(--space-section); font-size: var(--text-sm); line-height: var(--leading-body); }
+ @keyframes overlay-in { from { opacity: 0; } }
+ @keyframes overlay-out { to { opacity: 0; } }
+diff --git a/components/file-upload/file-upload.module.css b/components/file-upload/file-upload.module.css
+index b3ed086ad31d22192321ee3bcc4e95b4007e2221..5beb9427e564068417662f085c1f9b79d59f4275 100644
+--- a/components/file-upload/file-upload.module.css
++++ b/components/file-upload/file-upload.module.css
+@@ -12,8 +12,8 @@
+ .copy strong { font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+ .label { position: relative; display: block; min-width: 0; }
+ .labelText { display: block; }
+-.copy > span { color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+-.browse { flex: 0 0 auto; color: var(--accent-strong); font-size: var(--text-xs); font-weight: 500; }
++.copy > span { color: var(--field-hint-colour, var(--text-muted)); font-size: var(--field-hint-size, var(--text-xs)); line-height: var(--leading-body); overflow-wrap: anywhere; }
++.browse { flex: 0 0 auto; color: var(--accent-strong); font-size: var(--field-hint-size, var(--text-xs)); font-weight: 500; }
+ .statusFrame { overflow: hidden; }
+ .status { position: relative; min-height: 16px; margin: 0; padding-top: var(--space-related); color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+ .statusText { display: block; }
+diff --git a/components/input/input.d.ts b/components/input/input.d.ts
+index 7d2fdcb1577241d387bd2442a8d9c807038a7d26..e75f5dd393d5cf43ef74a35b7a5c8f731a1fe923 100644
+--- a/components/input/input.d.ts
++++ b/components/input/input.d.ts
+@@ -1,7 +1,13 @@
+-import type { InputHTMLAttributes } from "react";
+-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
++import type { InputHTMLAttributes, ReactNode } from "react";
++export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "prefix"> {
+     label: string;
+-    description?: string;
++    /** Fixed text or an icon inside the field before what is typed (a currency, "c:"). It takes the typed text's size and
++     * a quieter colour, with no gap: the value reads as one word with it. */
++    prefix?: ReactNode;
++    /** An icon or short text inside the field after what is typed (a status icon, a unit). */
++    suffix?: ReactNode;
++    /** Plain text animates word by word when it changes; markup (a bold id) is shown as given. */
++    description?: ReactNode;
+     error?: string;
+ }
+ export declare const Input: import("react").ForwardRefExoticComponent<InputProps & import("react").RefAttributes<HTMLInputElement>>;
+diff --git a/components/input/input.js b/components/input/input.js
+index 9236ce3d47a1067d05dad199e173f3b21f7c128e..f790aa12428eaeddd7c14643b21b76d27bc625db 100644
+--- a/components/input/input.js
++++ b/components/input/input.js
+@@ -24,6 +24,8 @@ function RollingNumber({ word }) {
+ /** Changed words rise in and unblur while unchanged words hold still, and numbers roll. Assistive tech reads the plain copy. */
+ function MotionText({ text }) {
+     const reduced = useReducedMotion();
++    if (typeof text !== "string")
++        return text;
+     const words = text.split(" ");
+     return _jsxs(_Fragment, { children: [_jsx("span", { className: styles.srOnly, children: text }), _jsx("span", { className: styles.words, "aria-hidden": "true", children: _jsx(AnimatePresence, { initial: false, mode: "popLayout", children: words.map((word, index) => _jsxs(motion.span, { className: styles.word, initial: reduced ? { opacity: 0 } : { opacity: 0, y: "0.35em", filter: `blur(${motionTokens.blur.soft}px)` }, animate: { opacity: 1, y: 0, filter: "blur(0px)" }, exit: reduced ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: "-0.35em", filter: `blur(${motionTokens.blur.subtle}px)`, transition: { duration: motionTokens.duration.exit, ease: [...motionTokens.ease.standard] } }, transition: reduced ? { duration: motionTokens.duration.instant } : { duration: motionTokens.duration.standard, ease: [...motionTokens.ease.enter] }, children: [isNumber(word) ? _jsx(RollingNumber, { word: word }) : word, index < words.length - 1 ? " " : null] }, `${index}:${isNumber(word) ? "#" : word}`)) }) })] });
+ }
+@@ -49,12 +51,12 @@ function MessageRow({ id, text, className, alert }) {
+     // with initial={false}, so rows present at hydration render the same on server and client either way.
+     return _jsx(motion.span, { className: styles.messageSlot, initial: reduced ? false : { height: 0, opacity: 0 }, animate: { height, opacity: 1 }, exit: { height: 0, opacity: 0, transition: reduced ? { duration: 0 } : { height: motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.instant } } }, transition: reduced ? { duration: 0 } : { height: motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.fast } }, children: _jsx(motion.span, { ref: copyRef, id: id, className: className, role: alert ? "alert" : undefined, initial: reduced ? false : { y: "0.35em", filter: `blur(${motionTokens.blur.soft}px)` }, animate: { y: 0, filter: "blur(0px)" }, transition: { duration: reduced ? 0 : motionTokens.duration.standard, ease: [...motionTokens.ease.enter] }, children: _jsx(MotionText, { text: text }) }) });
+ }
+-export const Input = forwardRef(function Input({ label, description, error, id, className, ...props }, ref) {
++export const Input = forwardRef(function Input({ label, description, error, id, className, prefix, suffix, ...props }, ref) {
+     const generatedId = useId();
+     const controlId = id ?? generatedId;
+     const hintId = description ? `${controlId}-description` : undefined;
+     const errorId = error ? `${controlId}-error` : undefined;
+     const describedBy = [props["aria-describedby"], hintId, errorId].filter(Boolean).join(" ") || undefined;
+-    return _jsxs("div", { className: styles.field, children: [_jsx("label", { className: styles.label, htmlFor: controlId, children: label }), _jsx("input", { ...props, id: controlId, ref: ref, className: [styles.input, className].filter(Boolean).join(" "), "aria-invalid": error ? true : props["aria-invalid"], "aria-describedby": describedBy }), _jsx(FieldMessage, { id: hintId, text: description, className: styles.description }), _jsx(FieldMessage, { id: errorId, text: error, className: styles.error, alert: true })] });
++    return _jsxs("div", { className: styles.field, children: [_jsx("label", { className: styles.label, htmlFor: controlId, children: label }), (prefix != null || suffix != null) ? _jsxs("div", { className: styles.control, children: [prefix != null ? _jsx("span", { className: styles.prefix, "aria-hidden": "true", children: prefix }) : null, _jsx("input", { ...props, id: controlId, ref: ref, className: [styles.input, styles.bare, className].filter(Boolean).join(" "), "aria-invalid": error ? true : props["aria-invalid"], "aria-describedby": describedBy }), suffix != null ? _jsx("span", { className: styles.suffix, "aria-hidden": "true", children: suffix }) : null] }) : _jsx("input", { ...props, id: controlId, ref: ref, className: [styles.input, className].filter(Boolean).join(" "), "aria-invalid": error ? true : props["aria-invalid"], "aria-describedby": describedBy }), _jsx(FieldMessage, { id: hintId, text: description, className: styles.description }), _jsx(FieldMessage, { id: errorId, text: error, className: styles.error, alert: true })] });
+ });
+ Input.displayName = "Input";
+diff --git a/components/input/input.module.css b/components/input/input.module.css
+index 614e35d7bbda0871a896de7fe03c8776b91f9ebe..54f955f1a3c3298fc0f538ab1198917bfca33116 100644
+--- a/components/input/input.module.css
++++ b/components/input/input.module.css
+@@ -1,17 +1,28 @@
+ /* No row gap: grid tracks clamp a negative margin at zero, so a closed message row would still pay the gap. Each row carries its own space instead. */
+ .field { display: grid; min-width: 0; }
+-.label { margin-bottom: var(--space-related); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
++.label { margin-bottom: var(--space-related); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ /* Focus answers with the border colour alone (no rings or halos); the field itself never changes size. */
+-.input { width: 100%; min-height: var(--control-height-md); padding: 0 var(--space-group); border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); line-height: var(--leading-body); letter-spacing: var(--tracking-body); outline: none; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
++.input { width: 100%; min-height: var(--control-height-md); padding: 0 var(--space-group); border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); outline: none; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+ .input::placeholder { color: var(--text-muted); }
+ @media (hover: hover) and (pointer: fine) { .input:hover:not(:disabled, [aria-invalid="true"]) { border-color: var(--foreground); } }
+ .input:focus-visible { border-color: var(--foreground); }
+ .input[aria-invalid="true"] { border-color: var(--danger); }
+ .input:disabled { cursor: not-allowed; opacity: .5; background: var(--surface-muted); }
++/* With a prefix or suffix the box is the control around the input: the prefix sits in line with the typed text, at its
++   size, so "c:" and "anil" read as one id; the input inside is bare. Hover, focus, invalid and disabled move to the box. */
++.control { display: flex; width: 100%; min-height: var(--control-height-md); box-sizing: border-box; align-items: center; padding: 0 var(--space-group); border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--foreground); font-size: var(--field-text-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); cursor: text; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
++.input.bare { min-width: 0; min-height: calc(var(--control-height-md) - 2px); flex: 1; padding: 0; border: 0; border-radius: 0; background: transparent; }
++.prefix, .suffix { display: inline-flex; flex: none; align-items: center; color: var(--text-secondary); font: inherit; letter-spacing: inherit; white-space: nowrap; pointer-events: none; }
++.suffix { margin-inline-start: var(--space-related); }
++@media (hover: hover) and (pointer: fine) { .control:hover:not(:has(:disabled, [aria-invalid="true"])) { border-color: var(--foreground); } }
++.control:has(.input:focus-visible) { border-color: var(--foreground); }
++.control:has(.input[aria-invalid="true"]) { border-color: var(--danger); }
++.control:has(.input:disabled) { cursor: not-allowed; opacity: .5; background: var(--surface-muted); }
++.control:has(.input:disabled) .input { opacity: 1; background: transparent; }
+ /* The row's space is padding inside the clipped slot, so the height animates from a true zero. */
+ .messageSlot { display: block; overflow: hidden; }
+-.description, .error { display: block; padding-top: var(--space-related); font-size: var(--text-xs); line-height: var(--leading-body); }
+-.description { color: var(--text-muted); } .error { color: var(--danger); }
++.description, .error { display: block; padding-top: var(--space-related); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
++.description { color: var(--field-hint-colour, var(--text-muted)); } .error { color: var(--danger); }
+ /* Words are measured against this box when they pop out to leave, so it must be the positioned parent. */
+ .words { position: relative; display: block; }
+ .word { display: inline-block; white-space: pre; }
+diff --git a/components/money-input/money-input.module.css b/components/money-input/money-input.module.css
+index 7c924bf318cebbbf3fbebef7dc1462058686bfea..41e7c73002c1769f1315c6c075c9d5bb2ee9f969 100644
+--- a/components/money-input/money-input.module.css
++++ b/components/money-input/money-input.module.css
+@@ -1,6 +1,6 @@
+ /* No row gap: grid tracks clamp a negative margin at zero, so a closed message row would still pay the gap. Each row carries its own space instead. */
+ .field { display: grid; min-width: 0; font-family: var(--font-body); letter-spacing: var(--tracking-body); }
+-.label { justify-self: start; margin-bottom: var(--space-related); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
++.label { justify-self: start; margin-bottom: var(--space-related); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ 
+ /* One tall shell: the amount on the left, the currency on the right. Set --money-input-height to resize it. */
+ .control { position: relative; display: flex; min-width: 0; height: var(--money-input-height, 76px); box-sizing: border-box; align-items: center; gap: var(--space-related); padding: 0 var(--space-related) 0 var(--space-comfort); border: 1px solid var(--border-strong); border-radius: var(--radius-container); corner-shape: var(--corner-shape); background: var(--surface); transition: border-color var(--duration-fast) var(--ease-standard); }
+@@ -67,8 +67,8 @@
+ .range[data-flash] { color: var(--warning); transition-duration: var(--duration-instant); }
+ 
+ .messageSlot { position: relative; display: block; overflow: hidden; }
+-.hint, .error { display: block; padding-top: var(--space-related); font-size: var(--text-xs); line-height: var(--leading-body); }
+-.hint { color: var(--text-muted); }
++.hint, .error { display: block; padding-top: var(--space-related); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
++.hint { color: var(--field-hint-colour, var(--text-muted)); }
+ .error { color: var(--danger); }
+ 
+ .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+diff --git a/components/multi-select/multi-select.module.css b/components/multi-select/multi-select.module.css
+index 7b1b370f284fba2a18ef545d5798d622311d7c51..ca1bb0f566906fff0116cfa530ed7059e284b87b 100644
+--- a/components/multi-select/multi-select.module.css
++++ b/components/multi-select/multi-select.module.css
+@@ -1,15 +1,15 @@
+ .field { position: relative; display: grid; gap: var(--space-related); min-width: 0; }
+ .control { position: relative; min-width: 0; }
+-.label { font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
++.label { font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ /* The trigger anchors the menu, so press feedback stays in color; it never scales. */
+-.trigger { position: relative; display: flex; width: 100%; min-height: var(--control-height-md); align-items: center; gap: var(--space-related); border: 1px solid var(--border); border-radius: var(--radius-control); corner-shape: var(--corner-shape); padding: var(--space-tight) var(--space-group) var(--space-tight) var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
++.trigger { position: relative; display: flex; width: 100%; min-height: var(--control-height-md); align-items: center; gap: var(--space-related); border: 1px solid var(--border); border-radius: var(--radius-control); corner-shape: var(--corner-shape); padding: var(--space-tight) var(--space-group) var(--space-tight) var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); text-align: left; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
+ @media (hover: hover) and (pointer: fine) { .trigger:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-muted); } }
+ .trigger:active:not(:disabled), .trigger[aria-expanded="true"] { border-color: var(--border-strong); background: var(--surface-muted); }
+ .trigger:disabled { opacity: .5; cursor: not-allowed; }
+ /* The chevron stays pinned to the trailing edge; a selection only reserves room for the clear button beside it, so nothing jumps. */
+ .hasClear .chevron { margin-left: var(--space-section); }
+ .value { position: relative; display: flex; min-width: 0; min-height: 26px; flex: 1; align-items: center; overflow: hidden; }
+-.placeholder, .description { color: var(--text-muted); }
++.placeholder { color: var(--text-muted); } .description { color: var(--field-hint-colour, var(--text-muted)); }
+ /* The placeholder sits outside the flow so the first chip can open its slot from the leading edge. */
+ .placeholder { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
+ /* The slot clips while its width springs open or closed; the chip keeps its natural width so the label never re-truncates mid-flight. */
+@@ -26,7 +26,7 @@
+ @media (hover: hover) and (pointer: fine) { .clear:hover { background: var(--surface); color: var(--foreground); } }
+ .chevron { flex: 0 0 auto; color: var(--text-muted); transition: transform var(--duration-spring) var(--ease-spring); }
+ .trigger[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+-.description { font-size: var(--text-xs); }
++.description { font-size: var(--field-hint-size, var(--text-sm)); letter-spacing: var(--tracking-body); }
+ .menu { position: absolute; z-index: var(--layer-dropdown); top: calc(100% + var(--space-related)); right: 0; left: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-container); corner-shape: var(--corner-shape); padding: var(--space-tight); background: var(--surface-raised); box-shadow: var(--shadow-floating); transform-origin: top center; will-change: transform, opacity; }
+ /* Arrow keys move the highlight often, so it changes almost instantly. Selection is shown by the check, not by weight, so labels never reflow. */
+ .option { display: flex; width: 100%; min-height: 38px; align-items: center; justify-content: space-between; gap: var(--space-group); border: 0; border-radius: calc(var(--radius-container) - var(--space-tight)); corner-shape: var(--corner-shape); padding: 0 var(--space-group); background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; transition: background-color 80ms var(--ease-standard), color 80ms var(--ease-standard); }
+diff --git a/components/number-field/number-field.module.css b/components/number-field/number-field.module.css
+index 187e13f9ff14799019a8b8ae403325e5ebe92f54..d2077393e34e6daf79a690b2da3d0f5f053e493c 100644
+--- a/components/number-field/number-field.module.css
++++ b/components/number-field/number-field.module.css
+@@ -56,7 +56,7 @@
+ .symbol { display: inline-block; overflow-x: clip; white-space: pre; }
+ /* The row's space is padding inside the clipped slot, so the height animates from a true zero. */
+ .messageSlot { display: block; overflow: hidden; }
+-.hint { display: block; padding-top: var(--space-related); color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); letter-spacing: var(--tracking-body); font-variant-numeric: tabular-nums; }
++.hint { display: block; padding-top: var(--space-related); color: var(--field-hint-colour, var(--text-muted)); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); font-variant-numeric: tabular-nums; }
+ /* Words are measured against their slot when they pop out to leave, so the slot must be the positioned parent. */
+ .words { position: relative; display: block; }
+ .wordSlot { position: relative; display: inline-block; vertical-align: top; white-space: pre; }
+diff --git a/components/otp-input/otp-input.module.css b/components/otp-input/otp-input.module.css
+index dc7ac3437ae0eb0c7fa5a6171c903cd0b52b7093..ba47b4ff9fd881bdeeb24ca1d5206c48b2345af5 100644
+--- a/components/otp-input/otp-input.module.css
++++ b/components/otp-input/otp-input.module.css
+@@ -1,6 +1,6 @@
+ /* No row gap: grid tracks clamp a negative margin at zero, so a closed message row would still pay the gap. Each row carries its own space instead. */
+ .field { display: grid; min-width: 0; }
+-.label { margin-bottom: var(--space-related); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
++.label { margin-bottom: var(--space-related); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ .inputs { position: relative; display: flex; width: fit-content; max-width: 100%; gap: var(--space-related); }
+ .slot { position: relative; display: grid; width: 42px; height: 48px; min-width: 0; flex: 0 1 42px; }
+ /* The native text is transparent (caret stays visible); .glyph draws the digit so it can rise in. */
+@@ -17,8 +17,8 @@
+ .inputs[data-invalid="true"] .ring { border-color: var(--danger); }
+ /* The row's space is padding inside the clipped slot, so the height animates from a true zero. */
+ .messageSlot { display: block; overflow: hidden; }
+-.description, .error { display: block; padding-top: var(--space-related); font-size: var(--text-xs); line-height: var(--leading-body); }
+-.description { color: var(--text-muted); }.error { color: var(--danger); }
++.description, .error { display: block; padding-top: var(--space-related); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
++.description { color: var(--field-hint-colour, var(--text-muted)); }.error { color: var(--danger); }
+ /* Words are measured against this box when they pop out to leave, so it must be the positioned parent. */
+ .words { position: relative; display: block; }
+ .word { display: inline-block; white-space: pre; }
+diff --git a/components/password-field/password-field.module.css b/components/password-field/password-field.module.css
+index afa7c2c5838b4876a1a902c652d1b2e282af65c0..250b4bd3d368fbc0142e9ea140d309a4787f12bb 100644
+--- a/components/password-field/password-field.module.css
++++ b/components/password-field/password-field.module.css
+@@ -1,12 +1,12 @@
+ /* No row gap: grid tracks clamp a negative margin at zero, so a closed message row would still pay the gap. Each row carries its own space instead. */
+ .field { display: grid; min-width: 0; }
+-.field label { margin-bottom: var(--space-related); font-size: var(--text-sm); font-weight: 500; }
++.field label { margin-bottom: var(--space-related); font-size: var(--text-sm); font-weight: 500; letter-spacing: var(--tracking-body); }
+ /* Focus shows as a darker border only; the shell never changes size. The toggle sits with an even inset on top, bottom and right. */
+ .shell { display: flex; min-height: var(--control-height-md); align-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: 0 calc((var(--control-height-md) - var(--space-hair) - var(--space-block)) / 2) 0 var(--space-group); background: var(--surface); transition: border-color var(--duration-fast) var(--ease-standard); }
+ @media (hover: hover) and (pointer: fine) { .shell:hover:not(:focus-within) { border-color: var(--foreground); } }
+ .shell:focus-within { border-color: var(--foreground); }
+ .shell:has(.input[aria-invalid="true"]) { border-color: var(--danger); }
+-.input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-sm); line-height: var(--leading-body); outline: 0; }
++.input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); line-height: var(--leading-body); outline: 0; }
+ .input::placeholder { color: var(--text-muted); }
+ /* Switching between dots and characters resolves in place instead of snapping. Swapping the keyframe name restarts it. */
+ .input[data-reveal="shown"] { animation: resolve-shown var(--duration-standard) var(--ease-enter); }
+@@ -19,7 +19,7 @@
+ .shell button[aria-pressed="true"] { color: var(--foreground); }
+ /* The row's space is padding inside the clipped slot, so the height animates from a true zero. */
+ .messageSlot { display: block; overflow: hidden; }
+-.hint { display: block; padding-top: var(--space-related); color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
++.hint { display: block; padding-top: var(--space-related); color: var(--field-hint-colour, var(--text-muted)); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ /* Words are measured against this box when they pop out to leave, so it must be the positioned parent. */
+ .words { position: relative; display: block; }
+ .word { display: inline-block; white-space: pre; }
+diff --git a/components/password-strength/password-strength.module.css b/components/password-strength/password-strength.module.css
+index daf4d434f1d02e1a35e277e9be149fc65ac76e11..f64fb981329857677af391c9f1a8bff6ea225dc9 100644
+--- a/components/password-strength/password-strength.module.css
++++ b/components/password-strength/password-strength.module.css
+@@ -24,7 +24,7 @@
+ .reveal[aria-pressed="true"] { color: var(--foreground); }
+ /* The row's space is padding inside the clipped slot, so its height opens from a true zero. */
+ .errorSlot { display: block; overflow: hidden; }
+-.error { position: relative; display: block; padding-top: var(--space-related); color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
++.error { position: relative; display: block; padding-top: var(--space-related); color: var(--danger); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ .errorText { display: block; }
+ .meterRow { display: flex; align-items: center; gap: var(--space-group); margin-top: var(--space-group); }
+ .meter { display: grid; flex: 1 1 auto; min-width: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-tight); }
+diff --git a/components/phone-input/phone-input.d.ts b/components/phone-input/phone-input.d.ts
+index b5fb141206f5b1931fd195d40b458055db731a57..e8ce6257162c7a9db8831e6b526b54df5e657d1c 100644
+--- a/components/phone-input/phone-input.d.ts
++++ b/components/phone-input/phone-input.d.ts
+@@ -19,8 +19,8 @@ export declare const PHONE_COUNTRIES: PhoneCountry[];
+ export declare const flagOf: (iso: string) => string;
+ /** Formats national digits as typed, keeping a typed trunk prefix: "07911123456" in the UK reads "07911 123456". */
+ export declare function formatNational(entry: PhoneCountry, digits: string): string;
+-export type PhoneStatus = "empty" | "incomplete" | "valid" | "too-long";
+-/** Reads "+44 (0)7911 123456", "0044 7911…", or "+14165550123" into a country and national digits. Longest calling code wins. */
++export type PhoneStatus = "empty" | "incomplete" | "valid" | "too-long" | "unsupported";
++/** Reads "+44 (0)7911 123456", "0044 7911…", or "+14165550123". Returns null if the number cannot be represented without losing digits. */
+ export declare function parsePhoneNumber(input: string, pool?: PhoneCountry[]): {
+     country: PhoneCountry;
+     national: string;
+@@ -28,8 +28,9 @@ export declare function parsePhoneNumber(input: string, pool?: PhoneCountry[]):
+ /** Formats an E.164 number for display, such as "+44 7400 123456". Returns the input when it cannot be read. */
+ export declare function formatPhoneNumber(e164: string): string;
+ export interface PhoneInputDetails {
++    /** Selected country. For an unsupported draft it is not a parsed country. */
+     country: PhoneCountry;
+-    /** The number as shown in the field, without the calling code. */
++    /** The number as shown, without the calling code for supported countries; raw text for an unsupported draft. */
+     formatted: string;
+     status: PhoneStatus;
+     valid: boolean;
+@@ -40,7 +41,7 @@ export interface PhoneInputProps {
+     /** The number in E.164, such as "+14155550132". An empty string clears the field. */
+     value?: string;
+     defaultValue?: string;
+-    /** Fires on every edit with the E.164 number (empty when there are no digits) and its parsed details. */
++    /** Fires on every edit with the E.164 number (empty for no digits or an unsupported draft) and its details. */
+     onValueChange?: (value: string, details: PhoneInputDetails) => void;
+     /** ISO code of the selected country. */
+     country?: string;
+diff --git a/components/phone-input/phone-input.js b/components/phone-input/phone-input.js
+index e781e438c6a7eac1f43132efdee3dc5334e012ac..4f58774762787ece033cd83e6226faa3e69e66d9 100644
+--- a/components/phone-input/phone-input.js
++++ b/components/phone-input/phone-input.js
+@@ -62,8 +62,6 @@ export const PHONE_COUNTRIES = [
+ const BY_ISO = new Map(PHONE_COUNTRIES.map(entry => [entry.iso, entry]));
+ const capacity = (pattern) => pattern.split("#").length - 1;
+ const lengthsOf = (entry) => entry.patterns.map(capacity);
+-/** A typed trunk prefix earns its own room; without one the longest valid length is the cap. */
+-const capDigits = (entry, digits) => digits.slice(0, splitTrunk(entry, digits)[0].length + Math.max(...lengthsOf(entry)));
+ const onlyDigits = (text) => text.replace(/\D/g, "");
+ /** Regional indicator letters. Platforms without flag glyphs show the two letters, which still read. */
+ export const flagOf = (iso) => String.fromCodePoint(...[...iso.toUpperCase()].map(char => 0x1f1e6 + char.charCodeAt(0) - 65));
+@@ -104,8 +102,8 @@ function statusOf(entry, digits) {
+     return length > Math.max(...lengths) ? "too-long" : "incomplete";
+ }
+ const toE164 = (entry, digits) => { const rest = splitTrunk(entry, digits)[1]; return rest ? `+${entry.dial}${rest}` : ""; };
+-/** Reads "+44 (0)7911 123456", "0044 7911…", or "+14165550123" into a country and national digits. Longest calling code wins. */
+-export function parsePhoneNumber(input, pool = PHONE_COUNTRIES) {
++/** Reads an international number without shortening it. Longest calling code wins. */
++function readPhoneNumber(input, pool) {
+     const trimmed = input.trim();
+     let digits = onlyDigits(trimmed);
+     if (!trimmed.startsWith("+")) {
+@@ -123,10 +121,15 @@ export function parsePhoneNumber(input, pool = PHONE_COUNTRIES) {
+         // "+44 (0)7911…" carries a trunk zero it should not; drop it when the rest is still a full number without it.
+         if (entry.trunk && rest.startsWith(entry.trunk) && rest.length - entry.trunk.length >= Math.min(...lengthsOf(entry)))
+             rest = rest.slice(entry.trunk.length);
+-        return { country: entry, national: capDigits(entry, rest) };
++        return { country: entry, national: rest, tooLong: splitTrunk(entry, rest)[1].length > Math.max(...lengthsOf(entry)) };
+     }
+     return null;
+ }
++/** Reads "+44 (0)7911 123456", "0044 7911…", or "+14165550123". Returns null if the number cannot be represented without losing digits. */
++export function parsePhoneNumber(input, pool = PHONE_COUNTRIES) {
++    const parsed = readPhoneNumber(input, pool);
++    return parsed && !parsed.tooLong ? { country: parsed.country, national: parsed.national } : null;
++}
+ /** Formats an E.164 number for display, such as "+44 7400 123456". Returns the input when it cannot be read. */
+ export function formatPhoneNumber(e164) {
+     const parsed = parsePhoneNumber(e164);
+@@ -141,7 +144,7 @@ const physical = (visualDuration, bounce) => {
+     return { type: "spring", stiffness: root * root, damping: 2 * (1 - bounce) * root, mass: 1 };
+ };
+ const GROW = physical(.4, .12), SHRINK = physical(.32, 0), GLIDE = physical(.28, .08), WIDTH = physical(.42, .16);
+-const PANEL_MAX = 340, CLOSED_RADIUS = 17, OPEN_RADIUS = 22, PAGE = 8;
++const PANEL_MAX = 340, PAGE = 8;
+ const subscribe = () => () => { };
+ function useReducedFlag() {
+     const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
+@@ -207,59 +210,72 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+     const hintId = `${inputId}-hint`, errorId = `${inputId}-error`;
+     const optionId = (key) => `${uid}-opt-${key}`;
+     const pool = useMemo(() => countries?.length ? PHONE_COUNTRIES.filter(entry => countries.includes(entry.iso)) : PHONE_COUNTRIES, [countries]);
+-    const fallback = BY_ISO.get(defaultCountry) ?? PHONE_COUNTRIES[0];
++    const fallback = pool.find(entry => entry.iso === defaultCountry) ?? pool[0] ?? PHONE_COUNTRIES[0];
+     const [state, setState] = useState(() => {
+-        const parsed = parsePhoneNumber(value ?? defaultValue ?? "", pool);
+-        return parsed ? { iso: parsed.country.iso, digits: parsed.national } : { iso: fallback.iso, digits: "" };
++        const initial = value ?? defaultValue ?? "";
++        const parsed = readPhoneNumber(initial, pool);
++        return parsed ? { iso: parsed.country.iso, digits: parsed.national, draft: null }
++            : { iso: fallback.iso, digits: "", draft: initial.trim() || null };
+     });
+     const iso = countryProp ?? state.iso;
+     const current = BY_ISO.get(iso) ?? fallback;
+-    const digits = state.digits;
+-    const e164 = toE164(current, digits);
++    const { digits, draft } = state;
++    const e164 = draft === null ? toE164(current, digits) : "";
+     // A controlled value that differs from what the field last produced is read back in.
+     const [seenValue, setSeenValue] = useState(value);
+     if (value !== seenValue) {
+         setSeenValue(value);
+         if (value !== undefined && value !== e164) {
+-            const parsed = parsePhoneNumber(value, pool);
+-            setState(parsed ? { iso: parsed.country.iso, digits: parsed.national } : { iso, digits: "" });
++            const parsed = readPhoneNumber(value, pool);
++            setState(parsed ? { iso: parsed.country.iso, digits: parsed.national, draft: null }
++                : { iso: current.iso, digits: "", draft: value.trim() || null });
+         }
+     }
+-    const formatted = formatNational(current, digits);
+-    const status = statusOf(current, digits);
++    const formatted = draft ?? formatNational(current, digits);
++    const status = draft === null ? statusOf(current, digits) : "unsupported";
+     const [touched, setTouched] = useState(false);
+     const lengths = lengthsOf(current);
+     const lengthCopy = lengths.length === 1 ? `${lengths[0]}` : `${lengths.slice(0, -1).join(", ")} or ${lengths[lengths.length - 1]}`;
+-    const builtIn = validate && touched && (status === "incomplete" || status === "too-long") ? `Numbers in ${current.name} have ${lengthCopy} digits` : undefined;
++    const builtIn = status === "unsupported" ? "This international number is not supported by the country list." :
++        (status === "too-long" || (validate && touched && status === "incomplete")) ? `Numbers in ${current.name} have ${lengthCopy} digits` : undefined;
+     const message = error ?? builtIn;
+     /* The guide: the rest of the example number, in the shape this country expects, drawn faintly after what was typed. */
+     const guide = useMemo(() => {
++        if (draft !== null)
++            return "";
+         const [trunk, rest] = splitTrunk(current, digits);
+         if (rest.length >= current.example.length)
+             return "";
+         const full = formatNational(current, trunk + rest + current.example.slice(rest.length));
+         return full.startsWith(formatted) ? full.slice(formatted.length) : "";
+-    }, [current, digits, formatted]);
++    }, [current, digits, draft, formatted]);
+     const inputRef = useRef(null);
+     useImperativeHandle(forwardedRef, () => inputRef.current);
++    const nativeError = status === "unsupported" || status === "too-long" || (validate && status === "incomplete")
++        ? builtIn ?? "Enter a complete phone number." : "";
++    useLayoutEffect(() => { inputRef.current?.setCustomValidity(nativeError); }, [nativeError]);
+     const pendingCaret = useRef(null);
+     const [, rerender] = useReducer((count) => count + 1, 0);
+     const emit = useCallback((entry, nextDigits) => {
+         const nextStatus = statusOf(entry, nextDigits);
+         onValueChange?.(toE164(entry, nextDigits), { country: entry, formatted: formatNational(entry, nextDigits), status: nextStatus, valid: nextStatus === "valid" });
+     }, [onValueChange]);
++    const setUnsupported = (raw) => {
++        pendingCaret.current = null;
++        setState(last => ({ ...last, draft: raw }));
++        onValueChange?.("", { country: current, formatted: raw, status: "unsupported", valid: false });
++    };
+     const setNumber = (nextDigits, caretDigits, entry = current) => {
+-        const capped = capDigits(entry, nextDigits);
+-        pendingCaret.current = caretDigits === null ? null : Math.min(caretDigits, capped.length);
++        pendingCaret.current = caretDigits === null ? null : Math.min(caretDigits, nextDigits.length);
+         if (entry.iso !== current.iso)
+             onCountryChange?.(entry.iso);
+-        // Nothing changed (a refused digit): React restores the old text after this handler, so the caret is placed on the next render.
+-        if (capped === digits && entry.iso === current.iso) {
++        // Nothing changed (for example, a typed separator): React restores the old text, so place the caret on the next render.
++        if (nextDigits === digits && entry.iso === current.iso && draft === null) {
+             rerender();
+             return;
+         }
+-        setState({ iso: entry.iso, digits: capped });
+-        emit(entry, capped);
++        setState({ iso: entry.iso, digits: nextDigits, draft: null });
++        emit(entry, nextDigits);
+     };
+     function placeCaret() {
+         const input = inputRef.current, count = pendingCaret.current;
+@@ -275,14 +291,17 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+     function onNumberChange(input) {
+         const raw = input.value;
+         // Autofill and dropped text arrive as a change: an international number chooses its own country.
+-        if (raw.includes("+") || (/^\s*00/.test(raw) && onlyDigits(raw).length > 6)) {
+-            const parsed = parsePhoneNumber(raw.slice(Math.max(0, raw.indexOf("+"))), pool);
+-            if (parsed && parsed.national) {
++        if (raw.includes("+") || /^\s*00/.test(raw)) {
++            const international = raw.includes("+") ? raw.slice(raw.indexOf("+")) : raw;
++            const parsed = readPhoneNumber(international, pool);
++            if (parsed) {
+                 if (parsed.country.iso !== current.iso)
+                     setAnnouncement(`Country set to ${parsed.country.name}`);
+                 setNumber(parsed.national, parsed.national.length, parsed.country);
+                 return;
+             }
++            setUnsupported(raw);
++            return;
+         }
+         const caret = input.selectionStart ?? raw.length;
+         setNumber(onlyDigits(raw), onlyDigits(raw.slice(0, caret)).length);
+@@ -294,6 +313,8 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+             openList("+");
+             return;
+         }
++        if (draft !== null)
++            return;
+         const start = input.selectionStart ?? 0, end = input.selectionEnd ?? 0;
+         if (start !== end || event.metaKey || event.ctrlKey || event.altKey)
+             return;
+@@ -316,17 +337,22 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+             return;
+         event.preventDefault();
+         const input = event.currentTarget;
+-        const parsed = /^\s*(\+|00)/.test(text) ? parsePhoneNumber(text, pool) : null;
+-        if (parsed) {
+-            if (parsed.country.iso !== current.iso)
+-                setAnnouncement(`Country set to ${parsed.country.name}`);
+-            setNumber(parsed.national, parsed.national.length, parsed.country);
++        if (/^\s*(\+|00)/.test(text)) {
++            const parsed = readPhoneNumber(text, pool);
++            if (parsed) {
++                if (parsed.country.iso !== current.iso)
++                    setAnnouncement(`Country set to ${parsed.country.name}`);
++                setNumber(parsed.national, parsed.national.length, parsed.country);
++            }
++            else
++                setUnsupported(text.trim());
++            return;
++        }
++        const pasted = onlyDigits(text);
++        if (draft !== null) {
++            setNumber(pasted, pasted.length);
+             return;
+         }
+-        let pasted = onlyDigits(text);
+-        // "1 415 555 0132" pasted into a US field: the leading calling code is dropped when the number would not fit otherwise.
+-        if (pasted.startsWith(current.dial) && pasted.length > capDigits(current, pasted).length)
+-            pasted = pasted.slice(current.dial.length);
+         // A whole number replaces what was there; a fragment goes in at the caret.
+         if (pasted.length >= Math.min(...lengthsOf(current))) {
+             setNumber(pasted, pasted.length);
+@@ -362,29 +388,37 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+     const orderOf = useMemo(() => new Map([...pool].sort((a, b) => a.name.localeCompare(b.name)).map((entry, index) => [entry.iso, index])), [pool]);
+     const rootRef = useRef(null);
+     const controlRef = useRef(null);
++    const anchorRef = useRef(null);
+     const measureRef = useRef(null);
+     const listFaceRef = useRef(null);
+     const scrollRef = useRef(null);
+     const triggerRef = useRef(null);
+     const searchRef = useRef(null);
+     const rowRefs = useRef(new Map());
+-    /* One surface whose width, height, and corners spring between the country button and the open list. */
++    /* One surface whose width and height spring between the country button and the open list. */
+     const anchorW = useMotionValue("auto");
+-    const shapeW = useMotionValue("100%"), shapeH = useMotionValue("100%"), radius = useMotionValue(CLOSED_RADIUS);
++    const shapeW = useMotionValue("100%"), shapeH = useMotionValue("100%");
+     const sizes = useRef({ trigger: 0, lid: 0, panel: 0, list: 0 });
+     const live = useRef({ open: false, reduced: false, measured: false });
+     useLayoutEffect(() => { live.current.reduced = reduced; }, [reduced]);
++    const syncAnchor = useCallback(() => {
++        const anchor = anchorRef.current, root = rootRef.current;
++        if (!anchor || !root)
++            return;
++        const rect = anchor.getBoundingClientRect();
++        root.style.setProperty("--pi-anchor-top", `${rect.top}px`);
++        root.style.setProperty("--pi-anchor-left", `${rect.left}px`);
++    }, []);
+     const place = useCallback((animated) => {
+         const { trigger, lid, panel, list } = sizes.current;
+         if (!trigger || !lid)
+             return;
+         const isOpen = live.current.open;
+-        const next = isOpen ? { w: Math.max(trigger, panel), h: lid + 2 + list, r: OPEN_RADIUS } : { w: trigger, h: lid, r: CLOSED_RADIUS };
++        const next = isOpen ? { w: Math.max(trigger, panel), h: lid + 2 + list } : { w: trigger, h: lid };
+         if (!animated || live.current.reduced || !live.current.measured) {
+             anchorW.jump(trigger);
+             shapeW.jump(next.w);
+             shapeH.jump(next.h);
+-            radius.jump(next.r);
+             live.current.measured = true;
+             return;
+         }
+@@ -392,19 +426,19 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+         animate(anchorW, trigger, WIDTH);
+         animate(shapeW, next.w, growing ? GROW : SHRINK);
+         animate(shapeH, next.h, growing ? GROW : SHRINK);
+-        animate(radius, next.r, growing ? GROW : SHRINK);
+-    }, [anchorW, radius, shapeH, shapeW]);
++    }, [anchorW, shapeH, shapeW]);
+     const read = useCallback(() => {
+         const measure = measureRef.current, control = controlRef.current, face = listFaceRef.current, root = rootRef.current;
+         if (!measure || !control || !face || !root)
+             return false;
++        syncAnchor();
+         const panel = Math.min(PANEL_MAX, control.offsetWidth);
+         root.style.setProperty("--pi-panel-w", `${panel}px`);
+         const previous = sizes.current;
+         const next = { trigger: measure.offsetWidth, lid: control.clientHeight, panel, list: face.offsetHeight };
+         sizes.current = next;
+         return next.trigger !== previous.trigger || next.lid !== previous.lid || next.panel !== previous.panel || (live.current.open && next.list !== previous.list);
+-    }, []);
++    }, [syncAnchor]);
+     useLayoutEffect(() => {
+         const measure = measureRef.current, control = controlRef.current, face = listFaceRef.current;
+         if (read())
+@@ -418,6 +452,14 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+         observer.observe(face);
+         return () => observer.disconnect();
+     }, [place, read]);
++    // A fixed open surface escapes scrollable dialogs; keep it attached to the field as its ancestors scroll.
++    useEffect(() => {
++        if (!open)
++            return;
++        window.addEventListener("scroll", syncAnchor, true);
++        window.addEventListener("resize", syncAnchor);
++        return () => { window.removeEventListener("scroll", syncAnchor, true); window.removeEventListener("resize", syncAnchor); };
++    }, [open, syncAnchor]);
+     const pendingFocus = useRef(null);
+     useLayoutEffect(() => {
+         if (live.current.open !== open) {
+@@ -462,8 +504,11 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+             const pad = 6;
+             if (top < scroller.scrollTop + pad)
+                 scroller.scrollTop = top - pad;
+-            else if (top + height > scroller.scrollTop + scroller.clientHeight - pad)
+-                scroller.scrollTop = top + height - scroller.clientHeight + pad;
++            else if (top + height > scroller.scrollTop + scroller.clientHeight - pad) {
++                const needed = top + height - scroller.clientHeight + pad;
++                const nextStart = [...rowRefs.current.values()].map(row => row.offsetTop).filter(start => start >= needed).sort((a, b) => a - b)[0];
++                scroller.scrollTop = (nextStart ?? needed) + (parseFloat(getComputedStyle(scroller).paddingTop) || 0);
++            }
+         }
+     }, [activeKey, hh, ho, hy, open, reduced, sections]);
+     function openList(seed = "") {
+@@ -486,15 +531,18 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+             return;
+         if (entry.iso !== current.iso) {
+             setRoll(Math.sign((orderOf.get(entry.iso) ?? 0) - (orderOf.get(current.iso) ?? 0)) || 1);
+-            const nextDigits = capDigits(entry, digits);
++            const nextDigits = draft === null ? digits : "";
+             if (countryProp === undefined)
+-                setState({ iso: entry.iso, digits: nextDigits });
++                setState({ iso: entry.iso, digits: nextDigits, draft: null });
+             else
+-                setState(last => ({ ...last, digits: nextDigits }));
++                setState(last => ({ ...last, digits: nextDigits, draft: null }));
+             onCountryChange?.(entry.iso);
+             emit(entry, nextDigits);
+             setAnnouncement(`${entry.name}, +${entry.dial}`);
+         }
++        else if (draft !== null) {
++            setNumber("", 0);
++        }
+         close("number");
+     }
+     function move(key) {
+@@ -594,10 +642,9 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+     };
+     const showCheck = status === "valid";
+     const invalid = !!message;
+-    const describedBy = [description ? hintId : null, message ? errorId : null].filter(Boolean).join(" ") || undefined;
+-    const rootStyle = { "--pi-closed-r": `${CLOSED_RADIUS}px` };
++    const describedBy = message ? errorId : description ? hintId : undefined;
+     const face = (entry) => _jsxs(_Fragment, { children: [_jsx("span", { className: styles.flag, "aria-hidden": "true", children: flagOf(entry.iso) }), _jsxs("span", { className: styles.dial, children: ["+", entry.dial] })] });
+-    return _jsxs("div", { ref: rootRef, className: [styles.field, className].filter(Boolean).join(" "), style: rootStyle, "data-open": open || undefined, "data-disabled": disabled || undefined, onBlur: onRootBlur, children: [_jsx("label", { htmlFor: inputId, className: hideLabel ? styles.srOnly : styles.label, children: label }), _jsxs("div", { ref: controlRef, className: styles.control, "data-invalid": invalid || undefined, children: [_jsxs(motion.div, { className: styles.anchor, style: { width: anchorW }, children: [_jsx("span", { ref: measureRef, className: `${styles.trigger} ${styles.measure}`, "aria-hidden": "true", children: face(current) }), _jsxs(motion.div, { className: styles.shape, style: { width: shapeW, height: shapeH, borderRadius: radius }, children: [_jsxs("div", { className: styles.lid, children: [_jsx("button", { ref: triggerRef, type: "button", className: styles.trigger, disabled: disabled, inert: open || undefined, tabIndex: open ? -1 : 0, "aria-haspopup": "listbox", "aria-expanded": open, "aria-controls": listId, "aria-label": `Country, ${current.name} +${current.dial}`, onClick: () => (open ? close("trigger") : openList()), onKeyDown: onTriggerKeyDown, children: _jsx("span", { className: styles.slot, "data-hidden": open || undefined, children: _jsx(AnimatePresence, { initial: false, custom: roll, children: _jsx(motion.span, { className: styles.layer, custom: roll, variants: reduced ? layerFade : layerVariants, initial: "enter", animate: "rest", exit: "exit", transition: reduced ? { duration: motionTokens.duration.instant } : { y: GLIDE, opacity: { duration: motionTokens.duration.exit, ease: enterEase }, filter: { duration: motionTokens.duration.exit, ease: enterEase } }, children: face(current) }, current.iso) }) }) }), _jsxs(motion.div, { className: styles.searchRow, inert: !open || undefined, initial: false, animate: open ? { opacity: 1, filter: "blur(0px)" } : { opacity: 0, filter: reduced ? "blur(0px)" : `blur(${blur.subtle}px)` }, transition: open ? { duration: motionTokens.duration.exit, ease: enterEase, delay: reduced ? 0 : motionTokens.duration.instant } : { duration: motionTokens.duration.instant, ease: standardEase }, children: [_jsx(Search, { className: styles.searchIcon, size: 16, strokeWidth: 1.75, "aria-hidden": "true" }), _jsx("input", { ref: searchRef, className: styles.search, type: "text", role: "combobox", "aria-label": "Search countries or calling codes", "aria-expanded": open, "aria-controls": listId, "aria-autocomplete": "list", "aria-activedescendant": open && activeKey ? optionId(activeKey) : undefined, placeholder: "Country or code", value: query, autoComplete: "off", spellCheck: false, onChange: event => onQuery(event.target.value), onKeyDown: onSearchKeyDown }), _jsx(AnimatePresence, { initial: false, children: query && _jsx(motion.button, { type: "button", className: styles.clear, "aria-label": "Clear search", onPointerDown: event => event.preventDefault(), onClick: () => { onQuery(""); searchRef.current?.focus(); }, initial: { opacity: 0, scale: .6 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: .6, transition: { duration: motionTokens.duration.instant } }, transition: reduced ? { duration: 0 } : GLIDE, children: _jsx(X, { size: 14, strokeWidth: 1.75, "aria-hidden": "true" }) }, "clear") }), _jsx("button", { type: "button", className: styles.closeHit, "aria-label": "Close country list", onClick: () => close("trigger") })] }), _jsx(motion.span, { className: styles.chevron, "aria-hidden": "true", initial: false, animate: { rotate: open ? 180 : 0 }, transition: reduced ? { duration: 0 } : GLIDE, children: _jsx(ChevronDown, { size: 16, strokeWidth: 1.75 }) })] }), _jsx(motion.div, { ref: listFaceRef, className: styles.listFace, inert: !open || undefined, "aria-hidden": !open || undefined, initial: false, animate: open ? { opacity: 1, y: 0, filter: "blur(0px)" } : { opacity: 0, y: reduced ? 0 : -6, filter: reduced ? "blur(0px)" : `blur(${blur.subtle}px)` }, transition: open ? { y: GROW, opacity: { duration: motionTokens.duration.exit, ease: enterEase, delay: reduced ? 0 : motionTokens.stagger.word }, filter: { duration: motionTokens.duration.exit, ease: enterEase, delay: motionTokens.stagger.word } } : { duration: motionTokens.duration.instant, ease: standardEase }, children: _jsx("div", { ref: scrollRef, className: styles.scroll, children: _jsxs("div", { id: listId, className: styles.options, role: "listbox", "aria-label": "Countries", onPointerDown: event => event.preventDefault(), ...nearest, children: [_jsx(motion.span, { className: styles.highlight, style: { y: hy, height: hh, opacity: ho }, "aria-hidden": "true" }), sections.map(section => {
++    return _jsxs("div", { ref: rootRef, className: [styles.field, className].filter(Boolean).join(" "), "data-open": open || undefined, "data-disabled": disabled || undefined, onBlur: onRootBlur, children: [_jsx("label", { htmlFor: inputId, className: hideLabel ? styles.srOnly : styles.label, children: label }), _jsxs("div", { ref: controlRef, className: styles.control, "data-invalid": invalid || undefined, children: [_jsxs(motion.div, { ref: anchorRef, className: styles.anchor, style: { width: anchorW }, children: [_jsx("span", { ref: measureRef, className: `${styles.trigger} ${styles.measure}`, "aria-hidden": "true", children: face(current) }), _jsxs(motion.div, { className: styles.shape, style: { width: shapeW, height: shapeH }, children: [_jsxs("div", { className: styles.lid, children: [_jsx("button", { ref: triggerRef, type: "button", className: styles.trigger, disabled: disabled, inert: open || undefined, tabIndex: open ? -1 : 0, "aria-haspopup": "listbox", "aria-expanded": open, "aria-controls": listId, "aria-label": `Country, ${current.name} +${current.dial}`, onClick: () => (open ? close("trigger") : openList()), onKeyDown: onTriggerKeyDown, children: _jsx("span", { className: styles.slot, "data-hidden": open || undefined, children: _jsx(AnimatePresence, { initial: false, custom: roll, children: _jsx(motion.span, { className: styles.layer, custom: roll, variants: reduced ? layerFade : layerVariants, initial: "enter", animate: "rest", exit: "exit", transition: reduced ? { duration: motionTokens.duration.instant } : { y: GLIDE, opacity: { duration: motionTokens.duration.exit, ease: enterEase }, filter: { duration: motionTokens.duration.exit, ease: enterEase } }, children: face(current) }, current.iso) }) }) }), _jsxs(motion.div, { className: styles.searchRow, inert: !open || undefined, initial: false, animate: open ? { opacity: 1, filter: "blur(0px)" } : { opacity: 0, filter: reduced ? "blur(0px)" : `blur(${blur.subtle}px)` }, transition: open ? { duration: motionTokens.duration.exit, ease: enterEase, delay: reduced ? 0 : motionTokens.duration.instant } : { duration: motionTokens.duration.instant, ease: standardEase }, children: [_jsx(Search, { className: styles.searchIcon, size: 16, strokeWidth: 1.75, "aria-hidden": "true" }), _jsx("input", { ref: searchRef, className: styles.search, type: "text", role: "combobox", "aria-label": "Search countries or calling codes", "aria-expanded": open, "aria-controls": listId, "aria-autocomplete": "list", "aria-activedescendant": open && activeKey ? optionId(activeKey) : undefined, placeholder: "Country or code", value: query, autoComplete: "off", spellCheck: false, onChange: event => onQuery(event.target.value), onKeyDown: onSearchKeyDown }), _jsx(AnimatePresence, { initial: false, children: query && _jsx(motion.button, { type: "button", className: styles.clear, "aria-label": "Clear search", onPointerDown: event => event.preventDefault(), onClick: () => { onQuery(""); searchRef.current?.focus(); }, initial: { opacity: 0, scale: .6 }, animate: { opacity: 1, scale: 1 }, exit: { opacity: 0, scale: .6, transition: { duration: motionTokens.duration.instant } }, transition: reduced ? { duration: 0 } : GLIDE, children: _jsx(X, { size: 14, strokeWidth: 1.75, "aria-hidden": "true" }) }, "clear") }), _jsx("button", { type: "button", className: styles.closeHit, "aria-label": "Close country list", onClick: () => close("trigger") })] }), _jsx(motion.span, { className: styles.chevron, "aria-hidden": "true", initial: false, animate: { rotate: open ? 180 : 0 }, transition: reduced ? { duration: 0 } : GLIDE, children: _jsx(ChevronDown, { size: 16, strokeWidth: 1.75 }) })] }), _jsx(motion.div, { ref: listFaceRef, className: styles.listFace, inert: !open || undefined, "aria-hidden": !open || undefined, initial: false, animate: open ? { opacity: 1, y: 0, filter: "blur(0px)" } : { opacity: 0, y: reduced ? 0 : -6, filter: reduced ? "blur(0px)" : `blur(${blur.subtle}px)` }, transition: open ? { y: GROW, opacity: { duration: motionTokens.duration.exit, ease: enterEase, delay: reduced ? 0 : motionTokens.stagger.word }, filter: { duration: motionTokens.duration.exit, ease: enterEase, delay: motionTokens.stagger.word } } : { duration: motionTokens.duration.instant, ease: standardEase }, children: _jsx("div", { ref: scrollRef, className: styles.scroll, children: _jsxs("div", { id: listId, className: styles.options, role: "listbox", "aria-label": "Countries", onPointerDown: event => event.preventDefault(), ...nearest, children: [_jsx(motion.span, { className: styles.highlight, style: { y: hy, height: hh, opacity: ho }, "aria-hidden": "true" }), sections.map(section => {
+                                                         const body = section.rows.map(row => {
+                                                             const selected = row.entry.iso === current.iso;
+                                                             return _jsxs("div", { id: optionId(row.key), role: "option", "aria-selected": selected, className: styles.option, "data-active": row.key === activeKey || undefined, ref: node => { if (node)
+@@ -608,7 +655,7 @@ export const PhoneInput = forwardRef(function PhoneInput({ label, hideLabel = fa
+                                                         return section.label
+                                                             ? _jsxs("div", { role: "group", "aria-labelledby": `${uid}-${section.key}`, className: styles.group, children: [_jsx("div", { id: `${uid}-${section.key}`, className: styles.groupLabel, role: "presentation", children: section.label }), body] }, section.key)
+                                                             : _jsx("div", { role: "presentation", className: styles.group, children: body }, section.key);
+-                                                    }), rows.length === 0 && _jsxs("p", { className: styles.empty, children: ["No countries match \u201C", query.trim(), "\u201D"] })] }) }) })] })] }), _jsxs("div", { className: styles.numberWrap, children: [_jsxs("span", { className: styles.guide, "aria-hidden": "true", children: [_jsx("span", { className: styles.guideTyped, children: formatted }), guide] }), _jsx("input", { ref: inputRef, id: inputId, className: styles.number, type: "tel", inputMode: "tel", autoComplete: "tel", value: formatted, disabled: disabled, required: required, "aria-invalid": invalid || undefined, "aria-describedby": describedBy, "aria-label": hideLabel ? label : undefined, onChange: event => onNumberChange(event.currentTarget), onKeyDown: onNumberKeyDown, onPaste: onPaste, onBlur: event => { setTouched(digits.length > 0); onBlur?.(event); } }), _jsx(AnimatePresence, { initial: false, children: showCheck && _jsx(motion.span, { className: styles.valid, "aria-hidden": "true", initial: reduced ? { opacity: 0 } : { opacity: 0, scale: .6, filter: `blur(${blur.subtle}px)` }, animate: { opacity: 1, scale: 1, filter: "blur(0px)" }, exit: { opacity: 0, scale: reduced ? 1 : .8, transition: { duration: motionTokens.duration.instant } }, transition: reduced ? { duration: motionTokens.duration.instant } : motionTokens.spring.snappy, children: _jsx(Check, { size: 16, strokeWidth: 2 }) }, "ok") })] })] }), _jsx(AnimatePresence, { initial: false, children: description && !message && _jsx(MessageRow, { id: hintId, text: description, tone: "hint" }, "hint") }), _jsx(AnimatePresence, { initial: false, children: message && _jsx(MessageRow, { id: errorId, text: message, tone: "error" }, "error") }), name && _jsx("input", { type: "hidden", name: name, value: e164 }), _jsx("span", { className: styles.srOnly, role: "status", "aria-live": "polite", children: announcement || (showCheck ? `Valid ${current.name} number` : "") })] });
++                                                    }), rows.length === 0 && _jsxs("p", { className: styles.empty, children: ["No countries match \u201C", query.trim(), "\u201D"] })] }) }) })] })] }), _jsxs("div", { className: styles.numberWrap, children: [_jsxs("span", { className: styles.guide, "aria-hidden": "true", children: [_jsx("span", { className: styles.guideTyped, children: formatted }), guide] }), _jsx("input", { ref: inputRef, id: inputId, className: styles.number, type: "tel", inputMode: "tel", autoComplete: "tel", value: formatted, disabled: disabled, required: required, "aria-invalid": invalid || undefined, "aria-describedby": describedBy, "aria-label": hideLabel ? label : undefined, onChange: event => onNumberChange(event.currentTarget), onKeyDown: onNumberKeyDown, onPaste: onPaste, onBlur: event => { setTouched(digits.length > 0); onBlur?.(event); } }), _jsx(AnimatePresence, { initial: false, children: showCheck && _jsx(motion.span, { className: styles.valid, "aria-hidden": "true", initial: reduced ? { opacity: 0 } : { opacity: 0, scale: .6, filter: `blur(${blur.subtle}px)` }, animate: { opacity: 1, scale: 1, filter: "blur(0px)" }, exit: { opacity: 0, scale: reduced ? 1 : .8, transition: { duration: motionTokens.duration.instant } }, transition: reduced ? { duration: motionTokens.duration.instant } : motionTokens.spring.snappy, children: _jsx(Check, { size: 16, strokeWidth: 2 }) }, "ok") })] })] }), _jsx(AnimatePresence, { initial: false, children: description && !message && _jsx(MessageRow, { id: hintId, text: description, tone: "hint" }, "hint") }), _jsx(AnimatePresence, { initial: false, children: message && _jsx(MessageRow, { id: errorId, text: message, tone: "error" }, "error") }), name && _jsx("input", { type: "hidden", name: name, value: e164, disabled: disabled }), _jsx("span", { className: styles.srOnly, role: "status", "aria-live": "polite", children: announcement || (showCheck ? `Valid ${current.name} number` : "") })] });
+ });
+ PhoneInput.displayName = "PhoneInput";
+ export default PhoneInput;
+diff --git a/components/phone-input/phone-input.module.css b/components/phone-input/phone-input.module.css
+index 77ff889f4241f835bc8fae011f1732a4ec6c23f4..4a61aceef0325a3f22288d429afe6c4f95f8a6ee 100644
+--- a/components/phone-input/phone-input.module.css
++++ b/components/phone-input/phone-input.module.css
+@@ -1,7 +1,7 @@
+ /* No row gap: grid tracks clamp a negative margin at zero, so a closed message row would still pay the gap. Each row carries its own space instead. */
+-.field { --pi-h: var(--control-height-md); --pi-panel-w: 320px; position: relative; display: grid; min-width: 0; font-family: var(--font-body); letter-spacing: var(--tracking-body); }
++.field { --pi-h: var(--control-height-md); --pi-panel-w: 320px; --pi-chevron-size: 16px; --pi-content-inset: calc(var(--space-tight) + var(--space-related)); --pi-chevron-clearance: calc(var(--pi-chevron-size) + var(--space-group) + var(--space-related)); position: relative; display: grid; min-width: 0; font-family: var(--font-body); letter-spacing: var(--tracking-body); }
+ .field[data-open] { z-index: var(--layer-dropdown); }
+-.label { justify-self: start; margin-bottom: var(--space-related); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
++.label { justify-self: start; margin-bottom: var(--space-related); color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ 
+ /* The shell matches the labeled input: one border, one radius, and a quiet border change on hover and focus. */
+ .control { position: relative; display: flex; min-width: 0; height: var(--pi-h); box-sizing: border-box; border: 1px solid var(--border-strong); border-radius: var(--radius-control); corner-shape: var(--corner-shape); background: var(--surface); transition: border-color var(--duration-fast) var(--ease-standard); }
+@@ -16,38 +16,39 @@
+ .field[data-open] .anchor::after { opacity: 0; }
+ 
+ /* One material for both states. Open, it steps out over the shell's own border so the two edges never double up. */
+-.shape { position: absolute; z-index: 2; top: 0; left: 0; overflow: clip; background: var(--surface); transition: box-shadow var(--duration-considered) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
++.shape { position: absolute; z-index: 2; top: 0; left: 0; overflow: clip; border-radius: var(--radius-control); corner-shape: var(--corner-shape); background: var(--surface); transition: box-shadow var(--duration-considered) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+ .shape::after { content: ""; position: absolute; inset: 0; z-index: 3; border: 1px solid var(--border); border-radius: inherit; corner-shape: inherit; opacity: 0; pointer-events: none; transition: opacity var(--duration-fast) var(--ease-standard); }
+-.field[data-open] .shape { translate: -1px -1px; background: var(--surface-raised); box-shadow: var(--shadow-floating); }
++.field[data-open] .shape { position: fixed; top: var(--pi-anchor-top, 0px); left: var(--pi-anchor-left, 0px); translate: -1px -1px; background: var(--surface-raised); box-shadow: var(--shadow-floating); }
+ .field[data-open] .shape::after { opacity: 1; }
+ .field[data-disabled] .shape { background: transparent; }
+ 
+ .lid { position: absolute; z-index: 1; top: 0; right: 0; left: 0; height: calc(var(--pi-h) - 2px); }
+ 
+-.trigger { box-sizing: border-box; display: flex; height: calc(var(--pi-h) - 2px); align-items: center; padding: 0 var(--space-block) 0 var(--space-group); font-size: var(--text-sm); font-weight: 500; white-space: nowrap; }
+-.lid .trigger { position: absolute; inset: var(--space-tight) auto var(--space-tight) var(--space-tight); width: calc(100% - 6px); height: auto; margin: 0; padding: 0 var(--space-block) 0 var(--space-related); border: 0; border-radius: calc(var(--radius-control) - var(--space-tight)); corner-shape: var(--corner-shape); background: transparent; color: var(--foreground); cursor: pointer; font-family: inherit; letter-spacing: inherit; text-align: left; -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: background-color var(--duration-fast) var(--ease-standard); }
++.trigger { box-sizing: border-box; display: flex; height: calc(var(--pi-h) - 2px); align-items: center; padding: 0 var(--pi-chevron-clearance) 0 var(--pi-content-inset); font-size: var(--field-text-size, var(--text-sm)); font-weight: 400; white-space: nowrap; }
++.lid .trigger { position: absolute; inset: var(--space-tight) auto var(--space-tight) var(--space-tight); width: calc(100% - 6px); height: auto; margin: 0; padding: 0 var(--pi-chevron-clearance) 0 var(--space-related); border: 0; border-radius: calc(var(--radius-control) - var(--space-tight)); corner-shape: var(--corner-shape); background: transparent; color: var(--foreground); cursor: pointer; font-family: inherit; letter-spacing: inherit; text-align: left; -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: background-color var(--duration-fast) var(--ease-standard); }
+ @media (hover: hover) and (pointer: fine) { .field:not([data-open], [data-disabled]) .lid .trigger:hover { background: var(--surface-muted); } }
+ .lid .trigger:active:not(:disabled) { background: var(--surface-muted); }
+ .lid .trigger:disabled { cursor: not-allowed; }
+ /* No focus rings (product decision): keyboard focus reads as the same quiet fill as hover. */
+ .lid .trigger:focus-visible { background: var(--surface-muted); }
+ .clear:focus-visible, .closeHit:focus-visible { background: color-mix(in oklab, var(--foreground) 8%, transparent); }
+-/* An invisible copy that says how wide the closed button wants to be. */
++/* An invisible copy with the visible content's inset and gap, so the closed button has its full width. */
+ .measure { visibility: hidden; pointer-events: none; width: max-content; }
++.measure, .layer { gap: var(--space-related); }
+ 
+ .slot { position: relative; display: block; min-width: 0; height: 100%; flex: 1; }
+ .slot[data-hidden] { opacity: 0; transition: opacity var(--duration-instant) var(--ease-standard); }
+-.layer { position: absolute; inset: 0; display: flex; align-items: center; gap: var(--space-related); }
++.layer { position: absolute; inset: 0; display: flex; align-items: center; }
+ .flag { display: inline-grid; width: 20px; flex: none; place-items: center; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", var(--font-body); font-size: var(--text-lg); font-weight: 400; line-height: 1; }
+-.dial { font-variant-numeric: tabular-nums; }
++.dial { font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-body); }
+ 
+-.chevron { position: absolute; top: 50%; right: var(--space-group); display: grid; width: 16px; height: 16px; margin-top: calc(var(--space-related) * -1); place-items: center; color: var(--text-muted); pointer-events: none; }
++.chevron { position: absolute; top: 50%; right: var(--space-group); display: grid; width: var(--pi-chevron-size); height: var(--pi-chevron-size); margin-top: calc(var(--pi-chevron-size) / -2); place-items: center; color: var(--text-muted); pointer-events: none; }
+ 
+ /* Search takes the lid's place while the list is open. */
+ .searchRow { position: absolute; inset: 0; display: flex; align-items: center; gap: var(--space-related); padding: 0 var(--space-hair) 0 var(--space-group); }
+ .searchRow[inert] { pointer-events: none; }
+ .searchIcon { flex: none; color: var(--text-muted); }
+-.search { min-width: 0; height: 100%; flex: 1; padding: 0; border: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-sm); letter-spacing: var(--tracking-body); outline: none; }
++.search { min-width: 0; height: 100%; flex: 1; padding: 0; border: 0; background: transparent; color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); letter-spacing: var(--tracking-body); outline: none; }
+ .search::placeholder { color: var(--text-muted); }
+ .clear { display: grid; width: 24px; height: 24px; flex: none; place-items: center; padding: 0; border: 0; border-radius: var(--radius-full); corner-shape: round; background: color-mix(in oklab, var(--foreground) 8%, transparent); color: var(--text-secondary); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+ /* Sits over the shared chevron, so the chevron closes the list. */
+@@ -61,7 +62,7 @@
+ .listFace { position: absolute; top: calc(var(--pi-h) - var(--space-hair)); left: 0; box-sizing: border-box; width: var(--pi-panel-w); padding: 0 var(--space-related) var(--space-related); }
+ .listFace::before { content: ""; position: absolute; top: 0; right: var(--space-inset); left: var(--space-inset); height: 1px; background: var(--border-subtle); }
+ .listFace[inert] { pointer-events: none; }
+-.scroll { max-height: 280px; overflow-y: auto; overscroll-behavior: contain; padding-top: var(--space-related); scrollbar-width: thin; }
++.scroll { max-height: 272px; overflow-y: auto; overscroll-behavior: contain; padding-top: var(--space-related); scrollbar-width: thin; }
+ .options { position: relative; display: grid; gap: var(--space-hair); }
+ .highlight { position: absolute; top: 0; right: 0; left: 0; border-radius: var(--radius-control); corner-shape: var(--corner-shape); background: color-mix(in oklab, var(--foreground) 6.5%, transparent); pointer-events: none; }
+ .group { display: grid; gap: var(--space-hair); }
+@@ -70,14 +71,14 @@
+ .option { position: relative; display: flex; min-height: 36px; box-sizing: border-box; align-items: center; gap: var(--space-group); padding: 0 var(--space-group); border-radius: var(--radius-control); corner-shape: var(--corner-shape); color: var(--text-secondary); cursor: pointer; font-size: var(--text-sm); user-select: none; -webkit-user-select: none; transition: color var(--duration-fast) var(--ease-standard); }
+ .option[data-active], .option[aria-selected="true"] { color: var(--foreground); }
+ .name { min-width: 0; flex: 1; overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+-.meta { flex: none; color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
++.meta { flex: none; color: var(--text-muted); font-size: inherit; font-variant-numeric: tabular-nums; }
+ .check { display: grid; width: 16px; height: 16px; flex: none; place-items: center; color: var(--foreground); opacity: 0; transform: scale(.6); transition: opacity var(--duration-fast) var(--ease-standard), transform var(--duration-spring) var(--ease-spring); }
+ .check[data-on] { opacity: 1; transform: none; }
+ .empty { margin: 0; padding: var(--space-group) var(--space-group) var(--space-inset); color: var(--text-muted); font-size: var(--text-sm); }
+ 
+ /* The number and its guide share one box. The guide paints the typed part invisibly, then the rest of the example faintly after it. */
+ .numberWrap { position: relative; display: flex; min-width: 0; flex: 1; align-items: center; }
+-.number, .guide { box-sizing: border-box; padding: 0 var(--space-block) 0 var(--space-group); font-family: inherit; font-size: var(--text-sm); font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-body); line-height: var(--leading-body); }
++.number, .guide { box-sizing: border-box; padding: 0 var(--space-block) 0 var(--space-group); font-family: inherit; font-size: var(--field-text-size, var(--text-sm)); font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-body); line-height: var(--leading-body); }
+ .number { position: relative; z-index: 1; width: 100%; height: 100%; min-width: 0; margin: 0; border: 0; border-radius: 0 var(--radius-control) var(--radius-control) 0; corner-shape: var(--corner-shape); background: transparent; color: var(--foreground); outline: none; }
+ .number:disabled { cursor: not-allowed; }
+ .guide { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; color: color-mix(in oklab, var(--text-muted) 72%, transparent); pointer-events: none; white-space: pre; }
+@@ -86,8 +87,8 @@
+ 
+ /* The row's space is padding inside the clipped slot, so the height animates from a true zero. */
+ .messageSlot { position: relative; display: block; overflow: hidden; }
+-.hint, .error { display: block; padding-top: var(--space-related); font-size: var(--text-xs); line-height: var(--leading-body); }
+-.hint { color: var(--text-muted); }
++.hint, .error { display: block; padding-top: var(--space-related); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
++.hint { color: var(--field-hint-colour, var(--text-muted)); }
+ .error { color: var(--danger); }
+ 
+ .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 diff --git a/components/select/select.js b/components/select/select.js
 index bccd01e6ad5ae24852fdd3190e8935eba48bfc91..0e6e97eff3f237e8833408cccc724a60553f65a5 100644
 --- a/components/select/select.js
@@ -9,3 +898,117 @@ index bccd01e6ad5ae24852fdd3190e8935eba48bfc91..0e6e97eff3f237e8833408cccc724a60
 -                    reset(); rootProps.onOpenChange?.(open); }, onValueChange: (next) => { setUncontrolledValue(next); onValueChange?.(next); }, children: [_jsxs(SelectPrimitive.Trigger, { ref: ref, id: controlId, "aria-describedby": hintId, className: [styles.trigger, className].filter(Boolean).join(" "), children: [_jsx("span", { className: styles.srOnly, children: _jsx(SelectPrimitive.Value, { placeholder: placeholder }) }), _jsx("span", { className: styles.valueText, "aria-hidden": "true", children: _jsx(AnimatePresence, { initial: false, custom: direction, children: _jsx(motion.span, { "data-placeholder": currentValue ? undefined : "", custom: direction, variants: reduceMotion ? valueFade : valueRoll, initial: "enter", animate: "center", exit: "exit", children: shown }, currentValue ? `value-${currentValue}` : "placeholder") }) }), _jsx(SelectPrimitive.Icon, { className: styles.chevron, children: _jsx(ChevronDown, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) })] }), _jsx(SelectPrimitive.Portal, { children: _jsxs(SelectPrimitive.Content, { className: styles.content, position: "popper", sideOffset: 4, collisionPadding: 12, ...contentProps, children: [_jsx(SelectPrimitive.ScrollUpButton, { className: styles.scrollButton, children: _jsx(ChevronUp, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) }), _jsxs(SelectPrimitive.Viewport, { className: styles.viewport, children: [_jsx(MenuHighlight, { state: highlight, className: styles.highlight }), options.map((option) => (_jsxs(SelectPrimitive.Item, { value: option.value, disabled: option.disabled, className: styles.item, children: [_jsx(SelectPrimitive.ItemText, { children: option.label }), _jsx(SelectPrimitive.ItemIndicator, { className: styles.indicator, children: _jsx(Check, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) })] }, option.value)))] }), _jsx(SelectPrimitive.ScrollDownButton, { className: styles.scrollButton, children: _jsx(ChevronDown, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) })] }) })] }), description && _jsx("span", { id: hintId, className: styles.hint, children: description })] }));
 +                    reset(); rootProps.onOpenChange?.(open); }, onValueChange: (next) => { setUncontrolledValue(next); onValueChange?.(next); }, children: [_jsxs(SelectPrimitive.Trigger, { ref: ref, id: controlId, "aria-describedby": hintId, className: [styles.trigger, className].filter(Boolean).join(" "), children: [_jsx("span", { className: styles.srOnly, children: _jsx(SelectPrimitive.Value, { placeholder: placeholder }) }), _jsx("span", { className: styles.valueText, "aria-hidden": "true", children: _jsx(AnimatePresence, { initial: false, custom: direction, children: _jsx(motion.span, { "data-placeholder": currentValue ? undefined : "", custom: direction, variants: reduceMotion ? valueFade : valueRoll, initial: "enter", animate: "center", exit: "exit", children: shown }, currentValue ? `value-${currentValue}` : "placeholder") }) }), _jsx(SelectPrimitive.Icon, { className: styles.chevron, children: _jsx(ChevronDown, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) })] }), _jsx(SelectPrimitive.Portal, { children: _jsxs(SelectPrimitive.Content, { className: styles.content, position: "popper", sideOffset: 4, collisionPadding: 12, children: [_jsx(SelectPrimitive.ScrollUpButton, { className: styles.scrollButton, children: _jsx(ChevronUp, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) }), _jsxs(SelectPrimitive.Viewport, { className: styles.viewport, ...contentProps, children: [_jsx(MenuHighlight, { state: highlight, className: styles.highlight }), options.map((option) => (_jsxs(SelectPrimitive.Item, { value: option.value, disabled: option.disabled, className: styles.item, children: [_jsx(SelectPrimitive.ItemText, { children: option.label }), _jsx(SelectPrimitive.ItemIndicator, { className: styles.indicator, children: _jsx(Check, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) })] }, option.value)))] }), _jsx(SelectPrimitive.ScrollDownButton, { className: styles.scrollButton, children: _jsx(ChevronDown, { size: 16, strokeWidth: 1.75, "aria-hidden": "true" }) })] }) })] }), description && _jsx("span", { id: hintId, className: styles.hint, children: description })] }));
  });
+diff --git a/components/select/select.module.css b/components/select/select.module.css
+index 805b8e9f6a67033f0f1c2c5bb91822dbb5907ab5..3594e58d9f485c94c4f2fe8da8909e34781087ca 100644
+--- a/components/select/select.module.css
++++ b/components/select/select.module.css
+@@ -1,7 +1,7 @@
+ .field { display: grid; gap: var(--space-related); min-width: 0; }
+-.field label { font-size: var(--text-sm); font-weight: 500; }
++.field label { font-size: var(--text-sm); font-weight: 500; letter-spacing: var(--tracking-body); }
+ /* The trigger anchors the floating menu. Radix opens on pointerdown and measures this box, so it never scales: press feedback is color only. */
+-.trigger { position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); width: 100%; min-height: var(--control-height-md); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 0 var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
++.trigger { position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); width: 100%; min-height: var(--control-height-md); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 0 var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); text-align: left; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
+ @media (hover: hover) and (pointer: fine) { .trigger:hover:not([data-disabled]) { border-color: var(--border-strong); background: var(--surface-muted); } }
+ .trigger:active:not([data-disabled]), .trigger[data-state="open"] { border-color: var(--border-strong); background: var(--surface-muted); }
+ .trigger:focus-visible { border-color: var(--border-strong); }
+@@ -12,7 +12,7 @@
+ .srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+ .chevron { display: inline-flex; flex: 0 0 auto; color: var(--text-muted); transition: transform var(--duration-spring) var(--ease-spring), color var(--duration-fast) var(--ease-standard); }
+ .trigger[data-state="open"] .chevron { transform: rotate(180deg); }
+-.hint { color: var(--text-muted); font-size: var(--text-xs); }
++.hint { color: var(--field-hint-colour, var(--text-muted)); font-size: var(--field-hint-size, var(--text-sm)); letter-spacing: var(--tracking-body); }
+ /* Radix holds the animation until the menu is positioned, so it always grows from the trigger edge. */
+ .content { --menu-x: 0px; --menu-y: -6px; box-sizing: border-box; z-index: var(--layer-dropdown); width: var(--radix-select-trigger-width); min-width: var(--radix-select-trigger-width); max-width: min(24rem, calc(100vw - 20px)); max-height: min(320px, var(--radix-select-content-available-height)); overflow: hidden; border: 1px solid var(--border); border-radius: calc(var(--radius-control) + var(--space-hair)); padding: var(--space-related); background: var(--surface-raised); color: var(--foreground); box-shadow: var(--shadow-floating); transform-origin: var(--radix-select-content-transform-origin); animation: select-in var(--duration-standard) var(--ease-enter) both; }
+ .content[data-side="top"] { --menu-y: 6px; }
+diff --git a/components/tag-input/tag-input.module.css b/components/tag-input/tag-input.module.css
+index 228fec2e7f91ac6018a5d785d6f4da3dde57419d..22ba90a7541645be2540ea48894ce81ba3057d6a 100644
+--- a/components/tag-input/tag-input.module.css
++++ b/components/tag-input/tag-input.module.css
+@@ -1,7 +1,7 @@
+ /* No row gap: grid tracks clamp a negative margin at zero, so a closed message row would still pay the gap. Each row carries its own space instead. */
+ /* The field fills its column, so a new tag never widens it or re-centers it inside a centered layout. */
+ .field { display: grid; width: 100%; min-width: 0; }
+-.field label { margin-bottom: var(--space-related); font-size: var(--text-sm); font-weight: 500; }
++.field label { margin-bottom: var(--space-related); font-size: var(--text-sm); font-weight: 500; letter-spacing: var(--tracking-body); }
+ /* The shell animates its height to .content, which carries the wrapping rows. The ring contracts onto the border on focus. */
+ .control { box-sizing: content-box; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-control); corner-shape: var(--corner-shape); background: var(--surface); box-shadow: 0 0 0 6px transparent; transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-standard) var(--ease-standard); }
+ @media (hover: hover) and (pointer: fine) { .control:hover:not(:focus-within) { border-color: var(--border-strong); } }
+@@ -14,11 +14,11 @@
+ .tag button:focus-visible { background: var(--surface); color: var(--foreground); outline: none; box-shadow: inset 0 0 0 1.5px var(--focus-ring); }
+ /* Quick press, spring release. */
+ .tag button:active { transform: scale(.96); transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), transform var(--duration-instant) var(--ease-standard); }
+-.content input { flex: 1 1 100px; min-width: 80px; min-height: 28px; box-sizing: border-box; border: 0; padding: 0 var(--space-tight); background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-sm); }
++.content input { flex: 1 1 100px; min-width: 80px; min-height: 28px; box-sizing: border-box; border: 0; padding: 0 var(--space-tight); background: transparent; color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); }
+ .content input:focus, .content input:focus-visible { outline: none; }
+ .content input::placeholder { color: transparent; }
+ /* The visible placeholder is drawn here so it can rise in when the last tag leaves. The native one stays for assistive tech. Inset matches the content and input padding. */
+-.placeholder { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; padding: 0 var(--space-group); color: var(--text-muted); font-size: var(--text-sm); white-space: nowrap; pointer-events: none; }
++.placeholder { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; padding: 0 var(--space-group); color: var(--text-muted); font-size: var(--field-text-size, var(--text-sm)); white-space: nowrap; pointer-events: none; }
+ /* The pick ring rides above the pills and sizes itself to the picked tag, so it can glide between tags without scaling its border. */
+ .ring { position: absolute; top: 0; left: 0; z-index: 1; box-sizing: border-box; border: 1px solid var(--accent); border-radius: var(--radius-full); corner-shape: round; background: var(--accent-subtle); opacity: 0; pointer-events: none; }
+ /* A resting tag is not a stacking context (its filter ends at none), so its label and button sit above the ring while its fill stays below. */
+@@ -26,7 +26,7 @@
+ .tag[data-picked] button { color: var(--foreground); }
+ /* The row's space is padding inside the clipped slot, so the height animates from a true zero. */
+ .messageSlot { display: block; overflow: hidden; }
+-.hint { display: block; padding-top: var(--space-related); color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
++.hint { display: block; padding-top: var(--space-related); color: var(--field-hint-colour, var(--text-muted)); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ /* Words are measured against this box when they pop out to leave, so it must be the positioned parent. */
+ .words { position: relative; display: block; }
+ .word { display: inline-block; white-space: pre; }
+diff --git a/components/textarea/textarea.module.css b/components/textarea/textarea.module.css
+index c51e4bedbf8b1e01bccc79566195eddd6c731532..8c0f5b30e783fd81584e47d5c7addd9e7737fe28 100644
+--- a/components/textarea/textarea.module.css
++++ b/components/textarea/textarea.module.css
+@@ -1,8 +1,8 @@
+ /* No row gap: grid tracks clamp a negative margin at zero, so a closed message row would still pay the gap. Each row carries its own space instead. */
+ .field { display: grid; min-width: 0; }
+-.field label { margin-bottom: var(--space-related); font-size: var(--text-sm); font-weight: 500; }
++.field label { margin-bottom: var(--space-related); font-size: var(--text-sm); font-weight: 500; letter-spacing: var(--tracking-body); }
+ /* Same focus language as Input: the ring contracts onto the border while it fades in, and the box never changes size. */
+-.control { width: 100%; min-height: 110px; resize: vertical; border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); line-height: var(--leading-body); outline: none; box-shadow: 0 0 0 6px transparent; transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-standard) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
++.control { width: 100%; min-height: 110px; resize: vertical; border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); line-height: var(--leading-body); outline: none; box-shadow: 0 0 0 6px transparent; transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-standard) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+ .control::placeholder { color: var(--text-muted); }
+ @media (hover: hover) and (pointer: fine) { .control:hover:not(:disabled, [aria-invalid="true"]) { border-color: var(--foreground); } }
+ .control:focus-visible { border-color: var(--foreground); box-shadow: 0 0 0 3px var(--focus-ring); outline: 2px solid transparent; outline-offset: 2px; }
+@@ -10,8 +10,8 @@
+ .control:disabled { cursor: not-allowed; background: var(--surface-muted); opacity: .6; }
+ /* The row's space is padding inside the clipped slot, so the height animates from a true zero. */
+ .messageSlot { display: block; overflow: hidden; }
+-.hint, .error { display: block; padding-top: var(--space-related); font-size: var(--text-xs); line-height: var(--leading-body); }
+-.hint { color: var(--text-muted); } .error { color: var(--danger); }
++.hint, .error { display: block; padding-top: var(--space-related); font-size: var(--field-hint-size, var(--text-sm)); line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
++.hint { color: var(--field-hint-colour, var(--text-muted)); } .error { color: var(--danger); }
+ /* Words are measured against this box when they pop out to leave, so it must be the positioned parent. */
+ .words { position: relative; display: block; }
+ .word { display: inline-block; white-space: pre; }
+diff --git a/components/time-picker/time-picker.module.css b/components/time-picker/time-picker.module.css
+index 0d32306fc06e223f7a45c67cd8c273f187bc0ba1..f811ce54b04dcf01de00e2d146b40d9f1d05faf5 100644
+--- a/components/time-picker/time-picker.module.css
++++ b/components/time-picker/time-picker.module.css
+@@ -1,8 +1,8 @@
+ .field { display: grid; gap: var(--space-related); min-width: 0; }
+-.label { font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
++.label { font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); letter-spacing: var(--tracking-body); }
+ .anchor { position: relative; min-width: 0; }
+ /* The trigger anchors the menu, so press feedback stays in color; it never scales. */
+-.trigger { position: relative; display: flex; width: 100%; min-height: var(--control-height-md); align-items: center; gap: var(--space-related); border: 1px solid var(--border); border-radius: var(--radius-control); corner-shape: var(--corner-shape); padding: 0 var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
++.trigger { position: relative; display: flex; width: 100%; min-height: var(--control-height-md); align-items: center; gap: var(--space-related); border: 1px solid var(--border); border-radius: var(--radius-control); corner-shape: var(--corner-shape); padding: 0 var(--space-group); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--field-text-size, var(--text-sm)); text-align: left; cursor: pointer; transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard); }
+ @media (hover: hover) and (pointer: fine) { .trigger:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-muted); } }
+ .trigger:active:not(:disabled), .trigger[aria-expanded="true"] { border-color: var(--border-strong); background: var(--surface-muted); }
+ .trigger:disabled { opacity: .5; cursor: not-allowed; }
+@@ -10,11 +10,11 @@
+ .valueText { display: grid; flex: 1; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+ .valueText > span { grid-area: 1 / 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ .value { font-variant-numeric: tabular-nums; }
+-.placeholder, .description { color: var(--text-muted); }
++.placeholder { color: var(--text-muted); } .description { color: var(--field-hint-colour, var(--text-muted)); }
+ .srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+ .chevron { flex: 0 0 auto; color: var(--text-muted); transition: transform var(--duration-spring) var(--ease-spring); }
+ .trigger[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+-.description { font-size: var(--text-xs); }
++.description { font-size: var(--field-hint-size, var(--text-sm)); letter-spacing: var(--tracking-body); }
+ .menu { position: absolute; z-index: var(--layer-dropdown); top: calc(100% + var(--space-related)); right: 0; left: 0; max-height: 250px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--border); border-radius: var(--radius-container); corner-shape: var(--corner-shape); padding: var(--space-tight); background: var(--surface-raised); box-shadow: var(--shadow-floating); transform-origin: top center; will-change: transform, opacity; }
+ /* Arrow keys move the highlight often, so it changes almost instantly. The dot marks the chosen time, so only one row is ever highlighted. */
+ .option { display: flex; width: 100%; min-height: 36px; align-items: center; justify-content: space-between; border: 0; border-radius: calc(var(--radius-container) - var(--space-tight)); corner-shape: var(--corner-shape); padding: 0 var(--space-group); background: transparent; color: var(--foreground); font: inherit; font-size: var(--text-sm); font-variant-numeric: tabular-nums; text-align: left; cursor: pointer; transition: background-color 80ms var(--ease-standard); }

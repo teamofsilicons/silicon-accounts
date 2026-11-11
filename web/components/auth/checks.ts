@@ -536,7 +536,7 @@ const hostedChecks: MockCheck[] = [
       // Legacy CRM imported them; they first sign into Briefcase.
       await expect(heading(page, "Finish setting up your account")).toBeVisible();
       await expect(page.getByText("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.")).toBeVisible();
-      await expect(page.getByText("This is the id Legacy CRM set up for you. Keep it, or pick another.")).toBeVisible();
+      await expect(page.getByText("This is the CarbonID Legacy CRM set up for you. Keep it, or pick another.")).toBeVisible();
       expect(await text()).not.toMatch(/Briefcase added you|id Briefcase set up/);
       // At Legacy CRM itself.
       await page.goto(`${base}${flowPath("legacy-crm", "signup_import")}`, { waitUntil: "networkidle" });
@@ -557,7 +557,7 @@ const hostedChecks: MockCheck[] = [
     })],
     run: async ({ page }) => {
       await expect(page.getByText("An app you use added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.")).toBeVisible();
-      await expect(page.getByText("This is the id set up for you when you were added. Keep it, or pick another.")).toBeVisible();
+      await expect(page.getByText("This is the CarbonID set up for you when you were added. Keep it, or pick another.")).toBeVisible();
       expect(await page.locator("main").innerText()).not.toMatch(/Briefcase added you|id Briefcase set up/);
     },
   },
@@ -689,7 +689,7 @@ const hostedChecks: MockCheck[] = [
     name: "sign-up: a taken id offers free ones; the date of birth opens on a year grid",
     path: flowPath("briefcase", "signup"),
     run: async ({ page }) => {
-      const field = page.getByRole("textbox", { name: "Your id" });
+      const field = page.getByRole("textbox", { name: "Your CarbonID" });
       await field.fill("saket");
       await expect(page.getByText("c:saket is taken.").first()).toBeVisible();
       const chip = page.getByRole("group", { name: "Free ids" }).getByRole("button").first();
@@ -716,7 +716,7 @@ const hostedChecks: MockCheck[] = [
       const list = page.getByRole("listbox", { name: "Timezone options" });
       const dob = page.getByRole("button", { name: "Date of birth" });
       // Tab into the field: the list stays shut, so the fields under it stay in view.
-      await page.getByRole("textbox", { name: "Your id" }).focus();
+      await page.getByRole("textbox", { name: "Your CarbonID" }).focus();
       await page.keyboard.press("Tab");
       await expect(field).toBeFocused();
       await expect(field).toHaveAttribute("aria-expanded", "false");
@@ -943,7 +943,7 @@ const hostedChecks: MockCheck[] = [
       expect(await focusShows(page.getByRole("link", { name: /^support@/ }), email), "the support link").toBe(true);
       expect(await focusShows(page.locator("[data-powered-by] a"), email), "Powered by").toBe(true);
       await page.goto(`${base}${flowPath("briefcase", "signup")}`, { waitUntil: "networkidle" });
-      expect(await focusShows(page.getByRole("button", { name: "Date of birth" }), page.getByRole("textbox", { name: "Your id" })), "the date of birth").toBe(true);
+      expect(await focusShows(page.getByRole("button", { name: "Date of birth" }), page.getByRole("textbox", { name: "Your CarbonID" })), "the date of birth").toBe(true);
       await page.goto(`${base}${flowPath("briefcase", "consent")}`, { waitUntil: "networkidle" });
       expect(await focusShows(page.getByRole("switch", { name: "Timezone" }), page.getByRole("button", { name: "Switch account" }), page.locator('li[data-scope="timezone"]')), "a consent switch").toBe(true);
     },
@@ -1512,7 +1512,7 @@ const liveChecks: LiveCheck[] = [
       await page.getByRole("textbox", { name: /digit 1 of 6/ }).click();
       await page.keyboard.type(code);
       await expect(heading(page, "Set up your account")).toBeVisible();
-      const idField = page.getByRole("textbox", { name: "Your id" });
+      const idField = page.getByRole("textbox", { name: "Your CarbonID" });
       await expect(idField).toHaveValue(/^webauth/);
       await expect(page.getByText(/is available\./).first()).toBeVisible();
       await idField.fill("saket");
@@ -2046,7 +2046,7 @@ const liveChecks: LiveCheck[] = [
       await page.keyboard.type(await env.code(email, sentAt));
       await expect(heading(page, "Finish setting up your account")).toBeVisible({ timeout: 8000 });
       await expect(page.getByRole("textbox", { name: "Display name" })).toHaveValue("Ivy Imported");
-      await expect(page.getByRole("textbox", { name: "Your id" })).toHaveValue(handle);
+      await expect(page.getByRole("textbox", { name: "Your CarbonID" })).toHaveValue(handle);
       await page.getByRole("button", { name: "Finish setup" }).click();
       await expect(heading(page, "Share your details with Legacy CRM")).toBeVisible({ timeout: 8000 });
       await page.getByRole("button", { name: "Share and continue" }).click();

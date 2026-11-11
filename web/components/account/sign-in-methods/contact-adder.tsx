@@ -156,7 +156,7 @@ export function ContactAdder({ channel, existing, defaultCountry = "US", startOp
                 defaultCountry={defaultCountry}
                 onChange={(next: PhoneFieldValue) => { setValue(next.phone); setPhoneProblem(next.problem); setError(null); }}
                 error={error}
-                description="We text a 6-digit code to it. It signs you in once it is verified."
+                description="The code has 6 digits and works for 10 minutes."
               />
             </div>
           ) : (
@@ -199,7 +199,7 @@ export function ContactAdder({ channel, existing, defaultCountry = "US", startOp
           />
           </div>
           <div className={styles.codeActions}>
-            <Button type="button" variant="ghost" size="sm" onClick={() => { setStep({ kind: "enter" }); setError(null); focusField(); }}>
+            <Button type="button" variant="link" size="sm" onClick={() => { setStep({ kind: "enter" }); setError(null); focusField(); }}>
               Use a Different {noun === "email" ? "Email" : "Number"}
             </Button>
             <span className={styles.codeRight}>

@@ -1,0 +1,25 @@
+/* /silicons/requests/[id] (request-page.tsx, Anil 2026-11-12): one card, centred: the marks with arrows to you, the
+   question as an h2, a lead line, Accept and Decline explained side by side, the two buttons; the days left under it. */
+.alertAction { display: block; margin-top: var(--space-group); }
+.skeleton { margin-top: var(--space-section); }
+
+.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; justify-items: center; gap: var(--space-inset); margin-top: var(--space-section); padding: var(--space-page) var(--space-block) var(--space-block); border: 1px solid var(--sq-stroke); background: var(--sq-fill); text-align: center; }
+.who { display: flex; align-items: center; gap: var(--space-group); }
+.arrow { flex: none; color: var(--text-muted); }
+.title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); text-wrap: balance; }
+.lead { max-width: 52ch; margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.lead strong { color: var(--foreground); font-weight: var(--weight-medium); }
+
+.choices { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-group); margin-top: var(--space-related); text-align: left; }
+.choice { --sq-r: var(--radius-control); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle); display: grid; align-content: start; gap: var(--space-hair); padding: var(--space-group); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.choice[data-yes] { --sq-fill: var(--neutral-1); }
+.choiceTitle { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.choiceText { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+.buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-related); }
+.left { margin: var(--space-group) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-align: center; font-variant-numeric: tabular-nums; }
+
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); padding-top: var(--space-related); }
+.error { margin: 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); }
+
+@media (max-width: 539px) { .choices { grid-template-columns: minmax(0, 1fr); } }

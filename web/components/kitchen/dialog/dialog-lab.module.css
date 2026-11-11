@@ -1,0 +1,27 @@
+/* /__dialog (dialog-lab.tsx): two Text code dialogs drawn as Silicon UI's Dialog lays them out (a header with the title
+   and description over a hairline, then the body), side by side. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; justify-items: start; gap: var(--space-related); }
+.heading { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); align-items: start; gap: var(--space-block); }
+.column { display: grid; align-content: start; gap: var(--space-group); min-width: 0; }
+.columnName { margin: 0; color: var(--text-secondary); font: var(--label); letter-spacing: var(--label-tracking); }
+
+.dialog { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-floating); }
+.header { display: grid; gap: var(--space-related); padding: var(--space-section); border-bottom: 1px solid var(--border-subtle); }
+.title { margin: 0; font: var(--h2); letter-spacing: var(--h2-tracking); }
+.description { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.body { display: grid; gap: var(--space-block); padding: var(--space-section); }
+.field { display: grid; gap: var(--space-related); }
+.start { justify-self: start; }
+.actions { display: flex; justify-content: flex-end; gap: var(--space-related); }
+
+/* The hierarchy: the typed number up to body, hints and errors down to 12 (Silicon UI's field variables, local patch). */
+.hierarchy { --field-text-size: var(--text-base); --field-hint-size: var(--text-xs); }
+
+.tiers { display: grid; gap: var(--space-hair); margin: 0; }
+.tier { display: flex; justify-content: space-between; gap: var(--space-group); color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.tier dt { color: var(--foreground); }
+.tier dd { margin: 0; }

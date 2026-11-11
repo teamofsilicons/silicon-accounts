@@ -419,7 +419,9 @@ export async function until<T>(read: () => Promise<T>, ok: (value: T) => boolean
 
 /** The live status line of an id field (IdField), once it settled (not "Checking…" nor empty). */
 export async function idStatus(scope: Locator | Page, settled: (text: string) => boolean = text => !!text && text !== "Checking…"): Promise<string> {
-  const line = scope.locator('p[role="status"][data-tone]').first();
+  // The id field (parts/id-field.tsx, 2026-11-11) announces its live status in a polite live region; the same words are
+  // the field's hint or error.
+  const line = scope.locator('[role="status"]').first();
   return until(async () => (await line.innerText().catch(() => "")).trim(), settled, 12_000);
 }
 

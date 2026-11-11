@@ -84,7 +84,7 @@ export const SECTIONS: readonly Section[] = [
 
 /** Account pages that belong to a section but are not in the sidebar: reached from the command palette and from links. */
 export const MORE_DESTINATIONS = [
-  { key: "proofs", label: "User verification", description: "Apps acting on your behalf at other apps", href: paths.proofs, icon: ShieldCheck },
+  { key: "proofs", label: "Permissions between apps", description: "One app doing something in another app for you", href: paths.proofs, icon: ShieldCheck },
   { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History },
 ] as const;
 

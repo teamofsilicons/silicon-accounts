@@ -1,25 +1,20 @@
-/* A Silicon's page (Anil, 2026-11-01): the back link on the page; the Silicon's name is the page's h1 for screen
-   readers, shown in the hero instead. The hero is a wide card in the Silicon's own colour pair (as its card on
-   /silicons): deepened at the top left, a faint light edge and a light raised shadow, the container squircle; its name
-   (36px, medium), its si:id (mono, softer), and at its foot its status and since when it is in your care; the Silicon
-   spark at the lower right. Its settings follow, 48px below. */
+/* /silicons/[uuid], one Silicon's page (silicon-page.tsx, Anil 2026-11-12), on the account pages' rows
+   (parts/rows.module.css). Only what those rows don't draw is here: the intro under the page bar, the tabs' spacing,
+   the secrets shown once, and the dialogs' forms and actions. */
 .alertAction { display: block; margin-top: var(--space-group); }
-.srOnlyHeader h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.skeleton { margin-top: var(--space-section); }
 
-.hero {
-  --sq-r: var(--radius-container);
-  position: relative; isolation: isolate; display: flex; min-width: 0; min-height: 200px; flex-direction: column; gap: var(--space-related);
-  padding: var(--space-block); overflow: hidden; border: 1px solid color-mix(in oklab, var(--neutral-0) 22%, transparent);
-  background-image: linear-gradient(135deg, color-mix(in oklab, var(--card-from), var(--neutral-11) 42%), var(--card-from) 48%, var(--card-to));
-  background-origin: border-box; box-shadow: var(--shadow-raised); color: var(--neutral-0);
-}
-.heroSpark { position: absolute; z-index: -1; right: var(--space-block); bottom: var(--space-block); width: 72px; height: 72px; color: var(--neutral-0); opacity: .9; }
-.heroName { color: var(--neutral-0); font: var(--h1); letter-spacing: var(--h1-tracking); overflow-wrap: anywhere; }
-.heroId { color: color-mix(in oklab, var(--neutral-0) 78%, transparent); font: var(--small); letter-spacing: var(--small-tracking); font-family: var(--font-mono); overflow-wrap: anywhere; }
-.heroFoot { display: grid; gap: var(--space-hair); margin-top: auto; padding-right: calc(var(--space-page) * 2); }
-.heroStatus { color: var(--neutral-0); font: var(--label); letter-spacing: var(--label-tracking); }
-.heroFact { color: color-mix(in oklab, var(--neutral-0) 82%, transparent); font: var(--small); letter-spacing: var(--small-tracking); }
+/* Its mark beside its si:id, its status and since when it is in your care. */
+.intro { display: flex; min-width: 0; align-items: center; gap: var(--space-group); margin-top: var(--space-section); }
+.introText { display: grid; min-width: 0; gap: 0; }
+.introTitle { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-related); color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); }
+.introLine { min-width: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
 
-.settings { margin-top: var(--space-section); }
+.reveals { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
+.tabs { margin-top: var(--space-block); }
 
-@media (max-width: 639px) { .hero { min-height: 168px; padding: var(--space-section); } .heroName { font: var(--h2); letter-spacing: var(--h2-tracking); } }
+/* In a dialog: its fields, then Cancel and the action at the end. */
+.form { display: grid; min-width: 0; gap: var(--space-inset); }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); padding-top: var(--space-related); }
+.start { justify-self: start; }
+.error { margin: 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); }

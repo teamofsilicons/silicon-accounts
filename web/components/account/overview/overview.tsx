@@ -43,6 +43,7 @@ import { STEP_ICON, checkupSteps, keepSession, readKept, subscribeKept, type Ste
 import { SiliconMark } from "../parts/silicon-mark";
 import { RequestDeck } from "../silicons/request-deck";
 import styles from "./overview.module.css";
+import { appHref } from "../apps/apps";
 
 const SILICON_TILES = 2;
 const APP_TILES = 4;
@@ -120,7 +121,7 @@ function Handle({ id }: { id: string }) {
       data-sq="surface"
       className={styles.handle}
       onClick={() => void copy(id)}
-      aria-label={state === "idle" ? `Copy your id, ${id}` : label}
+      aria-label={state === "idle" ? `Copy your CarbonID, ${id}` : label}
     >
       {label}
     </Button>
@@ -326,7 +327,7 @@ function Intro({ me }: { me: Me }) {
         <li className={styles.introItem}>
           <Avatar name={me.display_name} src={picture?.src ?? me.pfp_url} size="md" />
           <span className={styles.introLabel}>You</span>
-          <span>{me.id ? <>Others find you by <span className="mono">{me.id}</span>.</> : "Others find you by your id."}</span>
+          <span>{me.id ? <>Others find you by <span className="mono">{me.id}</span>.</> : "Others find you by your CarbonID."}</span>
         </li>
         <li className={styles.introItem}>
           <SiliconMark seed="scout" size={36} />
@@ -428,7 +429,7 @@ function YourApps() {
 function AppTile({ item, now }: { item: MyApp; now: number }) {
   const used = item.last_signed_in_at ?? item.first_signed_in_at;
   return (
-    <Link href={`${paths.apps}#app-${item.app.app_id}`} data-sq="surface" className={styles.tile}>
+    <Link href={appHref(item.app.app_id)} data-sq="surface" className={styles.tile}>
       <span className={styles.tileHead}>
         <AppMark app={item.app} size={32} decorative />
         <span className={styles.tileName}>{item.app.name}</span>

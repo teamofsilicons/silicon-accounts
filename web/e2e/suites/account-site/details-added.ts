@@ -9,7 +9,10 @@
 import type { Page } from "@playwright/test";
 import type { Journey } from "../../context";
 import { newContext, shot, signInWithCode, sleep, tag, type Env } from "../../lib";
-import { call, getMe, newCarbon, probePage, randomPhone, rowByKey, rowsSeen, signIntoAppSeen, timezoneLabel, until, userBaseRow } from "./_helpers";
+import { call, getMe, newCarbon, probePage, randomPhone, rowsSeen, signIntoAppSeen, timezoneLabel, until, userBaseRow } from "./_helpers";
+
+/** The digits of a phone number, however it is formatted. */
+const digits = (text: string) => text.replace(/\D/g, "");
 
 /** Signs up on the account site's own /sign-in with a phone code (the prefilled sign-up page), ending on the home page. */
 async function signUpByPhone(env: Env, page: Page, phone: string): Promise<void> {
@@ -20,11 +23,6 @@ async function signUpByPhone(env: Env, page: Page, phone: string): Promise<void>
   await sleep(300);
   await create.click();
   await page.waitForURL(`${env.site}/`, { timeout: 30_000 });
-}
-
-/** "1 of 10 phone numbers" from a Sign-in methods section's counter. */
-async function counter(page: Page, region: string, plural: string): Promise<string> {
-  return (await page.getByRole("region", { name: region, exact: true }).locator(`[aria-label$=" of 10 ${plural}"]`).first().getAttribute("aria-label").catch(() => null)) ?? "none";
 }
 
 const addedOnDetails: Journey = {
@@ -46,30 +44,30 @@ const addedOnDetails: Journey = {
 
     const { page } = carbon;
     await page.goto(`${env.site}/sign-in-methods`);
-    const phones = page.getByRole("region", { name: "Phone numbers", exact: true });
-    await phones.waitFor({ timeout: 30_000 });
+    // Security (2026-11-10): "Your sign-in" has a Text code row with the primary phone (formatted; compared by digits).
+    const signIn = page.getByRole("region", { name: "Your sign-in", exact: true });
+    await signIn.waitFor({ timeout: 30_000 });
     await sleep(700);
     await shot(env, page, "acct-added-02-sign-in-methods", true);
-    const phoneRow = (await rowByKey(page, "Your phone numbers", phone).innerText().catch(() => "")).replace(/\s+/g, " ");
-    results.check("Sign-in methods lists it as the primary phone number (1 of 10)", /Primary/.test(phoneRow) && (await counter(page, "Phone numbers", "phone numbers")) === "1 of 10 phone numbers", `${phoneRow} / ${await counter(page, "Phone numbers", "phone numbers")}`);
-    await page.goto(`${env.site}/apps`);
-    const dmCard = page.locator("#app-dm");
-    await dmCard.waitFor({ timeout: 30_000 });
-    await sleep(600);
-    const dmText = (await dmCard.innerText()).replace(/\s+/g, " ");
+    const phoneRow = (await signIn.getByRole("listitem").filter({ hasText: "Text code" }).innerText().catch(() => "")).replace(/\s+/g, " ");
+    results.check("Security's Text code row shows it, the account's phone", digits(phoneRow).includes(digits(phone)), phoneRow);
+    // An app's page (/apps/[id]) lists what it can see, with the values.
+    const appPage = async (appId: string) => {
+      await page.goto(`${env.site}/apps/${appId}`);
+      await page.getByRole("heading", { name: "What it can see about you" }).waitFor({ timeout: 30_000 });
+      await sleep(600);
+      return (await page.locator("main").innerText()).replace(/\s+/g, " ");
+    };
+    const dmText = await appPage("dm");
     await shot(env, page, "acct-added-03-apps", true);
-    results.check("/apps: DM can see the name and the phone, not the email (left unticked)", dmText.includes("Name, id and photo") && dmText.includes("Phone") && !dmText.includes("Email") && !dmText.includes(carbon.email), dmText.slice(0, 300));
+    results.check("/apps/dm: DM can see the name and the phone, not the email (left unticked)", dmText.includes("Name, photo and CarbonID") && dmText.includes("Phone number") && !dmText.includes("Email") && !dmText.includes(carbon.email), dmText.slice(0, 300));
     // An app whose flow spreads its details over pages and a review (Ledgerly: the phone on one page, the date of
     // birth and an optional timezone on the next): /apps shows what all its pages shared together.
     const ledgerly = await signIntoAppSeen(env, page, "ledgerly", { tick: ["timezone"], shotName: "acct-added-03b-ledgerly" });
     results.check("Ledgerly's flow: two details pages and a review, the phone already there (added for DM), the timezone ticked on page 2", ledgerly.walk.pages.length === 2 && !!ledgerly.walk.review && ledgerly.walk.pages[0]?.rows.some(row => row.field === "phone" && !row.missing) === true && ledgerly.walk.pages[1]?.shared.includes("timezone") === true, `${ledgerly.walk.pages.map(seen => `${seen.id}: ${rowsSeen(seen.rows)}`).join(" / ")}; review ${JSON.stringify(ledgerly.walk.review)}`);
-    await page.goto(`${env.site}/apps`);
-    const ledgerlyCard = page.locator("#app-ledgerly");
-    await ledgerlyCard.waitFor({ timeout: 30_000 });
-    await sleep(600);
-    const ledgerlyText = (await ledgerlyCard.innerText()).replace(/\s+/g, " ");
+    const ledgerlyText = await appPage("ledgerly");
     const meNow = await getMe(carbon.probe);
-    results.check("/apps: Ledgerly can see the name, the phone, the date of birth and the timezone (all its pages), not the email", ["Name, id and photo", "Phone", "Date of birth", "Timezone"].every(label => ledgerlyText.includes(label)) && ledgerlyText.includes(timezoneLabel(meNow.timezone)) && !ledgerlyText.includes("Email"), ledgerlyText.slice(0, 320));
+    results.check("/apps/ledgerly: Ledgerly can see the name, the phone, the date of birth and the timezone (all its pages), not the email", ["Name, photo and CarbonID", "Phone number", "Date of birth", "Timezone"].every(label => ledgerlyText.includes(label)) && ledgerlyText.includes(timezoneLabel(meNow.timezone)) && !ledgerlyText.includes("Email"), ledgerlyText.slice(0, 320));
     const ledgerlyRow = await userBaseRow(ctx, "ledgerly", carbon.uuid);
     results.check("…and Ledgerly's user base agrees (phone, dob, timezone; no email)", ledgerlyRow.row?.phone === phone && ledgerlyRow.row.dob === meNow.dob && ledgerlyRow.row.timezone === meNow.timezone && !ledgerlyRow.row.email, JSON.stringify({ phone: ledgerlyRow.row?.phone, dob: ledgerlyRow.row?.dob, timezone: ledgerlyRow.row?.timezone, email: ledgerlyRow.row?.email }));
 
@@ -88,12 +86,13 @@ const addedOnDetails: Journey = {
     const probe = await probePage(env, context);
     const before = await getMe(probe);
     results.check("setup: a Carbon signed up on the site with a phone, no email", before.emails.length === 0 && before.phones.some(item => item.phone === ownPhone && item.is_primary), JSON.stringify({ emails: before.emails, phones: before.phones.map(item => item.phone) }));
-    await phonePage.goto(`${env.site}/`);
-    const front = phonePage.getByRole("region", { name: `Identity card of ${before.id}`, exact: true });
-    await front.getByRole("button", { name: "Details" }).click({ timeout: 30_000 });
-    const back = phonePage.locator(`section[aria-label="Identity card of ${before.id}, details"]`);
+    // Personal info's Contact section: no email row yet, only the phone.
+    await phonePage.goto(`${env.site}/personal`);
+    const contact = phonePage.getByRole("region", { name: "Contact", exact: true });
+    await contact.waitFor({ timeout: 30_000 });
     await sleep(800);
-    results.check("the card's back says there is no email yet", (await back.innerText().catch(() => "")).includes("No email yet"));
+    const contactBefore = (await contact.innerText().catch(() => "")).replace(/\s+/g, " ");
+    results.check("Personal info's Contact has no email yet, only the phone", !contactBefore.includes("@") && digits(contactBefore).includes(digits(ownPhone)), contactBefore);
     const email = `acct.added.${t}@example.test`;
     const briefcase = await signIntoAppSeen(env, phonePage, "briefcase", { add: { email }, shotName: "acct-added-04-briefcase" });
     const share = briefcase.walk.pages[0];
@@ -102,16 +101,17 @@ const addedOnDetails: Journey = {
     const after = await until(() => getMe(probe), value => value.emails.length === 1, 10_000);
     results.check("the account's first email is verified and primary", after.emails[0]?.email === email && after.emails[0]?.is_primary === true && !!after.emails[0]?.verified_at, JSON.stringify(after.emails));
     await phonePage.goto(`${env.site}/sign-in-methods`);
-    await phonePage.getByRole("region", { name: "Emails", exact: true }).waitFor({ timeout: 30_000 });
+    const emailSignIn = phonePage.getByRole("region", { name: "Your sign-in", exact: true });
+    await emailSignIn.waitFor({ timeout: 30_000 });
     await sleep(700);
-    const emailRow = (await rowByKey(phonePage, "Your emails", email).innerText().catch(() => "")).replace(/\s+/g, " ");
+    const emailRow = (await emailSignIn.getByRole("listitem").filter({ hasText: "Email code" }).innerText().catch(() => "")).replace(/\s+/g, " ");
     await shot(env, phonePage, "acct-added-05-sign-in-methods", true);
-    results.check("Sign-in methods lists it as the primary email (1 of 10)", /Primary/.test(emailRow) && (await counter(phonePage, "Emails", "emails")) === "1 of 10 emails", `${emailRow} / ${await counter(phonePage, "Emails", "emails")}`);
-    await phonePage.goto(`${env.site}/`);
-    await front.getByRole("button", { name: "Details" }).click({ timeout: 30_000 });
+    results.check("Security's Email code row shows it", emailRow.includes(email), emailRow);
+    await phonePage.goto(`${env.site}/personal`);
+    await contact.waitFor({ timeout: 30_000 });
     await sleep(800);
-    const backText = (await back.innerText().catch(() => "")).replace(/\s+/g, " ");
-    results.check("…and the card's back shows it, primary", backText.includes(email) && /Primary/.test(backText), backText.slice(0, 240));
+    const contactAfter = (await contact.innerText().catch(() => "")).replace(/\s+/g, " ");
+    results.check("…and Personal info's Contact shows it", contactAfter.includes(email), contactAfter.slice(0, 240));
     const history = (await call<{ items: Array<{ title: string }> }>(probe, "/v1/me/history?kind=security&limit=20")).body.items.map(item => item.title);
     results.check("the activity names the email added and where: \"Email <address> added while signing in to Briefcase\"", history.includes(`Email ${email} added while signing in to Briefcase`), history.slice(0, 5).join(" | "));
     await context.close();

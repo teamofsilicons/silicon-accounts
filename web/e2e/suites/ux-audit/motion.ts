@@ -125,31 +125,23 @@ export const journeys: Journey[] = [
         results.watch(page, `motion-signed-${mode}`);
         collectConsole(page);
       }
-      await compare(ctx, findings, signed, "a page change along the dock (Identity → Apps)", async page => {
+      await compare(ctx, findings, signed, "a page change along the sidebar (Home → Connected apps)", async page => {
         await page.goto(`${env.site}/`);
         await page.locator("main").first().waitFor({ timeout: 30_000 });
         await settle(page, 800);
       }, async page => {
-        await page.locator("nav[aria-label='Account sections']").getByRole("link", { name: "Apps" }).click();
+        await page.locator("nav[aria-label='Account sections']").getByRole("link", { name: "Connected apps" }).click();
         await page.waitForURL(`${env.site}/apps`, { timeout: 15_000 });
       }, 1_200);
-      let eclipse: Record<Mode, boolean> = { "no-preference": false, reduce: false };
-      await compare(ctx, findings, signed, "changing the theme from the dock", async page => {
-        await settle(page, 600);
-        await page.evaluate("(() => { window.__uxaEclipse = false; new MutationObserver(() => { if (document.documentElement.getAttribute('data-transition') === 'eclipse') window.__uxaEclipse = true; }).observe(document.documentElement, { attributes: true }); })()");
-      }, async (page, mode) => {
-        await page.locator("nav[aria-label='Account sections']").getByRole("button", { name: /^Switch to (dark|light) mode$/ }).first().click();
-        await sleep(900);
-        eclipse = { ...eclipse, [mode]: (await page.evaluate("window.__uxaEclipse === true")) === true };
-      }, 1_400);
-      results.check("reduced motion: the theme changes without the eclipse (no data-transition=eclipse)", !eclipse.reduce, `reduce: ${eclipse.reduce}, without the preference: ${eclipse["no-preference"]}`);
-      await compare(ctx, findings, signed, "opening the Create a Silicon drawer", async page => {
-        await page.goto(`${env.site}/silicons`);
-        await page.getByRole("button", { name: "Create a Silicon" }).first().waitFor({ timeout: 30_000 });
+      // The theme switch left the account pages (the shell's account menu hides it, 2026-11-07), so there is no eclipse
+      // to check here any more; the hosted pages keep theirs.
+      await compare(ctx, findings, signed, "opening a dialog (Personal info's Name)", async page => {
+        await page.goto(`${env.site}/personal`);
+        await page.locator('main [data-edit="name"]').first().waitFor({ timeout: 30_000 });
         await settle(page, 800);
       }, async page => {
-        await page.getByRole("button", { name: "Create a Silicon" }).first().click();
-        await page.getByRole("dialog", { name: "Create a Silicon" }).waitFor({ timeout: 10_000 });
+        await page.locator('main [data-edit="name"]').first().click();
+        await page.getByRole("dialog", { name: "Name" }).waitFor({ timeout: 10_000 });
       }, 1_200);
       await compare(ctx, findings, signed, "opening the command palette (⌘K)", async page => {
         await page.keyboard.press("Escape");

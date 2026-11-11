@@ -11,7 +11,7 @@
  */
 import { fontCss } from "./type-lab";
 
-export const ROLES = ["display", "h1", "h2", "h3", "body", "label", "small", "caption"] as const;
+export const ROLES = ["display", "h1", "h2", "h3", "body", "label", "small", "caption", "hint"] as const;
 
 /** The text colour tokens offered first, by plain name; any other colour is a custom one. */
 export const TEXT_COLOURS = [

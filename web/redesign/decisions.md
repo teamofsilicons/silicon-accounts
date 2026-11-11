@@ -397,6 +397,9 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   ⌥I. Clicks are swallowed while it's on, because the dev server points at the live API.
 
 ## Process
+- PhoneInput country picker (2026-11-10): while open, its surface uses fixed viewport positioning tied to the field's anchor, so scrollable dialogs do not crop the options; scroll and resize keep it attached. Its corners use `--radius-control` and `--corner-shape`, matching the closed field, and opening on a selected country aligns a complete option at the top. The Security dialog keeps its own scrolling. Applied in Silicon UI source and the account site's deferred-release package patch.
+- PhoneInput audit (2026-11-10): when the picker cannot represent an international number, it keeps the raw draft visible, reports an empty value with `unsupported` status, and blocks native form submission until corrected. Extra digits stay visible with `too-long` status and browser validation; parsing and display never silently truncate. Country restrictions choose a country from their list. The invisible width measure and visible flag/code share their gap and starting inset. These changes are in Silicon UI source and the account site's existing local package patch, pending the deferred release.
+- Silicon UI #28/#29 (2026-11-10): PhoneInput's hidden width measure gets the same flag/code gap as the visible row, and its trigger reserves a 16 px chevron plus token spacing even when `--space-block` is compact. Dialog's close uses the xs icon button size with a transparent resting background and no border; hover, press and keyboard focus reveal its muted fill. Both are in the shared source and the account site's existing pnpm package patch; publish and upgrade with the deferred Silicon UI release.
 - Font lab (Anil, 2026-11-08): "Use same font for display and body" starts off. When on, the heading face drives both, the Text selector shows it but cannot be changed, and the saved separate text choice returns when turned off. Body size, weight, letter spacing and line height remain independently adjustable with either font choice. The shared Select's option highlight is corrected in Silicon UI source and patched into the account site. Anil deferred the npm release and package upgrade; the site keeps its tested pnpm patch for 0.4.0 until he resumes that work.
 - Keep priorities.md, decisions.md and log.md (this folder) updated with every task; shared-code changes also get a
   README.md note, as the site already does. Why: state lives in repo files, not chat. (2026-10-17)
@@ -421,3 +424,50 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   Zones in a country with the same clock all year read as the best known. Steps still go by band. Crowded Europe is rough at
   1°, to revisit. The boundary offsets are from 2012, so a few recent changes rely on the nearest-zone fallback; Russia always
   does. Create a Silicon defaults to the browser's time zone, then the Carbon's.
+- 2026-11-10 (Anil): Silicon UI text goes on the product scale. A dialog's title is h2 (18/600, display tracking); field hints and errors are small (14/400), one size up from 12/400, which the scale has no role for. Done in the local Silicon UI patch with button and hint tracking at their own size; the request for upstream is §3 of requests/silicon-ui-phone-input-dialog-close.md.
+- 2026-11-10 (Anil, copy B): the phone dialog with no number yet is titled "Add a phone number" with "Once it's verified, you can sign in with a code texted to it."; the field's hint is "The code has 6 digits and works for 10 minutes." (no longer repeating the description); the phone field's way out is "Enter the Country Code Yourself" (sign-up too); the button stays Send Code (not OTP: everything else says code). With numbers, the dialog keeps "Text code" and its list description; email is unchanged.
+- 2026-11-10 (Anil): the email and phone dialogs use the /__dialog hierarchy: typed text and the calling code are body (16/400, one number), a field's hint is the new ninth role, hint (12/400, --text-muted), and the field's switches (Enter the Country Code Yourself, Use a Different Number) are underlined caption links (Button's link variant, xs). Set on ContactList with Silicon UI's --field-text-size and --field-hint-size; other forms keep 14 until decided.
+- 2026-11-10 (Anil: "yes, all of them"): the dialog hierarchy is site-wide. tokens.css sets --field-text-size (body, 16) and --field-hint-size (hint, 12) on :root, so every Silicon UI field (Input, Textarea, PhoneInput, Select, Combobox, DatePicker, MultiSelect, TimePicker, PasswordField, TagInput) types at 16 with 12/400 hints. Create a Silicon's step-up of every Silicon UI size (labels and buttons at 16) is gone. Personal info's phone editor with no number uses copy B and drops its extra Close.
+- 2026-11-11 (Anil, Public id audit, all six): the id prefix is Silicon UI Input's new prefix slot (local patch), the typed id's size, so c:anil reads as one id; the live status is the field's hint (12/400, a problem its error) in place of a rest hint ("Your old id stays reserved for you for 10 days, so you can take it back."), so no empty line is held; the order is the id (description "Your id is c:anil. Others find you by it."), the field, then a hint-role note ("Apps you have signed into are told. They know you by an internal id that never changes."); the uuid is no longer shown in it; inline mono is .93em of its line (--mono-inline-scale); free ids are Silicon UI secondary xs buttons.
+- 2026-11-11 (Anil): a Carbon's c:id is called CarbonID in all copy (not "Public id", not "id"): Personal info's row and dialog, the change form and field, Home, the Silicons intro, Activity, the command menu, the error toast and sign-up. A Silicon's si:id still says "id" until decided (SiliconID?).
+
+## Dialog rules (Anil, 2026-11-11; from the CarbonID dialog, applied to every Personal info dialog)
+
+Every dialog follows these. The first three are set in CSS, so a new dialog gets them without asking: the variables
+on `[role="dialog"]` in `styles/tokens.css` and the `[role="dialog"] strong` rule in `styles/base.css`.
+
+1. **Header:** the title is h2. The description under it is small, 14/400, in `--text-soft`.
+2. **Under a field:** the hint, the live status and any note are small, 14/400, in `--text-secondary`. A status takes
+   the hint's place; no empty line is ever held for one. A note starts with a bold "Note:" (label, 14/500).
+3. **Values named in copy** (a CarbonID, an email, a name, a date) are `<strong>`: 14/500 in `--foreground`.
+4. **Copy:** the description says what the thing is for or who sees it, naming the current value; the hint says what
+   happens next. Nothing is said twice (description, hint and rows each carry their own fact). The title isn't
+   repeated as the field's label. No internal details (uuids, webhooks) unless the reader can act on them. Active
+   voice, plain words, and the product's names (CarbonID).
+5. **Typing:** what you type is body, 16/400. A fixed prefix ("c:", "+91") is part of the value: the same size.
+6. **Actions:** at the end, Cancel (ghost) then the primary action, both at the default size, title case. One way out
+   per state: the close button and Cancel on a form; a list with no form gets Close. Switches under a field ("Enter
+   the Country Code Yourself") are Button's link variant at sm (14/500).
+7. **Width:** a dialog fits its content (`--dialog-width`, as the date of birth dialog does for its calendar).
+8. **Check it:** with Edit text on (⌥I) every text names a role; nothing reads "Off scale".
+- 2026-11-11 (Anil: "design the connected apps screen"): Connected apps as the prototype draws it, on the account pages'
+  rows (parts/rows.tsx, now shared with Security). /apps is one list (each app's mark, name and "Signed in 2 weeks ago",
+  linking to its page), then Permissions between apps (with its active count), then "Access removed" only when there
+  are any. /apps/[id]: Connected apps above the name with Open, where it lives and since when, Who uses it, What it can
+  see about you (Name, photo and CarbonID marked Always, then each shared detail with its value), Also acts for you (Stop,
+  asked first), and Remove (asked first, following the dialog rules; your Silicons keep their own access). The
+  membership id, the sessions count's own line, the With access / Access removed switch and the in-card remove are gone.
+- 2026-11-12 (Anil): Permissions between apps (/proofs) as the prototype draws it: Connected apps above the title, one
+  line on what a permission is, an Active list (both apps' marks, "Briefcase in Commit", what it may do and when it
+  ends, Stop asked first in a dialog) and an Ended list when there are any (faded marks, why and when). The rows are
+  apps/proof-rows.tsx, shared with an app's page ("Also acts for you"). The issuing → receiving diagram, the token
+  countdown ring, the Active / Ended switch and the facts grid are gone. "Revoke" is "Stop" in the words.
+- 2026-11-12 (Anil: "the pages and nested pages of silicons"), as the prototype draws them, on the account pages' rows:
+  /silicons is Waiting for you, then the Silicons as tiles (Home's: mark, name, si:id, a status and "Key changed 3 days
+  ago" or who it is being handed to; the whole tile opens it). /silicons/[uuid]: Silicons above its name, its mark,
+  si:id, status and since when, then the tabs Access (Secret key with Change; Webhook with Set, Change, Remove) and
+  Settings (About: name, id, timezone, photo, looked after by with Hand Over or Cancel Handover; then Delete). Every
+  change is a dialog on the dialog rules; the hold-to-confirm buttons and the inline editors are gone. A request has its
+  own page, /silicons/requests/[id] (who asks drawn with arrows to you, Accept and Decline explained side by side, the
+  days left); Review opens it. The old drawer (silicon-drawer.tsx) is removed.
+- 2026-11-12: Personal info's groups are the account pages' sections (parts/rows.tsx: an h2 over a boxed list), like Security, Connected apps and Silicons, so its headings run h1 → h2; its rows keep the label, value and chevron.

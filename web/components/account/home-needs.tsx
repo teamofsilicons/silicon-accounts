@@ -15,11 +15,11 @@
  * the device last; the count is a neutral badge.
  */
 import Image from "next/image";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { Laptop, TriangleAlert } from "lucide-react";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
-import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
+import { ButtonLink } from "@teamofsilicons/silicon-ui/button-link";
 import type { CustodianRequest, SessionInfo } from "@/lib/api/types";
 import { useMe } from "@/lib/query/session";
 import { NEEDS_YOU_ID } from "./parts/anchors";
@@ -29,7 +29,7 @@ import { asCarbon, describeError, msUntil, personLabel, spanText, useNow } from 
 import { useEveryCustodianRequest, useEverySession, useSignOutSession } from "./parts/queries";
 import { SiliconMark } from "./parts/silicon-mark";
 import { sessionName } from "./security/sessions";
-import { RequestDeck } from "./silicons/request-deck";
+import { requestHref } from "./silicons/request-page";
 import styles from "./home-needs.module.css";
 
 const siliconName = (request: CustodianRequest) => request.silicon.display_name || request.silicon.id || "A Silicon";
@@ -86,7 +86,6 @@ function timeLeft(request: CustodianRequest, now: number): { text: string; tone:
 
 function Requests({ id, title, waiting, failed, error, retry, stale, now }: { id: string; title: string; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo | undefined; now: number }) {
   const signOut = useSignOutSession();
-  const [reviewing, setReviewing] = useState<CustodianRequest | null>(null);
   const count = waiting.length + (failed ? 1 : 0) + (stale ? 1 : 0);
   // The soonest to run out first; a device has no deadline, so it comes last.
   const byDeadline = [...waiting].sort((a, b) => Date.parse(a.expires_at) - Date.parse(b.expires_at));
@@ -110,7 +109,7 @@ function Requests({ id, title, waiting, failed, error, retry, stale, now }: { id
             <Row key={request.id} lead={<SiliconMark seed={request.silicon.uuid} size={28} pending={!transfer} />}
               title={transfer ? `${personLabel(request.from)} is handing ${siliconName(request)} to you` : `${siliconName(request)} wants you to look after it`}
               when={{ text: time.text, tone: time.tone }}>
-              <Button variant="secondary" size="sm" onClick={() => setReviewing(request)}>Review</Button>
+              <ButtonLink href={requestHref(request.id)} variant="secondary" size="sm">Review</ButtonLink>
             </Row>
           );
         })}
@@ -121,13 +120,6 @@ function Requests({ id, title, waiting, failed, error, retry, stale, now }: { id
           </Row>
         ) : null}
       </ul>
-      <Dialog open={!!reviewing} onOpenChange={open => { if (!open) setReviewing(null); }}>
-        {reviewing ? (
-          <DialogContent title={reviewing.kind === "transfer" ? `${personLabel(reviewing.from)} is handing ${siliconName(reviewing)} to you` : `${siliconName(reviewing)} wants you to look after it`} description="Each request lasts 14 days. A declined Silicon's account is released; a declined transfer changes nothing.">
-            <RequestDeck requests={[reviewing]} now={now} onEmptied={() => setReviewing(null)} />
-          </DialogContent>
-        ) : null}
-      </Dialog>
     </section>
   );
 }

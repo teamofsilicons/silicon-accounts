@@ -33,7 +33,7 @@ export const journey: Journey = {
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code, { delay: 30 });
 
-    const idField = page.getByRole("textbox", { name: "Your id" });
+    const idField = page.getByRole("textbox", { name: "Your CarbonID" });
     await idField.waitFor({ timeout: 20_000 });
     await sleep(800);
     await shot(env, page, "a-02-signup");

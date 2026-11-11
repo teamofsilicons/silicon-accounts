@@ -78,7 +78,7 @@ export function HomeIdentity() {
       </span>
       <div className={styles.text}>
         <h1 className={styles.name}>Welcome, {first}</h1>
-        {account.id ? <CopyChip value={account.id} what="your id" /> : null}
+        {account.id ? <CopyChip value={account.id} what="your CarbonID" /> : null}
         {since ? <p className={styles.since}>Member since {since}</p> : null}
       </div>
     </section>
