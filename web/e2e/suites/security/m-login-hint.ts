@@ -59,7 +59,7 @@ export const journey: Journey = {
     const base = `${env.site}/authorize?app_id=briefcase&redirect_uri=${encodeURIComponent(callback)}&state=lh-${tag()}`;
     const withHint = `&login_hint=${encodeURIComponent(victim)}&email=${encodeURIComponent(victim)}&phone=${encodeURIComponent(victimPhone)}`;
     await page.goto(`${base}&method=email${withHint}`);
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     await sleep(500);
     const value = await field.inputValue();
@@ -81,7 +81,7 @@ export const journey: Journey = {
     await shot(env, page, "security-login-hint-02-google");
     results.check("the Opening page moves on to Google without the hint: the mock Google's authorize request had no login_hint and the provider page's address carries no address", !!last && (last.params?.login_hint ?? null) === null && page.url().startsWith(env.oidc) && !contains(page.url()), `${seen.body.items?.length ?? 0} authorize requests; login_hint ${JSON.stringify(last?.params?.login_hint ?? null)}; at ${page.url().slice(0, 80)}`);
     await page.goto(`${env.site}/sign-in?login_hint=${encodeURIComponent(victim)}&email=${encodeURIComponent(victim)}`);
-    const ownField = page.getByRole("textbox", { name: "Email" });
+    const ownField = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await ownField.waitFor({ timeout: 30_000 });
     await sleep(300);
     results.check("the account site's own /sign-in ignores a login_hint too (empty field)", (await ownField.inputValue()) === "", `field "${await ownField.inputValue()}"`);

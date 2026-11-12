@@ -101,7 +101,7 @@ export const journey: Journey = {
       // An app can never hand over a Carbon's email: a login_hint in its link is ignored entirely.
       const hint = `someone.else.${t}@example.test`;
       await startAtApp(env, page, "briefcase", { method: "email", extra: { login_hint: hint } });
-      const field = page.getByRole("textbox", { name: "Email" });
+      const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
       await field.waitFor({ timeout: 30_000 });
       await sleep(500);
       const flow = await readFlow(page);

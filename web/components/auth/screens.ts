@@ -157,19 +157,7 @@ const interactionScreens: ScreenSpec[] = [
       await page.waitForTimeout(1200);
     },
   },
-  {
-    name: "auth-default-signup-dob-years",
-    path: flowPath("briefcase", "signup"),
-    as: "signed-out",
-    routes: flowRoutes,
-    waitFor: READY,
-    fullPage: false,
-    prepare: async page => {
-      await page.getByRole("button", { name: "Date of birth" }).click();
-      await page.getByRole("button", { name: /choose a year/ }).click();
-      await page.waitForTimeout(700);
-    },
-  },
+
   {
     name: "auth-default-choose-phone",
     path: flowPath("briefcase", "choose_method"),
@@ -177,8 +165,9 @@ const interactionScreens: ScreenSpec[] = [
     routes: flowRoutes,
     waitFor: READY,
     fullPage: false,
+    // One "Email or phone" field: a number without + is read in the visitor's country, with Choose Country beside it.
     prepare: async page => {
-      await page.getByRole("button", { name: "Phone", exact: true }).click();
+      await page.getByRole("textbox", { name: "Email or phone" }).fill("98765 43210");
       await page.waitForTimeout(600);
     },
   },
@@ -190,9 +179,8 @@ const interactionScreens: ScreenSpec[] = [
     waitFor: READY,
     fullPage: false,
     prepare: async page => {
-      await page.getByRole("button", { name: "Phone", exact: true }).click();
-      await page.getByRole("button", { name: "Country not in the list?" }).click();
-      await page.keyboard.type("40 755 345 678");
+      // A number with its country code goes as typed.
+      await page.getByRole("textbox", { name: "Email or phone" }).fill("+40 755 345 678");
       await page.waitForTimeout(600);
     },
   },
@@ -204,8 +192,8 @@ const interactionScreens: ScreenSpec[] = [
     waitFor: READY,
     fullPage: false,
     prepare: async page => {
-      await page.getByRole("textbox", { name: "Email" }).fill("saket.dev@example.test");
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page.getByRole("textbox", { name: /^Email/ }).fill("saket.dev@example.test");
+      await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
       await page.waitForSelector("text=Check your email");
       await page.getByRole("textbox", { name: /digit 1 of 6/ }).first().click();
       await page.keyboard.type("123456", { delay: 30 });
@@ -214,6 +202,8 @@ const interactionScreens: ScreenSpec[] = [
     },
   },
   { name: "auth-first-party", path: flowPath("silicon-accounts", "choose_method"), as: "signed-out", routes: flowRoutes, waitFor: READY },
+  // After an account is deleted (the CarbonID comes from session storage; without it the page names none).
+  { name: "auth-goodbye", path: "/goodbye", as: "signed-out", waitFor: "h1:has-text(\"Your account is deleted\")" },
   {
     // No fake app uses a background image: briefcase with one (and a logo-only header), to see the image treatment.
     name: "auth-branding-image",

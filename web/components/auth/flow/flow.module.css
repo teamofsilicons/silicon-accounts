@@ -461,3 +461,17 @@ label.shareText[data-disabled] { cursor: default; }
   .textButton, .suggestion, .resend, .idControl, .shareRow, .footer a, .pageDots > span { transition: none; }
   .spin { animation: none; }
 }
+
+/* One "Email or phone" field: "Choose Country" (or "Use an Email Instead") sits under the field's line, at its start. */
+.fieldWithSwitch { display: grid; gap: var(--space-tight); }
+.fieldSwitch { justify-self: start; }
+/* The sign-in page's last line: no passwords, and how Silicons sign in. */
+.methodsNote { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+
+/* The sign-in code: the address in the sentence, in the text colour; "Use a Different Email" and Resend share a row. */
+.codeAddress { color: var(--foreground); font-weight: var(--weight-medium); overflow-wrap: anywhere; }
+.resendRow[data-aside] { justify-content: space-between; }
+
+/* Sign-up: the photo inside a ring of the Silicon colours (the prototype's .ring), above the welcome. */
+.welcomeRing { display: inline-grid; justify-self: start; aspect-ratio: 1; padding: var(--space-tight); border-radius: 50%; corner-shape: round; background: conic-gradient(from 200deg, var(--silicon-mark-1-from), var(--silicon-mark-1-to), var(--silicon-mark-2-to), var(--silicon-mark-2-from), var(--silicon-mark-3-from), var(--silicon-mark-1-from)); }
+.welcomeRing > * { box-shadow: 0 0 0 var(--space-hair) var(--surface); }

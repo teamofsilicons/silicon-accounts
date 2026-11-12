@@ -5,8 +5,13 @@
 .section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
 .head { display: flex; align-items: center; gap: var(--space-related); }
 .title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
+.headBlock { display: grid; gap: var(--space-tight); }
+.description { max-width: 70ch; margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
 
 .rows { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); list-style: none; }
+/* A danger zone: the box's line and its dividers in a light red. */
+.rows[data-tone="danger"] { --sq-stroke: color-mix(in oklab, var(--danger) 35%, var(--border)); }
+.rows[data-tone="danger"] > * + * { border-top-color: color-mix(in oklab, var(--danger) 20%, var(--border-subtle)); }
 .row, .link { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); }
 .row + .row, .row + .linkItem, .linkItem + .row, .linkItem + .linkItem { border-top: 1px solid var(--border-subtle); }
 .text { display: grid; min-width: 0; flex: 1; gap: 0; }

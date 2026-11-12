@@ -18,7 +18,7 @@ const digits = (text: string) => text.replace(/\D/g, "");
 async function signUpByPhone(env: Env, page: Page, phone: string): Promise<void> {
   await page.goto(`${env.site}/sign-in`);
   await signInWithCode(env, page, { phone });
-  const create = page.getByRole("button", { name: "Create account" });
+  const create = page.getByRole("button", { name: /^Create account$/i });
   await create.waitFor({ timeout: 30_000 });
   await sleep(300);
   await create.click();

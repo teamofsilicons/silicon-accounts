@@ -35,7 +35,7 @@ export const journey: Journey = {
       results.watch(page, "f-pre");
       await page.goto(`${env.site}/sign-in`);
       await signInWithCode(env, page, { phone: "+12025550142" });
-      const create = page.getByRole("button", { name: "Create account" });
+      const create = page.getByRole("button", { name: /^Create account$/i });
       const home = page.waitForURL(`${env.site}/`, { timeout: 30_000 }).then(() => "home" as const);
       if ((await Promise.race([home, create.waitFor({ timeout: 30_000 }).then(() => "signup" as const)])) === "signup") await create.click();
       await page.waitForURL(`${env.site}/`, { timeout: 30_000 });
@@ -127,14 +127,10 @@ export const journey: Journey = {
       await id.waitFor({ timeout: 20_000 });
       await sleep(700);
       await shot(env, p, "f-03-finish-import");
-      const prefill = {
-        id: await id.inputValue(),
-        name: await p.getByRole("textbox", { name: "Display name" }).inputValue(),
-        timezone: await p.getByRole("combobox", { name: "Timezone" }).inputValue(),
-        dob: (await p.getByRole("button", { name: "Date of birth" }).innerText()).replace(/\s+/g, " "),
-      };
-      results.check("the imported details are the prefill (c:ada_byron, Ada Byron, Europe/London, April 12, 1990)", prefill.id === "ada_byron" && prefill.name === "Ada Byron" && /London/.test(prefill.timezone) && /April 12, 1990/.test(prefill.dob), JSON.stringify(prefill));
-      const finish = p.getByRole("button", { name: "Finish setup" });
+      // Sign-up shows only the name and CarbonID (2026-11-12); the import's timezone and date of birth go with it unseen.
+      const prefill = { id: await id.inputValue(), name: await p.getByRole("textbox", { name: "Your name" }).inputValue() };
+      results.check("the imported details are the prefill (c:ada_byron, Ada Byron)", prefill.id === "ada_byron" && prefill.name === "Ada Byron", JSON.stringify(prefill));
+      const finish = p.getByRole("button", { name: /^Finish setup$/i });
       results.check("finishing an imported account says so (\"Finish setup\")", await finish.isVisible());
       await finish.click();
       const walk = await completeDetails(env, p, "legacy-crm", { shotName: "f-04-legacy-crm" });

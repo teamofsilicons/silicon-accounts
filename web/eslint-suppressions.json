@@ -44,11 +44,6 @@
       "count": 1
     }
   },
-  "components/auth/steps/signup.tsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "components/docs/code-actions.tsx": {
     "no-restricted-syntax": {
       "count": 1

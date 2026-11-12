@@ -674,14 +674,12 @@ export async function hostedLink(env: Env, page: Page, app: string): Promise<str
  * methods page opens on the phone (dm lists phone first) shows "Phone | Email": the Email segment is chosen first.
  */
 export async function sendEmailCode(env: Env, page: Page, email: string): Promise<string> {
-  const field = page.getByRole("textbox", { name: "Email" });
-  const segment = page.getByRole("button", { name: "Email", exact: true });
-  await field.or(segment).first().waitFor({ timeout: 30_000 });
-  if (!(await field.isVisible().catch(() => false))) await segment.click();
+  // One "Email or phone" field when the app offers both (2026-11-12); an email-only app's "Email".
+  const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
   await field.waitFor({ timeout: 30_000 });
   const after = await lastSeq(env);
   await field.fill(email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
   const code = await codeFor(env, email, after);
   await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 20_000 });
   return code;

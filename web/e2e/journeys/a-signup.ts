@@ -2,10 +2,10 @@ import type { Journey } from "../context";
 import { codeFor, lastSeq, newContext, shot, sleep, tag } from "../lib";
 
 /** The date exactly 18 years before today in `timeZone`, as the date picker writes it ("October 7, 2008"). */
-function eighteenYearsAgo(timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "long", day: "numeric" }).formatToParts(new Date());
-  const part = (type: string) => parts.find(entry => entry.type === type)?.value ?? "";
-  return `${part("month")} ${part("day")}, ${Number(part("year")) - 18}`;
+/** "2008-11-12": the day exactly 18 years before today in a timezone, as the API stores a date of birth. */
+function eighteenYearsAgoDate(timeZone: string): string {
+  const [year, month, day] = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).split("-");
+  return `${Number(year) - 18}-${month}-${day}`;
 }
 
 export const journey: Journey = {
@@ -23,11 +23,11 @@ export const journey: Journey = {
     const signIn = page.getByRole("link", { name: /sign in/i }).first();
     results.check("the landing page offers sign-in", (await signIn.count()) > 0);
     await signIn.click();
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     const after = await lastSeq(env);
     await field.fill(email);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code = await codeFor(env, email, after);
     results.check("the code reached the mock email server", /^\d{6}$/.test(code), code);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
@@ -38,18 +38,14 @@ export const journey: Journey = {
     await sleep(800);
     await shot(env, page, "a-02-signup");
     const id = await idField.inputValue();
-    const name = await page.getByRole("textbox", { name: "Display name" }).inputValue();
-    const timezone = await page.getByRole("combobox", { name: "Timezone" }).inputValue();
-    const dob = (await page.getByRole("button", { name: "Date of birth" }).innerText()).replace(/\s+/g, " ");
+    const name = await page.getByRole("textbox", { name: "Your name" }).inputValue();
     const photos = await page.locator("img").evaluateAll(images => images.map(image => (image as HTMLImageElement).src).filter(src => /iris|pfp/.test(src)));
     results.check("sign-up: the id is prefilled from the email", id.startsWith("ada-walk-"), id);
     results.check("sign-up: the display name is prefilled", name.startsWith("Ada Walk"), name);
-    results.check("sign-up: the timezone is the browser's", /Kolkata/.test(timezone), timezone);
-    const expectedDob = eighteenYearsAgo("Asia/Kolkata");
-    results.check("sign-up: the date of birth is exactly 18 years before the Carbon's own today", dob.includes(expectedDob), `${dob} (want ${expectedDob})`);
+    // Sign-up asks only for the name and CarbonID (2026-11-12): the timezone and date of birth are checked on the account.
     results.check("sign-up: the default photo comes from Iris", photos.length > 0, photos[0] ?? "none");
 
-    await page.getByRole("button", { name: "Create account" }).click();
+    await page.getByRole("button", { name: /^Create account$/i }).click();
     await page.waitForURL(url => !url.pathname.startsWith("/authorize") && !url.pathname.startsWith("/sign-in"), { timeout: 30_000 });
     await page.waitForLoadState("networkidle");
     await sleep(800);
@@ -57,8 +53,11 @@ export const journey: Journey = {
     results.check("the identity home shows the new c:id", (await page.locator("main").innerText()).includes(id), id);
     const session = await page.request.get(`${env.site}/v1/session`);
     results.check("the session cookie works through the site's proxy", session.status() === 200, String(session.status()));
-    const me = (await (await page.request.get(`${env.site}/v1/me`)).json()) as { id?: string; uuid?: string; dob?: string };
+    const me = (await (await page.request.get(`${env.site}/v1/me`)).json()) as { id?: string; uuid?: string; dob?: string; timezone?: string };
     results.check("GET /v1/me answers for the new Carbon", me.id === `c:${id}`, JSON.stringify(me).slice(0, 200));
+    results.check("the account's timezone is the browser's", /Kolkata/.test(me.timezone ?? ""), String(me.timezone));
+    const expectedDob = eighteenYearsAgoDate("Asia/Kolkata");
+    results.check("the account's date of birth is exactly 18 years before the Carbon's own today", me.dob === expectedDob, `${me.dob} (want ${expectedDob})`);
     // Building apps lives on the developer site now: the account site says where it is and links there.
     const meta = (await (await page.request.get(`${env.site}/v1/meta`)).json()) as { developer_url?: string };
     results.check("GET /v1/meta names the developer site (developer_url)", meta.developer_url === env.developer, String(meta.developer_url));

@@ -14,7 +14,7 @@ const CONTRACT_LABELS = ["Continue with Google", "Continue with Apple", "Continu
 
 /** What our page offers once the browser is there: its visible text fields and provider buttons. */
 async function hostedOffer(page: Page): Promise<{ url: string; email: boolean; phone: boolean; google: boolean; apple: boolean; emailValue: string; phoneValue: string }> {
-  const email = page.getByRole("textbox", { name: "Email" });
+  const email = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
   const phone = page.getByRole("textbox", { name: "Phone number" });
   const visible = async (locator: ReturnType<Page["getByRole"]>) => (await locator.count()) > 0 && (await locator.first().isVisible());
   return {
@@ -46,7 +46,7 @@ const directButtons: Journey = {
     const before = await lastSeq(env);
     await frame.getByRole("link", { name: "Continue with email" }).click();
     await page.waitForURL(url => url.href.startsWith(env.site), { timeout: 30_000 });
-    await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     await sleep(500);
     const onEmail = await hostedOffer(page);
     await shot(env, page, "auth-flows-direct-email");
@@ -76,7 +76,7 @@ const directButtons: Journey = {
     // The SDK started as a sign-up (data-intent="signup"): its email button opens the sign-up version.
     await sdkPage.goto(`${env.apps}/interface/?only=sdk&intent=signup`);
     await host.getByRole("button", { name: "Continue with email" }).click({ timeout: 15_000 });
-    await sdkPage.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await sdkPage.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     const signupTitle = await hostedTitle(sdkPage);
     const flow = await readFlow(sdkPage);
     results.check("the SDK with data-intent=\"signup\": Continue with email opens \"Create your Silicon Interface account\" on the email field", signupTitle === "Create your Silicon Interface account" && flow?.intent === "signup" && flow.method_hint === "email", `${signupTitle} | ${flow?.intent} ${flow?.method_hint}`);
@@ -96,7 +96,7 @@ const directButtons: Journey = {
     if (drawn) {
       await signUp.click();
       await intentPage.waitForURL(url => url.href.startsWith(`${env.site}/authorize/flow/`), { timeout: 30_000 });
-      await intentPage.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+      await intentPage.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
       const title = await hostedTitle(intentPage);
       const offer = await hostedOffer(intentPage);
       results.check("…\"Sign up\" opens the sign-up version with every method of interface", title === "Create your Silicon Interface account" && offer.google && offer.apple && offer.email, `${title} ${JSON.stringify(offer)}`);

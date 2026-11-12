@@ -26,7 +26,7 @@ export const journey: Journey = {
       const started = await startAtApp(env, page, "briefcase");
       const state = started.searchParams.get("state");
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       await waitForDetailsPage(page);
       const id = flowIdOf(page)!;
       await button(page, "Cancel").click();
@@ -61,7 +61,7 @@ export const journey: Journey = {
       const email = freshEmail("cancel-page2");
       const started = await startAtApp(env, page, "ledgerly");
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       await waitForDetailsPage(page, { id: "contact" });
       await addOnPage(env, page, "phone", await freshPhone(env));
       await button(page, "Continue").click();
@@ -83,7 +83,7 @@ export const journey: Journey = {
       const email = freshEmail("cancel-review");
       await startAtApp(env, page, "ledgerly");
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       await waitForDetailsPage(page, { id: "contact" });
       await addOnPage(env, page, "phone", await freshPhone(env));
       await button(page, "Continue").click();

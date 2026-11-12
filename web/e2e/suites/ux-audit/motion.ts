@@ -92,11 +92,11 @@ export const journeys: Journey[] = [
       const codes: Partial<Record<Mode, string>> = {};
       await compare(ctx, findings, pages, "the hosted card moving from email to code", async (page, mode) => {
         await page.goto(await hostedLink(env, page, "briefcase"));
-        await page.getByRole("textbox", { name: "Email" }).fill(emails[mode], { timeout: 30_000 });
+        await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).fill(emails[mode], { timeout: 30_000 });
         await stepReady(page);
       }, async (page, mode) => {
         const after = await lastSeq(env);
-        await page.getByRole("button", { name: "Continue", exact: true }).click();
+        await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
         codes[mode] = await codeFor(env, emails[mode], after);
       }, 1_600);
       // The first five digits before the probe (each keystroke moves the code field's ring one cell, which is input,
@@ -109,7 +109,7 @@ export const journeys: Journey[] = [
         await settle(page, 300);
       }, async (page, mode) => {
         await page.keyboard.type((codes[mode] ?? "").slice(5), { delay: 10 });
-        await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
+        await page.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 30_000 });
       }, 1_800);
       const hiddenSignup = await kit<Array<{ el: string; opacity: number }>>(pages.reduce, "hiddenContent()");
       results.check("reduced motion: setting up shows everything (no entrance left at opacity 0)", hiddenSignup.length === 0, JSON.stringify(hiddenSignup));
@@ -154,7 +154,7 @@ export const journeys: Journey[] = [
       await signed.reduce.keyboard.press("Escape");
 
       // Every account page at rest under reduced motion: no endless animation, nothing left invisible.
-      for (const path of ["/", "/sign-in-methods", "/apps", "/silicons", "/proofs", "/activity", "/settings"]) {
+      for (const path of ["/", "/sign-in-methods", "/apps", "/silicons", "/proofs", "/activity", "/privacy"]) {
         const page = signed.reduce;
         await page.goto(`${env.site}${path}`);
         await page.locator("main").first().waitFor({ timeout: 30_000 });
@@ -182,7 +182,7 @@ export const journeys: Journey[] = [
         await compare(ctx, findings, flows, "a flow's details page moving to the next (ledgerly Step 1 → Step 2)", async page => {
           await startAtApp(env, page, "ledgerly", { intent: "signup" });
           await signInWithCode(env, page, { email: freshEmail("uxa.motion.flow") });
-          await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+          await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
           await page.getByText("Step 1 of 2", { exact: true }).first().waitFor({ timeout: 30_000 });
           await completeStepOne(env, page);
           await settle(page, 600);

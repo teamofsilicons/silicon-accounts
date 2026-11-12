@@ -15,13 +15,13 @@ import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Input } from "@teamofsilicons/silicon-ui/input";
 import { motionTokens } from "@teamofsilicons/silicon-ui/motion-tokens";
 import { OtpInput } from "@teamofsilicons/silicon-ui/otp-input";
-import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import type { ApiError } from "@/lib/api/errors";
 import type { AccountSummary, FlowChallenge, SigninMethod } from "@/lib/api/types";
 import { formatCountdown } from "@/lib/format";
 import type { ActionResult } from "./controller";
 import { carbonError, describe, type ErrorContext, type ErrorLike } from "./errors";
 import { useFinePointer, useNow } from "./hooks";
+import { guessCountry } from "@/components/foundation/phone-field/phone-data";
 import { PhoneField, type PhoneFieldValue } from "@/components/foundation/phone-field/phone-field";
 import styles from "./flow.module.css";
 
@@ -298,10 +298,11 @@ export function ProviderButton({ provider, loading, disabled, onClick }: { provi
   );
 }
 
-export function OrDivider() {
+/** The line between the ways in: "or", or what comes next ("or get a code", the prototype's words above the field). */
+export function OrDivider({ label = "or" }: { label?: string }) {
   return (
-    <div className={styles.divider} role="separator" aria-label="or">
-      <span aria-hidden="true">or</span>
+    <div className={styles.divider} role="separator" aria-label={label}>
+      <span aria-hidden="true">{label}</span>
     </div>
   );
 }
@@ -401,6 +402,8 @@ export interface CodeEntryProps {
   /** Accessible name of the code field. */
   label?: string;
   submitLabel?: string;
+  /** Beside Resend, at the other end of its row: "Use a Different Email" on the sign-in code (the prototype's row). */
+  aside?: ReactNode;
 }
 
 /**
@@ -408,7 +411,7 @@ export interface CodeEntryProps {
  * shakes the row and says how many tries are left; the tenth locks entry with a countdown (LockNote); an expired code
  * asks for a new one, and says that it expired. "Resend code" waits for the server's resend time.
  */
-export function CodeEntry({ challenge, verify, resend, label, submitLabel }: CodeEntryProps) {
+export function CodeEntry({ challenge, verify, resend, label, submitLabel, aside }: CodeEntryProps) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -508,7 +511,8 @@ export function CodeEntry({ challenge, verify, resend, label, submitLabel }: Cod
         <FieldNote text={status} tone="status" />
         <Button type="submit" className={styles.wide} loading={pending} disabled={locked}>{submitLabel ?? "Verify"}</Button>
       </form>
-      <div className={styles.resendRow}>
+      <div className={styles.resendRow} data-aside={aside ? "" : undefined}>
+        {aside}
         <ResendButton availableAt={stale ? 0 : challenge.resend_available_at} onResend={askAgain} label={stale ? "Send a new code" : "Resend code"} />
         {resent && !resendError && !timeUp ? <span className={styles.resendNote} role="status">New code sent</span> : null}
       </div>
@@ -524,7 +528,7 @@ export function CodeEntry({ challenge, verify, resend, label, submitLabel }: Cod
 export type ContactKind = "email" | "phone";
 
 export interface ContactFormProps {
-  /** Which kinds to offer, in order (a segmented control appears when there are two). */
+  /** Which kinds to offer (both: one "Email or phone" field). */
   kinds: ContactKind[];
   initialKind?: ContactKind;
   initialEmail?: string;
@@ -537,20 +541,43 @@ export interface ContactFormProps {
   note?: string;
   /** Context for error copy. */
   errorContext?: ErrorContext;
-  /** The Email | Phone switch's name ("Sign in with", "Sign up with", "Add"). */
+  /** No longer shown (the Email | Phone switch became one field); kept so callers needn't change. */
   kindsLabel?: string;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+/** When a wait of `seconds` ends (read in an event, never during render). */
+const secondsFromNow = (seconds: number): number => Date.now() + seconds * 1000;
+
+/** A typed value that can only be a phone number: digits with the usual separators and an optional leading "+". */
+const PHONE_SHAPE = /^\+?[\d\s().-]+$/;
+const regionName = (iso: string): string => {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(iso) ?? iso;
+  } catch {
+    return iso;
+  }
+};
+
 /**
- * Email or phone, with client checks that mirror the server's and its own words when it refuses. A phone number from
- * any country goes through PhoneField, which never sends a number the Carbon did not type.
+ * Email or phone, with client checks that mirror the server's and its own words when it refuses.
+ *
+ * When the app offers both, one field takes either (Anil, 2026-11-12, the prototype's "Email or phone"): an "@" makes it
+ * an email, digits a phone number. A number with "+" carries its own country; one without is read in the visitor's
+ * likely country (guessCountry), which the line under the field names, with "Choose Country" opening PhoneField's
+ * country picker for anyone abroad. One kind alone keeps its own field.
  */
-export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, submitLabel, onSubmit, autoFocus, note, errorContext, kindsLabel = "Sign in with" }: ContactFormProps) {
-  const [kind, setKind] = useState<ContactKind>(() => (initialKind && kinds.includes(initialKind) ? initialKind : kinds[0] ?? "email"));
+export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, submitLabel, onSubmit, autoFocus, note, errorContext }: ContactFormProps) {
+  const both = kinds.includes("email") && kinds.includes("phone");
+  const [kind] = useState<ContactKind>(() => (initialKind && kinds.includes(initialKind) ? initialKind : kinds[0] ?? "email"));
   const [email, setEmail] = useState(initialEmail ?? "");
-  /** The phone as PhoneField last reported it; it is also where the field starts again after Email ⇄ Phone. */
+  /** One field for both: what was typed. */
+  const [typed, setTyped] = useState(() => (initialKind === "phone" ? initialPhone ?? "" : initialEmail ?? ""));
+  /** One field for both, a number from abroad: PhoneField with its country picker instead. */
+  const [picking, setPicking] = useState(false);
+  const [country] = useState(() => (typeof window === "undefined" ? "US" : guessCountry()));
+  /** The phone as PhoneField last reported it. */
   const [phone, setPhone] = useState<PhoneFieldValue>({ mode: "picker", phone: initialPhone ?? "", problem: null });
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -558,17 +585,30 @@ export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, su
   const emailInput = useRef<HTMLInputElement>(null);
   const now = useNow(500);
   const waiting = retryAt && now ? Math.max(0, Math.ceil((retryAt - now) / 1000)) : 0;
-  const focusOnMount = useRef(autoFocus && kind === "email");
+  const focusOnMount = useRef(autoFocus && (both || kind === "email"));
   useEffect(() => {
     if (focusOnMount.current) emailInput.current?.focus({ preventScroll: true });
   }, []);
 
+  const value = typed.trim();
+  const looksPhone = both && !picking && !!value && PHONE_SHAPE.test(value) && /\d/.test(value);
+  /** What one field will send: an email, or a phone number with the country it's read in. */
+  const current: { kind: ContactKind; value: string; country?: string } = both && !picking
+    ? (looksPhone ? { kind: "phone", value, country: value.startsWith("+") ? undefined : country } : { kind: "email", value })
+    : !both && kind === "email" ? { kind: "email", value: email.trim() } : { kind: "phone", value: phone.phone, country: phone.country };
+
   /** The same checks the server makes first, so an obvious slip never costs a request. */
   const problem = (): string | null => {
-    if (kind === "email") {
-      const value = email.trim();
-      if (!value) return "Enter your email address.";
-      if (!EMAIL.test(value)) return "Enter a full email address, like name@example.com.";
+    if (both && !picking) {
+      if (!value) return "Enter your email or phone number.";
+      if (looksPhone) return value.replace(/\D/g, "").length < 6 ? "Enter the whole phone number." : null;
+      if (!value.includes("@")) return "Enter an email address, or a phone number with digits only.";
+      return EMAIL.test(value) ? null : "Enter a full email address, like name@example.com.";
+    }
+    if (!both && kind === "email") {
+      const text = email.trim();
+      if (!text) return "Enter your email address.";
+      if (!EMAIL.test(text)) return "Enter a full email address, like name@example.com.";
       return null;
     }
     // Only what is certainly wrong stops here; whether a number exists is the server's call (it knows every country).
@@ -585,70 +625,90 @@ export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, su
     }
     setError(null);
     setPending(true);
-    const failure = kind === "email" ? await onSubmit("email", email.trim()) : await onSubmit("phone", phone.phone, phone.country);
+    const failure = await onSubmit(current.kind, current.value, current.country);
     setPending(false);
     if (!failure) return;
-    if (failure.code === "rate_limited" && failure.retryAfter) setRetryAt(Date.now() + failure.retryAfter * 1000);
+    if (failure.code === "rate_limited" && failure.retryAfter) setRetryAt(secondsFromNow(failure.retryAfter));
     setError(describe(failure, errorContext));
   };
 
-  const options = kinds.map(value => ({ value, label: value === "email" ? "Email" : "Phone" }));
-  const several = kinds.length > 1;
+  const switchLink = (label: string, onClick: () => void) => (
+    <span className={styles.fieldSwitch}><Button type="button" variant="link" size="sm" onClick={onClick}>{label}</Button></span>
+  );
 
   return (
     <form className={styles.form} noValidate onSubmit={event => void submit(event)}>
-      {several ? (
-        <SegmentedControl
-          label={kindsLabel}
-          options={options}
-          value={kind}
-          onValueChange={value => {
-            setKind(value as ContactKind);
-            setError(null);
-            setRetryAt(null);
-          }}
-          className={styles.segments}
-        />
-      ) : null}
-      {kind === "email" ? (
-        <div className={several ? styles.quietLabel : undefined}>
+      {both && !picking ? (
+        <div className={styles.fieldWithSwitch}>
           <Input
             ref={emailInput}
-            label="Email"
-            type="email"
-            name="email"
+            label="Email or phone"
+            type="text"
+            name="username"
             inputMode="email"
-            autoComplete="email"
+            autoComplete="username"
             autoCapitalize="off"
             spellCheck={false}
-            placeholder="name@example.com"
-            value={email}
+            value={typed}
             onChange={event => {
-              setEmail(event.currentTarget.value);
-              // The send limit is per address: another address may go now.
+              setTyped(event.currentTarget.value);
+              // The send limit is per address: another one may go now.
               setRetryAt(null);
               if (error) setError(null);
             }}
             error={error ?? undefined}
-            description={error ? undefined : note}
+            description={error ? undefined : looksPhone && !value.startsWith("+") ? `Read as a number in ${regionName(country)}. Start with + for another country.` : note}
           />
+          {looksPhone && !value.startsWith("+") ? switchLink("Choose Country", () => {
+            setPhone({ mode: "picker", phone: value, problem: null });
+            setPicking(true);
+            setError(null);
+          }) : null}
         </div>
-      ) : (
-        <PhoneField
-          label="Phone number"
-          hideLabel={several}
-          initial={phone.phone}
-          onChange={value => {
-            if (value.phone !== phone.phone) {
-              // The send limit is per number: another number may go now.
-              setRetryAt(null);
-              setError(null);
-            }
-            setPhone(value);
+      ) : !both && kind === "email" ? (
+        <Input
+          ref={emailInput}
+          label="Email"
+          type="email"
+          name="email"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder="name@example.com"
+          value={email}
+          onChange={event => {
+            setEmail(event.currentTarget.value);
+            // The send limit is per address: another address may go now.
+            setRetryAt(null);
+            if (error) setError(null);
           }}
-          error={error}
-          description={note}
+          error={error ?? undefined}
+          description={error ? undefined : note}
         />
+      ) : (
+        <div className={styles.fieldWithSwitch}>
+          <PhoneField
+            label="Phone number"
+            initial={phone.phone}
+            defaultCountry={country}
+            onChange={next => {
+              if (next.phone !== phone.phone) {
+                // The send limit is per number: another number may go now.
+                setRetryAt(null);
+                setError(null);
+              }
+              setPhone(next);
+            }}
+            error={error}
+            description={note}
+          />
+          {both ? switchLink("Use an Email Instead", () => {
+            setTyped("");
+            setPicking(false);
+            setError(null);
+          }) : null}
+        </div>
       )}
       <Button type="submit" className={styles.wide} loading={pending} disabled={waiting > 0}>
         {waiting > 0 ? `Try Again in ${formatCountdown(waiting)}` : submitLabel}

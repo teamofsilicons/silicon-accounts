@@ -39,6 +39,7 @@ import { timezoneLabel, utcOffset } from "@/lib/timezones";
 import { asCarbon, describeError, isDefaultPhoto, msUntil, PHOTO_ACCEPT, PHOTO_MAX_BYTES, photoProblem, personLabel, spanText, stkRotatedAt, useNow } from "../parts/common";
 import { PhotoUrlForm, TimezoneForm } from "../parts/detail-editors";
 import { IdChangeForm } from "../parts/id-change-form";
+import { recipient } from "../parts/handover";
 import { PageBar } from "../parts/page-bar";
 import { useCancelTransferSettled, useChangeSiliconIdInForm, useDeleteSiliconSettled, useEverySilicon, useRemoveSiliconWebhookSettled, useRotateStkOnce, useSetSiliconWebhookOnce, useSiliconDefaultPhoto, useStartTransfer } from "../parts/queries";
 import { addReveal, dismissReveal, dismissRevealsOf, usePendingReveals } from "../parts/reveals";
@@ -287,25 +288,6 @@ function WebhookSection({ silicon }: { silicon: ManagedSilicon }) {
 }
 
 /* Settings: About ---------------------------------------------------------------------------------------------------- */
-
-const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** Turns what was typed into the `to` the API takes (`c:id` or an email), or says why it can't be. */
-function recipient(raw: string, me: CarbonMe): { to: string } | { problem: string } {
-  const value = raw.trim().toLowerCase();
-  if (!value) return { problem: "Name the Carbon who should take over: their c:id or their email." };
-  if (value.startsWith("si:")) return { problem: "A Silicon can\u2019t look after a Silicon. Name a Carbon\u2019s c:id or email." };
-  if (value.includes("@")) {
-    if (!EMAIL_SHAPE.test(value)) return { problem: `Enter an email like name@example.com; \u201c${value}\u201d isn\u2019t one.` };
-    if (me.emails.some(item => item.email.toLowerCase() === value)) return { problem: `${value} is your own email, and you already look after it.` };
-    return { to: value };
-  }
-  const handle = value.replace(/^c:/, "");
-  if (!/^[a-z0-9_-]{3,30}$/.test(handle)) return { problem: "A CarbonID is c: and 3 to 30 of a to z, 0 to 9, - and _." };
-  const to = `c:${handle}`;
-  if (me.id && to === me.id.toLowerCase()) return { problem: "That\u2019s your own CarbonID, and you already look after it." };
-  return { to };
-}
 
 type Editing = "name" | "id" | "timezone" | "photo" | "handover" | "cancel" | null;
 

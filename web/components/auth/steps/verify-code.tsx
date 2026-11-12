@@ -1,15 +1,18 @@
 "use client";
 
 /**
- * verify_code: the 6 digit code that was sent to an email or phone. The code is checked as soon as the last digit
- * lands; "Change" goes back to send it somewhere else; "Resend code" waits for the server's resend time.
+ * verify_code: the 6 digit code that was sent to an email or phone, as the prototype draws it (Anil, 2026-11-12): "Check
+ * your email", "We sent a 6-digit code to {where}. It works for 10 minutes.", the code (checked as soon as the last digit
+ * lands) and Continue, then "Use a Different Email" (send it somewhere else) beside "Resend code", which waits for the
+ * server's resend time.
  */
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import type { ApiError } from "@/lib/api/errors";
 import type { FlowController } from "../flow/controller";
 import { useFinePointer, useNow } from "../flow/hooks";
 import type { HostedFlow } from "../flow/model";
-import { CodeEntry, DestinationRow, FlowAlert, StepHeading, useStepErrors } from "../flow/parts";
+import { CodeEntry, FlowAlert, StepHeading, useStepErrors } from "../flow/parts";
+import styles from "../flow/flow.module.css";
 
 export interface VerifyCodeProps {
   flow: HostedFlow;
@@ -28,7 +31,7 @@ export function VerifyCode({ flow, ctl, notice, onChange }: VerifyCodeProps) {
   const at = Date.parse(challenge.expires_at);
   /** Whole minutes the code still works (rounded up, so the last minute reads "1 more minute"); 0 once it expired. */
   const minutesLeft = !Number.isFinite(at) || !now ? 10 : at <= now ? 0 : Math.max(1, Math.ceil((at - now) / 60_000));
-  const lifetime = minutesLeft === 0 ? "This code expired, so send a new one below." : `It works for ${minutesLeft === 1 ? "1 more minute" : `${minutesLeft} minutes`}.`;
+  const lifetime = minutesLeft === 0 ? "It expired, so send a new one below." : `It works for ${minutesLeft === 1 ? "1 more minute" : `${minutesLeft} minutes`}.`;
   const isEmail = challenge.channel === "email";
   const verify = (code: string) => {
     errors.begin();
@@ -42,16 +45,18 @@ export function VerifyCode({ flow, ctl, notice, onChange }: VerifyCodeProps) {
     <>
       <StepHeading
         title={isEmail ? "Check your email" : "Check your phone"}
-        description={`Enter the 6 digit code we ${isEmail ? "emailed" : "texted"} you. ${lifetime}`}
+        description={<>We sent a 6-digit code to <strong className={styles.codeAddress}>{challenge.destination}</strong>. {lifetime}</>}
         noFocus={fine}
       />
       <FlowAlert error={errors.carried} app={flow.app.name} onSwitch={() => ctl.switchAccount()} />
-      <DestinationRow
-        channel={challenge.channel}
-        destination={challenge.destination}
-        action={<Button variant="ghost" size="sm" onClick={onChange} aria-label={`Change where the code goes (now ${challenge.destination})`}>Change</Button>}
+      <CodeEntry
+        challenge={challenge}
+        verify={verify}
+        resend={resend}
+        label={isEmail ? "Code from the email" : "Code from the text message"}
+        submitLabel="Continue"
+        aside={<Button variant="link" size="sm" onClick={onChange}>{isEmail ? "Use a Different Email" : "Use a Different Number"}</Button>}
       />
-      <CodeEntry challenge={challenge} verify={verify} resend={resend} label={isEmail ? "Code from the email" : "Code from the text message"} />
     </>
   );
 }

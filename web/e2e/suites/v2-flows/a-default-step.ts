@@ -31,7 +31,7 @@ export const journey: Journey = {
       const email = freshEmail("default");
       await startAtApp(env, page, "briefcase");
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       const flow = await waitForDetailsPage(page);
       const details = flow.details!;
       const field = (name: string) => details.fields.find(entry => entry.field === name);
@@ -79,7 +79,7 @@ export const journey: Journey = {
       returning = email;
       await startAtApp(env, page, "briefcase");
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       await waitForDetailsPage(page);
       await setTicked(page, "timezone", true);
       results.check("ticking the timezone shows it ticked", (await detailRows(page)).find(entry => entry.field === "timezone")?.ticked === true);
@@ -100,7 +100,7 @@ export const journey: Journey = {
       const email = freshEmail("default-scope");
       await startAtApp(env, page, "briefcase", { extra: { scope: "profile email phone" } });
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       const flow = await waitForDetailsPage(page);
       const phone = flow.details?.fields.find(entry => entry.field === "phone");
       results.check("scope=…phone puts the phone on the page as an optional detail (missing for an email-only account)", flow.details?.count === 1 && phone?.mode === "optional" && phone.missing === true && phone.shared === false, JSON.stringify(flow.details?.fields));
@@ -120,7 +120,7 @@ export const journey: Journey = {
       const email = freshEmail("default-nothing");
       await startAtApp(env, page, "spacestation");
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       const flow = await waitForDetailsPage(page);
       const rows = await detailRows(page);
       results.check("an app asking for nothing: one page, no details of its own", flow.details?.count === 1 && (flow.details?.fields ?? []).filter(entry => entry.field !== "profile").length === 0, JSON.stringify(flow.details));
@@ -148,11 +148,11 @@ export const journey: Journey = {
       results.watch(page, "default-switch");
       await startAtApp(env, page, "briefcase");
       await signInWithCode(env, page, { email: freshEmail("default-switch") });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       await waitForDetailsPage(page);
       await page.getByRole("button", { name: "Switch account" }).click();
       const methods = await waitForFlow(page, f => f.step === "choose_method", "the methods page after Switch account");
-      await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 15_000 });
+      await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 15_000 });
       results.check("Switch account on the details page: back to briefcase's methods, without offering the browser's account", !(methods as { signed_in_as?: unknown }).signed_in_as && (await page.getByRole("button", { name: /^Continue as / }).count()) === 0, JSON.stringify((methods as { signed_in_as?: unknown }).signed_in_as ?? null));
       await signInWithCode(env, page, { email: returning });
       const other = await backAtApp(env, page, "briefcase");

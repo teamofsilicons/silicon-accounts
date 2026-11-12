@@ -20,7 +20,7 @@ const hostedProblems: Journey = {
     results.watch(page, "hosted-problems", expectedErrors);
     await page.goto(`${env.apps}/briefcase/`);
     await page.locator("#signin-hosted").click();
-    await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     const flowUrl = page.url();
     const flowId = new URL(flowUrl).pathname.split("/").pop() ?? "";
     await sql(env, `update signin_flows set expires_at = now() - interval '1 second' where id = '${flowId}'`);
@@ -31,7 +31,7 @@ const hostedProblems: Journey = {
     await shot(env, page, "auth-flows-hosted-problems-01-expired");
     results.check("a flow past its 60 minutes (time travel) → \"This sign-in expired\" (flow_expired)", (await expired.isVisible()) && (await page.locator("[data-problem]").getAttribute("data-problem")) === "flow_expired");
     await page.getByRole("button", { name: "Start again" }).click({ timeout: 10_000 });
-    await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     const restarted = new URL(page.url()).pathname.split("/").pop() ?? "";
     results.check("\"Start again\" opens a new flow for the same app (the methods again)", restarted !== flowId && /\/authorize\/flow\//.test(page.url()), page.url());
 
@@ -44,7 +44,7 @@ const hostedProblems: Journey = {
     await notBound.waitFor({ timeout: 20_000 }).catch(() => undefined);
     await sleep(300);
     await shot(env, stranger, "auth-flows-hosted-problems-02-other-browser");
-    results.check("the flow's link in another browser → \"Finish signing in where you started\" (flow_not_bound), no methods", (await notBound.isVisible()) && (await stranger.getByRole("textbox", { name: "Email" }).count()) === 0);
+    results.check("the flow's link in another browser → \"Finish signing in where you started\" (flow_not_bound), no methods", (await notBound.isVisible()) && (await stranger.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).count()) === 0);
 
     // An unknown flow id.
     await stranger.goto(`${env.site}/authorize/flow/AAAAAAAAAAAAAAAAAAAAAA`);

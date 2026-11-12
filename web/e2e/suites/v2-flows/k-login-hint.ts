@@ -36,7 +36,7 @@ export const journey: Journey = {
     // The hosted page with a login_hint: nothing prefilled, nothing echoed.
     const href = await startAtApp(env, page, "briefcase", { extra: { login_hint: known } });
     const flow = await waitForFlow(page, f => f.step === "choose_method", "briefcase's methods page");
-    const email = page.getByRole("textbox", { name: "Email" });
+    const email = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await email.waitFor({ timeout: 30_000 });
     results.check("briefcase's link with login_hint=<an email>: the email field is empty", href.searchParams.get("login_hint") === known && (await email.inputValue()) === "", `field "${await email.inputValue()}"`);
     const raw = JSON.stringify(flow);
@@ -78,7 +78,7 @@ export const journey: Journey = {
     // The account site's own sign-in.
     await page.goto(`${env.site}/sign-in?login_hint=${encodeURIComponent(known)}`);
     await page.waitForURL(url => url.pathname.startsWith("/authorize"), { timeout: 30_000 });
-    const ownEmail = page.getByRole("textbox", { name: "Email" });
+    const ownEmail = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     const ownShown = await ownEmail.waitFor({ timeout: 30_000 }).then(() => true, () => false);
     results.check("the account site's /sign-in?login_hint=…: no login_hint on the way to /authorize, the field empty", !page.url().includes("login_hint") && (!ownShown || (await ownEmail.inputValue()) === ""), `${page.url().slice(0, 160)} field "${ownShown ? await ownEmail.inputValue() : "(signed in: Continue as)"}"`);
 
@@ -103,7 +103,7 @@ export const journey: Journey = {
     const signInUrl = (await navigated).url();
     results.check("SDK signIn({loginHint, method: email}) goes to /authorize without it", !signInUrl.includes("login_hint") && !signInUrl.includes(encodeURIComponent(known)), signInUrl.slice(0, 200));
     await waitForFlow(page, f => f.step === "choose_method", "quill-docs' email page");
-    const sdkEmail = page.getByRole("textbox", { name: "Email" });
+    const sdkEmail = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await sdkEmail.waitFor({ timeout: 30_000 });
     results.check("…and the page opens with the email field empty", (await sdkEmail.inputValue()) === "", `field "${await sdkEmail.inputValue()}"`);
 

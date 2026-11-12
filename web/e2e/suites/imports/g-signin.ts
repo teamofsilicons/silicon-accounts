@@ -58,9 +58,7 @@ async function prefill(page: Page) {
     heading: await page.getByRole("heading", { name: "Finish setting up your account" }).count(),
     text: await textOf(page),
     id: await id.inputValue(),
-    name: await page.getByRole("textbox", { name: "Display name" }).inputValue(),
-    timezone: await page.getByRole("combobox", { name: "Timezone" }).inputValue(),
-    dob: (await page.getByRole("button", { name: "Date of birth" }).innerText()).replace(/\s+/g, " "),
+    name: await page.getByRole("textbox", { name: "Your name" }).inputValue(),
   };
 }
 
@@ -106,7 +104,7 @@ export const journeys: Journey[] = [
       // legacy-crm knows the email from its own records; it can't hand it to us (UNDERSTANDING.md: the Carbon always
       // types it on our pages).
       await startAtApp(env, page, "legacy-crm", { extra: { login_hint: email } });
-      const field = page.getByRole("textbox", { name: "Email" });
+      const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
       await field.waitFor({ timeout: 30_000 });
       await page.waitForURL(/\/authorize\/flow\//, { timeout: 15_000 }).catch(() => undefined);
       await sleep(500);
@@ -118,11 +116,11 @@ export const journeys: Journey[] = [
       const seen = await prefill(page);
       await shot(env, page, "imports-signin-01-finish");
       results.check("the sign-up step says \"Finish setting up your account\" and that Legacy CRM added them", seen.heading === 1 && seen.text.includes("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue.") && seen.text.includes(email), seen.text.slice(0, 300));
-      results.check("it is prefilled with what legacy-crm imported: id, name, timezone, date of birth", seen.id === `fin_${t}` && seen.name === "Fin Ward" && /Paris/.test(seen.timezone) && /March 14, 1991/.test(seen.dob), JSON.stringify({ ...seen, text: undefined }));
+      results.check("it is prefilled with what legacy-crm imported: id and name (its timezone and date of birth go with it, checked on the account)", seen.id === `fin_${t}` && seen.name === "Fin Ward", JSON.stringify({ ...seen, text: undefined }));
       const flow = await flowView(page);
       results.check("the flow (API) is at signup with finishing_import true and the imported details", flow?.step === "signup" && flow.signup?.finishing_import === true && flow.signup.id === `c:fin_${t}` && flow.signup.display_name === "Fin Ward" && flow.signup.timezone === "Europe/Paris" && flow.signup.dob === "1991-03-14", JSON.stringify(flow?.signup ?? flow).slice(0, 400));
       results.check("…and names the app that imported them (imported_by legacy-crm), which the page repeats for the id (\"This is the CarbonID Legacy CRM set up for you.\")", flow?.signup?.imported_by?.app_id === "legacy-crm" && flow.signup.imported_by.name === "Legacy CRM" && seen.text.includes("This is the CarbonID Legacy CRM set up for you."), `${JSON.stringify(flow?.signup?.imported_by)}; ${/This is the (?:CarbonID|id)[^.]*\./.exec(seen.text)?.[0] ?? seen.text.slice(0, 200)}`);
-      await page.getByRole("button", { name: "Finish setup" }).click();
+      await page.getByRole("button", { name: /^Finish setup$/i }).click();
       const walk = await completeDetails(env, page, "legacy-crm", { shotName: "imports-signin-02" });
       const details = walk.pages[0];
       const rowOf = (field: string) => details?.rows.find(item => item.field === field);
@@ -213,8 +211,8 @@ export const journeys: Journey[] = [
       );
       await signInWithCode(env, page, { phone });
       const seen = await prefill(page);
-      results.check("the SMS code leads to \"Finish setting up\" prefilled from the import", seen.heading === 1 && seen.id === `pia_${t}` && seen.name === "Pia Phone" && /Los.Angeles/.test(seen.timezone) && /August 8, 1988/.test(seen.dob) && seen.text.includes("Legacy CRM added you to Silicon Accounts."), JSON.stringify({ ...seen, text: seen.text.slice(0, 160) }));
-      await page.getByRole("button", { name: "Finish setup" }).click();
+      results.check("the SMS code leads to \"Finish setting up\" prefilled from the import", seen.heading === 1 && seen.id === `pia_${t}` && seen.name === "Pia Phone" && seen.text.includes("Legacy CRM added you to Silicon Accounts."), JSON.stringify({ ...seen, text: seen.text.slice(0, 160) }));
+      await page.getByRole("button", { name: /^Finish setup$/i }).click();
       const after = await lastSeq(env);
       const walk = await completeDetails(env, page, "legacy-crm", { add: { email }, tick: ["phone"], shotName: "imports-signin-04-requires-email" });
       const details = walk.pages[0];
@@ -259,12 +257,12 @@ export const journeys: Journey[] = [
       await signInWithCode(env, page, { email });
       const seen = await prefill(page);
       await shot(env, page, "imports-signin-05-intent-signup");
-      results.check("an imported Carbon who came to sign up finishes the account legacy-crm imported (\"Finish setting up your account\", its id and name)", seen.heading === 1 && seen.id === `sana_${t}` && seen.name === "Sana Signup" && /Asia.Dubai|Dubai/.test(seen.timezone), JSON.stringify({ ...seen, text: seen.text.slice(0, 160) }));
+      results.check("an imported Carbon who came to sign up finishes the account legacy-crm imported (\"Finish setting up your account\", its id and name)", seen.heading === 1 && seen.id === `sana_${t}` && seen.name === "Sana Signup", JSON.stringify({ ...seen, text: seen.text.slice(0, 160) }));
       // The prefill is the Carbon's to change: another id and name than the ones legacy-crm chose.
       await page.getByRole("textbox", { name: "Your CarbonID" }).fill(`sana_own_${t}`);
-      await page.getByRole("textbox", { name: "Display name" }).fill("Sana Her Own Name");
+      await page.getByRole("textbox", { name: "Your name" }).fill("Sana Her Own Name");
       await sleep(900);
-      await page.getByRole("button", { name: "Finish setup" }).click();
+      await page.getByRole("button", { name: /^Finish setup$/i }).click();
       await completeDetails(env, page, "legacy-crm");
       const account = await appAccount(page);
       const [member] = await rowsOf<{ status: string; accounts: number }>(env, `select m.status, (select count(*)::int from account_emails where email = ${lit(email)}) as accounts from memberships m where m.app_id = 'legacy-crm' and m.account_uuid = ${lit(uuid)}`);

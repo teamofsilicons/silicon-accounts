@@ -4,7 +4,9 @@
  * choose_method: how the Carbon signs in (or signs up: the app's intent=signup shows the sign-up version of the page,
  * "Create your Briefcase account"; the account logic is the same). A browser that is already signed in is offered
  * "Continue as" first (with "Use another account", which tells the server to forget it for this flow). Otherwise the
- * app's methods show in its order: Google and Apple as neutral buttons, email and phone as one field with a code.
+ * app's methods show in its order: Google and Apple as neutral buttons, "or get a code", then email and phone as one
+ * field ("Email or phone") and "Send Me a Code", with the prototype's note that there are no passwords and that Silicons
+ * sign in with their secret key (Anil, 2026-11-12).
  *
  * `method` narrows the page to one method until the Carbon asks for the others: email or phone opens on that empty
  * field (nothing is ever filled in for the Carbon: an app cannot hand us an email or phone, and login_hint is ignored);
@@ -123,7 +125,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
       initialKind={initialKind}
       initialEmail={memory.email ?? ""}
       initialPhone={memory.phone ?? ""}
-      submitLabel={changing ? "Send Code" : "Continue"}
+      submitLabel={changing ? "Send Code" : "Send Me a Code"}
       onSubmit={send}
       autoFocus={fine && !signedIn}
       errorContext={{ app: flow.app.name }}
@@ -156,7 +158,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
           {providersFirst ? (
             <>
               {providerButtons}
-              {both ? <OrDivider /> : null}
+              {both ? <OrDivider label="or get a code" /> : null}
               {contactForm}
             </>
           ) : (
@@ -166,6 +168,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
               {providerButtons}
             </>
           )}
+          {!changing && contacts.length ? <p className={styles.methodsNote}>No passwords. Building a Silicon? It signs in with its secret key from the command line.</p> : null}
           {narrowed ? <button type="button" className={styles.textButton} onClick={() => setShowAll(true)}>{signup ? "Other Ways to Sign Up" : "Other Ways to Sign In"}</button> : null}
           {changing && onBack ? <button type="button" className={styles.textButton} onClick={onBack}>Back to the code</button> : null}
         </div>

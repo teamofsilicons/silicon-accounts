@@ -198,11 +198,11 @@ const domains: Journey = {
     // The refused address is the API's 403 (Chromium logs every 4xx a page's fetch gets as a console error).
     results.watch(page, "domains", [/status of 403 .*\/v1\/flows\/[\w-]+\/email/]);
     await startAtApp(env, page, "campus-connect");
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     const before = await lastSeq(env);
     await field.fill(`outsider.ui.${t}@gmail.test`);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     await page.getByText(/only accepts email addresses at university\.test/).waitFor({ timeout: 10_000 }).catch(() => undefined);
     await sleep(300);
     await shot(env, page, "auth-flows-domains-01-refused");
@@ -273,12 +273,12 @@ const closedSignup: Journey = {
     const page = await context.newPage();
     results.watch(page, "closed", [/status of 403 .*\/v1\/flows\/[\w-]+\/verify/]);
     await startAtApp(env, page, "legacy-crm");
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     const newcomer = `newcomer.${t}@example.test`;
     const mark = await lastSeq(env);
     await field.fill(newcomer);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code = await codeFor(env, newcomer, mark);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code, { delay: 25 });
@@ -286,7 +286,7 @@ const closedSignup: Journey = {
     await sleep(300);
     await shot(env, page, "auth-flows-allow-signup-01");
     const text = (await page.locator("main").innerText()).replace(/\s+/g, " ");
-    results.check("the hosted page says legacy-crm takes no new accounts (no sign-up form)", /does(n't| not) (take|accept) new accounts/.test(text) && (await page.getByRole("button", { name: "Create account" }).count()) === 0, text.slice(0, 300));
+    results.check("the hosted page says legacy-crm takes no new accounts (no sign-up form)", /does(n't| not) (take|accept) new accounts/.test(text) && (await page.getByRole("button", { name: /^Create account$/i }).count()) === 0, text.slice(0, 300));
     await context.close();
 
     const imported2 = `imported.ui.${t}@example.test`;
@@ -300,20 +300,20 @@ const closedSignup: Journey = {
     const fp = await finish.newPage();
     results.watch(fp, "closed-finish");
     await startAtApp(env, fp, "legacy-crm");
-    const f2 = fp.getByRole("textbox", { name: "Email" });
+    const f2 = fp.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await f2.waitFor({ timeout: 30_000 });
     const mark2 = await lastSeq(env);
     await f2.fill(imported2);
-    await fp.getByRole("button", { name: "Continue", exact: true }).click();
+    await fp.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code2 = await codeFor(env, imported2, mark2);
     await fp.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await fp.keyboard.type(code2, { delay: 25 });
-    const finishButton = fp.getByRole("button", { name: "Finish setup" });
+    const finishButton = fp.getByRole("button", { name: /^Finish setup$/i });
     const finishing = await finishButton.waitFor({ timeout: 20_000 }).then(() => true, () => false);
     await sleep(300);
     await shot(env, fp, "auth-flows-allow-signup-02-finish");
     const finishText = (await fp.locator("main").innerText()).replace(/\s+/g, " ");
-    results.check("an imported Carbon on legacy-crm sees \"Finish setup\" with the imported name, naming Legacy CRM", finishing && finishText.includes("Legacy CRM") && (await fp.getByRole("textbox", { name: "Display name" }).inputValue()) === `Imported Browser ${t}`, finishText.slice(0, 300));
+    results.check("an imported Carbon on legacy-crm sees \"Finish setup\" with the imported name, naming Legacy CRM", finishing && finishText.includes("Legacy CRM") && (await fp.getByRole("textbox", { name: "Your name" }).inputValue()) === `Imported Browser ${t}`, finishText.slice(0, 300));
     await finish.close();
   },
 };

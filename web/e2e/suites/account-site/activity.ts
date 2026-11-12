@@ -26,7 +26,7 @@ async function filter(page: Page, label: string): Promise<{ rows: string[]; empt
 
 const activity: Journey = {
   name: "account-site-activity",
-  title: "the activity timeline: every kind of entry (sign-ins, id change, proofs, app access, security), newest first in the account's timezone, 50 at a time with \"Show older activity\", each filter showing only its kind, details opening in place, and the card's recent four",
+  title: "the activity: every kind of entry (sign-ins, id change, proofs, app access, security), newest first by day in the account's timezone, 50 at a time with \"Show Older Activity\", the five filters (Security, Personal info, Apps, Silicons), and Security's link to it",
   async run(ctx) {
     const { env, results } = ctx;
     const carbon = await newCarbon(ctx, "acct-activity");
@@ -71,18 +71,22 @@ const activity: Journey = {
     const aucklandTime = new Intl.DateTimeFormat("en-US", { timeZone: "Pacific/Auckland", hour: "numeric", minute: "2-digit" }).format(when);
     const aucklandDay = new Intl.DateTimeFormat("en-US", { timeZone: "Pacific/Auckland", weekday: "long", month: "long", day: "numeric" }).format(when);
     const browserDay = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", weekday: "long", month: "long", day: "numeric" }).format(when);
-    const zoneWords = `Days and times are in ${timezoneLabel("Pacific/Auckland")}, your timezone.`;
+    const zoneWords = `Times are in ${timezoneLabel("Pacific/Auckland")}.`;
+    // The day is each section's heading (Today, Yesterday, or "Thursday, November 12"); the row holds the time.
+    const todayInAuckland = new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(Date.now()) === new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(when);
+    const dayHeading = todayInAuckland ? "Today" : aucklandDay;
     const mainNow = async () => (await page.locator("main").innerText().catch(() => "")).replace(/\s+/g, " ");
     const started = Date.now();
     await page.goto(`${env.site}/activity`);
     const region = page.getByRole("region", { name: "Account activity" });
     await region.locator("li").first().waitFor({ timeout: 20_000 });
-    const drawnFirst = { header: await mainNow(), row: ((await region.locator("li").first().innerText().catch(() => "")) || "").replace(/\s+/g, " ") };
+    const firstHeading = async () => (await region.getByRole("heading").first().innerText().catch(() => "")).trim();
+    const drawnFirst = { header: await mainNow(), day: await firstHeading(), row: ((await region.locator("li").first().innerText().catch(() => "")) || "").replace(/\s+/g, " ") };
     results.metric("/activity first rows visible after navigation", Date.now() - started);
     results.check(
       "the first rows drawn already read in the account's timezone (no flash of the browser's day and time first)",
-      drawnFirst.header.includes(zoneWords) && drawnFirst.row.includes(aucklandDay) && drawnFirst.row.includes(aucklandTime),
-      `first drawn: header ${drawnFirst.header.includes(zoneWords) ? "Auckland" : `"${drawnFirst.header.match(/Days and times are in [^.]*\./)?.[0] ?? "?"}"`}; row "${drawnFirst.row.slice(0, 140)}" (Auckland "${aucklandDay}" "${aucklandTime}", browser day "${browserDay}")`,
+      drawnFirst.header.includes(zoneWords) && drawnFirst.day === dayHeading && drawnFirst.row.includes(aucklandTime),
+      `first drawn: header ${drawnFirst.header.includes(zoneWords) ? "Auckland" : `"${drawnFirst.header.match(/Times are in [^.]*\./)?.[0] ?? "?"}"`}; day "${drawnFirst.day}"; row "${drawnFirst.row.slice(0, 140)}" (Auckland "${dayHeading}" "${aucklandTime}", browser day "${browserDay}")`,
     );
     // Then settled: the account's timezone, one row per entry (a day that changed under the rows leaves no copies).
     let settled: string[] = [];
@@ -91,7 +95,7 @@ const activity: Journey = {
       const rows = await timelineRows(page);
       const header = await mainNow();
       const key = rows.join("\n");
-      const steady = key === previous && rows.length === 50 && header.includes(zoneWords) && (rows[0] ?? "").includes(aucklandDay);
+      const steady = key === previous && rows.length === 50 && header.includes(zoneWords) && (await firstHeading()) === dayHeading;
       previous = key;
       settled = rows;
       return steady;
@@ -104,9 +108,9 @@ const activity: Journey = {
     results.check("the page says days and times are in the account's timezone (Auckland)", header.includes(zoneWords), header.slice(0, 200));
     results.check("the first page is the newest 50, in the API's order", firstPage.length === 50 && all.slice(0, 50).every((item, index) => (firstPage[index] ?? "").startsWith(item.title.slice(0, 24))), `${firstPage.length} rows; first: ${firstPage[0]} / ${all[0]?.title}`);
     results.check("the newest entry is the timezone change", /^Profile updated/.test(firstPage[0] ?? "") && /timezone/.test(firstPage[0] ?? ""), firstPage[0] ?? "");
-    results.check("its time reads in Auckland time (the account's timezone, not the browser's)", (firstPage[0] ?? "").includes(aucklandTime) && (firstPage[0] ?? "").includes(aucklandDay), `want "${aucklandDay}" "${aucklandTime}" in: ${firstPage[0]}`);
-    const more = page.getByRole("button", { name: "Show older activity" });
-    results.check("\"Show older activity\" is offered", (await more.count()) === 1);
+    results.check("its time and day read in Auckland (the account's timezone, not the browser's)", (firstPage[0] ?? "").includes(aucklandTime) && (await firstHeading()) === dayHeading, `want "${dayHeading}" "${aucklandTime}": ${await firstHeading()} / ${firstPage[0]}`);
+    const more = page.getByRole("button", { name: "Show Older Activity" });
+    results.check("\"Show Older Activity\" is offered", (await more.count()) === 1);
     while ((await more.count()) === 1) {
       await more.click();
       await sleep(900);
@@ -117,45 +121,28 @@ const activity: Journey = {
     const days = await page.getByRole("region", { name: "Account activity" }).getByRole("heading").allInnerTexts();
     results.check("entries are grouped under day headings", days.length >= 1, days.join(", "));
 
-    // Each filter shows only its kind.
-    const ids = await filter(page, "Id changes");
-    results.check("Id changes: the change and the creation, nothing else", ids.rows.length === 2 && ids.rows[0]?.startsWith(`Id changed from ${carbon.id} to ${newId}`) === true && ids.rows[1]?.startsWith(`Account created with the id ${carbon.id}`) === true, ids.rows.join(" | "));
-    const signins = await filter(page, "Sign-ins");
-    results.check("Sign-ins: only sign-ins and the sign-up", signins.rows.length >= 3 && signins.rows.every(row => /^(Signed (in|up)|Failed sign-in)/.test(row)) && signins.rows.some(row => row.startsWith("Signed in to Briefcase")) && signins.rows.some(row => row.startsWith("Signed in to Commit")), signins.rows.join(" | ").slice(0, 300));
-    results.check("…including the failed sign-in, as the history words it", signins.rows.some(row => row.startsWith(failed[0]?.title ?? "Failed sign-in")), signins.rows.filter(row => row.startsWith("Failed")).join(" | ") || "no failed sign-in row");
-    const proofs = await filter(page, "User verification");
-    results.check("Proofs: issued and revoked", proofs.rows.length === 2 && proofs.rows.some(row => row.startsWith("Briefcase got a proof to act for you at Commit")) && proofs.rows.some(row => row.startsWith("Proof for Briefcase to act for you at Commit revoked")), proofs.rows.join(" | "));
-    const access = await filter(page, "App access");
-    // v2 keeps each answer on an app's what's-shared page (audit `consent.granted`), filed under App access: such a row
-    // belongs here when it reads as what was shared with the app, never as the raw action name ("Consent granted").
-    const appAccessRow = (row: string) => /^(Started using|Removed)/.test(row) || (/\bshared\b/i.test(row) && !/^Consent granted/i.test(row));
-    const notAppAccess = access.rows.filter(row => !appAccessRow(row));
-    results.check("App access: started using each app, Commit's removal", access.rows.some(row => row.startsWith("Started using Briefcase")) && access.rows.some(row => row.startsWith("Started using Commit")) && access.rows.some(row => row.startsWith("Removed Commit's access")) && notAppAccess.length === 0, notAppAccess.length ? `not app access (${notAppAccess.length}): ${notAppAccess.slice(0, 3).join(" | ")}` : access.rows.join(" | "));
-    const custodian = await filter(page, "Custodian");
-    results.check("Custodian: nothing yet, and it says what would show there", custodian.rows.length === 0 && custodian.empty.includes("Silicons you take on, hand over or are asked to look after show up here."), custodian.empty.slice(0, 200));
+    // The filters (the prototype's five) group the history's kinds.
+    const ids = await filter(page, "Personal info");
+    results.check("Personal info: the CarbonID change and the creation, nothing else", ids.rows.length === 2 && ids.rows[0]?.startsWith(`Id changed from ${carbon.id} to ${newId}`) === true && ids.rows[1]?.startsWith(`Account created with the id ${carbon.id}`) === true, ids.rows.join(" | "));
     const security = await filter(page, "Security");
-    results.check("Security: the profile changes, 50 at a time", security.rows.length === 50 && security.rows.every(row => /^(Profile updated|Session created|[^ ]+ account|Email|Phone|A (browser|CLI))/.test(row)) && (await page.getByRole("button", { name: "Show older activity" }).count()) === 1, `${security.rows.length} rows; ${security.rows.slice(0, 2).join(" | ")}`);
+    const elsewhere = (row: string) => /^(Started using|Removed .*access|Id changed|Account created with the id|Proof for |.* got a proof to act for you at )/.test(row);
+    const strays = security.rows.filter(elsewhere);
+    results.check("Security: sign-ins and the security and profile changes, and none of the other filters' rows", security.rows.length >= 3 && strays.length === 0 && security.rows.some(row => row.startsWith("Signed in to Briefcase")) && security.rows.some(row => row.startsWith("Signed in to Commit")), strays.length ? `not security (${strays.length}): ${strays.slice(0, 3).join(" | ")}` : `${security.rows.length} rows; ${security.rows.slice(0, 3).join(" | ")}`);
+    results.check("…including the failed sign-in, as the history words it", security.rows.some(row => row.startsWith(failed[0]?.title ?? "Failed sign-in")), security.rows.filter(row => row.startsWith("Failed")).join(" | ") || "no failed sign-in row");
+    const apps = await filter(page, "Apps");
+    // v2 keeps each answer on an app's what's-shared page (audit `consent.granted`), filed under app access: such a row
+    // belongs here when it reads as what was shared with the app, never as the raw action name ("Consent granted").
+    const appRow = (row: string) => /^(Started using|Removed)/.test(row) || (/\bshared\b/i.test(row) && !/^Consent granted/i.test(row)) || / got a proof to act for you at /.test(row) || /^Proof for .* revoked/.test(row);
+    const notApps = apps.rows.filter(row => !appRow(row));
+    results.check("Apps: started using each app, Commit's removal, and the proof issued and revoked", apps.rows.some(row => row.startsWith("Started using Briefcase")) && apps.rows.some(row => row.startsWith("Started using Commit")) && apps.rows.some(row => row.startsWith("Removed Commit's access")) && apps.rows.some(row => row.startsWith("Briefcase got a proof to act for you at Commit")) && apps.rows.some(row => row.startsWith("Proof for Briefcase to act for you at Commit revoked")) && notApps.length === 0, notApps.length ? `not apps (${notApps.length}): ${notApps.slice(0, 3).join(" | ")}` : apps.rows.join(" | ").slice(0, 300));
+    const custodian = await filter(page, "Silicons");
+    results.check("Silicons: nothing yet, and it says what would show there", custodian.rows.length === 0 && custodian.empty.includes("Silicons you take on, hand over or are asked to look after show up here."), custodian.empty.slice(0, 200));
 
-    // A row with details opens in place.
-    await filter(page, "User verification");
-    const trigger = page.getByRole("region", { name: "Account activity" }).locator("[data-timeline-trigger]").first();
-    const hasDetail = (await trigger.count()) === 1;
-    if (hasDetail) {
-      await trigger.click();
-      await sleep(600);
-      const expanded = await trigger.getAttribute("aria-expanded");
-      const detail = (await page.getByRole("region", { name: "Account activity" }).locator("dl").first().innerText().catch(() => "")).replace(/\s+/g, " ");
-      results.check("a proof row opens its details in place", expanded === "true" && detail.length > 0, detail.slice(0, 200));
-      await shot(env, page, "acct-activity-02-detail");
-    } else {
-      results.check("a proof row opens its details in place", false, "no row with details");
-    }
-
-    // The identity card's recent activity is the newest four.
-    await page.goto(`${env.site}/`);
-    const glance = page.getByRole("complementary", { name: "At a glance" });
-    const recent = await until(async () => (await glance.getByRole("list").last().locator("li").allInnerTexts().catch(() => [] as string[])).map(text => text.replace(/\s+/g, " ")), rows => rows.length === 4, 15_000);
-    results.check("the card's recent activity: the newest four, linking to All activity", recent.length === 4 && all.slice(0, 4).every((item, index) => (recent[index] ?? "").startsWith(item.title.slice(0, 24))) && (await glance.getByRole("link", { name: "All activity" }).getAttribute("href")) === "/activity", recent.join(" | "));
+    // Security's Activity row leads here.
+    await page.goto(`${env.site}/sign-in-methods`);
+    const link = page.getByRole("link", { name: /^Activity/ });
+    await link.waitFor({ timeout: 20_000 });
+    results.check("Security's Activity row links to /activity", (await link.getAttribute("href")) === "/activity");
     await carbon.context.close();
   },
 };

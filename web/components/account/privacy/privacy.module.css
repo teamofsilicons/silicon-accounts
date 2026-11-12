@@ -1,0 +1,8 @@
+/* Data & privacy (privacy.tsx), on the account pages' rows (parts/rows.tsx). */
+.mark { --sq-stroke: var(--border-subtle); border: 1px solid var(--sq-stroke); }
+.alertAction { display: block; margin-top: var(--space-related); }
+.skeleton { margin-top: var(--space-section); }
+
+/* Delete account (/__delete-entry A): the page's own row; only the bin, on a light red tile, and the title are red. */
+.deleteTile { --sq-r: var(--radius-control); --sq-fill: color-mix(in oklab, var(--danger) 10%, var(--surface)); display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; background: var(--sq-fill); color: var(--danger); }
+.deleteTitle { color: var(--danger); }

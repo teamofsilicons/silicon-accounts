@@ -122,7 +122,7 @@ export const journeys: Journey[] = [
       results.watch(page, "keyboard-hosted");
       collectConsole(page);
       await page.goto(await hostedLink(env, page, "briefcase"));
-      await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+      await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
       await walkStep(ctx, page, findings, "keyboard-hosted methods", [/Continue with Google/, /Continue with Apple/, /^Email$/, /Continue/, /Silicon Accounts/]);
 
       // Email by keys: Tab to the field, type, Enter.
@@ -154,7 +154,7 @@ export const journeys: Journey[] = [
       await page.keyboard.type(code, { delay: 40 });
 
       // Setting up by keys: the timezone combobox and the date of birth, then Create account.
-      await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 30_000 });
       await focusAfterStep(ctx, page, "setting up");
       await walkStep(ctx, page, findings, "keyboard-hosted signup", [/Not you/, /Display name/, /Your CarbonID/, /Timezone/, /Date of birth/, /Create account/, /Silicon Accounts/]);
       if (await tabAndPress(ctx, page, "the timezone combobox", stop => stop.role === "combobox" && /Timezone/i.test(stop.name ?? ""), "ArrowDown")) {
@@ -211,7 +211,7 @@ export const journeys: Journey[] = [
       results.watch(page, "keyboard-first-party");
       collectConsole(page);
       await page.goto(`${env.site}/sign-in`);
-      await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+      await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
       const stops = await walkStep(ctx, page, findings, "keyboard-first-party methods", [/Continue with Google/, /Continue with Apple/, /^Email$/, /Continue/, /Silicon Accounts/]);
 
       // Email ⇄ Phone: the segmented control answers arrow keys.
@@ -223,7 +223,7 @@ export const journeys: Journey[] = [
         results.check("keyboard: ArrowRight on the Email segment switches to Phone", phoneShown);
         await page.keyboard.press("ArrowLeft");
         await sleep(500);
-        results.check("keyboard: ArrowLeft switches back to Email", await page.getByRole("textbox", { name: "Email" }).isVisible().catch(() => false));
+        results.check("keyboard: ArrowLeft switches back to Email", await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).isVisible().catch(() => false));
       }
 
       const email = freshEmail("uxa.keys1p");
@@ -237,7 +237,7 @@ export const journeys: Journey[] = [
       results.check("keyboard: the code step puts focus in its first cell (390)", /digit 1 of 6/.test(atCode.name ?? ""), label(atCode));
       await tabAndPress(ctx, page, "the first code cell", stop => /digit 1 of 6/.test(stop.name ?? ""), "Home");
       await page.keyboard.type(code, { delay: 40 });
-      await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 30_000 });
       await focusAfterStep(ctx, page, "setting up (390)");
       await walkStep(ctx, page, findings, "keyboard-first-party signup", [/Display name/, /Your CarbonID/, /Timezone/, /Date of birth/, /Create account/]);
       await tabAndPress(ctx, page, "Create account", stop => /^Create account$/.test(stop.name ?? ""));
@@ -298,7 +298,7 @@ export const journeys: Journey[] = [
           await page.keyboard.type(sms, { delay: 25 });
           await live(page, 'ul[aria-label^="Details shared with"] > li[data-field="phone"]:not([data-missing])').first().waitFor({ timeout: 15_000 });
           await page.getByRole("button", { name: "Start messaging", exact: true }).click();
-        } else await page.getByRole("button", { name: "Share and continue", exact: true }).click({ timeout: 30_000 });
+        } else await page.getByRole("button", { name: /^Share and continue$/i }).click({ timeout: 30_000 });
         await page.waitForURL(url => url.href.startsWith(`${env.apps}/${app}/`), { timeout: 30_000 });
       }
       const issued = await fetch(`${env.apps}/dm/actions/issue-user_verification`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ uuid: carbon.uuid, receiving_app: "briefcase", scopes: ["files.write"] }) });
@@ -308,7 +308,7 @@ export const journeys: Journey[] = [
       const created = await pageFetch(page, "/v1/me/silicons", { method: "POST", body: { id: `si:uxa-keys-${Date.now().toString(36)}`, display_name: "Keyboard Scout" } });
       results.check("keyboard-account: a Silicon in the Carbon's care", created.status === 200 || created.status === 201, String(created.status));
       // Every page at 1440 light; at 390 dark (the phone bar instead of the dock) the pages with the most controls.
-      const pages = [["/", "identity"], ["/sign-in-methods", "sign-in-methods"], ["/apps", "apps"], ["/silicons", "silicons"], ["/proofs", "proofs"], ["/activity", "activity"], ["/settings", "settings"]] as const;
+      const pages = [["/", "identity"], ["/sign-in-methods", "sign-in-methods"], ["/apps", "apps"], ["/silicons", "silicons"], ["/proofs", "proofs"], ["/activity", "activity"], ["/privacy", "privacy"]] as const;
       for (const [width, height, dark, names] of [[1440, 900, false, null], [390, 844, true, ["identity", "silicons", "settings"]]] as const) {
         await page.setViewportSize({ width, height });
         await page.emulateMedia({ colorScheme: dark ? "dark" : "light" });
@@ -338,7 +338,7 @@ export const journeys: Journey[] = [
       const code = await sendEmailCode(env, page, email);
       await tabAndPress(ctx, page, "the first code cell", stop => /digit 1 of 6/.test(stop.name ?? ""), "Home");
       await page.keyboard.type(code, { delay: 40 });
-      await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 30_000 });
       await tabAndPress(ctx, page, "Create account", stop => /^Create account$/.test(stop.name ?? ""));
 
       // Step 1 of 2: the phone ledgerly requires, added on the page.
@@ -397,7 +397,7 @@ export const journeys: Journey[] = [
         const code = await sendEmailCode(env, page, freshEmail("uxa.keysdev"));
         await page.getByRole("textbox", { name: /digit 1 of 6/ }).first().click();
         await page.keyboard.type(code, { delay: 25 });
-        await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+        await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
         await page.getByRole("button", { name: "Share and continue" }).click({ timeout: 30_000 });
         await page.waitForURL(new RegExp(`${env.apps.replace(/[.:/]/g, "\\$&")}/briefcase/`), { timeout: 30_000 });
         await context.close();

@@ -1,0 +1,43 @@
+/* /__activity (activity-lab.tsx): the designs share the account pages' look (a white list with a clear border, rows 8px
+   high and 12px at the sides, straight dividers), and each changes one thing. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-narrow, 56rem) + 2 * var(--gutter)); gap: var(--space-block); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.tabs { display: grid; gap: var(--space-block); }
+.frame { --sq-r: var(--radius-container); --sq-stroke: var(--border-subtle); overflow: hidden; border: 1px solid var(--sq-stroke); }
+.page { display: grid; align-content: start; gap: var(--space-inset); }
+.h2 { margin: var(--space-related) 0 0; font: var(--h2); letter-spacing: var(--h2-tracking); }
+
+/* B and C: one list, the days as light dividers inside it. */
+.list { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); list-style: none; }
+.divider { padding: var(--space-related) var(--space-group); border-top: 1px solid var(--border-subtle); background: var(--neutral-1); color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
+.divider:first-child { border-top: 0; }
+.row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); border-top: 1px solid var(--border-subtle); }
+.divider + .row { border-top: 0; }
+.row[data-flag] { background: color-mix(in oklab, var(--warning, var(--accent)) 6%, var(--surface)); }
+.text { display: grid; min-width: 0; flex: 1; gap: 0; }
+.sentence { min-width: 0; overflow: hidden; color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.sentence strong { font-weight: var(--weight-medium); }
+.detail { min-width: 0; overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.time { flex: none; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.times { color: var(--text-secondary); font: var(--small); }
+.mark { --sq-stroke: var(--border-subtle); border: 1px solid var(--sq-stroke); }
+
+/* C: what may need you, first. */
+.look { display: grid; gap: var(--space-inset); }
+.lookHead { display: flex; align-items: center; gap: var(--space-related); }
+.lookList { --sq-stroke: color-mix(in oklab, var(--warning, var(--accent)) 35%, var(--border)); }
+.flagIcon { display: grid; flex: none; place-items: center; color: var(--warning, var(--accent)); }
+.allClear { display: flex; align-items: center; gap: var(--space-related); margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+/* D: a dense log. */
+.compactDay { display: grid; gap: var(--space-tight); margin-top: var(--space-related); }
+.compactHead { margin: 0; color: var(--text-secondary); font: var(--label); letter-spacing: var(--label-tracking); }
+.compactList { display: grid; margin: 0; padding: 0; list-style: none; }
+.compactRow { display: grid; grid-template-columns: 4.5rem auto minmax(0, 1fr); align-items: center; gap: var(--space-related); padding: var(--space-tight) 0; border-top: 1px solid var(--border-subtle); }
+.compactRow[data-flag] .compactText { color: var(--warning-ink, var(--danger)); }
+.compactTime { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); font-variant-numeric: tabular-nums; }
+.compactText { min-width: 0; overflow: hidden; color: var(--foreground); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.compactDetail { color: var(--text-soft); }
+.legend { display: flex; align-items: center; gap: var(--space-tight); margin: var(--space-related) 0 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); }

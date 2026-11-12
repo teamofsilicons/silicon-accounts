@@ -6,7 +6,8 @@
  *   Checkup       what needs you here: a recovery phone when there is none, a device not used lately (Keep or Sign
  *                 Out). Hidden when nothing does, like Home's Needs you, in the same boxed list.
  *   Silicon keys  each Silicon you look after: when its key was made, and Change (on the Silicon's page).
- *   Your sign-in  Google and Apple (connected with their email, or Connect), Email code and Text code (the emails and
+ *   Your sign-in  Google and Apple (connected with their email, or Connect; Unlink asks in a dialog that names the ways
+ *                 in you keep, as the prototype's askUnlink), Email code and Text code (the emails and
  *                 phone numbers that get a code; Edit opens them in a dialog).
  *   Devices       where you are signed in: this device marked, the others with Sign Out; then "Sign out of all other
  *                 devices".
@@ -22,7 +23,6 @@ import { AtSign, History, KeyRound, Laptop, Phone, SquareTerminal, Code } from "
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
-import { ConfirmMorph } from "@teamofsilicons/silicon-ui/confirm-morph";
 import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
 import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
 import { ButtonLink } from "@/components/foundation/button-link";
@@ -91,7 +91,12 @@ export function Security() {
         </>
       ) : (
         <div className={styles.skeleton} aria-busy="true" aria-label="Loading your security settings">
-          {[0, 1, 2].map(index => <SkeletonBlock key={index} width="100%" height={index === 1 ? "176px" : "104px"} radius="var(--radius-container)" index={index} />)}
+          {[2, 4, 4].map((rows, index) => (
+            <div key={index} className={styles.skeletonSection}>
+              <SkeletonBlock width="8rem" height="1.25rem" radius="var(--radius-control)" index={index} />
+              <SkeletonBlock width="100%" height={`calc(${rows} * 3rem)`} radius="var(--radius-container)" index={index} />
+            </div>
+          ))}
         </div>
       )}
       </Page>
@@ -178,13 +183,13 @@ function YourSignIn({ carbon, onEdit }: { carbon: CarbonMe; onEdit: (channel: "e
     <Section id="security-sign-in" title="Your sign-in">
       {(["google", "apple"] as const).map(provider => {
         const linked = carbon.identities.filter(item => item.provider === provider);
-        if (linked.length) return linked.map(identity => <IdentityRow key={`${provider}:${identity.subject}`} identity={identity} />);
+        if (linked.length) return linked.map(identity => <IdentityRow key={`${provider}:${identity.subject}`} identity={identity} carbon={carbon} />);
         const offered = !!meta.data?.providers[provider];
         return (
           <Row key={provider} lead={<span className={styles.provider}><ProviderMark provider={provider} /></span>} title={PROVIDER_NAMES[provider]}
             detail={meta.error && !meta.data ? "Can't be connected right now" : "Not connected"} error={error?.provider === provider ? error.text : null}>
             {offered ? (
-              <Button variant="secondary" size="sm" onClick={() => void start(provider)} loading={connecting === provider} disabled={connecting !== null && connecting !== provider}>Connect</Button>
+              <Button variant="secondary" size="sm" aria-label={`Connect ${PROVIDER_NAMES[provider]}`} onClick={() => void start(provider)} loading={connecting === provider} disabled={connecting !== null && connecting !== provider}>Connect</Button>
             ) : null}
           </Row>
         );
@@ -199,28 +204,55 @@ function YourSignIn({ carbon, onEdit }: { carbon: CarbonMe; onEdit: (channel: "e
   );
 }
 
-function IdentityRow({ identity }: { identity: IdentityView }) {
+/** The ways you can still sign in once one provider is unlinked, as the prototype names them (askUnlink). */
+function otherWays(carbon: CarbonMe, without: IdentityView): string[] {
+  const ways = (["google", "apple"] as const)
+    .filter(provider => carbon.identities.some(item => item.provider === provider && !(provider === without.provider && item.subject === without.subject)))
+    .map(provider => PROVIDER_NAMES[provider]);
+  if (carbon.emails.length) ways.push("an email code");
+  if (carbon.phones.length) ways.push("a text code");
+  return ways;
+}
+
+const listJoin = (items: string[]) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`);
+
+/** A connected provider; Unlink asks in a dialog that names the ways in you keep, and won't remove the only one. */
+function IdentityRow({ identity, carbon }: { identity: IdentityView; carbon: CarbonMe }) {
   const unlink = useUnlinkProvider();
+  const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = PROVIDER_NAMES[identity.provider];
+  const others = otherWays(carbon, identity);
+
+  const confirm = async () => {
+    setError(null);
+    try {
+      await unlink.mutateAsync({ provider: identity.provider, subject: identity.subject });
+      setAsking(false);
+    } catch (raw) {
+      setError(describeError(raw));
+    }
+  };
+
   return (
-    <Row lead={<span className={styles.provider}><ProviderMark provider={identity.provider} /></span>} title={name} detail={identity.email ?? "Connected"} error={error}>
-      <ConfirmMorph
-        label="Unlink"
-        prompt={`Unlink ${name}?`}
-        confirmLabel="Unlink"
-        pendingLabel="Unlinking"
-        doneLabel="Unlinked"
-        onConfirm={async () => {
-          setError(null);
-          try {
-            await unlink.mutateAsync({ provider: identity.provider, subject: identity.subject });
-          } catch (raw) {
-            setError(describeError(raw));
-            throw raw;
-          }
-        }}
-      />
+    <Row lead={<span className={styles.provider}><ProviderMark provider={identity.provider} /></span>} title={name} detail={identity.email ?? "Connected"}>
+      <Button variant="secondary" size="sm" aria-label={`Unlink ${name}`} onClick={() => { setError(null); setAsking(true); }}>Unlink</Button>
+      <Dialog open={asking} onOpenChange={open => { if (!open && !unlink.isPending) setAsking(false); }}>
+        {asking ? (
+          <DialogContent
+            title={`Unlink ${name}?`}
+            description={others.length
+              ? <>You won&rsquo;t be able to sign in with {name}. You can still sign in with <strong>{listJoin(others)}</strong>.</>
+              : <>{name} is your only way to sign in. Add an email or phone first.</>}
+          >
+            {error ? <p className={styles.rowError} role="alert">{error}</p> : null}
+            <div className={styles.dialogActions}>
+              <Button variant="ghost" onClick={() => setAsking(false)} disabled={unlink.isPending}>Cancel</Button>
+              <Button variant="danger" onClick={() => void confirm()} loading={unlink.isPending} disabled={!others.length}>Unlink</Button>
+            </div>
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </Row>
   );
 }

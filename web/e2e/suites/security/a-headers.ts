@@ -121,7 +121,7 @@ export const journey: Journey = {
       ["/silicons", 200],
       ["/apps", 200],
       ["/proofs", 200],
-      ["/settings", 200],
+      ["/privacy", 200],
       [`/authorize?app_id=briefcase&redirect_uri=${encodeURIComponent(callback)}&state=hdr-${tag()}`, 200],
       [`/authorize?app_id=briefcase&redirect_uri=${encodeURIComponent(callback)}&state=hdr-${tag()}&intent=signup&method=google`, 200],
       ["/authorize/flow/not-a-real-flow", 200],

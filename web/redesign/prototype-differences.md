@@ -166,3 +166,35 @@ Silicon's activity, automation, cloud services, per-field sharing.
 - **Access also has the Webhook**, which the prototype doesn't show. Category: kept from the site.
 - **About also has Timezone and Photo.** Category: kept from the site (the API has them).
 - **The id row is "Id"** until a Silicon's id has a name (CarbonID's counterpart is undecided).
+
+## Activity (2026-11-12)
+
+- **A name, photo, date of birth or timezone change shows under Security, not Personal info.** Category: API (the
+  history files them under its security kind; only CarbonID changes have a kind of their own).
+- **Rows show the actor's mark only for apps**; changes you made show the kind's icon, not your photo. Category: kept
+  simple until the history says who acted.
+
+## Data & privacy and Delete your account (2026-11-12)
+
+- **Delete account opens a page of its own** (/privacy/delete) instead of the prototype's askDeleteAccount dialog.
+  Category: Anil's design (/__delete H): Before you delete (each Silicon handed over or deleted right there, requests
+  waiting for you), What you'll lose access to, then where the checks stand beside Delete Account; the dialog only asks
+  for the CarbonID.
+- **The 30 days to change your mind isn't shown yet.** Category: API (#11). The design has it; the page hides it with
+  RECOVERY_DAYS null and says the CarbonID is held for 10 days, which is true today.
+- **Download your data isn't built.** Category: API (#2).
+- **No red danger zone.** Data & privacy's Delete account is a plain row with only its bin and title red, and the delete
+  page's box is the page's grey, not the prototype's red .dz. Category: Anil's design (/__delete-entry A).
+
+## Sign-in and sign-up (2026-11-12)
+
+- **"Powered by Silicon Accounts" instead of "One account for every Team of Silicons app"** under the card. Category:
+  kept (it links apps' visitors to us; the README requires it on every app's page).
+- **The app's logo and name above the title**, not the prototype's large mark beside it. Category: branding (apps
+  choose their logo and whether the name shows).
+- **No "Paste code" button** on the code step: pasting into the code works, and a button needs the clipboard
+  permission. Category: kept simple.
+- **"Not You?" on the sign-up**, which the prototype's welcome doesn't draw. Category: safety (the verified address is
+  someone's).
+- **The first-party title says "Silicon Accounts"**, the prototype "Team of Silicons". Category: product name as the
+  site uses it.

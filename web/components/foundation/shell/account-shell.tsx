@@ -15,13 +15,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { LogOut, Menu, Search, Settings as SettingsIcon, SwatchBook } from "lucide-react";
+import { Database, LogOut, Menu, Search, SwatchBook } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { UserMenu, type UserMenuUser } from "@teamofsilicons/silicon-ui/user-menu";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { SkipLink } from "@/components/foundation/layout/layout";
+import { Page, SkipLink } from "@/components/foundation/layout/layout";
 import { useCarbonPicture } from "@/lib/carbon-avatar";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
 import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
@@ -61,16 +61,36 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return !["button", "checkbox", "radio", "submit", "reset", "range", "color", "file"].includes((target as HTMLInputElement).type);
 }
 
-/** The loading stand-in for a page: header and two regions in their final positions. */
-export function PageSkeleton() {
+/** A page's title while it loads: a sidebar section or a page reached from one, by its exact path; else unknown. */
+function loadingTitle(pathname: string): { title?: string; nested: boolean } {
+  const exact = [...SECTIONS, ...MORE_DESTINATIONS].find(item => item.href === pathname);
+  if (exact) return { title: exact.label, nested: !SECTIONS.some(section => section.href === pathname) };
+  return { nested: true };
+}
+
+/**
+ * The loading stand-in for an account page, drawn like the page it becomes (Anil, 2026-11-12): the page bar pinned at the
+ * top with the title when the path names it (a crumb's line above it on nested pages), then sections on the page column,
+ * each a heading over a boxed list, so nothing jumps when the page arrives.
+ */
+export function PageSkeleton({ pathname = "" }: { pathname?: string }) {
+  const { title, nested } = loadingTitle(pathname);
   return (
-    <div className={styles.loading} aria-busy="true" aria-label="Loading">
-      <div className={styles.loadingHeader}>
-        <SkeletonBlock width="min(320px, 70%)" height="44px" radius="12px" />
-        <SkeletonBlock width="min(480px, 90%)" height="18px" radius="8px" index={1} />
+    <div aria-busy="true" aria-label={title ? `Loading ${title}` : "Loading"}>
+      <div className={styles.loadingBar}>
+        {nested ? <div className={styles.loadingCrumb}><SkeletonBlock width="6rem" height="1rem" radius="var(--radius-control)" /></div> : null}
+        <div className={styles.loadingTitleRow}>
+          {title ? <h1 className={styles.loadingTitle}>{title}</h1> : <SkeletonBlock width="min(14rem, 60%)" height="1.75rem" radius="var(--radius-control)" />}
+        </div>
       </div>
-      <SkeletonBlock width="100%" height="220px" radius="var(--radius-surface)" index={2} />
-      <SkeletonBlock width="100%" height="140px" radius="var(--radius-surface)" index={3} />
+      <Page>
+        {[2, 3, 2].map((rows, index) => (
+          <div key={index} className={styles.loadingSection}>
+            <SkeletonBlock width="8rem" height="1.25rem" radius="var(--radius-control)" index={index} />
+            <SkeletonBlock width="100%" height={`calc(${rows} * 3rem)`} radius="var(--radius-container)" index={index} />
+          </div>
+        ))}
+      </Page>
     </div>
   );
 }
@@ -175,7 +195,8 @@ export function AccountShell({ children }: { children: ReactNode }) {
         run: () => void go(destination.href),
       };
     }),
-    { id: "go.settings", label: "Settings", description: "Your local time and your account", group: "Go to", icon: <SettingsIcon size={16} strokeWidth={1.75} />, keywords: ["preferences", "delete", "timezone", "time zone"], run: () => void go(paths.settings) },
+    // The old Settings page is Data & privacy now (a section above); these words still find it.
+    { id: "go.delete-account", label: "Delete account", description: "On Data & privacy", group: "Go to", icon: <Database size={16} strokeWidth={1.75} />, keywords: ["settings", "preferences", "delete", "close account"], run: () => void go(paths.privacy) },
     ...ELSEWHERE.map(site => {
       const Icon = site.icon;
       return {
@@ -255,7 +276,6 @@ export function AccountShell({ children }: { children: ReactNode }) {
       showTheme={false}
       onSignOut={menuSignOut}
       align="end"
-      items={[{ label: "Settings", icon: <SettingsIcon size={16} strokeWidth={1.75} />, onSelect: () => void go(paths.settings) }]}
     />
   ) : null;
 
@@ -320,5 +340,5 @@ export function AccountShell({ children }: { children: ReactNode }) {
     );
   }
   // Loading, or signed out on an account page (on the way to sign in).
-  return isHome ? <div className={styles.bare} aria-busy="true" /> : chrome(<PageSkeleton />);
+  return isHome ? <div className={styles.bare} aria-busy="true" /> : chrome(<PageSkeleton pathname={pathname} />);
 }

@@ -110,7 +110,11 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     // The SolidJS site had the identity card at /identity too; it lives at / now.
-    return [{ source: "/identity", destination: "/", permanent: false }];
+    return [
+      { source: "/identity", destination: "/", permanent: false },
+      // Settings became Data & privacy (2026-11-12); its local time is Personal info's Timezone row now.
+      { source: "/settings", destination: "/privacy", permanent: false },
+    ];
   },
   async headers() {
     return [

@@ -33,7 +33,7 @@ export const journey: Journey = {
       const email = freshEmail("dm-added");
       await startAtApp(env, page, "dm");
       await codeSignIn(env, page, { phone: phoneOfFirst });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       const flow = await waitForDetailsPage(page, { id: "dm-setup" });
       const details = flow.details!;
       const field = (name: string) => details.fields.find(entry => entry.field === name);
@@ -79,7 +79,7 @@ export const journey: Journey = {
       const phone = await freshPhone(env);
       await startAtApp(env, page, "dm");
       await codeSignIn(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       const flow = await waitForDetailsPage(page, { id: "dm-setup" });
       const id = flowIdOf(page)!;
       const field = (name: string) => flow.details?.fields.find(entry => entry.field === name);
@@ -140,7 +140,7 @@ export const journey: Journey = {
       const phone = await freshPhone(env);
       await startAtApp(env, page, "dm");
       await codeSignIn(env, page, { phone });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       await waitForDetailsPage(page, { id: "dm-setup" });
       await settle(page);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

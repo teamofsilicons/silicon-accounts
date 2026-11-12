@@ -99,10 +99,10 @@ const sendLimit: Journey = {
     results.watch(page, "send-limit", [/status of 429 .*\/v1\/flows\/[\w-]+\/email/]);
     await page.goto(`${env.apps}/briefcase/`);
     await page.locator("#signin-hosted").click();
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     await field.fill(capped);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     await page.getByText(/Too many codes were sent to c\*\*\*@example\.test/).waitFor({ timeout: 10_000 }).catch(() => undefined);
     await sleep(300);
     await shot(env, page, "auth-flows-otp-send-limit-01");
@@ -198,11 +198,11 @@ const lockout: Journey = {
     results.watch(page, "lockout", [/status of 42[23] .*\/v1\/flows\/[\w-]+\/verify/]);
     await page.goto(`${env.apps}/briefcase/`);
     await page.locator("#signin-hosted").click();
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     const before = await lastSeq(env);
     await field.fill(shown);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const pageCode = await codeFor(env, shown, before);
     const group = page.getByRole("group", { name: /Code from the email/ });
     await group.waitFor({ timeout: 15_000 });
@@ -223,7 +223,7 @@ const lockout: Journey = {
     await group.waitFor({ timeout: 30_000 });
     await sleep(300);
     await page.keyboard.type(pageCode, { delay: 25 });
-    const create = page.getByRole("button", { name: "Create account" });
+    const create = page.getByRole("button", { name: /^Create account$/i });
     await create.waitFor({ timeout: 20_000 }).catch(() => undefined);
     results.check("after the cooldown (time travel) and a reload, the page's own code works → sign-up", await create.isVisible());
     await context.close();
@@ -269,11 +269,11 @@ const expiry: Journey = {
     results.watch(page, "code-expiry", [/status of 410 .*\/v1\/flows\/[\w-]+\/verify/]);
     await page.goto(`${env.apps}/briefcase/`);
     await page.locator("#signin-hosted").click();
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     const before = await lastSeq(env);
     await field.fill(shown);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const first = await codeFor(env, shown, before);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await sql(env, `update otp_challenges set expires_at = now() - interval '1 second' where destination = '${shown}' and consumed_at is null`);
@@ -289,7 +289,7 @@ const expiry: Journey = {
     await sleep(500);
     await page.getByRole("group", { name: /Code from the email/ }).locator("input").first().click();
     await page.keyboard.type(second, { delay: 25 });
-    const create = page.getByRole("button", { name: "Create account" });
+    const create = page.getByRole("button", { name: /^Create account$/i });
     await create.waitFor({ timeout: 20_000 }).catch(() => undefined);
     results.check("…the new code from \"Send a new code\" works → sign-up", await create.isVisible());
     await context.close();

@@ -103,22 +103,9 @@ export const journeys: Journey[] = [
         const code = await sendEmailCode(env, signup, freshEmail("uxa.overlays.signup"));
         await signup.getByRole("textbox", { name: /digit 1 of 6/ }).first().click();
         await signup.keyboard.type(code, { delay: 25 });
-        await signup.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
+        await signup.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 30_000 });
         await stepReady(signup);
-        await auditOverlay(ctx, signup, findings, {
-          name: "overlay-signup-date-of-birth",
-          trigger: p => p.getByRole("button", { name: /Date of birth/ }).first(),
-          panel: p => p.getByRole("dialog", { name: /Date of birth: choose a day/ }),
-          kind: "popover",
-          gridArrows: true,
-        });
-        await auditOverlay(ctx, signup, findings, {
-          name: "overlay-signup-timezone",
-          trigger: p => p.getByRole("combobox", { name: "Timezone" }),
-          key: "ArrowDown",
-          panel: p => p.getByRole("listbox").first(),
-          kind: "listbox",
-        });
+        // Sign-up asks only for the name and CarbonID since 2026-11-12: no date of birth or timezone overlays left on it.
         await context.close();
       }
 
@@ -132,7 +119,7 @@ export const journeys: Journey[] = [
         const code = await sendEmailCode(env, user, freshEmail("uxa.overlays.user"));
         await user.getByRole("textbox", { name: /digit 1 of 6/ }).first().click();
         await user.keyboard.type(code, { delay: 25 });
-        await user.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+        await user.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
         await user.getByRole("button", { name: "Share and continue" }).click({ timeout: 30_000 });
         await user.waitForURL(url => url.href.startsWith(`${env.apps}/briefcase/`), { timeout: 30_000 });
         await context.close();

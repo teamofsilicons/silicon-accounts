@@ -29,9 +29,14 @@ export const appTitle = (flow: Pick<HostedFlow, "app" | "intent">): string =>
     ? flow.app.copy.signup_title?.trim() || (flow.app.first_party ? "Create your account" : `Create your ${flow.app.name} account`)
     : flow.app.copy.title?.trim() || `Sign in to ${flow.app.name}`;
 
-/** The app's subtitle for the page (copy.subtitle, or copy.signup_subtitle on the sign-up page), or null. */
+/**
+ * The app's subtitle for the page (copy.subtitle, or copy.signup_subtitle on the sign-up page). Without one, the
+ * sign-in page says the prototype's "New here? Signing in makes your account." (a first visit is a sign-up either way).
+ */
 export const appSubtitle = (flow: Pick<HostedFlow, "app" | "intent">): string | null =>
-  (intentOf(flow) === "signup" ? flow.app.copy.signup_subtitle?.trim() : flow.app.copy.subtitle?.trim()) || null;
+  intentOf(flow) === "signup"
+    ? flow.app.copy.signup_subtitle?.trim() || null
+    : flow.app.copy.subtitle?.trim() || "New here? Signing in makes your account.";
 
 export const providerName = (provider: "google" | "apple"): string => (provider === "google" ? "Google" : "Apple");
 

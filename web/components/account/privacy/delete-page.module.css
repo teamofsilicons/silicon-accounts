@@ -1,0 +1,48 @@
+/* Delete your account (delete-page.tsx), from /__delete's design H: one box, 24px at the sides; Before you delete and
+   What you'll lose access to as lists with no lines between rows (the account pages' rows, parts/rows.tsx); lines
+   between the parts inset by the same 24px; the foot holds the 30 days (once the API keeps deleted accounts) and where
+   the checks stand beside Delete Account. */
+.lead { max-width: 70ch; margin: 0; color: var(--text-soft); font: var(--body); letter-spacing: var(--body-tracking); }
+.alertAction { display: block; margin-top: var(--space-related); }
+.skeleton { margin-top: var(--space-section); }
+
+.box { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; margin-top: var(--space-section); overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.head { display: grid; gap: var(--space-tight); padding: var(--space-group) var(--space-block) var(--space-related); }
+.head[data-ruled] { margin: var(--space-related) var(--space-block) 0; padding: var(--space-block) 0 var(--space-related); border-top: 1px solid var(--border); }
+.titleRow { display: flex; align-items: center; gap: var(--space-related); }
+.title { margin: 0; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); }
+.line { margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.list { display: grid; margin: 0; padding: 0 0 var(--space-related); list-style: none; }
+.list > li { padding-inline: var(--space-block); }
+.box .list > li + li { border-top: 0; }
+.mark { --sq-stroke: var(--border-subtle); border: 1px solid var(--sq-stroke); }
+.done { display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; color: var(--success, var(--foreground)); }
+
+.foot { display: grid; gap: var(--space-group); margin: var(--space-related) var(--space-block) 0; padding: var(--space-block) 0; border-top: 1px solid var(--border); }
+.recover { --sq-r: var(--radius-control); --sq-fill: var(--neutral-1); --sq-stroke: var(--border-subtle); display: flex; align-items: flex-start; gap: var(--space-group); padding: var(--space-group) var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.recoverIcon { display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; color: var(--accent-ink, var(--foreground)); }
+.recoverText { display: grid; min-width: 0; gap: var(--space-hair); }
+.recoverTitle { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.recoverLine { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.recoverLine strong { color: var(--foreground); font-weight: var(--weight-medium); }
+.action { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-group); }
+.status { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--space-group); }
+.track { display: flex; flex: none; gap: var(--space-tight); }
+.segment { --sq-r: var(--radius-control); --sq-fill: color-mix(in oklab, var(--text-muted) 45%, transparent); width: var(--space-block); height: var(--space-tight); background: var(--sq-fill); }
+.segment[data-state="waiting"] { --sq-fill: var(--warning, var(--accent)); }
+.statusText { display: grid; min-width: 0; }
+.statusTitle { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.statusLine { min-width: 0; overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.ready { display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; color: var(--success, var(--foreground)); }
+
+/* Dialogs (decisions.md, Dialog rules). */
+.form { display: grid; gap: var(--space-group); }
+.dialogText { margin: 0; color: var(--dialog-description-colour, var(--text-soft)); font: var(--body); letter-spacing: var(--body-tracking); }
+.error { margin: 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); }
+
+@media (max-width: 639px) {
+  .head, .list > li { padding-inline: var(--space-group); }
+  .head[data-ruled], .foot { margin-inline: var(--space-group); }
+}
+

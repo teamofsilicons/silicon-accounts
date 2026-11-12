@@ -333,7 +333,7 @@ export async function ensurePhoneOwned(ctx: { env: Env; browser: Browser; result
   results.watch(page, "imports-precondition");
   await page.goto(`${env.site}/sign-in`);
   await signInWithCode(env, page, { phone });
-  const create = page.getByRole("button", { name: "Create account" });
+  const create = page.getByRole("button", { name: /^Create account$/i });
   const home = page.waitForURL(`${env.site}/`, { timeout: 30_000 }).then(() => "home" as const);
   if ((await Promise.race([home, create.waitFor({ timeout: 30_000 }).then(() => "signup" as const)])) === "signup") await create.click();
   await page.waitForURL(`${env.site}/`, { timeout: 30_000 });
@@ -1004,9 +1004,8 @@ export async function importRows(ctx: Caller, app: FakeApp, rows: Array<Record<s
  * phone, email): picks "Email" in the "Email | Phone" choice when the email field isn't the one shown.
  */
 export async function signInWithEmailCode(env: Env, page: Page, email: string): Promise<string> {
-  await page.getByRole("textbox", { name: /^(Email|Phone number)$/ }).first().waitFor({ timeout: 30_000 });
-  const field = page.getByRole("textbox", { name: "Email" });
-  if (!(await field.isVisible().catch(() => false))) await page.getByRole("button", { name: "Email", exact: true }).click({ timeout: 10_000 });
+  // One "Email or phone" field when the app offers both; an email-only app's "Email".
+  await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).first().waitFor({ timeout: 30_000 });
   return signInWithCode(env, page, { email });
 }
 

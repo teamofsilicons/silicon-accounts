@@ -11,7 +11,7 @@ async function revealed(page: Page, kind: "stk" | "whsec"): Promise<string> {
 
 export const journey: Journey = {
   name: "y-silicons",
-  title: "a Carbon's Silicon on the account site: created on /silicons/new (STK shown once on its page), its webhook set (secret shown once), its key changed in a dialog; settings' telemetry switch",
+  title: "a Carbon's Silicon on the account site: created on /silicons/new (STK shown once on its page), its webhook set (secret shown once), its key changed in a dialog",
   needs: ["ada"],
   async run({ env, results, browser, shared }) {
     const ada = shared.ada!;
@@ -66,15 +66,6 @@ export const journey: Journey = {
     await stored.click();
     await sleep(500);
 
-    await page.goto(`${env.site}/settings`);
-    const telemetry = page.getByRole("switch").first();
-    await telemetry.waitFor({ timeout: 30_000 });
-    const was = await telemetry.getAttribute("aria-checked");
-    await telemetry.click();
-    await sleep(500);
-    const cookie = (await context.cookies(env.site)).find(entry => entry.name === "sa_telemetry");
-    results.check("settings: turning telemetry off sets sa_telemetry=off", was !== "true" || cookie?.value === "off", `${was} → ${cookie?.value}`);
-    if (was === "true") await telemetry.click();
     await context.close();
   },
 };

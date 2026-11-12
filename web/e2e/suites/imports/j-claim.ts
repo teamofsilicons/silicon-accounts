@@ -61,12 +61,10 @@ export const journeys: Journey[] = [
       await shot(env, page, "imports-claim-01-briefcase-google");
       const seen = {
         id: await idField.inputValue(),
-        name: await page.getByRole("textbox", { name: "Display name" }).inputValue(),
-        timezone: await page.getByRole("combobox", { name: "Timezone" }).inputValue(),
-        dob: (await page.getByRole("button", { name: "Date of birth" }).innerText()).replace(/\s+/g, " "),
+        name: await page.getByRole("textbox", { name: "Your name" }).inputValue(),
       };
-      results.check("Google with the imported email at briefcase leads to \"Finish setting up your account\", not a new sign-up", /Finish setting up your account/.test(text) && (await page.getByRole("button", { name: "Finish setup" }).count()) === 1, text.slice(0, 300));
-      results.check("…prefilled with what legacy-crm imported (not Google's name)", seen.id === `gina_${t}` && seen.name === "Gina Imported" && /Tokyo/.test(seen.timezone) && /May 5, 1985/.test(seen.dob), JSON.stringify(seen));
+      results.check("Google with the imported email at briefcase leads to \"Finish setting up your account\", not a new sign-up", /Finish setting up your account/.test(text) && (await page.getByRole("button", { name: /^Finish setup$/i }).count()) === 1, text.slice(0, 300));
+      results.check("…prefilled with what legacy-crm imported (not Google's name)", seen.id === `gina_${t}` && seen.name === "Gina Imported", JSON.stringify(seen));
       results.check("…and it doesn't say Briefcase added them: legacy-crm did", !/Briefcase added you/.test(text) && !/CarbonID Briefcase set up for you/.test(text), text.match(/[^.]*added you[^.]*\.|This is the (?:CarbonID|id)[^.]*\./g)?.join(" | ") ?? text.slice(0, 200));
       results.check(
         "…it names legacy-crm and where they are going: \"Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.\" and \"This is the CarbonID Legacy CRM set up for you.\"",
@@ -75,7 +73,7 @@ export const journeys: Journey[] = [
       );
       const flow = await flowView(page);
       results.check("the flow (API) at briefcase says who imported them: imported_by legacy-crm (Legacy CRM)", flow?.signup?.finishing_import === true && flow.signup.imported_by?.app_id === "legacy-crm" && flow.signup.imported_by.name === "Legacy CRM", JSON.stringify(flow?.signup ?? flow).slice(0, 300));
-      await page.getByRole("button", { name: "Finish setup" }).click();
+      await page.getByRole("button", { name: /^Finish setup$/i }).click();
       await afterConsent(env, page, "briefcase", "imports-claim-02");
       const atBriefcase = await appAccount(page);
       results.check("briefcase receives the account legacy-crm imported (same uuid)", atBriefcase?.uuid === uuid && atBriefcase.id === `c:gina_${t}`, JSON.stringify(atBriefcase).slice(0, 300));
@@ -117,15 +115,15 @@ export const journeys: Journey[] = [
       const page = await context.newPage();
       results.watch(page, "imports-expired", [/status of 410/]);
       const reachFinish = async () => {
-        const field = page.getByRole("textbox", { name: "Email" });
+        const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
         await field.waitFor({ timeout: 30_000 });
         const after = await lastSeq(env);
         await field.fill(email);
-        await page.getByRole("button", { name: "Continue", exact: true }).click();
+        await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
         const code = await codeFor(env, email, after);
         await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
         await page.keyboard.type(code, { delay: 30 });
-        await page.getByRole("button", { name: "Finish setup" }).waitFor({ timeout: 20_000 });
+        await page.getByRole("button", { name: /^Finish setup$/i }).waitFor({ timeout: 20_000 });
       };
       await page.goto(`${env.apps}/legacy-crm/`);
       await page.locator("#signin-hosted").click();
@@ -133,13 +131,13 @@ export const journeys: Journey[] = [
       const [session] = await rowsOf<{ id: string; claim: string | null }>(env, `select id, claim_account_uuid as claim from signup_sessions where verified_email = ${lit(email)} and consumed_at is null order by created_at desc limit 1`);
       results.check("the sign-up session names the imported account it finishes", session?.claim === uuid, JSON.stringify(session));
       await psql(env, `update signup_sessions set expires_at = now() - interval '1 second' where id = ${lit(session?.id ?? randomUUID())}`);
-      await page.getByRole("button", { name: "Finish setup" }).click();
+      await page.getByRole("button", { name: /^Finish setup$/i }).click();
       const alert = page.getByText("Your sign-up expired");
       const told = await alert.first().waitFor({ timeout: 15_000 }).then(() => true, () => false);
       await sleep(1500);
       const text = await pageText(page);
       await shot(env, page, "imports-expired-01");
-      results.check("48 hours later, finishing is refused: back at the sign-in methods with \"Your sign-up expired\" and what to do", told && /Verify the email or phone/.test(text) && (await page.getByRole("textbox", { name: "Email" }).isVisible()), text.slice(0, 400));
+      results.check("48 hours later, finishing is refused: back at the sign-in methods with \"Your sign-up expired\" and what to do", told && /Verify the email or phone/.test(text) && (await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).isVisible()), text.slice(0, 400));
       const reason = /The sign-up session expired[^.]*\./.exec(text)?.[0] ?? "";
       results.check("…in a sentence that reads (no dangling \"expired at:\" where the time was cut out)", !!reason && !/expired at:/.test(reason), reason || text.slice(0, 300));
       const sentence = "The sign-up session expired. A verified email, phone or provider account stays ready for sign-up for 48 hours.";
@@ -148,13 +146,13 @@ export const journeys: Journey[] = [
       results.check("…the account stays unclaimed with its unverified email, and the membership imported", still?.status === "unclaimed" && still.emails[0]?.verified === false && still.membership?.status === "imported", JSON.stringify(still).slice(0, 300));
 
       // A new code finishes it.
-      const emailField = page.getByRole("textbox", { name: "Email" });
+      const emailField = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
       if (!(await emailField.isVisible().catch(() => false))) {
         await page.goto(`${env.apps}/legacy-crm/`);
         await page.locator("#signin-hosted").click();
       }
       await reachFinish();
-      await page.getByRole("button", { name: "Finish setup" }).click();
+      await page.getByRole("button", { name: /^Finish setup$/i }).click();
       await afterConsent(env, page, "legacy-crm", "imports-expired-02");
       const account = await appAccount(page);
       const [finished] = [...(await accountsByUuid(env, [uuid])).values()];
@@ -187,11 +185,11 @@ export const journeys: Journey[] = [
       results.watch(page, "imports-claim-second");
       await page.goto(`${env.apps}/pixel-studio/`);
       await page.locator("#signin-hosted").click();
-      const field = page.getByRole("textbox", { name: "Email" });
+      const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
       await field.waitFor({ timeout: 30_000 });
       const after = await lastSeq(env);
       await field.fill(email);
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
       const code = await codeFor(env, email, after);
       await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
       await page.keyboard.type(code, { delay: 30 });
@@ -201,13 +199,13 @@ export const journeys: Journey[] = [
       const text = await pageText(page);
       await shot(env, page, "imports-claim-04-second-importer");
       const flow = await flowView(page);
-      results.check("at pixel-studio, the email code leads to \"Finish setting up your account\" prefilled with the account's details (legacy-crm's import)", /Finish setting up your account/.test(text) && (await idField.inputValue()) === `xena_${t}` && (await page.getByRole("textbox", { name: "Display name" }).inputValue()) === "Xena From The CRM", text.slice(0, 300));
+      results.check("at pixel-studio, the email code leads to \"Finish setting up your account\" prefilled with the account's details (legacy-crm's import)", /Finish setting up your account/.test(text) && (await idField.inputValue()) === `xena_${t}` && (await page.getByRole("textbox", { name: "Your name" }).inputValue()) === "Xena From The CRM", text.slice(0, 300));
       results.check(
         "…and names the app whose import created the account: \"Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Pixel Studio.\" (flow imported_by legacy-crm)",
         text.includes("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Pixel Studio.") && text.includes("This is the CarbonID Legacy CRM set up for you.") && !/Pixel Studio added you/.test(text) && flow?.signup?.imported_by?.app_id === "legacy-crm",
         `${text.match(/[^.]*added you[^.]*\.[^.]*\.|This is the (?:CarbonID|id)[^.]*\./g)?.join(" | ") ?? text.slice(0, 200)}; imported_by ${JSON.stringify(flow?.signup?.imported_by)}`,
       );
-      await page.getByRole("button", { name: "Finish setup" }).click();
+      await page.getByRole("button", { name: /^Finish setup$/i }).click();
       await afterConsent(env, page, "pixel-studio", "imports-claim-05");
       const atPixel = await appAccount(page);
       const [finished] = await rowsOf<{ crm: string | null; pixel: string | null; status: string; email_verified: boolean }>(env, `select (select status from memberships where app_id = 'legacy-crm' and account_uuid = a.uuid) as crm,
@@ -246,10 +244,10 @@ export const journeys: Journey[] = [
       await shot(env, page, "imports-claim-06-dm-finish");
       results.check(
         "at dm, the email code leads to \"Finish setting up your account\": \"Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to DM.\", prefilled with legacy-crm's id and name",
-        text.includes("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to DM.") && (await idField.inputValue()) === `dana_${t}` && (await page.getByRole("textbox", { name: "Display name" }).inputValue()) === "Dana Imported",
+        text.includes("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to DM.") && (await idField.inputValue()) === `dana_${t}` && (await page.getByRole("textbox", { name: "Your name" }).inputValue()) === "Dana Imported",
         text.slice(0, 300),
       );
-      await page.getByRole("button", { name: "Finish setup" }).click();
+      await page.getByRole("button", { name: /^Finish setup$/i }).click();
       const sms = await lastSeq(env);
       const walk = await completeDetails(env, page, "dm", { add: { phone }, shotName: "imports-claim-07-dm" });
       const details = walk.pages[0];
@@ -299,10 +297,10 @@ export const journeys: Journey[] = [
       const text = await pageText(page);
       results.check(
         "\"Finish setting up your account\": \"Ledgerly added you to Silicon Accounts. Check the details it gave us, then continue.\" (the app being signed into imported them), prefilled with its id and name",
-        text.includes("Ledgerly added you to Silicon Accounts. Check the details it gave us, then continue.") && (await idField.inputValue()) === `lena_${t}` && (await page.getByRole("textbox", { name: "Display name" }).inputValue()) === "Lena Ledger",
+        text.includes("Ledgerly added you to Silicon Accounts. Check the details it gave us, then continue.") && (await idField.inputValue()) === `lena_${t}` && (await page.getByRole("textbox", { name: "Your name" }).inputValue()) === "Lena Ledger",
         text.slice(0, 300),
       );
-      await page.getByRole("button", { name: "Finish setup" }).click();
+      await page.getByRole("button", { name: /^Finish setup$/i }).click();
       const walk = await completeDetails(env, page, "ledgerly", { add: { phone }, tick: ["timezone"], shotName: "imports-claim-08-ledgerly" });
       const [first, second] = walk.pages;
       const field = (seen: typeof first, name: string) => seen?.rows.find(row => row.field === name);

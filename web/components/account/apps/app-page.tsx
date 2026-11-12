@@ -44,8 +44,8 @@ const host = (url: string | null) => {
   }
 };
 
-/** One detail an app can see: its icon, what it is, and the value it gets. */
-function seen(scope: Scope, me: Me | undefined): { icon: ReactNode; label: string; value: string | null } | null {
+/** One detail an app can see: its icon, what it is, and the value it gets. Data & privacy names them too. */
+export function seen(scope: Scope, me: Me | undefined): { icon: ReactNode; label: string; value: string | null } | null {
   const carbon = asCarbon(me);
   switch (scope) {
     case "email":

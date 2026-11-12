@@ -143,17 +143,19 @@ export const journey: Journey = {
     // 6. Dark-theme tokens (the grey ladder, 2026-11-10; tokens.css).
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
     // The browser hands colours back in its own space, so each token is compared by painting it beside the expected colour.
-    const tokens = await page.evaluate(() => {
-      const paint = (color: string) => {
-        const probe = document.createElement("span");
-        probe.style.color = color;
-        document.body.append(probe);
-        const value = getComputedStyle(probe).color;
-        probe.remove();
-        return value;
-      };
-      return [["var(--text-muted)", "oklch(64% 0 0)"], ["var(--text-secondary)", "oklch(77% 0 0)"], ["var(--accent-strong)", "#A9BDFF"]].map(([token, want]) => ({ token, same: paint(token!) === paint(want!), got: paint(token!) }));
-    });
+    // No named functions inside evaluate: the test runner wraps them in a helper the page doesn't have.
+    const tokens = await page.evaluate(pairs => pairs.map(([token, want]) => {
+      const a = document.createElement("span");
+      const b = document.createElement("span");
+      a.style.color = token;
+      b.style.color = want;
+      document.body.append(a, b);
+      const got = getComputedStyle(a).color;
+      const same = got === getComputedStyle(b).color;
+      a.remove();
+      b.remove();
+      return { token, same, got };
+    }), [["var(--text-muted)", "oklch(64% 0 0)"], ["var(--text-secondary)", "oklch(77% 0 0)"], ["var(--accent-strong)", "#A9BDFF"]]);
     results.check("dark tokens: muted oklch(64% 0 0), secondary oklch(77% 0 0), accent-strong #A9BDFF", tokens.every(item => item.same), tokens.map(item => `${item.token} ${item.got}`).join(" | "));
     // 7. The account site's old /developer addresses lead to the developer site (a 307, the tab renamed where it moved).
     const moved = await fetch(`${env.site}/developer/briefcase/branding?from=e2e`, { redirect: "manual" });

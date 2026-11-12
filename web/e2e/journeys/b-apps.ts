@@ -19,13 +19,13 @@ export const journey: Journey = {
     const href = await startAtApp(env, page, "briefcase");
     results.check("briefcase's hosted link points at the site's /authorize", href.href.startsWith(`${env.site}/authorize?`), href.href.slice(0, 120));
     results.check("…and hands the hosted pages no email or phone (an app never does)", !href.searchParams.has("login_hint") && ![...href.searchParams.values()].some(value => /@|\+\d{6,}/.test(value)), href.search.slice(0, 200));
-    await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     await sleep(500);
     await shot(env, page, "b-01-briefcase-methods");
     results.check("the sign-in page uses briefcase's own title", (await hostedTitle(page)) === "Sign in to Briefcase", await hostedTitle(page));
     results.check("briefcase offers Google and Apple", (await methodButton(page, "google").count()) === 1 && (await methodButton(page, "apple").count()) === 1);
     await signInWithCode(env, page, { email });
-    const create = page.getByRole("button", { name: "Create account" });
+    const create = page.getByRole("button", { name: /^Create account$/i });
     await create.waitFor({ timeout: 25_000 });
     await sleep(400);
     await shot(env, page, "b-02-briefcase-signup");

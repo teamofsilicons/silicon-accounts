@@ -4,9 +4,6 @@
     "app/status-page.module.css": {
       "font-size": 1
     },
-    "components/account/activity/activity.module.css": {
-      "spacing": 1
-    },
     "components/account/home.module.css": {
       "spacing": 1
     },
@@ -14,9 +11,6 @@
       "spacing": 2
     },
     "components/account/parts/photo.module.css": {
-      "spacing": 2
-    },
-    "components/account/settings/settings.module.css": {
       "spacing": 2
     },
     "components/account/silicons/request-deck.module.css": {

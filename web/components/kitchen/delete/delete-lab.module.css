@@ -1,0 +1,91 @@
+/* /__delete (delete-lab.tsx): each design on the account pages' rows (parts/rows.tsx) at the page column's width. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-narrow, 56rem) + 2 * var(--gutter)); gap: var(--space-block); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; justify-items: start; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.tabs { display: grid; gap: var(--space-block); }
+.page { display: grid; }
+.context { margin: 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); }
+.endText { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); white-space: nowrap; }
+
+/* B: a step's mark, a ring to do or a tick done. */
+.step { display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; color: var(--text-muted); }
+.step[data-done] { color: var(--success, var(--foreground)); }
+.doneTitle { color: var(--text-secondary); }
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); padding: var(--space-related) var(--space-group); border-top: 1px solid var(--border-subtle); }
+.footNote { color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+
+/* The confirmation dialog (decisions.md, Dialog rules). */
+.form { display: grid; gap: var(--space-group); }
+.ends { display: grid; gap: var(--space-tight); margin: 0; padding-left: var(--space-group); color: var(--dialog-description-colour, var(--text-soft)); font: var(--body); letter-spacing: var(--body-tracking); }
+.dialogText { margin: 0; color: var(--dialog-description-colour, var(--text-soft)); font: var(--body); letter-spacing: var(--body-tracking); }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); }
+
+/* D: a page of its own; Checks, a line, what you lose, the recovery note, then Delete. */
+.pageTitle { margin: var(--space-related) 0 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.rule { width: 100%; height: 0; margin: var(--space-section) 0 0; border: 0; border-top: 1px solid var(--border); }
+.mark { --sq-stroke: var(--border-subtle); border: 1px solid var(--sq-stroke); }
+.recover { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-tight) var(--space-related); margin: var(--space-group) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.recoverLabel { color: var(--foreground); font-weight: var(--weight-medium); }
+.deleteBar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); margin-top: var(--space-section); }
+
+/* E: everything in one container: a head and its rows, a full-width line, the next head and rows, a foot. Rows are the
+   account pages' rows (parts/rows.tsx) with their straight dividers. */
+.box { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; margin-top: var(--space-group); overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.boxHead { display: grid; gap: var(--space-tight); padding: var(--space-group) var(--space-group) var(--space-related); }
+.boxHead[data-ruled] { margin-top: var(--space-related); border-top: 1px solid var(--border); }
+.boxTitleRow { display: flex; align-items: center; gap: var(--space-related); }
+.boxTitle { margin: 0; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); }
+.boxLine { margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.boxList { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border-subtle); }
+.boxFoot { display: grid; gap: var(--space-group); padding: var(--space-group); border-top: 1px solid var(--border); background: var(--neutral-1); }
+.boxFoot .recover { margin: 0; }
+.boxFoot .deleteBar { margin: 0; }
+
+/* F: E, compact. A head on one line, rows 4px high with a 20px mark and xs buttons, what you lose in two columns, the
+   note and Delete on one line. */
+.cHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-tight) var(--space-related); padding: var(--space-related) var(--space-group); }
+.cHead[data-ruled] { border-top: 1px solid var(--border); }
+.cTitle { margin: 0; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.cHint { color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.cList { display: grid; margin: 0; padding: 0; list-style: none; }
+.cRow { display: flex; min-width: 0; align-items: center; gap: var(--space-related); padding: var(--space-tight) var(--space-group); border-top: 1px solid var(--border-subtle); }
+.cText { display: flex; min-width: 0; flex: 1; align-items: baseline; gap: var(--space-related); }
+.cName { flex: none; color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); }
+.cMeta { min-width: 0; overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.cActions { display: flex; flex: none; gap: var(--space-tight); }
+.cDone { display: grid; width: calc(var(--control-height-xs) - var(--space-tight)); flex: none; place-items: center; color: var(--text-secondary); }
+.cGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-tight) var(--space-group); margin: 0; padding: 0 var(--space-group) var(--space-group); list-style: none; color: var(--foreground); font: var(--small); letter-spacing: var(--small-tracking); }
+.cItem { display: flex; min-width: 0; align-items: center; gap: var(--space-related); min-height: var(--control-height-xs); }
+.cIcon { display: grid; flex: none; place-items: center; color: var(--text-secondary); }
+.cFoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-related); padding: var(--space-related) var(--space-group); border-top: 1px solid var(--border); background: var(--neutral-1); }
+.cNote { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-tight); margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.cDelete { display: flex; align-items: center; gap: var(--space-related); }
+@media (max-width: 639px) { .cGrid { grid-template-columns: minmax(0, 1fr); } }
+
+/* G: E with room at the sides (24px), no lines between rows, and the line between the two parts inset by the same 24px. */
+.box[data-airy] .boxHead { padding-inline: var(--space-block); }
+.box[data-airy] .boxHead[data-ruled] { margin: var(--space-related) var(--space-block) 0; padding-inline: 0; padding-top: var(--space-block); }
+.box[data-airy] .boxList { border-top: 0; padding-bottom: var(--space-related); }
+.box[data-airy] .boxList > li { padding-inline: var(--space-block); }
+.box[data-airy] .boxList > li + li { border-top: 0; }
+.box[data-airy] .boxFoot { padding: var(--space-group) var(--space-block); }
+
+/* H: the foot. A soft card for the 30 days, then the checks' state beside Delete, all 24px from the sides. */
+.hFoot { display: grid; gap: var(--space-group); margin: var(--space-related) var(--space-block) 0; padding: var(--space-block) 0; border-top: 1px solid var(--border); }
+.hRecover { --sq-r: var(--radius-control); --sq-fill: var(--neutral-1); --sq-stroke: var(--border-subtle); display: flex; align-items: flex-start; gap: var(--space-group); padding: var(--space-group) var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.hRecoverIcon { display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; color: var(--accent-ink, var(--foreground)); }
+.hRecoverText { display: grid; gap: var(--space-hair); min-width: 0; }
+.hRecoverTitle { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.hRecoverLine { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.hRecoverLine strong { color: var(--foreground); font-weight: var(--weight-medium); }
+.hAction { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-group); }
+.hStatus { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--space-group); }
+.hTrack { display: flex; flex: none; gap: var(--space-tight); }
+.hSegment { --sq-r: var(--radius-control); --sq-fill: color-mix(in oklab, var(--text-muted) 45%, transparent); width: var(--space-block); height: var(--space-tight); background: var(--sq-fill); }
+.hSegment[data-state="waiting"] { --sq-fill: var(--warning, var(--accent)); }
+.hStatusText { display: grid; min-width: 0; }
+.hStatusTitle { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.hStatusLine { min-width: 0; overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.hReady { display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; color: var(--success, var(--foreground)); }
+.pageLead { max-width: 70ch; margin: var(--space-tight) 0 0; color: var(--text-soft); font: var(--body); letter-spacing: var(--body-tracking); }

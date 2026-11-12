@@ -111,12 +111,12 @@ const prefillBrowser: Journey = {
     const page = await context.newPage();
     results.watch(page, "ids");
     await startAtApp(env, page, "spacestation");
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     const after = await lastSeq(env);
     const address = `pick.${t}@second.test`;
     await field.fill(address);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code = await codeFor(env, address, after);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code, { delay: 25 });
@@ -142,7 +142,7 @@ const prefillBrowser: Journey = {
     await first.click();
     await sleep(600);
     results.check("picking a free id fills the field and it is available", (await idField.inputValue()) === picked && /is available/.test(await page.locator("main").innerText()), `${picked} → ${await idField.inputValue()}`);
-    await page.getByRole("button", { name: "Create account" }).click();
+    await page.getByRole("button", { name: /^Create account$/i }).click();
     const walk = await completeDetails(env, page, "spacestation");
     results.check("then spacestation's one page (what's shared: the profile, the optional timezone) and back at the app", walk.pages.length === 1 && walk.pages[0]?.rows.some(r => r.field === "timezone" && r.mode === "optional") === true && /\/spacestation\/callback/.test(page.url()), JSON.stringify(walk.pages.map(p => p.rows)));
     const rows = await sql(env, `select a.handle from accounts a join account_emails e on e.account_uuid = a.uuid where e.email = '${address}'`);
@@ -216,15 +216,15 @@ const expiry: Journey = {
     const shown = `shown.${t}@example.test`;
     await page.goto(`${env.apps}/briefcase/`);
     await page.locator("#signin-hosted").click();
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     const after = await lastSeq(env);
     await field.fill(shown);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code = await codeFor(env, shown, after);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code, { delay: 25 });
-    await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 20_000 });
+    await page.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 20_000 });
     await sql(env, `update signup_sessions set expires_at = now() - interval '1 second' where verified_email = '${shown}'`);
     await page.reload();
     const alert = page.getByText("Your sign-up expired");
@@ -232,8 +232,8 @@ const expiry: Journey = {
     await sleep(300);
     await shot(env, page, "auth-flows-signup-expiry-01");
     results.check("reloading after 48 hours shows \"Your sign-up expired\" with the email field again", (await alert.isVisible()) && (await field.isVisible()), (await page.locator("main").innerText()).replace(/\s+/g, " ").slice(0, 200));
-    await page.getByRole("button", { name: "Create account" }).waitFor({ state: "detached", timeout: 2_000 }).catch(() => undefined);
-    results.check("…and the sign-up form is gone", (await page.getByRole("button", { name: "Create account" }).count()) === 0);
+    await page.getByRole("button", { name: /^Create account$/i }).waitFor({ state: "detached", timeout: 2_000 }).catch(() => undefined);
+    results.check("…and the sign-up form is gone", (await page.getByRole("button", { name: /^Create account$/i }).count()) === 0);
     await context.close();
   },
 };

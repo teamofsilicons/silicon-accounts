@@ -21,7 +21,7 @@ export const ACCOUNT_PAGES: Array<{ path: string; name: string; ready: RegExp }>
   { path: "/silicons", name: "silicons", ready: /Silicon/ },
   { path: "/proofs", name: "proofs", ready: /User verification/ },
   { path: "/activity", name: "activity", ready: /./ },
-  { path: "/settings", name: "settings", ready: /./ },
+  { path: "/privacy", name: "privacy", ready: /./ },
 ];
 
 /** Every account page in every variant, then the dock check. */
@@ -230,11 +230,11 @@ export const journeys: Journey[] = [
       });
       await state("states-revoke-proof", "/proofs", /[Pp]ermission/, () => page.getByRole("button", { name: /^Stop / }).first().click({ timeout: 15_000 }));
       await state("states-proofs-ended", "/proofs", /[Pp]ermission/, () => page.getByRole("region", { name: "Ended", exact: true }).scrollIntoViewIfNeeded({ timeout: 15_000 }));
-      await state("states-delete-blocked", "/settings", /./, async () => {
-        await page.getByRole("button", { name: "Hold to delete your account" }).scrollIntoViewIfNeeded();
+      await state("states-delete-blocked", "/privacy/delete", /./, async () => {
+        await page.getByRole("button", { name: "Delete Account" }).scrollIntoViewIfNeeded();
       }, /Silicon/);
-      const hold = page.getByRole("button", { name: "Hold to delete your account" });
-      results.check("states-delete-blocked: deleting is not possible while a Silicon is in the Carbon's care (UNDERSTANDING.md: Custodian)", (await hold.isDisabled().catch(() => false)) || (await hold.getAttribute("aria-disabled")) === "true", `disabled: ${await hold.isDisabled().catch(() => "?")}`);
+      const deleteAccount = page.getByRole("button", { name: "Delete Account" });
+      results.check("states-delete-blocked: deleting is not possible while a Silicon is in the Carbon's care (UNDERSTANDING.md: Custodian)", await deleteAccount.isDisabled().catch(() => false), `disabled: ${await deleteAccount.isDisabled().catch(() => "?")}`);
       results.check("account-states: findings saved", true, saveFindings(ctx, findings));
       await carbon.context.close();
     },

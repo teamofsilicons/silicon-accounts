@@ -111,7 +111,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 
 | Area | Routes | Code |
 | --- | --- | --- |
-| web-account | `/` (identity home when signed in), `/sign-in-methods`, `/apps`, `/silicons`, `/proofs`, `/activity`, `/settings` | `app/(app)/(shell)/(account)/`, `components/account/` |
+| web-account | `/` (identity home when signed in), `/sign-in-methods`, `/apps`, `/silicons`, `/proofs`, `/activity`, `/privacy`, `/privacy/delete` (`/settings` redirects to `/privacy`) | `app/(app)/(shell)/(account)/`, `components/account/` |
 | public | `/` when signed out (the landing page, rewritten by `proxy.ts` to `app/landing`), the agent files | `app/landing/`, `components/landing/`, `components/site/`, `app/*.txt`, `lib/agent/` |
 | web-auth | `/sign-in`, `/authorize`, `/authorize/flow/[id]`, `/device`, `/embed/v1/buttons` (polish) | `app/(app)/(auth)/`, `components/auth/` |
 | legacy web-docs | former docs routes redirect through `proxy.ts`; the old renderer and generated build remain temporarily as source, while `developer/` owns the public docs | `app/(app)/(docs)/`, `components/docs/`, `lib/docs/` (guide: `lib/docs/README.md`), `lib/docs-redirects.ts` |
@@ -120,7 +120,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 
 `app/(app)/layout.tsx` mounts the client providers for everything under it (one query cache across the account pages
 and the hosted pages); the root layout and the public landing load none. `app/(app)/(shell)/layout.tsx` wraps the
-account pages in the account shell (sidebar, ⌘K palette, sign-in gate). `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
+account pages in the account shell (sidebar, ⌘K palette, sign-in gate). While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
 development only: production answers 404 unless the server runs with `ACCOUNTS_KITCHEN=1`.
 
 ## Conventions
@@ -383,6 +383,12 @@ under 1024 px. The choices live in the address
 `/__cards` (2026-11-11) compares card systems for Your Silicons and Your apps (tile, tile + footer, picture, stacked), both sections in one anatomy, and Home's app card in six paddings (`components/kitchen/cards/`).
 `/__links` (2026-11-10) compares the phone field's switches as Silicon UI Button's `link` variant (local patch), underlined at rest or on hover only, beside today's ghost xs button (`components/kitchen/links/`).
 `/__dialog` (2026-11-10) shows the Text code dialog now beside the same dialog on four tiers (title; the field and Send Code; the description; the hint and the way out), set with Silicon UI's field size variables `--field-text-size` and `--field-hint-size` (local patch) (`components/kitchen/dialog/`).
+
+`/__activity` (2026-11-12) shows the Activity page as built (Now) beside three drawings on the real history: B, one list where who acted leads each row; C, what may need you first (failed sign-ins, new permissions) then the rest with repeats folded; D, a dense one-line log filtered by who (`components/kitchen/activity/`).
+
+`/__delete` (2026-11-12) shows Data & privacy's Delete account as built (Now) beside three drawings on your real account, each previewed blocked (your Silicons) or free: A, the Silicons that block you by name, each opening its Settings; B, a checklist ticked off before Delete turns on; C, what deleting ends counted from your account (apps, devices, emails, the CarbonID held); D, Security's Checkup style on a page of its own: Checks (each Silicon handed over or deleted right there, a handover waiting, requests waiting for you), a line, what you'll lose access to, and a 30-day recovery note that needs the API; E, D in one container with the note and Delete in its foot; F, E compact; G, E with more room at the sides, an inset line and no lines between rows; H, G with the 30 days as a card and the checks' state beside Delete. Nothing on it deletes (`components/kitchen/delete/`).
+
+`/__delete-entry` (2026-11-12) shows Data & privacy's Delete account row five ways under the page's real What apps see: Now (red outline), A quiet (only the bin and title red), B words (a heading, a sentence, a Delete Account button), C foot (a red link under a line at the page's end), D button (a white row with Delete… at its end). Each opens the real /privacy/delete (`components/kitchen/delete-entry/`).
 
 `/__banner` (2026-11-10) is the introduction banner's lab. Its main view is `IntroBanner`
 (`components/kitchen/banner/intro-banner.tsx`), a prototype proposed to Silicon UI

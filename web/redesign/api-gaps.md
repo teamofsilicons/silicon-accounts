@@ -15,6 +15,7 @@ them out until the API ships them; nothing is mocked in the product. For the API
 | 8 | Cloud services (audiences) | Silicon › Access | Allowed token audiences per Silicon: list, add, remove. |
 | 9 | What an app can see, per field | App page | Today it comes from granted scopes and can't be changed. Needed: turn an optional field off for one app without removing the app. |
 | 10 | Carbon pixel avatars | Every app, Personal info › Photo | Iris draws today's default photo (`/pfp/carbon`); it should draw the pixel avatar (lib/pixel-avatar.ts) from the uuid, so every app shows it by default. And a way to store a Carbon's avatar look (hair, face, clothing) on the account, so the editor opens on it on any device; today the site keeps it in the browser beside the uploaded photo. |
+| 11 | Recover a deleted account within 30 days | Delete your account (/__delete, designs D to H; Anil decided 2026-11-12: "we'll add the recovery feature") | Not in the prototype; today's contract has no recovery: DELETE /v1/me is immediate and final (sessions end, emails and links are freed, the same email can sign up again with a new uuid, the CarbonID is held 10 days). Recovery needs a 30-day soft delete: the account held (signed out, apps told or not?), its emails, links and CarbonID kept for it, signing in within 30 days restoring it, then the real deletion. UNDERSTANDING.md would need to say so first. |
 
 Already supported, so not gaps: date of birth and timezone (`me.update`), custodian requests and handover, STK
 rotation, webhooks, proofs, sessions, history by kind.

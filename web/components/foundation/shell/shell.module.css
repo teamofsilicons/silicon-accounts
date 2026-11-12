@@ -104,8 +104,14 @@
 }
 
 /* Loading and failure states of the shell itself. */
-.loading { display: grid; width: 100%; max-width: var(--page-max); gap: var(--space-block); margin-inline: auto; padding: var(--space-section) var(--gutter) var(--space-page); }
-.loadingHeader { display: grid; gap: var(--space-group); }
+/* An account page loading (PageSkeleton): the page bar as parts/page-bar.module.css draws it, then sections as
+   parts/rows.module.css spaces them (a heading 16px over its box, sections 32px apart). */
+.loadingBar { position: sticky; z-index: var(--layer-sticky); top: var(--top-height, 0px); display: grid; padding: var(--space-related) var(--space-inset); border-bottom: 1px solid var(--border); background: var(--surface); }
+/* The breadcrumb's line: 28px, as Silicon UI's Breadcrumb draws it. */
+.loadingCrumb { display: flex; height: calc(var(--control-height-xs) + var(--space-tight)); align-items: center; }
+.loadingTitleRow { display: flex; min-height: var(--control-height-sm); align-items: center; padding-inline: var(--space-hair); }
+.loadingTitle { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); }
+.loadingSection { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
 .problem { width: 100%; max-width: calc(var(--page-narrow) + 2 * var(--gutter)); margin: var(--space-page) auto; padding: 0 var(--gutter); }
 
 /* A page outside the shell (landing while signed out) fills the viewport. */

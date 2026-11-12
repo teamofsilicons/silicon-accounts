@@ -92,7 +92,7 @@ export const journey: Journey = {
       results.check("the embed's Sign up takes the whole window to \"Create your Pixel Studio account\" with every method", flow.intent === "signup" && flow.method_hint === null && (await hostedTitle(page)) === "Create your Pixel Studio account" && (await page.getByRole("button", { name: "Continue with Google", exact: true }).count()) === 1, `${flow.intent} ${flow.method_hint} ${await hostedTitle(page)}`);
       const email = freshEmail("embed-signup");
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       await waitForDetailsPage(page);
       await button(page, "Share and continue").click();
       const outcome = await backAtApp(env, page, "pixel-studio");
@@ -175,7 +175,7 @@ export const journey: Journey = {
       results.check("…our sign-up page: \"Create your Quill Docs account\" with every method", flow.intent === "signup" && (await hostedTitle(page)) === "Create your Quill Docs account" && (await page.getByRole("button", { name: "Continue with Google", exact: true }).count()) === 1, `${flow.intent} ${await hostedTitle(page)}`);
       const email = freshEmail("sdk-signup");
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       await waitForDetailsPage(page);
       await button(page, "Share and continue").click();
       const outcome = await backAtApp(env, page, "quill-docs");

@@ -12,17 +12,23 @@ import Link from "next/link";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import styles from "./rows.module.css";
 
-/** A section: its h2 (and a count) over a boxed list. Without a title the list stands alone (the page bar names it). */
-export function Section({ id, title, count, label, children }: { id: string; title?: string; count?: number; label?: string; children: ReactNode }) {
+/**
+ * A section: its h2 (and a count, and a line under it) over a boxed list. Without a title the list stands alone (the page
+ * bar names it). `tone="danger"` draws the box's line in red, the prototype's danger zone (.dz), for deleting.
+ */
+export function Section({ id, title, count, label, description, tone, children }: { id: string; title?: string; count?: number; label?: string; description?: ReactNode; tone?: "danger"; children: ReactNode }) {
   return (
     <section className={styles.section} aria-labelledby={title ? id : undefined} aria-label={title ? undefined : label}>
       {title ? (
-        <div className={styles.head}>
-          <h2 id={id} className={styles.title}>{title}</h2>
-          {count ? <Badge size="sm" tone="neutral">{count}</Badge> : null}
+        <div className={styles.headBlock}>
+          <div className={styles.head}>
+            <h2 id={id} className={styles.title}>{title}</h2>
+            {count ? <Badge size="sm" tone="neutral">{count}</Badge> : null}
+          </div>
+          {description ? <p className={styles.description}>{description}</p> : null}
         </div>
       ) : null}
-      <ul data-sq="surface" className={styles.rows}>{children}</ul>
+      <ul data-sq="surface" className={styles.rows} data-tone={tone}>{children}</ul>
     </section>
   );
 }

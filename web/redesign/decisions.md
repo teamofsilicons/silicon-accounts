@@ -471,3 +471,44 @@ on `[role="dialog"]` in `styles/tokens.css` and the `[role="dialog"] strong` rul
   own page, /silicons/requests/[id] (who asks drawn with arrows to you, Accept and Decline explained side by side, the
   days left); Review opens it. The old drawer (silicon-drawer.tsx) is removed.
 - 2026-11-12: Personal info's groups are the account pages' sections (parts/rows.tsx: an h2 over a boxed list), like Security, Connected apps and Silicons, so its headings run h1 → h2; its rows keep the label, value and chevron.
+- 2026-11-12 (Anil): Activity as the prototype draws it: Security above the title, "What you, your Silicons and your
+  apps did, newest first." with the timezone, the prototype's five filters, then a section per day on the account
+  pages' rows (what happened, its detail line, the time; an app's mark, else the kind's icon). The filters group the
+  API's kinds: Security = sign-ins and security, Personal info = CarbonID changes, Apps = app access and permissions,
+  Silicons = custodian. Rows no longer open into a details table.
+
+## 2026-11-12: Deleting an account will be recoverable for 30 days
+
+Anil: "we'll add the recovery feature". The delete page tells people they have 30 days to change their mind (sign in
+before the last day and the account comes back as it was), so the account site will show it as a fact, without a
+"needs the API" label. Today DELETE /v1/me is immediate and final, so this waits on the API and on UNDERSTANDING.md
+saying so (api-gaps.md #11). Until then the real page must not promise recovery. Open for the API: whether apps are
+told on the day of deletion or after the 30 days, and whether emails, Google or Apple links and the CarbonID stay held
+for the 30 days (the design assumes they do). Designs: /__delete (D to H).
+
+## 2026-11-12: Delete your account is a page, from /__delete design H
+
+Anil chose H ("Yes, build H"). /privacy/delete (components/account/privacy/delete-page.tsx) holds the checks before
+deleting (every Silicon: Hand Over, Delete, or Cancel Handover while one waits; requests waiting for you, which
+deleting turns down), what you'll lose access to, and Delete Account, off until no Silicon is in your care. Data &
+privacy keeps one Delete account row that links to it. Copy is Anil's choice of A throughout, B for "What you'll lose
+access to". The 30-day recovery card and "Kept for you for 30 days" are in the code behind RECOVERY_DAYS, null until the
+API keeps deleted accounts; until then the page says the CarbonID is held for 10 days and the dialog says it can't be
+undone.
+
+## 2026-11-12: Data & privacy's Delete account is a quiet row (/__delete-entry A)
+
+Anil kept A after trying B: one row in the page's own list look, only the bin (on a light red tile) and the title red,
+"Remove your account and everything in it", opening /privacy/delete. It says nothing about Silicons; that is the delete
+page's job ("this is about deleting the account"). Not kept: the red-outlined danger box, a heading with a button (B), a
+footer link (C), a row with a Delete… button (D), and opening in place (ExpandableCard).
+
+## 2026-11-12: Sign-in and sign-up pages on the prototype
+
+Anil's answers: one "Email or phone" field (not the Email | Phone switch), sign-up asks only for the name and the
+CarbonID, and the prototype's layout and words go to every app's pages in the app's own colours, logo and layout
+("Powered by Silicon Accounts" stays). Sign-in: "or get a code", "Send Me a Code", the no-passwords note; with no
+subtitle of its own an app's page says "New here? Signing in makes your account." Code: "We sent a 6-digit code to
+{address}. It works for 10 minutes.", Continue, "Use a Different Email" beside Resend. Sign-up: the photo in a ring,
+"Welcome to {app}", "This is how people and Silicons will see you in every app.", Your name, Your CarbonID (live check),
+Create Account; "Not You?" kept. After deleting an account: /goodbye, "Your account is deleted".

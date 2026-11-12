@@ -112,7 +112,7 @@ export const journeys: Journey[] = [
         await page.goto(`${env.site}/`);
         await reflow(ctx, page, findings, "landing");
         await page.goto(`${env.site}/sign-in`);
-        await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+        await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
         await stepReady(page);
         await reflow(ctx, page, findings, "signin-email");
         for (const app of ["acme-notes", "pixel-studio", "ledgerly"]) {
@@ -123,21 +123,21 @@ export const journeys: Journey[] = [
         }
         await page.goto(await hostedLink(env, page, "briefcase"));
         const email = freshEmail("uxa.reflow");
-        const field = page.getByRole("textbox", { name: "Email" });
+        const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
         await field.waitFor({ timeout: 30_000 });
         const after = await lastSeq(env);
         await field.fill(email);
-        await page.getByRole("button", { name: "Continue", exact: true }).click();
+        await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
         const code = await codeFor(env, email, after);
         await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 20_000 });
         await stepReady(page);
         await reflow(ctx, page, findings, "hosted-briefcase-code");
         await page.getByRole("textbox", { name: /digit 1 of 6/ }).first().click();
         await page.keyboard.type(code, { delay: 25 });
-        await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
+        await page.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 30_000 });
         await stepReady(page);
         await reflow(ctx, page, findings, "hosted-briefcase-signup");
-        await page.getByRole("button", { name: "Create account" }).click();
+        await page.getByRole("button", { name: /^Create account$/i }).click();
         await page.getByRole("button", { name: "Share and continue" }).waitFor({ timeout: 30_000 });
         await stepReady(page);
         await reflow(ctx, page, findings, "hosted-briefcase-details");
@@ -153,7 +153,7 @@ export const journeys: Journey[] = [
         collectConsole(page);
         await startAtApp(env, page, "ledgerly", { intent: "signup" });
         await signInWithCode(env, page, { email: freshEmail("uxa.reflow.flow") });
-        await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+        await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
         await page.getByText("Step 1 of 2", { exact: true }).first().waitFor({ timeout: 30_000 });
         await stepReady(page);
         await reflow(ctx, page, findings, "hosted-ledgerly-step1-adding-phone");
@@ -176,7 +176,7 @@ export const journeys: Journey[] = [
       const { page } = carbon;
       results.watch(page, "reflow-signed-in", DEVELOPER_EXPECTED);
       collectConsole(page, DEVELOPER_EXPECTED);
-      for (const [path, name] of [["/", "identity"], ["/sign-in-methods", "sign-in-methods"], ["/apps", "apps"], ["/silicons", "silicons"], ["/proofs", "proofs"], ["/activity", "activity"], ["/settings", "settings"]] as const) {
+      for (const [path, name] of [["/", "identity"], ["/sign-in-methods", "sign-in-methods"], ["/apps", "apps"], ["/silicons", "silicons"], ["/proofs", "proofs"], ["/activity", "activity"], ["/privacy", "privacy"]] as const) {
         await openAccountPage(ctx, page, path, /./);
         await reflow(ctx, page, findings, `account-${name}`);
       }

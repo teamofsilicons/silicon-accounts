@@ -280,10 +280,11 @@ const shown: ScreenSpec[] = [
   { name: "account-activity-open", path: "/activity", prepare: async page => { await page.locator("[data-timeline-trigger]").first().click(); await wait(page, 900); } },
 
   // Settings: sessions, and deleting blocked by the Silicons in your care; then free to delete.
-  { name: "account-settings", path: "/settings" },
+  { name: "account-privacy", path: "/privacy" },
   // Sessions are on the Security pillar since 2026-10-17 (components/account/security/sessions.tsx).
   { name: "account-security-signout", path: "/sign-in-methods", prepare: async page => { await page.getByRole("button", { name: "Sign out", exact: true }).nth(1).click(); await wait(page, 600); } },
-  { name: "account-settings-deletable", path: "/settings", routes: [["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, custodian_of: 0 } })]] },
+  { name: "account-privacy-delete", path: "/privacy/delete" },
+  { name: "account-privacy-deletable", path: "/privacy/delete", routes: [["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, custodian_of: 0 } })]] },
 
   // Long values: a 94-character display name wraps on the card; a 30-character si:id and a long name wrap on a tile.
   { name: "account-identity-long-name", path: "/personal", waitFor: card, routes: [["GET /v1/me", () => ({ json: { ...data.carbon, display_name: longName } })]] },
@@ -298,7 +299,7 @@ const failing: MockRoute[] = ["apps", "proofs", "silicons", "custodian-requests"
   .map((path): MockRoute => [`GET /v1/me/${path}`, () => error(503, "unavailable", "Silicon Accounts could not read this right now.", "Try again in a moment.")]);
 // Queries retry a 5xx twice (lib/query/client.ts), so the error shows after about two seconds.
 const errors: ScreenSpec[] = [
-  ...["identity", "apps", "proofs", "silicons", "activity", "settings"]
+  ...["identity", "apps", "proofs", "silicons", "activity", "privacy"]
     .map(page => ({ name: `account-error-${page}`, path: page === "identity" ? "/" : `/${page}`, routes: failing, settle: 4500 })),
   // GET /v1/meta failing: connecting Google or Apple says so, with Try again.
   { name: "account-error-sign-in-methods-meta", path: "/sign-in-methods", routes: [["GET /v1/meta", () => error(503, "unavailable", "Silicon Accounts is restarting.", "Try again in a moment.")]], settle: 4500 },

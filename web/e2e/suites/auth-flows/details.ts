@@ -92,7 +92,7 @@ const whatsShared: Journey = {
     results.check("the optional timezone starts unticked (UNDERSTANDING: \"It's unticked until they do\")", row("timezone")?.ticked === false, JSON.stringify(row("timezone")));
     const listText = (await list.innerText()).replace(/\s+/g, " ");
     results.check("the email row shows the masked address, the timezone row the account's (Berlin)", listText.includes("s***@example.test") && !listText.includes(email) && /Berlin/.test(listText), listText.slice(0, 300));
-    results.check("one page, so its button is \"Share and continue\" (and Cancel, no Back)", (await page.getByRole("button", { name: "Share and continue", exact: true }).count()) === 1 && (await page.getByRole("button", { name: "Cancel", exact: true }).count()) === 1 && (await page.getByRole("button", { name: "Back", exact: true }).count()) === 0);
+    results.check("one page, so its button is \"Share and continue\" (and Cancel, no Back)", (await page.getByRole("button", { name: /^Share and continue$/i }).count()) === 1 && (await page.getByRole("button", { name: "Cancel", exact: true }).count()) === 1 && (await page.getByRole("button", { name: "Back", exact: true }).count()) === 0);
     const powered = await poweredBy(page);
     results.check("the details page keeps \"Powered by Silicon Accounts\" linking to accounts.teamofsilicons.com", powered.href === POWERED_BY_HREF && /Powered by/.test(powered.text) && powered.atEnd, JSON.stringify(powered));
     // Tick the timezone and share.
@@ -253,7 +253,7 @@ const whatsShared: Journey = {
       await sleep(300);
       await shot(env, uPage, "auth-flows-whats-shared-02-no-details");
       const uRows = await rowsOf(uPage, "Browser");
-      results.check("…in the browser that page lists just the profile, with \"Share and continue\"", JSON.stringify(uRows.map(r => r.field)) === '["profile"]' && (await uPage.getByRole("button", { name: "Share and continue", exact: true }).count()) === 1, JSON.stringify(uRows));
+      results.check("…in the browser that page lists just the profile, with \"Share and continue\"", JSON.stringify(uRows.map(r => r.field)) === '["profile"]' && (await uPage.getByRole("button", { name: /^Share and continue$/i }).count()) === 1, JSON.stringify(uRows));
       const uWalk = await completeDetails(env, uPage, "browser");
       results.check("…and continuing lands back at the app signed in", uWalk.pages.length === 1 && !!(await appAccount(uPage))?.uuid, uPage.url());
       await uContext.close();
@@ -467,17 +467,17 @@ const flowPages: Journey = {
     results.watch(page, "flow-pages");
     const email = `ledger.ui.${t}@example.test`;
     await startAtApp(env, page, "ledgerly", { intent: "signup" });
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     const heading = await hostedTitle(page);
     results.check("intent=signup: the methods page says \"Create your Ledgerly account\"", heading === "Create your Ledgerly account", heading);
     const after = await lastSeq(env);
     await field.fill(email);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code = await codeFor(env, email, after);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code, { delay: 25 });
-    await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+    await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
     const walk = await completeDetails(env, page, "ledgerly", { add: { phone: randomPhone() }, tick: ["timezone"], stopAtReview: true, shotName: "auth-flows-flow-pages" });
     const [w1, w2] = walk.pages;
     results.check("page 1 \"How can we reach you?\" (Step 1 of 2), page 2 \"About you\" (Step 2 of 2) drawn split, its button \"Review\"", w1?.title === "How can we reach you?" && w1.progress === "Step 1 of 2" && w2?.title === "About you" && w2.progress === "Step 2 of 2" && w2.shownLayout === "split" && w2.continueLabel === "Review", JSON.stringify(walk.pages.map(p => ({ t: p.title, p: p.progress, l: p.shownLayout, c: p.continueLabel }))));

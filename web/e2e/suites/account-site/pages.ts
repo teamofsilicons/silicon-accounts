@@ -34,9 +34,10 @@ const VIEWS: View[] = [
     path: "/activity",
     title: "Activity · Silicon Accounts",
     ready: page => page.getByText("Nothing here yet").first(),
-    open: async page => page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Custodian", exact: true }).click({ timeout: 30_000 }),
+    open: async page => page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Silicons", exact: true }).click({ timeout: 30_000 }),
   },
-  { name: "settings", path: "/settings", title: "Settings · Silicon Accounts", ready: page => page.getByRole("heading", { name: "Local time" }) },
+  { name: "privacy", path: "/privacy", title: "Data & privacy · Silicon Accounts", ready: page => page.getByRole("heading", { name: "What apps see" }) },
+  { name: "privacy-delete", path: "/privacy/delete", title: "Delete your account · Silicon Accounts", ready: page => page.getByRole("heading", { name: "Before you delete" }) },
 ];
 
 async function show(page: Page, site: string, view: View): Promise<boolean> {

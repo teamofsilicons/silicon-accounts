@@ -45,6 +45,8 @@ Last updated: 2026-11-10
 - Generalised decision inbox (custodian requests and account verification), once the API lists verification requests.
 - The developer portal (`../../developer`, ~24k lines on its own Arc UI copies): its own redesign, after this site.
 
+- **Activity, parked until orgs** (Anil, 2026-11-12: "not yet ready, we'll get back to this with the complete context of the orgs"). Direction: combine the current design (the kind's icon) with B · Who leads from /__activity, because in an org an admin may make changes for a user, so a row must say who acted. One idea to draw then: the kind's icon and the actor's photo together. Playground: /__activity (components/kitchen/activity/).
+
 ## Waiting on Anil
 - Confirm the Super Visuals licence: Home's introduction now shows BG 110, 102 and 127 (picture cards, 2026-11-11). Say whether to file the Silicon UI IntroBanner request (redesign/requests/silicon-ui-intro-banner.md) (2026-11-10).
 - Review the compact experiment (branch `compact`; dev panel → Look → Density to compare) and say what to keep, and whether Home gets more air (2026-11-10).
