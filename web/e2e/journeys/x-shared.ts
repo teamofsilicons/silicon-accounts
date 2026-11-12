@@ -97,7 +97,7 @@ export const journey: Journey = {
 
     // 4. Keyboard focus shows on the shell's brand link and on plain links (fills and underlines, never rings).
     await page.goto(`${env.site}/`);
-    const brand = page.getByRole("link", { name: "Accounts home" }).first();
+    const brand = page.getByRole("link", { name: "Team of Silicons Accounts" }).first();
     await brand.waitFor({ timeout: 30_000 });
     const brandBefore = await styleOf(brand, ["background-color"]);
     await brand.focus();
@@ -117,7 +117,7 @@ export const journey: Journey = {
     // 5. A phone number from a country Arc's picker does not list, added on Security's Text code dialog.
     await page.goto(`${env.site}/sign-in-methods`);
     const textCode = page.getByRole("region", { name: "Your sign-in", exact: true }).getByRole("listitem").filter({ hasText: "Text code" });
-    await textCode.getByRole("button").first().click({ timeout: 30_000 });
+    await textCode.getByRole("link").first().click({ timeout: 30_000 });
     const phoneDialog = page.getByRole("dialog").first();
     await phoneDialog.waitFor({ timeout: 10_000 });
     // With numbers already on the account the dialog lists them first; adding is a button under the list.
@@ -151,7 +151,15 @@ export const journey: Journey = {
       b.style.color = want;
       document.body.append(a, b);
       const got = getComputedStyle(a).color;
-      const same = got === getComputedStyle(b).color;
+      // Computed colours can come back in different spaces (lab vs oklch), so both are painted and compared by pixel.
+      const canvas = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
+      const pixels = [got, getComputedStyle(b).color].map(colour => {
+        canvas.clearRect(0, 0, 1, 1);
+        canvas.fillStyle = colour;
+        canvas.fillRect(0, 0, 1, 1);
+        return [...canvas.getImageData(0, 0, 1, 1).data];
+      });
+      const same = pixels[0].every((value, index) => Math.abs(value - pixels[1][index]) <= 1);
       a.remove();
       b.remove();
       return { token, same, got };

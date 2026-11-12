@@ -11,6 +11,8 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
 
 ## Design
 
+- **The account command menu uses Silicon UI Dialog with a hidden accessible title and top placement (2026-11-12).** The palette draws the visible surface, while Dialog owns the modal layer and focus return. Why: Silicon UI #31 supplies the missing headerless mode, so the account menu no longer needs a direct Radix layer.
+
 - **Security on Home's rules, in the prototype's order (Anil, 2026-11-10).** The pinned page bar (as Connected apps);
   Checkup (a recovery phone when there is none, a device not used lately: Keep or Sign Out; hidden when nothing needs
   you), Silicon keys (when each key was made, Change on the Silicon's page), Your sign-in (Google, Apple, Email code,
@@ -512,3 +514,11 @@ subtitle of its own an app's page says "New here? Signing in makes your account.
 {address}. It works for 10 minutes.", Continue, "Use a Different Email" beside Resend. Sign-up: the photo in a ring,
 "Welcome to {app}", "This is how people and Silicons will see you in every app.", Your name, Your CarbonID (live check),
 Create Account; "Not You?" kept. After deleting an account: /goodbye, "Your account is deleted".
+
+## 2026-11-12: muted text clears 4.5:1 (overlays audit)
+
+- `--text-muted` is #6B6B6B (was the #8E8E8E trial): the lightest grey that clears 4.5:1 on white (5.3), the shell's
+  grey (5.0) and `--surface-muted` (4.7). Anil chose it over #666666 and over keeping the trial.
+- The top bar's Search label and ⌘K take muted too (they were lighter than muted, 2026-10-30), so all three of the
+  bar's quiet words ("Accounts", "Search", ⌘K) pass.
+- The account site stays light only (lib/theme.ts); the audit now expects light for a dark-preferring visitor.

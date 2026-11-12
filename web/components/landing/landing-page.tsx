@@ -13,11 +13,13 @@ import styles from "./landing.module.css";
 const NAV = [
   { href: "https://teamofsilicons.com/products", label: "Products", menu: true },
   { href: "https://starter.teamofsilicons.com", label: "Starter" },
-  { href: "https://developers.teamofsilicons.com", label: "Developers" },
+  // Developers is this stack's own developer site (the API's developer_url, read on the server by PublicLanding), so
+  // local and staging builds link to theirs.
+  { href: "developer", label: "Developers" },
   { href: "https://writings.teamofsilicons.com", label: "Writings" },
 ] as const;
 
-export function LandingPage() {
+export function LandingPage({ developerUrl }: { developerUrl: string }) {
   return (
     <div className={styles.page}>
       <a className="skip-link" data-sq="surface" href="#main">Skip to content</a>
@@ -28,7 +30,7 @@ export function LandingPage() {
           </a>
           <nav className={styles.navLinks} aria-label="Team of Silicons">
             {NAV.map(item => (
-              <a key={item.label} href={item.href}>
+              <a key={item.label} href={item.href === "developer" ? developerUrl : item.href}>
                 {item.label}
                 {"menu" in item ? <Image src="/brand/nav-chevron.svg" alt="" width={16} height={16} /> : null}
               </a>

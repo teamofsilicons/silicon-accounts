@@ -3,13 +3,14 @@
  * The Organization and WebSite JSON-LD come from the root layout. Server-rendered.
  */
 import { APPLICATION_ID, JsonLd, WEBSITE_ID, applicationLd } from "@/lib/seo";
+import { developerUrl } from "@/lib/server/meta";
 import { CANONICAL_ORIGIN, LANDING_TITLE, SITE_DESCRIPTION } from "@/lib/site";
 import { LandingPage } from "./landing-page";
 
 export async function PublicLanding({ nonce }: { nonce?: string }) {
   return (
     <>
-      <LandingPage />
+      <LandingPage developerUrl={await developerUrl()} />
       <JsonLd
         nonce={nonce}
         graph={[

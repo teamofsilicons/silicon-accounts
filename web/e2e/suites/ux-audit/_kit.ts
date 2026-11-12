@@ -153,7 +153,8 @@ export const KIT_SOURCE = String.raw`
         || (cs.boxShadow && cs.boxShadow !== "none") || el.matches("img,video,canvas,iframe") || el.getAttribute("data-sq-fb") !== null;
       if (!paints) continue;
       out.checked++;
-      var optedOut = !!el.closest('[data-corner="rounded"],[data-corner="sharp"]');
+      // A surface that sets --sq-k: 1 asks for a round corner on purpose (the shell's page panel, Anil's 8px corner).
+      var optedOut = !!el.closest('[data-corner="rounded"],[data-corner="sharp"]') || (marked && cs.getPropertyValue("--sq-k").trim() === "1");
       var small = r.width <= 26 && r.height <= 26;
       var circle = Math.abs(r.width - r.height) < 2 && maxR >= Math.min(r.width, r.height) / 2 - 1;
       var shape = out.native ? (cs.getPropertyValue("corner-top-left-shape") || cs.getPropertyValue("corner-shape") || "").trim() : "";

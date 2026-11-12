@@ -11,7 +11,7 @@ import { newCarbon, signIntoApp, until } from "./_helpers";
 
 /** The account site's own sections, as its dock names them (every one a page of this site). */
 /** The sidebar's sections (lib/navigation.ts SECTIONS, 2026-11-07): every one a page of this site. */
-const OWN = ["Home", "Silicons", "Connected apps", "Security", "Personal info"];
+const OWN = ["Home", "Silicons", "Connected apps", "Security", "Personal info", "Data & privacy"];
 
 /** GET <site><path> without following redirects: the status and where it points. */
 async function redirectOf(site: string, path: string): Promise<{ status: number; location: string }> {
@@ -46,7 +46,7 @@ const scope: Journey = {
     const external = await linksOf(elsewhere);
     await shot(env, page, "acct-scope-01-dock");
     results.check(
-      "the sidebar's sections are the Carbon's account (Home, Silicons, Connected apps, Security, Personal info), every one a page of this site",
+      "the sidebar's sections are the Carbon's account (Home, Silicons, Connected apps, Security, Personal info, Data & privacy), every one a page of this site",
       OWN.every(name => own.some(section => section.name === name && section.href.startsWith("/"))) && own.length === OWN.length,
       own.map(section => `${section.name} ${section.href}`).join(", "),
     );
@@ -108,7 +108,7 @@ const scope: Journey = {
     const sheetLinks = await sheet.getByRole("link").evaluateAll(links => links.map(link => ({ text: (link.textContent ?? "").replace(/\s+/g, " ").trim(), href: link.getAttribute("href") ?? "" })));
     const sheetDeveloper = sheetLinks.find(link => link.text.startsWith("Developers"));
     const sheetDocs = sheetLinks.find(link => link.text.startsWith("Docs"));
-    results.check("on a phone, the sheet lists the five account sections, Developers and Docs", sheetLinks.length === 7 && sheetDeveloper?.href.replace(/\/$/, "") === env.developer && sheetDocs?.href === `${env.developer}/docs`, JSON.stringify(sheetLinks.map(link => `${link.text.slice(0, 24)} ${link.href}`)));
+    results.check("on a phone, the sheet lists the six account sections, Developers and Docs", sheetLinks.length === 8 && sheetDeveloper?.href.replace(/\/$/, "") === env.developer && sheetDocs?.href === `${env.developer}/docs`, JSON.stringify(sheetLinks.map(link => `${link.text.slice(0, 24)} ${link.href}`)));
     await page.keyboard.press("Escape");
     await page.setViewportSize({ width: 1440, height: 900 });
 

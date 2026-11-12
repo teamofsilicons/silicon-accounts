@@ -253,7 +253,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   }, [session, me.data, picture?.src]);
 
   const brand = (
-    <Link href={paths.home} aria-label="Accounts home" data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
+    <Link href={paths.home} aria-label="Team of Silicons Accounts" data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
       event.preventDefault();
       void go(paths.home, event.currentTarget);
@@ -263,7 +263,9 @@ export function AccountShell({ children }: { children: ReactNode }) {
     </Link>
   );
   const search = (
-    <Button variant="soft" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
+    // Keyed by the layout: Silicon UI's Button measures its label once and keeps that width inline, so after a resize
+    // from wide to narrow it stayed 400px and covered the brand. A new Button measures again.
+    <Button key={narrow ? "narrow" : "wide"} variant="soft" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
       <Search size={16} strokeWidth={2.1} aria-hidden="true" />
       <span className={styles.searchLabel}>Search</span>
       <kbd data-sq="surface" className={styles.keys}>{isApple ? "⌘K" : "Ctrl K"}</kbd>

@@ -5,38 +5,26 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-11-10
+Last updated: 2026-11-12
 
 ## Now
-1. **Silicons on the prototype** (2026-11-12, uncommitted): /silicons, /silicons/[uuid] (Access, Settings) and /silicons/requests/[id] rebuilt; review with Anil; e2e journeys for the older pages updated 2026-11-12.
+1. Home's Your apps: which apps show (Anil is thinking of a different logic, 2026-11-10); Your Silicons follows his
+   2026-11-11 tiles.
 ## Next
-1a. Redesign Your Silicons and Your apps on Home on the chosen type set (Anil, 2026-11-08); the introduction banner is Anil's to redesign.
-2. **Prototype v7, phase 4: Silicons.** List, `/silicons/[uuid]` with Access and Settings tabs (replacing the drawer),
-   request and offer pages; Home's Silicon tiles then link to each Silicon. Map: [prototype-map.md](prototype-map.md).
-3. Finish moving pages to tiles. Page, Section, Surface and SettingsGroup follow the rule and Home's type scale now,
-   but some pages still draw their own outlined cards: Security's lists, Connected apps' cards, Silicon tiles, the
-   identity card and the empty states. Connected apps is the next likely aside on action (an app's detail beside the
-   list).
-4. Account command menu on Silicon UI Dialog instead of direct Radix, if Dialog can hold the palette without its own
-   title row (else report what is missing).
-5. Connected apps redesigned (2026-11-11, uncommitted): `/apps` and `/apps/[id]` built on the prototype; review with
-   Anil; rewrite the e2e suites written for the old cards (account-site/apps.ts, imports/k-consent.ts,
-   account-site/scope.ts); Permissions between apps (`/proofs`) redesigned on the same rows (2026-11-12).
-6. Security redesigned on Home's rules (2026-11-10, uncommitted): review with Anil (its email and phone list restyled
-   too); update the e2e suites written for the old page; then `/security` (`/sign-in-methods` redirects)
-   and Activity.
-7. Personal info (`/personal`, the identity card for now) rebuilt as the prototype's rows with every edit dialog.
-8. Data & privacy (`/privacy`, `/settings` redirects).
-9. Sign-in steps restyled; their suppressions cleared.
-10. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
-11. Identity screens: `pnpm screens --only account-identity` fails while a real API runs on 8589; run with it stopped.
+1. developer-site e2e suites still use the old hosted sign-in words ("Email", "Create account": j-pages, b-bff-session,
+   f-signin-tab, h-details, i-flows); auth-flows-oidc needs openid-client installed.
+2. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
+3. Identity screens: `pnpm screens --only account-identity` fails while a real API runs on 8589; run with it stopped.
+
+Done since 2026-11-10 (ab05095 and after): Silicons, Connected apps and Permissions, Security (Unlink dialog, row links,
+Change key on the page), Personal info, Data & privacy with the delete page, sign-in and sign-up, /goodbye.
 
 ## Waiting on the API
 - Everything in [api-gaps.md](api-gaps.md): notifications, data download, a Silicon's activity, apps and sign-in
   stats, wrong-keys alerts, automation, cloud services, per-field sharing.
 
 ## Later
-- Publish Silicon UI and update this site's package dependency when Anil resumes the release. Deferred at his request (2026-11-08). The prepared upstream patches are `silicon-ui-select-0.4.1.patch` and `silicon-ui-issues-28-29.patch`; the site uses the tested pnpm patch for 0.4.0 in the meantime.
+- Publish Silicon UI and update this site's package dependency when Anil resumes the release. Deferred at his request (2026-11-08). `silicon-ui-unreleased-through-31.patch` is the current cumulative upstream patch; the earlier Select and #28/#29 patches remain for reference. The site uses the tested pnpm patch for 0.4.0 in the meantime.
 - Add a Silicon's chevron: Silicon UI's DropdownMenuTrigger draws it at stroke 1.8 (about 1.13 px at 15 px) with no prop, while our icons are at 2. Anil wants 2 everywhere; choose between our own Button trigger via `asChild` (loses the flip on open) or a Silicon UI request for a chevron stroke option (2026-11-07).
 - Make a Silicon's optional webhook URL easy to find now it's out of the create wizard; it lives in the Silicon page's settings (decisions.md, 2026-11-07).
 - Move `components/foundation/layout` (Page, PageHeader, Section) to silicon-ui's page layout if #24 ships.
@@ -62,6 +50,7 @@ Last updated: 2026-11-10
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-11-12 Silicon UI #30 CommandPalette name, focus sequence and quiet text, and #31 headerless/top Dialog implemented in shared source and the account site's local patch; the account command menu now uses the shared Dialog (uncommitted; release deferred).
 - 2026-11-10 PhoneInput country picker no longer clips inside the Security dialog and matches the field radius and corner shape; local patch and upstream artifact refreshed (uncommitted)
 - 2026-11-10 PhoneInput audit: unsupported and overlong numbers preserved with validation, restricted default and form/accessibility fixes; local Silicon UI package patch refreshed (uncommitted)
 - 2026-11-10 Silicon UI #28 PhoneInput spacing and #29 quiet Dialog close fixed in source and the account site's patched package; release deferred (uncommitted)

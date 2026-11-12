@@ -22,7 +22,6 @@ import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { ButtonLink } from "@teamofsilicons/silicon-ui/button-link";
-import { Checkbox } from "@teamofsilicons/silicon-ui/checkbox";
 import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
 import { FileUpload } from "@teamofsilicons/silicon-ui/file-upload";
 import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
@@ -41,12 +40,12 @@ import { PhotoUrlForm, TimezoneForm } from "../parts/detail-editors";
 import { IdChangeForm } from "../parts/id-change-form";
 import { recipient } from "../parts/handover";
 import { PageBar } from "../parts/page-bar";
-import { useCancelTransferSettled, useChangeSiliconIdInForm, useDeleteSiliconSettled, useEverySilicon, useRemoveSiliconWebhookSettled, useRotateStkOnce, useSetSiliconWebhookOnce, useSiliconDefaultPhoto, useStartTransfer } from "../parts/queries";
+import { useCancelTransferSettled, useChangeSiliconIdInForm, useDeleteSiliconSettled, useEverySilicon, useRemoveSiliconWebhookSettled, useSetSiliconWebhookOnce, useSiliconDefaultPhoto, useStartTransfer } from "../parts/queries";
 import { addReveal, dismissReveal, dismissRevealsOf, usePendingReveals } from "../parts/reveals";
 import { Row, Section, Strong, Tile } from "../parts/rows";
 import { SecretReveal } from "../parts/secret-reveal";
 import { SiliconMark } from "../parts/silicon-mark";
-import { normalizeStk, stkProblem, stkSecret } from "../parts/stk";
+import { ChangeKeyDialog } from "./change-key";
 import styles from "./silicon-page.module.css";
 
 type Tab = "access" | "settings";
@@ -157,52 +156,12 @@ const idOf = (silicon: ManagedSilicon) => silicon.id ?? silicon.uuid;
 
 function SecretKey({ silicon, now }: { silicon: ManagedSilicon; now: number }) {
   const [open, setOpen] = useState(false);
-  const [own, setOwn] = useState(false);
-  const [stk, setStk] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const rotateStk = useRotateStkOnce();
-  const id = idOf(silicon);
   const made = stkRotatedAt(silicon) ?? silicon.created_at;
-  const close = () => { setOpen(false); setOwn(false); setStk(""); setError(null); };
-  const rotate = async (event: FormEvent) => {
-    event.preventDefault();
-    if (own) {
-      const problem = stkProblem(stk);
-      if (problem) return setError(problem);
-    }
-    setError(null);
-    try {
-      // The answer leaves the mutation cache as soon as it is here: the reveal above the tabs holds the only copy.
-      const answer = await rotateStk.run({ uuid: silicon.uuid, stk: own ? normalizeStk(stk) : undefined });
-      close();
-      if (answer.stk) {
-        addReveal({
-          silicon: silicon.uuid,
-          origin: "stk",
-          title: `${id}\u2019s new key`,
-          description: `The old key stopped working and ${id} was signed out everywhere. Give it this one; Silicon Accounts keeps only its hash.`,
-          secrets: [stkSecret(id, answer.stk)],
-        });
-      }
-    } catch (raw) {
-      setError(describeError(raw));
-    }
-  };
   return (
     <Section id="silicon-key" title="Secret key">
       <Row lead={<Tile><KeyRound size={16} strokeWidth={2} /></Tile>} title={<span className="mono">stk-••••••••••••</span>} detail={<>Made <Strong>{formatRelative(made, now)}</Strong></>}>
         <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>Change</Button>
-        <Ask open={open} onClose={close} busy={rotateStk.isPending} title={`Change ${id}\u2019s key?`} description={<>The old key stops working at once, and <strong>{id}</strong> is signed out of every app.</>}>
-          <form className={styles.form} onSubmit={event => void rotate(event)} noValidate>
-            <Checkbox label="Choose the new key yourself" description="Otherwise one is made for you and shown once." checked={own} onCheckedChange={value => { setOwn(value === true); setError(null); }} />
-            {own ? <Input label="New key" className="mono" value={stk} onChange={event => { setStk(event.target.value); setError(null); }} placeholder="stk-0123456789ab" autoComplete="off" spellCheck={false} description="stk- and 8 to 32 hex digits. It is never shown again, so keep a copy." /> : null}
-            {error ? <p className={styles.error} role="alert">{error}</p> : null}
-            <Actions>
-              <Button type="button" variant="ghost" onClick={close} disabled={rotateStk.isPending}>Cancel</Button>
-              <Button type="submit" variant="danger" loading={rotateStk.isPending}>Change Key</Button>
-            </Actions>
-          </form>
-        </Ask>
+        <ChangeKeyDialog silicon={silicon} open={open} onClose={() => setOpen(false)} />
       </Row>
     </Section>
   );

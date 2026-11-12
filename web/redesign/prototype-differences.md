@@ -107,7 +107,7 @@ marked "check" is a first guess, to be confirmed against Silicon UI's code befor
 
 | What | Prototype | Site | Status |
 |---|---|---|---|
-| Search | A text field in the top bar; results drop below it | A button opening the ⌘K palette | asking |
+| Search | A text field in the top bar; results drop below it | A button opening the ⌘K palette in Silicon UI's headerless Dialog (#31 implemented locally) | asking |
 
 ## Data (8): in api-gaps.md
 
@@ -125,10 +125,11 @@ Silicon's activity, automation, cloud services, per-field sharing.
 
 ## Security (2026-11-10)
 
-- **Change on a Silicon key** goes to the Silicon's page (its key rotation lives there) instead of opening a rotate
-  dialog on Security. Category: our flow; the rotation form isn't shared yet.
-- **Email code / Text code** have an Edit button that opens the list in a dialog, where the prototype's row itself
-  opens it. Category: Silicon UI has no clickable list row; a button is the closest.
+- ~~**Change on a Silicon key** goes to the Silicon's page.~~ Fixed 2026-11-12: Change asks on Security (the shared
+  ChangeKeyDialog, `silicons/change-key.tsx`) and the new key shows above Silicon keys until it is stored. The prototype
+  shows the new key in a dialog; here it is the same reveal card as on the Silicon's page.
+- ~~**Email code / Text code** have an Edit button.~~ Fixed 2026-11-12: the whole row opens the list (a link to
+  `?edit=email|phone`, as Personal info's rows), a chevron at its end.
 - **Devices** show when each was last active and its IP; the prototype shows a place ("Kolkata, India"), which the API
   doesn't give. Category: API gap.
 - **Sign Out of All Other Devices** signs each session out one by one; the API has no single call. Category: API gap.

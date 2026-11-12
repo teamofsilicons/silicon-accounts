@@ -49,10 +49,10 @@ export function Row({ lead, title, detail, error, wide, children }: { lead: Reac
 }
 
 /** A row inside a Section that is a link: the whole row goes to `href`, a chevron at its end; `end` sits before it. */
-export function LinkItem({ href, lead, title, detail, end, label }: { href: string; lead: ReactNode; title: ReactNode; detail?: ReactNode; end?: ReactNode; label?: string }) {
+export function LinkItem({ href, lead, title, detail, end, label, replace, scroll }: { href: string; lead: ReactNode; title: ReactNode; detail?: ReactNode; end?: ReactNode; label?: string; replace?: boolean; scroll?: boolean }) {
   return (
     <li className={styles.linkItem}>
-      <Link href={href} className={styles.link} aria-label={label}>
+      <Link href={href} replace={replace} scroll={scroll} className={styles.link} aria-label={label}>
         {lead}
         <span className={styles.text}>
           <span className={styles.rowTitle}>{title}</span>

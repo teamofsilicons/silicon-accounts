@@ -6,10 +6,11 @@
  * pointed at, focused or used, then stays for the visit; ranking is lib/docs/search.ts.
  *
  * The field is a combobox over a listbox of results: arrows move, Enter opens, Escape clears the field and then closes.
+ * The layer is Silicon UI's Dialog without its header (hideHeader, top placement); the panel draws its own surface.
  */
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@teamofsilicons/silicon-ui/dialog";
 import { CornerDownLeft, FileText, Hash, Search, X } from "lucide-react";
 import { DOCS_BASE } from "@/lib/docs/site";
 import { prepareIndex, searchDocs, type PreparedRecord, type SearchHit, type SearchRecord } from "@/lib/docs/search";
@@ -134,6 +135,10 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
     } else if (event.key === "End" && options.length) {
       event.preventDefault();
       setActive(options.length - 1);
+    } else if (event.key === "Escape" && !query) {
+      // The field says its list is open, so Dialog leaves this Escape to it (Silicon UI's escape layering): close here.
+      event.preventDefault();
+      setOpen(false);
     } else if (event.key === "Enter") {
       const target = options[activeIndex];
       if (target) {
@@ -157,8 +162,8 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
   else status = hits.length ? `${hits.length === 24 ? "Top 24" : hits.length} result${hits.length === 1 ? "" : "s"}` : "No results";
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={next => (next ? show() : setOpen(false))}>
-      <DialogPrimitive.Trigger asChild>
+    <Dialog open={open} onOpenChange={next => (next ? show() : setOpen(false))}>
+      <DialogTrigger asChild>
         <button
           type="button"
           className={styles.trigger}
@@ -172,15 +177,12 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
           <span className={styles.triggerLabel}>Search the docs</span>
           <kbd className={styles.triggerKey} data-sq="surface">{apple ? "⌘ K" : "Ctrl K"}</kbd>
         </button>
-      </DialogPrimitive.Trigger>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className={styles.overlay} />
-        <div className={styles.positioner}>
-          <DialogPrimitive.Content
-            className={styles.panel}
-            data-sq="clip"
-            aria-describedby={undefined}
-            onOpenAutoFocus={event => {
+      </DialogTrigger>
+      <DialogContent
+        title="Search the docs"
+        hideHeader
+        placement="top"
+        onOpenAutoFocus={event => {
               event.preventDefault();
               inputRef.current?.focus();
             }}
@@ -192,7 +194,7 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
               setActive(0);
             }}
           >
-            <DialogPrimitive.Title className="sr-only">Search the docs</DialogPrimitive.Title>
+          <div className={styles.panel} data-sq="clip">
             <div className={styles.searchRow}>
               <Search size={18} strokeWidth={1.75} aria-hidden="true" className={styles.searchIcon} />
               <input
@@ -223,7 +225,7 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
                   <X size={15} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               ) : null}
-              <DialogPrimitive.Close className={styles.close} data-sq="surface">Esc</DialogPrimitive.Close>
+              <DialogClose className={styles.close} data-sq="surface">Esc</DialogClose>
             </div>
 
             <div className={styles.status} role="status" aria-live="polite">{status}</div>
@@ -273,9 +275,8 @@ export function DocsSearch({ suggestions }: { suggestions: SearchSuggestion[] })
               <span><kbd data-sq="surface">esc</kbd> to close</span>
               <span className={styles.footerNote}>Searches in your browser</span>
             </div>
-          </DialogPrimitive.Content>
-        </div>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+          </div>
+      </DialogContent>
+    </Dialog>
   );
 }

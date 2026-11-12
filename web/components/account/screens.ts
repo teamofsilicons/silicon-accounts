@@ -66,7 +66,7 @@ const longSilicon = { ...data.silicons[0], uuid: "Lng", id: "si:a_very_long_sili
 const click = async (page: Page, name: string | RegExp) => { await page.getByRole("button", { name }).first().click(); };
 const wait = (page: Page, ms = 700) => page.waitForTimeout(ms);
 const openSecurityPhone = async (page: Page) => {
-  await page.getByText("Text code", { exact: true }).locator("xpath=ancestor::li").getByRole("button").click();
+  await page.getByText("Text code", { exact: true }).locator("xpath=ancestor::li").getByRole("link").click();
   const add = page.getByRole("button", { name: "Add a Phone Number" });
   if (await add.isVisible()) await add.click();
   await page.getByRole("textbox", { name: "Phone number" }).waitFor();

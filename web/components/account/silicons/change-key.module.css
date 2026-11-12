@@ -1,0 +1,4 @@
+/* The Change key dialog's form, as the Silicon page's dialogs. */
+.form { display: grid; min-width: 0; gap: var(--space-inset); }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); padding-top: var(--space-related); }
+.error { margin: 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); }

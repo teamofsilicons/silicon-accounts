@@ -5,10 +5,11 @@
  *
  *   Checkup       what needs you here: a recovery phone when there is none, a device not used lately (Keep or Sign
  *                 Out). Hidden when nothing does, like Home's Needs you, in the same boxed list.
- *   Silicon keys  each Silicon you look after: when its key was made, and Change (on the Silicon's page).
+ *   Silicon keys  each Silicon you look after: when its key was made, and Change (asks here, as the prototype's
+ *                 askRotate; the new key is shown above the list until it is stored).
  *   Your sign-in  Google and Apple (connected with their email, or Connect; Unlink asks in a dialog that names the ways
  *                 in you keep, as the prototype's askUnlink), Email code and Text code (the emails and
- *                 phone numbers that get a code; Edit opens them in a dialog).
+ *                 phone numbers that get a code; the row opens them in a dialog at ?edit=email|phone).
  *   Devices       where you are signed in: this device marked, the others with Sign Out; then "Sign out of all other
  *                 devices".
  *   Activity      the way to every sign-in and change.
@@ -19,13 +20,13 @@
  */
 import Image from "next/image";
 import { useState, useSyncExternalStore } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AtSign, History, KeyRound, Laptop, Phone, SquareTerminal, Code } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
 import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
-import { ButtonLink } from "@/components/foundation/button-link";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page } from "@/components/foundation/layout/layout";
 import type { CarbonMe, IdentityView, Provider, SessionInfo } from "@/lib/api/types";
@@ -38,17 +39,25 @@ import { asCarbon, asSilicon, describeError, spanText, stkRotatedAt, useNow } fr
 import { useConnectProvider, useEverySession, useEverySilicon, useSignOutSession, useUnlinkProvider } from "../parts/queries";
 import { PageBar } from "../parts/page-bar";
 import { SiliconMark } from "../parts/silicon-mark";
-import { siliconHref } from "../silicons/silicons";
+import { ChangeKeyDialog } from "../silicons/change-key";
+import { dismissReveal, usePendingReveals } from "../parts/reveals";
+import { SecretReveal } from "../parts/secret-reveal";
 import { ContactList, LinkResult, PROVIDER_NAMES, ProviderMark } from "../sign-in-methods/sign-in-methods";
 import { sessionName } from "./sessions";
-import { LinkRow, Row, Section, Tile } from "../parts/rows";
+import { LinkItem, LinkRow, Row, Section, Tile } from "../parts/rows";
 import styles from "./security.module.css";
+
+/** Email code and Text code open their list in a dialog at ?edit=email or ?edit=phone, like Personal info's rows. */
+const editHref = (channel: "email" | "phone") => `${paths.signInMethods}?edit=${channel}`;
 
 export function Security() {
   const me = useMe();
   const carbon = asCarbon(me.data);
   const silicon = asSilicon(me.data);
-  const [editing, setEditing] = useState<"email" | "phone" | null>(null);
+  const router = useRouter();
+  const asked = useSearchParams().get("edit");
+  const editing = asked === "email" || asked === "phone" ? asked : null;
+  const close = () => router.replace(paths.signInMethods, { scroll: false });
 
   return (
     <div>
@@ -68,12 +77,12 @@ export function Security() {
       ) : carbon ? (
         <>
           <LinkResult />
-          <Checkup carbon={carbon} onAddPhone={() => setEditing("phone")} />
+          <Checkup carbon={carbon} onAddPhone={() => router.push(editHref("phone"), { scroll: false })} />
           <SiliconKeys />
-          <YourSignIn carbon={carbon} onEdit={setEditing} />
+          <YourSignIn carbon={carbon} />
           <Devices />
           <ActivityRow />
-          <Dialog open={!!editing} onOpenChange={open => { if (!open) setEditing(null); }}>
+          <Dialog open={!!editing} onOpenChange={open => { if (!open) close(); }}>
             {editing ? (
               <DialogContent
                 // With no number yet the dialog opens on the form, so it says what it's for (Anil, 2026-11-10, copy B).
@@ -137,27 +146,40 @@ function Checkup({ carbon, onAddPhone }: { carbon: CarbonMe; onAddPhone: () => v
 function SiliconKeys() {
   const silicons = useEverySilicon();
   const now = useNow(60_000);
+  const reveals = usePendingReveals();
+  const [changing, setChanging] = useState<string | null>(null);
   const list = silicons.data?.items ?? [];
   if (!list.length) return null;
+  const target = list.find(silicon => silicon.uuid === changing);
+  // A key changed here is shown here (the prototype's keyModal shows it where you changed it) until "I've stored it".
+  const fresh = reveals.filter(reveal => reveal.origin === "stk" && list.some(silicon => silicon.uuid === reveal.silicon));
   return (
-    <Section id="security-keys" title="Silicon keys">
-      {list.map(silicon => {
-        const made = stkRotatedAt(silicon) ?? silicon.created_at;
-        return (
-          <Row key={silicon.uuid} lead={<SiliconMark seed={silicon.uuid} size={28} />}
-            title={silicon.display_name || silicon.id || "A Silicon"}
-            detail={<>Made <span className={styles.strong}>{formatRelative(made, now)}</span></>}>
-            <ButtonLink href={siliconHref(silicon)} variant="secondary" size="sm" aria-label={`Change ${silicon.display_name || silicon.id || "this Silicon"}'s key`}>Change</ButtonLink>
-          </Row>
-        );
-      })}
-    </Section>
+    <>
+      {fresh.length ? (
+        <div className={styles.reveals}>
+          {fresh.map(reveal => <SecretReveal key={reveal.id} revealId={reveal.id} title={reveal.title} description={reveal.description} secrets={reveal.secrets} onDone={() => dismissReveal(reveal.id)} focusOnMount />)}
+        </div>
+      ) : null}
+      <Section id="security-keys" title="Silicon keys">
+        {list.map(silicon => {
+          const made = stkRotatedAt(silicon) ?? silicon.created_at;
+          return (
+            <Row key={silicon.uuid} lead={<SiliconMark seed={silicon.uuid} size={28} />}
+              title={silicon.display_name || silicon.id || "A Silicon"}
+              detail={<>Made <span className={styles.strong}>{formatRelative(made, now)}</span></>}>
+              <Button variant="secondary" size="sm" aria-label={`Change ${silicon.display_name || silicon.id || "this Silicon"}'s key`} onClick={() => setChanging(silicon.uuid)}>Change</Button>
+            </Row>
+          );
+        })}
+      </Section>
+      {target ? <ChangeKeyDialog silicon={target} open onClose={() => setChanging(null)} /> : null}
+    </>
   );
 }
 
 /* Your sign-in ------------------------------------------------------------------------------------------------------- */
 
-function YourSignIn({ carbon, onEdit }: { carbon: CarbonMe; onEdit: (channel: "email" | "phone") => void }) {
+function YourSignIn({ carbon }: { carbon: CarbonMe }) {
   const meta = useMeta();
   const connect = useConnectProvider();
   const [connecting, setConnecting] = useState<Provider | null>(null);
@@ -194,12 +216,9 @@ function YourSignIn({ carbon, onEdit }: { carbon: CarbonMe; onEdit: (channel: "e
           </Row>
         );
       })}
-      <Row lead={<Tile><AtSign size={16} strokeWidth={2} /></Tile>} title="Email code" detail={emails.length ? emails.join(", ") : "Not set up"}>
-        <Button variant="secondary" size="sm" onClick={() => onEdit("email")}>{emails.length ? "Edit" : "Add"}</Button>
-      </Row>
-      <Row lead={<Tile><Phone size={16} strokeWidth={2} /></Tile>} title="Text code" detail={phones.length ? phones.join(", ") : "Not set up"}>
-        <Button variant="secondary" size="sm" onClick={() => onEdit("phone")}>{phones.length ? "Edit" : "Add"}</Button>
-      </Row>
+      {/* The prototype's srow: the whole row opens its list in a dialog (?edit=…), a chevron at its end. */}
+      <LinkItem href={editHref("email")} replace scroll={false} lead={<Tile><AtSign size={16} strokeWidth={2} /></Tile>} title="Email code" detail={emails.length ? emails.join(", ") : "Not set up"} />
+      <LinkItem href={editHref("phone")} replace scroll={false} lead={<Tile><Phone size={16} strokeWidth={2} /></Tile>} title="Text code" detail={phones.length ? phones.join(", ") : "Not set up"} />
     </Section>
   );
 }

@@ -169,8 +169,10 @@ export class Results {
  * frame; it never reproduces with the embed on its own, resized or removed). Also Home's popular apps
  * (components/account/home-sections.tsx POPULAR_APPS, 2026-10-31): it reads each one's public page, and an app the
  * stack doesn't register (Ting is not among the testkit's fake apps) answers 404, which Home handles by leaving it out.
+ * And a page transition cut short by a resize (a test switching to a phone's viewport mid-navigation): the browser
+ * aborts the view transition and reports it; the page itself is fine.
  */
-const BENIGN = [/_rsc=.* due to access control checks/, /Frame load interrupted/, /ResizeObserver loop completed with undelivered notifications/, /status of 404 \(Not Found\) @ \S+\/v1\/apps\/ting\/public$/];
+export const BENIGN = [/Transition was aborted because of invalid state\. Viewport size changed/, /_rsc=.* due to access control checks/, /Frame load interrupted/, /ResizeObserver loop completed with undelivered notifications/, /status of 404 \(Not Found\) @ \S+\/v1\/apps\/ting\/public$/];
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Browsers                                                                                                            */

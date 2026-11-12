@@ -23,7 +23,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { chromium, webkit, type Browser, type Page } from "@playwright/test";
+import { chromium, expect, webkit, type Browser, type Page } from "@playwright/test";
 import { mockApi } from "./mock/api";
 import type { ScreenSpec } from "./screens-types";
 
@@ -82,8 +82,29 @@ const foundationScreens: ScreenSpec[] = [
   { name: "kitchen-squircle-fallback", path: "/__kitchen?squircle=fallback", waitFor: "[data-kitchen-ready]", widths: [1440], themes: ["light"], settle: 1200 },
   { name: "landing", path: "/", as: "signed-out" },
   { name: "shell-home", path: "/", waitFor: "[data-home]" },
-  { name: "shell-palette", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => {
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
+  { name: "shell-palette", path: "/personal", waitFor: "#personal-profile", fullPage: false, prepare: async page => {
+    const trigger = page.locator("button[aria-keyshortcuts]").filter({ visible: true }).first();
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "Search and jump" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Close dialog" })).toHaveCount(0);
+    const close = dialog.getByRole("button", { name: "Esc, close command palette" });
+    await expect(close).toBeVisible();
+    const option = dialog.getByRole("option").first();
+    await expect(option).toHaveAttribute("tabindex", "-1");
+    const input = dialog.getByRole("combobox", { name: "Search pages and actions" });
+    await input.press("ArrowDown");
+    await expect(option).toHaveAttribute("aria-selected", "true");
+    await input.press("Tab");
+    await expect(close).toBeFocused();
+    await close.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await input.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await trigger.click();
     await page.waitForTimeout(600);
   } },
   { name: "shell-nav-sheet", path: "/silicons", widths: [390], fullPage: false, prepare: async page => {

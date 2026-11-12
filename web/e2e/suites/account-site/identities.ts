@@ -32,8 +32,8 @@ const identities: Journey = {
     const googleRow = linkedList.getByRole("listitem").filter({ hasText: gmail }).filter({ has: ada.page.getByRole("button", { name: "Unlink Google" }) });
     const googleText = (await googleRow.innerText().catch(() => "")).replace(/\s+/g, " ");
     results.check("the Google row shows the account", /Google/.test(googleText) && googleText.includes(gmail), googleText);
-    // The emails are in Email code's dialog (Edit).
-    await linkedList.getByRole("listitem").filter({ hasText: "Email code" }).getByRole("button", { name: "Edit" }).click();
+    // The emails are in Email code's dialog (the row is a link to ?edit=email).
+    await linkedList.getByRole("listitem").filter({ hasText: "Email code" }).getByRole("link").click();
     const emailRow = (await ada.page.getByRole("dialog").getByRole("list", { name: "Your emails" }).locator(`[data-key="${gmail}"]`).innerText().catch(() => "")).replace(/\s+/g, " ");
     await ada.page.keyboard.press("Escape");
     results.check("the email row says it was verified by Google", /Verified by Google on/.test(emailRow), emailRow);

@@ -37,8 +37,8 @@
 
 /* Search sits in the middle of the bar: Silicon UI's soft button (grey, no border), muted label, a key for the shortcut.
    400px wide, the label at the start and the key at the end (Anil, 2026-10-30). On narrow screens only its icon shows. Doubled class so the mute wins over .soft's ink. */
-/* Lighter than muted (Anil, 2026-10-30): halfway between --text-muted and --text-faint, in both themes. */
-.search.search { width: min(100%, 400px); max-width: 100%; justify-self: center; color: color-mix(in oklab, var(--text-muted), var(--text-faint)); cursor: text; }
+/* Muted (was lighter than muted, Anil 2026-10-30; muted since 2026-11-12 so "Search" and ⌘K clear 4.5:1). */
+.search.search { width: min(100%, 400px); max-width: 100%; justify-self: center; color: var(--text-muted); cursor: text; }
 /* Button centres its contents in nested label spans and has no option to spread them, so this reaches in and lets them
    fill the width; the label (flex: 1) then pushes the key to the end. A tolerated difference
    (redesign/prototype-differences.md); drop it once Silicon UI's Button can. */
@@ -117,18 +117,8 @@
 /* A page outside the shell (landing while signed out) fills the viewport. */
 .bare { min-height: 100vh; min-height: 100dvh; }
 
-/* Command palette layer. */
-.paletteOverlay { position: fixed; inset: 0; z-index: var(--layer-overlay); background: var(--overlay); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-.paletteOverlay[data-state="open"] { animation: palette-fade-in var(--duration-standard) var(--ease-enter) both; }
-.paletteOverlay[data-state="closed"] { animation: palette-fade-out var(--duration-fast) var(--ease-standard) both; }
-.palettePositioner { position: fixed; inset: 0; z-index: var(--layer-dialog); display: flex; justify-content: center; padding: min(14vh, var(--space-screen)) var(--space-inset) var(--space-inset); pointer-events: none; }
-.palettePanel { width: min(100%, 640px); height: fit-content; outline: none; pointer-events: auto; }
-@keyframes palette-fade-in { from { opacity: 0; } }
-@keyframes palette-fade-out { to { opacity: 0; } }
-
 @media (prefers-reduced-motion: reduce) {
   .brand, .body, .resizeGrip { transition: none; }
-  .paletteOverlay[data-state="open"] { animation-duration: var(--duration-instant); }
 }
 
 /* The shell's "Leave this page?" question (leave-question.tsx). */

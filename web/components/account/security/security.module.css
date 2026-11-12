@@ -38,3 +38,4 @@
   .row[data-wide] { flex-wrap: wrap; }
   .row[data-wide] .actions { width: 100%; justify-content: flex-start; padding-left: calc(var(--control-height-xs) + var(--space-tight) + var(--space-group)); }
 }
+.reveals { display: grid; gap: var(--space-inset); }
