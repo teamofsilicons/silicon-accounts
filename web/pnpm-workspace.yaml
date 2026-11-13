@@ -3,9 +3,6 @@ ignoredBuiltDependencies:
   - unrs-resolver
 onlyBuiltDependencies:
   - esbuild
-patchedDependencies:
-  '@teamofsilicons/silicon-ui@0.4.0': patches/@teamofsilicons__silicon-ui@0.4.0.patch
-
 # Production standalone bundles run on Linux ARM64, including native image dependencies.
 supportedArchitectures:
   cpu: [ current, arm64 ]

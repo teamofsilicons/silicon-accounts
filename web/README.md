@@ -846,6 +846,10 @@ in `redesign/api-gaps.md`).
   deck in a dialog) and asks a Carbon with no phone to add one. The attention strip is gone.
 - **Avatars are circles** (Silicon UI's default): the 30% squircle override is gone from `styles/tokens.css`, so the
   account menu's hover, press and loading states match the picture.
+- **Silicon UI 0.5.0** (2026-11-13): the local pnpm patch of 0.4.0 is gone; everything in it shipped in 0.5.0
+  (teamofsilicons/silicon-ui#41, issues #28 to #40). The hint-size fallback is 12px upstream, which changes nothing here
+  (`tokens.css` sets `--field-hint-size`). `hideHeader`, Button's `link` and Input's `prefix`/`suffix` are experimental
+  props upstream, so `eslint.config.mjs` allows `dialog` and `input` too. `redesign/silicon-ui-*.patch` are history.
 - **Silicon UI 0.4.0**: faster motion (durations about halved; new spring tiers, old names kept) and fluid hover in
   NavList and menus. No site code changed.
 - **Local photos**: in development, when `ACCOUNTS_IRIS_BASE_URL` is not set, `proxy.ts` allows the local stack's default
