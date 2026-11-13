@@ -143,3 +143,16 @@ named a privileged app.
 
 Rollback is a symlink switch: no schema changed, so `/opt/accounts/previous-release` can be restored
 directly. Receipt: [verification-redesign-2026-11-13.json](verification-redesign-2026-11-13.json).
+
+## Audit fixes — 2026-11-13
+
+Release `accounts-audit-c38050a` (source `c38050a`) replaced `accounts-redesign-b08d20a` 35 minutes
+later, the same way: a code-only overlay, schema unchanged at 38, verified backup first. It carries
+104 fixes from a reviewed audit of every crate and both sites, among them: key sign-in no longer
+outlives a concurrent key revocation; federation errors no longer reveal internal DNS; logs no
+longer carry raw paths (tickets, device codes, emails); production refuses the internal tokens
+.env.example used to publish (checked first: production's own tokens differ); the developer site's
+API proxy caps request bodies; embeds no longer allow wildcard or plain-http framing origins; the
+client library refuses id_tokens as access tokens. The OpenAPI document now covers every route.
+Receipt: [verification-audit-2026-11-13.json](verification-audit-2026-11-13.json).
+

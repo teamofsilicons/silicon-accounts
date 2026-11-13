@@ -1,0 +1,31 @@
+{
+  "release": "accounts-audit-c38050a",
+  "revision": "c38050abd4beb177757bd0d3a04f2c16ba92a8b8",
+  "baseline": "accounts-redesign-b08d20a",
+  "archive_sha256": "e4803f6a509ead3b05de937cf6bd4e29d83224af69cd51dfc57c6852270f18a9",
+  "archive_files": 4894,
+  "migration_version": {
+    "before": 38,
+    "after": 38,
+    "migrations_run": false
+  },
+  "backup_key": "backups/predeploy-redesign-20261113T180004Z.dump",
+  "backup_sha256": "9858bea94b161bc7e0b05138b75563cf0e5644fda844c1a0f21f7b9eee410576",
+  "ssm_command_id": "2f3a86ef-7419-4379-971a-9026798b70b0",
+  "unchanged_configuration": true,
+  "local_validation": {
+    "rust_tests": "1061 passed, 0 failed (OpenAPI route coverage passes again)",
+    "clippy": "no errors",
+    "web": "typecheck, lint, 34 tests, production build",
+    "developer": "typecheck, lint, 99 tests, production build"
+  },
+  "public_checks": {
+    "https://accounts.teamofsilicons.com/readyz": 200,
+    "https://accounts.teamofsilicons.com/": 200,
+    "https://accounts.teamofsilicons.com/sign-in": 200,
+    "https://accounts.teamofsilicons.com/v1/openapi.json": "200, 184 paths",
+    "https://developers.teamofsilicons.com/docs": 200
+  },
+  "browser_check": "Signed-in Security page on the redesign, no console errors (desktop Chrome)",
+  "verified_at": "2026-11-13T18:00:08Z"
+}
