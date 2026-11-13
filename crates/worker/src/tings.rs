@@ -204,7 +204,7 @@ pub async fn run(state: AppState, mut shutdown: Shutdown) {
         match catalog {
             Ok(()) => break,
             Err(e) => {
-                tracing::warn!(code=%e.code,"Ting catalog unavailable; account notifications remain queued")
+                tracing::warn!(code=%e.code,error=%e,"Ting catalog unavailable; account notifications remain queued")
             }
         }
         if !shutdown.sleep(Duration::from_secs(30)).await {
@@ -216,7 +216,9 @@ pub async fn run(state: AppState, mut shutdown: Shutdown) {
         move |n| {let state=claiming.clone();async move {claim(&state,n).await}},
         move |row,at| {let state=state.clone();async move {
             match tokio::time::timeout_at(pipeline::deadline(at),deliver(&state,&row)).await {
-                Ok(Ok(()))=>{},_=>tracing::warn!(delivery_id=%row.id,"Ting attempt interrupted; its lease will expire"),
+                Ok(Ok(()))=>{},
+                Ok(Err(e))=>tracing::warn!(delivery_id=%row.id,error=%e,"Ting attempt failed; its lease will expire"),
+                Err(_)=>tracing::warn!(delivery_id=%row.id,"Ting attempt timed out; its lease will expire"),
             }
         }}).await;
 }

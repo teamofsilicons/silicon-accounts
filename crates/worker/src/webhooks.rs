@@ -13,8 +13,9 @@
 //!    database gets there; the HTTP request itself is cut at 10 s) is abandoned unrecorded. A
 //!    crashed or stopped worker's lease simply runs out and another node retries: delivery is
 //!    at-least-once, and receivers dedupe by `event_id`.
-//! 2. **Resolve the target now**: the app's (or Silicon's) *current* webhook URL and *current*
-//!    signing secret, so a rotated secret or a moved endpoint applies to retries and replays.
+//! 2. **Resolve the target now**: the app's (or its Cell link's) *current* webhook URL and
+//!    *current* signing secret, so a rotated secret or a moved endpoint applies to retries and
+//!    replays.
 //! 3. **POST** the stored body with `Content-Type: application/json`,
 //!    `User-Agent: SiliconAccounts-Webhooks/1`, `X-Accounts-Event-Id`, `X-Accounts-Event-Type`,
 //!    `X-Accounts-Delivery-Id`, `X-Accounts-Timestamp` (unix seconds) and
@@ -204,21 +205,8 @@ async fn load_target(
                 disabled: status != AppStatus::Active,
             })
         }
-        WebhookTargetKind::Silicon => {
-            // A Silicon's own webhook is also delivered after it was released or deleted, as long
-            // as the endpoint and secret are still stored (e.g. silicon.custodian.declined).
-            let row: Option<(Option<String>, Option<Vec<u8>>)> = sqlx::query_as(
-                "select webhook_url, webhook_secret_enc from accounts where uuid = $1 and kind = 'silicon'",
-            )
-            .bind(id)
-            .fetch_optional(&mut *conn)
-            .await?;
-            row.map(|(url, secret_enc)| Target {
-                url,
-                secret_enc,
-                disabled: false,
-            })
-        }
+        // Silicon events go to Ting; claim_due never picks a Silicon delivery.
+        WebhookTargetKind::Silicon => None,
     })
 }
 

@@ -263,9 +263,9 @@ async fn json_errors(response: Response, method: &Method, path: &str) -> Respons
         }
         s if s.is_server_error() => {
             let context = if text.is_empty() {
-                format!("{method} {path} answered {s} without a body")
+                format!("{method} answered {s} without a body")
             } else {
-                format!("{method} {path} answered {s}: {text}")
+                format!("{method} answered {s}: {text}")
             };
             // Logs the original text; the caller only sees the generic message + request id.
             let mut e = ApiError::internal(context);

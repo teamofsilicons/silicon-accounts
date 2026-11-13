@@ -10,7 +10,7 @@
 //! out and another node retries them: delivery is at-least-once (webhook receivers dedupe by
 //! `event_id`).
 //!
-//! - [`webhooks`]: delivers `webhook_deliveries` (app and Silicon webhooks). Each attempt POSTs
+//! - [`webhooks`]: delivers `webhook_deliveries` (app and Cell link webhooks). Each attempt POSTs
 //!   the stored event body, signed with the target's *current* secret, to the target's *current*
 //!   URL; a 2xx within 10 s is delivered, anything else is retried 10 s, 30 s, 1 min, 5 min,
 //!   15 min, 30 min, then hourly until 72 h after the event → `failed` (apps can replay it).

@@ -39,6 +39,7 @@ use accounts_core::events::{APP_EVENT_TYPES, SILICON_EVENT_TYPES};
 use accounts_core::http::cookies::read_cookie;
 use accounts_core::http::{AccountAuth, AuthVia, Query, SESSION_COOKIE};
 use accounts_core::models::{AccountKind, App, SubscriptionDelivery};
+use accounts_core::repo::apps::AppAuthError;
 use accounts_core::repo::{sessions, subscriptions, tokens};
 use accounts_core::{ApiError, AppState};
 use axum::Extension;
@@ -726,13 +727,14 @@ impl StreamState {
                     secret,
                     subscription_id,
                 } => {
-                    if state
+                    match state
                         .app_cache
                         .verify(&state.db, &state.keys.pepper, app_id, secret)
                         .await
-                        .is_err()
                     {
-                        return Ok(Some(Close::AccessRemoved));
+                        Ok(_) => {}
+                        Err(e @ AppAuthError::Internal(_)) => return Err(e.to_api()),
+                        Err(_) => return Ok(Some(Close::AccessRemoved)),
                     }
                     let mut conn = state.db.acquire().await?;
                     let alive = subscriptions::get(&mut conn, app_id, *subscription_id)

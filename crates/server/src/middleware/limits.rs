@@ -98,7 +98,7 @@ pub async fn limits(State(timeouts): State<Timeouts>, req: Request, next: Next) 
     match tokio::time::timeout(budget, next.run(req)).await {
         Ok(response) => response,
         Err(_) => {
-            tracing::warn!(%method, %path, seconds = budget.as_secs(), "request ran past its time budget");
+            tracing::warn!(%method, seconds = budget.as_secs(), "request ran past its time budget");
             let mut response = errors::render(&path, timed_out(&method, &path, budget));
             // The budget bounds the whole request: whatever body is left stays unread.
             response.extensions_mut().insert(LeaveUnread);
