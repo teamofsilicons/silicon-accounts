@@ -136,10 +136,10 @@ export function InterfaceAuthorize({ query }: { query: Record<string, string> })
                 <Row
                   lead={<AppMark app={{ app_id: app.app_id, name: app.name, logo_url: app.logo_url }} size={28} decorative />}
                   title={app.name}
-                  detail={<>{app.description || `${flow.interface.name} uses ${app.name} for you.`} Sees: {app.scopes.join(", ")}.</>}
+                  detail={`Sees your ${app.scopes.join(", ")}`}
                 />
                 {app.optional_scopes.map(scope => (
-                  <Row key={scope} lead={<Tile>{ICON[scope] ?? <UserRound size={16} strokeWidth={2} />}</Tile>} title={`Share your ${scope} with ${app.name}`} detail="Off unless you switch it on">
+                  <Row key={scope} lead={<Tile>{ICON[scope] ?? <UserRound size={16} strokeWidth={2} />}</Tile>} title={`Share your ${scope}`} detail={`Optional, for ${app.name}`}>
                     <Switch checked={(selected[app.app_id] ?? []).includes(scope)} onCheckedChange={on => share(app.app_id, scope, on)} aria-label={`Share your ${scope} with ${app.name}`} disabled={pending} />
                   </Row>
                 ))}

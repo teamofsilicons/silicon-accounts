@@ -71,6 +71,7 @@ export function defaultRoutes(signedIn: boolean): MockRoute[] {
     ["GET /v1/me/sessions", auth(() => ({ json: data.page(data.sessions) }))],
     ["GET /v1/me/history", auth(() => ({ json: data.page(data.history) }))],
     ["GET /v1/me/proofs", auth(() => ({ json: data.page(data.proofs) }))],
+    ["GET /v1/me/interface-sessions", auth(() => ({ json: { sessions: [] } }))],
     ["GET /v1/me/silicons", auth(() => ({ json: data.page(data.silicons) }))],
     ["GET /v1/me/custodian-requests", auth(() => ({ json: data.page(data.custodianRequests) }))],
     ["GET /v1/me/owned-apps", auth(() => ({ json: data.page(data.ownedApps()) }))],

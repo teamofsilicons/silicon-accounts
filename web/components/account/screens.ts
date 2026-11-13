@@ -51,6 +51,12 @@ const accountRoutes: MockRoute[] = [
   }],
 ];
 
+/** Two sessions of one Interface across two apps (GET /v1/me/interface-sessions). */
+const interfaceSessions: MockRoute = ["GET /v1/me/interface-sessions", () => ({ json: { sessions: [
+  { session_id: "is_1", interface_id: "potato", name: "Potato", logo_url: null, apps: ["Briefcase", "DM"], created_at: "2026-11-10T09:00:00Z", expires_at: "2026-12-10T09:00:00Z" },
+  { session_id: "is_2", interface_id: "potato", name: "Potato", logo_url: null, apps: ["Briefcase"], created_at: "2026-11-12T09:00:00Z", expires_at: "2026-12-12T09:00:00Z" },
+] } })];
+
 const empty: MockRoute[] = [
   ["GET /v1/me/apps", () => ({ json: data.page([]) })],
   ["GET /v1/me/proofs", () => ({ json: data.page([]) })],
@@ -233,21 +239,24 @@ const shown: ScreenSpec[] = [
     await page.locator('[data-phone-mode="international"]').waitFor();
     await wait(page, 600);
   } },
-  { name: "account-sign-in-methods-add", path: "/sign-in-methods", prepare: async page => {
-    await click(page, "Add an email");
+  { name: "account-sign-in-methods-add", path: "/sign-in-methods?edit=email", prepare: async page => {
+    await click(page, "Add an Email");
     await wait(page);
     await page.getByLabel("Email address").fill("night.shift@example.com");
-    await click(page, "Send code");
+    await click(page, "Send Code");
     await page.getByText("Enter the 6-digit code").waitFor();
     await wait(page, 900);
   } },
-  { name: "account-sign-in-methods-remove", path: "/sign-in-methods", prepare: async page => { await page.getByRole("button", { name: "Remove", exact: true }).nth(1).click(); await wait(page, 600); } },
+  { name: "account-sign-in-methods-remove", path: "/sign-in-methods?edit=email", prepare: async page => { await page.getByRole("button", { name: /^Remove / }).first().click(); await wait(page, 600); } },
 
   // Apps: with access, the remove question, the removed ones.
   { name: "account-apps", path: "/apps" },
   { name: "account-app-page", path: "/apps/briefcase" },
   { name: "account-apps-remove", path: "/apps/briefcase", prepare: async page => { await click(page, "Remove"); await wait(page, 600); } },
-  { name: "account-apps-removed", path: "/apps", prepare: async page => { await click(page, /^Access removed/); await wait(page, 900); } },
+  { name: "account-apps-removed", path: "/apps", prepare: async page => { await page.getByRole("heading", { name: "Access removed", exact: true }).scrollIntoViewIfNeeded(); await wait(page, 400); } },
+  // An Interface that signs you in to apps, and Remove asked first.
+  { name: "account-apps-interfaces", path: "/apps", routes: [interfaceSessions] },
+  { name: "account-apps-interface-remove", path: "/apps", routes: [interfaceSessions], prepare: async page => { await page.getByRole("region", { name: "Interfaces" }).getByRole("button", { name: "Remove" }).click(); await wait(page, 600); } },
 
   // Proofs: the active one with its ring, the revoke question, the ended ones.
   { name: "account-proofs", path: "/proofs", prepare: async page => {
@@ -276,7 +285,7 @@ const shown: ScreenSpec[] = [
   } },
   { name: "account-silicons-drawer", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); } },
   { name: "account-silicons-drawer-stk", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await drawerTo(page, "STK"); } },
-  { name: "account-silicons-drawer-notifications", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await page.locator(drawer).getByRole("heading", { name: "Notifications", exact: true }).evaluate(element => element.scrollIntoView({ block: "start" })); await wait(page, 600); } },
+  { name: "account-silicon-access", path: "/silicons/Qz4", fullPage: false },
   { name: "account-silicons-drawer-transfer", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:head_of_growth"); await drawerTo(page, "Custodian"); } },
   { name: "account-silicons-drawer-delete", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await drawerTo(page, "Delete this Silicon"); } },
   { name: "account-silicons-drawer-change-id", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:head_of_growth"); await click(page, "Change its id"); await wait(page, 600); await page.keyboard.type("scout"); await wait(page, 1300); } },

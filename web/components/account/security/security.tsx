@@ -69,11 +69,15 @@ export function Security() {
           <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try Again</Button></span>
         </Alert>
       ) : silicon ? (
-        <EmptyState
-          icon={<KeyRound width={24} height={24} strokeWidth={1.5} />}
-          title="Silicons sign in with an STK"
-          description={`${silicon.id ?? "This Silicon"} signs in with its si:id and STK, not with emails or phone numbers. Its custodian can rotate the STK.`}
-        />
+        <>
+          <EmptyState
+            icon={<KeyRound width={24} height={24} strokeWidth={1.5} />}
+            title="Silicons sign in with an STK"
+            description={`${silicon.id ?? "This Silicon"} signs in with its si:id and STK, not with emails or phone numbers. Its custodian can rotate the STK.`}
+          />
+          {/* A Silicon signed in here can still see where it is signed in, and end what it doesn't recognise. */}
+          <Devices />
+        </>
       ) : carbon ? (
         <>
           <LinkResult />
@@ -170,7 +174,7 @@ function SiliconKeys() {
         {list.map(silicon => {
           const made = stkRotatedAt(silicon) ?? silicon.created_at;
           return (
-            <Row key={silicon.uuid} lead={<SiliconMark seed={silicon.uuid} size={28} />}
+            <Row key={silicon.uuid} lead={<SiliconMark seed={silicon.uuid} photo={silicon.pfp_url} size={28} />}
               title={silicon.display_name || silicon.id || "A Silicon"}
               detail={<>Made <span className={styles.strong}>{formatRelative(made, now)}</span></>}>
               <Button variant="secondary" size="sm" aria-label={`Change ${silicon.display_name || silicon.id || "this Silicon"}'s key`} onClick={() => setChanging(silicon.uuid)}>Change</Button>
@@ -290,6 +294,7 @@ function Devices() {
   const now = useNow(60_000);
   const [signingOutOthers, setSigningOutOthers] = useState(false);
   const [othersError, setOthersError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
 
   if (sessions.error && !sessions.data) {
     return (
@@ -310,14 +315,18 @@ function Devices() {
   const signOutOthers = async () => {
     setOthersError(null);
     setSigningOutOthers(true);
-    try {
-      // No one call signs out every other session; each one ends on its own.
-      for (const session of others) await revoke.mutateAsync(session.id);
-    } catch (raw) {
-      setOthersError(describeError(raw));
-    } finally {
-      setSigningOutOthers(false);
+    // No one call signs out every other session; each one ends on its own, and one that fails doesn't stop the rest.
+    let failed: unknown = null;
+    for (const session of others) {
+      try {
+        await revoke.mutateAsync(session.id);
+      } catch (raw) {
+        failed ??= raw;
+      }
     }
+    setSigningOutOthers(false);
+    if (failed) setOthersError(describeError(failed));
+    else setAsking(false);
   };
 
   return (
@@ -327,8 +336,19 @@ function Devices() {
         {ordered.map(session => <DeviceRow key={session.id} session={session} now={now} />)}
         {others.length ? (
           <li className={styles.foot}>
-            <Button variant="danger" size="sm" onClick={() => void signOutOthers()} loading={signingOutOthers}>Sign Out of All Other Devices</Button>
-            {othersError ? <span className={styles.rowError} role="alert">{othersError}</span> : null}
+            <Button variant="danger" size="sm" onClick={() => { setOthersError(null); setAsking(true); }}>Sign Out of All Other Devices</Button>
+            <Dialog open={asking} onOpenChange={open => { if (!open && !signingOutOthers) setAsking(false); }}>
+              <DialogContent
+                title="Sign out of all other devices?"
+                description={<>{others.length === 1 ? "1 other sign-in ends" : `${others.length} other sign-ins end`}, including the silicon-accounts CLI and the developer site. This device stays signed in.</>}
+              >
+                {othersError ? <p className={styles.rowError} role="alert">{othersError}</p> : null}
+                <div className={styles.actions}>
+                  <Button variant="ghost" onClick={() => setAsking(false)} disabled={signingOutOthers}>Cancel</Button>
+                  <Button variant="danger" loading={signingOutOthers} onClick={() => void signOutOthers()}>Sign Out</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </li>
         ) : null}
       </ul>

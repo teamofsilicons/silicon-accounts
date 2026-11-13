@@ -101,7 +101,7 @@ function Decision({ request, you, now }: { request: CustodianRequest; you: { nam
               <ArrowRight className={styles.arrow} size={18} strokeWidth={2} />
             </>
           ) : null}
-          <SiliconMark seed={request.silicon.uuid} size={48} pending={!transfer} />
+          <SiliconMark seed={request.silicon.uuid} photo={request.silicon.pfp_url} size={48} pending={!transfer} />
           <ArrowRight className={styles.arrow} size={18} strokeWidth={2} />
           <Avatar name={you.name} src={you.photo} size="lg" />
         </div>

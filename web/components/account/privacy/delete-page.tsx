@@ -17,6 +17,7 @@
  * with RECOVERY_DAYS null the page says what is true today: no recovery card, and the CarbonID held for 10 days.
  */
 import { useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AtSign, Check, Cpu, Inbox, Laptop, Link2, RotateCcw } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
@@ -46,8 +47,8 @@ import {
   useEveryCustodianRequest,
   useEveryProof,
   useEverySession,
+  refreshSiliconViews,
   useEverySilicon,
-  useSetMeView,
   useStartTransfer,
 } from "../parts/queries";
 import { Row, Tile } from "../parts/rows";
@@ -236,7 +237,7 @@ function SiliconCheck({ silicon, carbon, now }: { silicon: ManagedSilicon; carbo
 
   return (
     <Row
-      lead={<SiliconMark seed={silicon.uuid} size={28} />}
+      lead={<SiliconMark seed={silicon.uuid} photo={silicon.pfp_url} size={28} />}
       title={transfer ? `${name} is going to ${personLabel(transfer.to)}` : `${name} needs a new home`}
       detail={transfer ? `Waiting for them to accept · ${spanText(msUntil(transfer.expires_at, now))} left` : "Hand it to someone, or delete it"}
       wide
@@ -292,7 +293,7 @@ function Foot({ carbon, silicons, now }: { carbon: CarbonMe; silicons: ManagedSi
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const remove = useDeleteAccount();
-  const view = useSetMeView();
+  const client = useQueryClient();
   const id = carbon.id ?? carbon.uuid;
   const left = silicons.length;
   const waiting = silicons.filter(item => item.pending_transfer);
@@ -314,8 +315,9 @@ function Foot({ carbon, silicons, now }: { carbon: CarbonMe; silicons: ManagedSi
       window.setTimeout(() => leaveDeletedAccount(id), 600);
     } catch (raw) {
       const failure = ApiError.from(raw);
-      // A Silicon came into this Carbon's care since the page loaded: the checks show it once the account is read again.
-      if (failure.code === "custodian_of_silicons") void view.refresh();
+      // A Silicon came into this Carbon's care since the page loaded: the checks (read from the Silicons list) show it
+      // once the list and the account are read again.
+      if (failure.code === "custodian_of_silicons") refreshSiliconViews(client);
       setError(describeError(failure));
     }
   };

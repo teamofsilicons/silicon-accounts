@@ -19,9 +19,6 @@ function readableUrl(src: string): string | null {
   } catch { return null; }
 }
 
-const channelDistance = (data: Uint8ClampedArray, at: number, rgb: number[]) =>
-  Math.max(Math.abs(data[at] - rgb[0]), Math.abs(data[at + 1] - rgb[1]), Math.abs(data[at + 2] - rgb[2]));
-
 /** Sample coloured cells from the saved creature itself, from its light side through its dark side. */
 function avatarColours(data: Uint8ClampedArray, width: number, height: number): [string, string, string] | undefined {
   const cells: { order: number; colour: string }[] = [];
@@ -37,50 +34,6 @@ function avatarColours(data: Uint8ClampedArray, width: number, height: number): 
   if (cells.length < 12) return undefined;
   cells.sort((a, b) => a.order - b.order);
   return [cells[Math.floor(cells.length * .15)].colour, cells[Math.floor(cells.length * .5)].colour, cells[Math.floor(cells.length * .85)].colour];
-}
-
-/** The old exporter painted a diagonal linear wash, then drew each mosaic cell as a flat square. */
-async function recoverLegacyAvatar(blob: Blob): Promise<{ src: string; colours?: [string, string, string] } | null> {
-  const bitmap = await createImageBitmap(blob);
-  try {
-    const size = bitmap.width;
-    if (size !== bitmap.height || size < 256 || size > 1024) return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = size; canvas.height = size;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) return null;
-    context.drawImage(bitmap, 0, 0);
-    const pixels = context.getImageData(0, 0, size, size);
-    const data = pixels.data;
-    const from = [data[0], data[1], data[2]];
-    const last = (size * size - 1) * 4;
-    const to = [data[last], data[last + 1], data[last + 2]];
-    const ground = (x: number, y: number) => {
-      const t = (x + y) / (2 * (size - 1));
-      return from.map((value, channel) => value + (to[channel] - value) * t);
-    };
-    // Real photos have texture inside their pixels; the avatar has many solid coloured cells.
-    let solid = 0;
-    for (let y = Math.floor(size * .2); y < size * .8; y += Math.max(8, Math.floor(size / 20))) {
-      for (let x = Math.floor(size * .2); x < size * .8; x += Math.max(8, Math.floor(size / 20))) {
-        const at = (y * size + x) * 4;
-        if (channelDistance(data, at, ground(x, y)) < 45) continue;
-        const neighbor = (y * size + x + 2) * 4;
-        const below = ((y + 2) * size + x) * 4;
-        if (channelDistance(data, at, [data[neighbor], data[neighbor + 1], data[neighbor + 2]]) < 3 &&
-            channelDistance(data, at, [data[below], data[below + 1], data[below + 2]]) < 3) solid++;
-      }
-    }
-    if (solid < 12) return null;
-    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      const at = (y * size + x) * 4;
-      const distance = channelDistance(data, at, ground(x, y));
-      data[at + 3] = distance <= 18 ? 0 : distance >= 35 ? 255 : Math.round((distance - 18) * 255 / 17);
-    }
-    const colours = avatarColours(data, size, size);
-    context.putImageData(pixels, 0, 0);
-    return { src: canvas.toDataURL("image/png"), colours };
-  } finally { bitmap.close(); }
 }
 
 async function firstFrame(blob: Blob): Promise<{ poster: string; colours?: [string, string, string] }> {
@@ -139,9 +92,8 @@ export function siliconPhotoAsset(src: string): Promise<SiliconPhotoAsset> {
       if (blob.type === "image/png") {
         // A maker PNG is exact: find its look again, so the card can draw it live (silicon-avatar-match.ts).
         const choice = await lookOfPng(blob);
+        // Any other PNG is a photo, shown as it is: guessing an old avatar from flat colour areas cut real logos out.
         if (choice) return { kind: "avatar", src: url, poster: url, choice };
-        const recovered = await recoverLegacyAvatar(blob);
-        if (recovered) return { kind: "avatar", src: recovered.src, poster: recovered.src, colours: recovered.colours };
       }
     } catch { /* An unreadable photo still displays as a photo. */ }
     return { kind: "photo", src };

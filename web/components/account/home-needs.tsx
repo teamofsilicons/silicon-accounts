@@ -106,7 +106,7 @@ function Requests({ id, title, waiting, failed, error, retry, stale, now }: { id
           const time = timeLeft(request, now);
           const transfer = request.kind === "transfer";
           return (
-            <Row key={request.id} lead={<SiliconMark seed={request.silicon.uuid} size={28} pending={!transfer} />}
+            <Row key={request.id} lead={<SiliconMark seed={request.silicon.uuid} photo={request.silicon.pfp_url} size={28} pending={!transfer} />}
               title={transfer ? `${personLabel(request.from)} is handing ${siliconName(request)} to you` : `${siliconName(request)} wants you to look after it`}
               when={{ text: time.text, tone: time.tone }}>
               <ButtonLink href={requestHref(request.id)} variant="secondary" size="sm">Review</ButtonLink>

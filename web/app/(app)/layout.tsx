@@ -6,7 +6,7 @@
  */
 import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";
-import { DevStatesPanel } from "@/components/foundation/dev/dev-states";
+import { DevTools } from "@/components/foundation/dev/dev-tools";
 import { Providers } from "@/components/foundation/providers";
 import { hasSessionCookie } from "@/lib/server/session";
 
@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <Providers surface={surface} sessionHint={sessionHint}>
       {children}
-      {process.env.NODE_ENV === "development" && surface !== "embed" ? <DevStatesPanel /> : null}
+      {process.env.NODE_ENV === "development" && surface !== "embed" ? <DevTools /> : null}
     </Providers>
   );
 }

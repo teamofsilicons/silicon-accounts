@@ -63,6 +63,9 @@
 /* Below the top bar: the section list and the page, inset 8px, with 8px between them. */
 .body { --sidebar-width: 248px; position: relative; display: grid; min-width: 0; flex: 1; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); gap: var(--space-related); padding: var(--space-related); transition: grid-template-columns var(--duration-standard) var(--ease-standard); }
 .aside { position: sticky; top: calc(var(--top-height) + var(--space-related)); height: calc(100dvh - var(--top-height) - (var(--space-related) * 2)); overflow-y: auto; }
+/* The server draws the wide layout (it can't know the width); under 900px the sidebar and its handle stay hidden until
+   the page swaps in the phone's sheet, so a phone never shows the section list over the page first. */
+@media (max-width: 899px) { .aside, .resize { display: none; } }
 @media (max-width: 899px) { .body { display: flex; flex-direction: column; gap: 0; padding: 0; } }
 
 /* The sidebar's width in steps (sidebar-resize.tsx): a 17px grab area over the page box's left edge. On hover, focus or

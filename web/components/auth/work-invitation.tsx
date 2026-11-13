@@ -7,7 +7,7 @@
  * - An invitation for an existing Carbon: what the work id will be, and "Sign In and Review Invitation" in Silicon
  *   Organizations.
  * - A new work account: its work id, "Send Verification Code" to the invited email, then the code (the flow's code
- *   boxes), name, date of birth (Silicon UI's DatePicker) and timezone (the timezone search Personal Info uses), and
+ *   boxes), name, date of birth (DobField: a year list over Silicon UI's calendar) and timezone (the timezone search Personal Info uses), and
  *   "Verify Email and Accept Work Account", which hands the proof to Silicon Organizations in a POST.
  *
  * The words and behaviour are main's; only the look moved onto the redesign.
@@ -15,7 +15,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Combobox } from "@teamofsilicons/silicon-ui/combobox";
-import { DatePicker } from "@teamofsilicons/silicon-ui/date-picker";
 import { Input } from "@teamofsilicons/silicon-ui/input";
 import { OtpInput } from "@teamofsilicons/silicon-ui/otp-input";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
@@ -28,9 +27,9 @@ import { useMeta } from "@/lib/query/session";
 import { ApiError } from "@/lib/api/errors";
 import { timezoneOptions } from "@/lib/timezones";
 import styles from "./flow/flow.module.css";
+import { DobField } from "./flow/dob-field";
 
 const MIN_DOB = new Date(1900, 0, 2);
-const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 export function WorkInvitationPage({ ticket }: { ticket: string }) {
   const invite = useWorkInvitation(ticket);
@@ -43,7 +42,7 @@ export function WorkInvitationPage({ ticket }: { ticket: string }) {
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
-  const [dob, setDob] = useState<Date | undefined>(undefined);
+  const [dob, setDob] = useState<string | null>(null);
   const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
   const [maxDob] = useState(() => {
     const today = new Date();
@@ -89,7 +88,7 @@ export function WorkInvitationPage({ ticket }: { ticket: string }) {
   const submit = async () => {
     if (!challenge || !dob) return;
     try {
-      const result = await verify.mutateAsync({ challenge_id: challenge, code, display_name: name, dob: dateKey(dob), timezone });
+      const result = await verify.mutateAsync({ challenge_id: challenge, code, display_name: name, dob, timezone });
       setVerified(result);
       verify.reset();
       handoff(result);
@@ -138,7 +137,7 @@ export function WorkInvitationPage({ ticket }: { ticket: string }) {
               <form className={styles.form} onSubmit={event => { event.preventDefault(); void submit(); }}>
                 <OtpInput label="Verification code" length={6} value={code} onChange={setCode} autoFocus />
                 <Input label="Display name" autoComplete="name" value={name} onChange={event => setName(event.target.value)} required maxLength={100} />
-                <DatePicker label="Date of birth" value={dob} onChange={setDob} minDate={MIN_DOB} maxDate={maxDob} />
+                <DobField label="Date of birth" value={dob} onChange={setDob} minDate={MIN_DOB} maxDate={maxDob} />
                 <Combobox label="Timezone" options={zones} value={timezone} onValueChange={setTimezone} placeholder="Search a city or an offset" />
                 <Button type="submit" className={styles.wide} loading={verify.isPending} disabled={code.length !== 6 || !name.trim() || !dob || !timezone}>Verify Email and Accept Work Account</Button>
                 <Button type="button" variant="ghost" loading={send.isPending} onClick={sendCode}>Resend Code</Button>

@@ -3,12 +3,13 @@
 /**
  * select_account: which account signs in to the app, when one sign-in reaches a personal account and work accounts
  * (from main's work accounts, 2026-11-03; on the flow's design 2026-11-13). Personal, then Work, each account on the
- * flow's AccountRow ("Continue as"'s row): its photo, name and id, a work account's org under them, and Continue. An
+ * flow's AccountRow ("Continue as"'s row): its photo, name and id, a work account's org (logo and name) under them, and Continue. An
  * account whose org doesn't allow this app is greyed with the server's reason, and can't be chosen. "Sign in to Another
  * Account" goes back to signing in.
  */
 import { useState } from "react";
 import { Button } from "@teamofsilicons/silicon-ui/button";
+import { AppMark } from "@/components/account/parts/app-mark";
 import type { ApiError } from "@/lib/api/errors";
 import type { FlowController } from "../flow/controller";
 import type { HostedFlow } from "../flow/model";
@@ -46,7 +47,13 @@ export function SelectAccount({ flow, ctl, notice }: { flow: HostedFlow; ctl: Fl
                   account={account}
                   size="sm"
                   blocked={blocked}
-                  detail={blocked ? account.reason ?? `${account.org?.name ?? "Your org"} does not allow this app.` : account.org?.name}
+                  detail={blocked ? account.reason ?? `${account.org?.name ?? "Your org"} does not allow this app.` : account.org ? (
+                    // Each work account shows its org's name and logo (UNDERSTANDING.md), so look-alike accounts stay apart.
+                    <span className={styles.orgLine}>
+                      <AppMark app={{ app_id: account.org.org_id, name: account.org.name, logo_url: account.org.logo_url }} size={16} decorative />
+                      {account.org.name}
+                    </span>
+                  ) : undefined}
                   action={
                     <Button
                       size="sm"

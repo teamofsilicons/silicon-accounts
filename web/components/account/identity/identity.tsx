@@ -103,7 +103,7 @@ export function Identity() {
               >
                 <span className="mono">{account.id ?? account.uuid}</span>
               </Row>
-              <Row label="Date of birth" edit="dob">{account.dob ? formatDate(`${account.dob}T12:00:00Z`) : <span className={styles.muted}>Not added</span>}</Row>
+              <Row label="Date of birth" edit={carbon ? "dob" : undefined}>{account.dob ? formatDate(account.dob) : <span className={styles.muted}>Not added</span>}</Row>
               <Row label="Timezone" edit="timezone">{account.timezone}</Row>
             </Box>
             {carbon ? <ContactBox carbon={carbon} /> : null}

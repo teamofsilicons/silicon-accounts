@@ -124,7 +124,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   let response: Response;
   try {
-    response = dev?.fail ? devFailure() : await fetch(url, { method, headers, body, credentials: "include", signal: options.signal, cache: "no-store" });
+    // The NODE_ENV test (not just `dev`) lets production builds drop devFailure and its text.
+    response = process.env.NODE_ENV === "development" && dev?.fail ? devFailure() : await fetch(url, { method, headers, body, credentials: "include", signal: options.signal, cache: "no-store" });
   } catch (error) {
     throw networkError(error, method, path);
   }
