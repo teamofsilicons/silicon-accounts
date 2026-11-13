@@ -326,7 +326,18 @@ async fn accounts_rename_preserves_credentials_sessions_and_token_boundaries() {
     };
     let carbon = ctx.carbon().await;
     let session = ctx.browser_session(&carbon).await;
+    // The current issuance helper reads work identity metadata, which did not
+    // exist in migration 0011. Supply an empty personal-only projection solely
+    // while minting this legacy credential, then restore the exact old schema.
+    sqlx::query("alter table accounts add column org_id text")
+        .execute(&ctx.db.pool)
+        .await
+        .unwrap();
     let old = ctx.tokens_for(&carbon, "accounts", &[Scope::Profile]).await;
+    sqlx::query("alter table accounts drop column org_id")
+        .execute(&ctx.db.pool)
+        .await
+        .unwrap();
     let before: serde_json::Value =
         sqlx::query_scalar("select to_jsonb(a)-'app_id' from apps a where app_id='accounts'")
             .fetch_one(&ctx.db.pool)

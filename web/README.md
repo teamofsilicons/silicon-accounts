@@ -104,6 +104,24 @@ builds this site into `.next-8690` (`NEXT_DIST_DIR`), so it never touches the de
 `NEXT_DIST_DIR=.next-8690 PORT=8690 ACCOUNTS_API_URL=http://127.0.0.1:8689 pnpm build` (or `pnpm dev`). Next allows
 one `next dev` per build directory at a time. `scripts/e2e.sh` stacks work the same way (`e2e/README.md`).
 
+## Local frontend with live data
+
+Run `scripts/dev-live.sh` from the repository root, then open `http://localhost:9100`.
+This starts only the frontend, with an isolated `.next-live-9100` build directory and
+`ACCOUNTS_API_URL=https://accounts.teamofsilicons.com`. Every account edit uses production data.
+The API must include exactly `http://localhost:9100` in `ACCOUNTS_EXTRA_ALLOWED_ORIGINS`.
+Use `localhost`, not `127.0.0.1` or another port. Requests go through the frontend's existing
+same-origin API rewrites; this does not enable credentialed CORS.
+
+Google and Apple keep their registered production callback URLs. For a first-party flow
+returning to the explicitly allowed localhost origin, the API parks the provider answer and
+returns an opaque single-use ticket to the local callback proxy. It exchanges the answer only
+after the localhost browser presents its original flow cookie, then returns to the local flow
+page. Provider linking sends an absolute return URL on the current frontend origin for the
+same reason. Production Secure/HttpOnly cookies are preserved (use a browser that supports
+Secure cookies on the trusted `localhost` origin); no production cookies are copied from the
+hosted site, and sign-in is separate on localhost.
+
 ## Who owns what
 
 Routes live in `app/`, grouped by area; an area's components live in `components/<area>/`. The foundation built the
@@ -864,3 +882,11 @@ in `redesign/api-gaps.md`).
 - **Account rows** (`components/account/parts/rows.tsx`, 2026-11-11): Section, Row, LinkItem, LinkRow, Tile and Strong, the boxed lists on Home's rules, shared by Security and Connected apps (`/apps`, `/apps/[id]`). LinkItem takes `replace` and `scroll` for rows that open a dialog by search parameter (Security's `?edit=email|phone`).
 - **Change a Silicon's key** (`components/account/silicons/change-key.tsx`, 2026-11-12): one dialog for the Silicon's page and Security's Silicon keys; the new key goes to the reveals store, shown where it was changed.
 - **The landing's Developers link** (2026-11-12) is the API's `developer_url`, read on the server (`lib/server/meta.ts`) by PublicLanding, so local and staging builds link to their own developer site.
+
+Silicon UI local keyboard fix: ConfirmMorph preserves its pointer re-arming delay, but a separate keyboard activation can confirm immediately. This retains the established revocation flow and is covered by the developer app-verification keyboard regression. Hosted branding also maps round/sharp/squircle corners to Silicon UI tokens and keeps soft/outline primary actions.
+
+## Work accounts and organizations (2026-11-03)
+
+The hosted flow renders the server-driven `select_account` step before sharing details. Personal and work identities are grouped, and blocked work identities show the server’s reason. `/linked-accounts` reads the main account and linked work accounts, switches the first-party cookie session, and starts a separate authenticated linking flow. A work-only Carbon main account can create its personal account there. A personal Silicon needs its own Carbon custodian and independent account-link approval. Pending link request IDs survive page reloads; cancelling or finishing clears the saved ID and completion query. The identity and settings pages leave work-handle changes and work-account closure to Organizations. Shared API types, endpoints and query hooks were extended for these flows; no auth token is placed in browser storage.
+
+Work-invitation pages permit form handoff to the exact configured Organizations HTTP origin only when it is loopback; the value comes from trusted API metadata or `ACCOUNTS_ORGANIZATIONS_URL`. Other pages keep their existing form policy. Invitation pages send `Referrer-Policy: strict-origin`: only the Accounts origin reaches Organizations, preserving the Origin check without leaking the invitation ticket path.

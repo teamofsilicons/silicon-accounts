@@ -190,7 +190,15 @@ pub async fn claim_pending(
                 flow.extras.error = Some(FlowError::from_api(&e));
                 return Ok(Vec::new());
             }
-            let signed = browser::sign_in(conn, state, headers, meta, &account.uuid).await?;
+            let signed = browser::sign_in(
+                conn,
+                state,
+                headers,
+                meta,
+                &account.uuid,
+                flow.extras.link_request_id.is_some(),
+            )
+            .await?;
             flow.extras.browser_session_id = Some(signed.session_id);
             flow.extras.auth_method = Some(provider.as_str().to_string());
             flow.extras.new_account = false;
@@ -321,6 +329,7 @@ pub async fn switch_account(
     model::ensure_step(
         &flow,
         &[
+            Step::SelectAccount,
             Step::ChooseMethod,
             Step::VerifyCode,
             Step::Signup,
@@ -648,7 +657,15 @@ pub async fn verify_code(
                 next::record_refusal(&mut tx, &meta, &fa, &a, method, &e.code).await?;
                 return persist_failure(tx, &mut flow, e).await;
             }
-            let signed = browser::sign_in(&mut tx, &state, &headers, &meta, &a.uuid).await?;
+            let signed = browser::sign_in(
+                &mut tx,
+                &state,
+                &headers,
+                &meta,
+                &a.uuid,
+                flow.extras.link_request_id.is_some(),
+            )
+            .await?;
             flow.extras.browser_session_id = Some(signed.session_id);
             flow.extras.auth_method = Some(method.to_string());
             flow.extras.new_account = false;
@@ -742,4 +759,83 @@ fn contact_session(
             ..Default::default()
         },
     }
+}
+
+#[derive(Deserialize)]
+pub struct SelectAccountBody {
+    pub account_uuid: String,
+}
+pub async fn select_account(
+    State(state): State<AppState>,
+    meta: ClientMeta,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(body): Json<SelectAccountBody>,
+) -> ApiResult<FlowResponse> {
+    let mut tx = state.db.begin().await?;
+    let mut flow = load_bound(&mut tx, &state, &headers, &HttpMethod::POST, &id, true).await?;
+    model::ensure_step(&flow, &[Step::SelectAccount], "select an account")?;
+    let proved = flow
+        .extras
+        .authenticated_account_uuid
+        .as_deref()
+        .ok_or_else(|| {
+            ApiError::unauthenticated(
+                "account_proof_required",
+                "Prove your identity before selecting an account.",
+            )
+        })?;
+    let current = browser::current(&mut tx, &state, &headers)
+        .await?
+        .ok_or_else(|| {
+            ApiError::unauthenticated(
+                "session_required",
+                "Sign in again before selecting an account.",
+            )
+        })?;
+    if current.account.uuid != proved
+        || !accounts_core::repo::organizations::linked(&mut tx, proved, &body.account_uuid).await?
+    {
+        return Err(ApiError::forbidden(
+            "account_not_linked",
+            "This account is not linked to the account you proved.",
+        ));
+    }
+    let account = accounts::require(&mut tx, &body.account_uuid).await?;
+    if !account.is_active() {
+        return Err(ApiError::forbidden(
+            "account_not_active",
+            "This account is no longer active.",
+        ));
+    }
+    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    if let Err(e) =
+        accounts_core::repo::organizations::check(&mut tx, &account.uuid, &fa.app.app_id).await
+    {
+        tx.rollback().await?;
+        accounts_core::repo::organizations::record_refusal(
+            &state.db,
+            &account.uuid,
+            &fa.app.app_id,
+        )
+        .await?;
+        return Err(e);
+    }
+    let signed = browser::sign_in(&mut tx, &state, &headers, &meta, &account.uuid, false).await?;
+    flow.extras.browser_session_id = Some(signed.session_id);
+    flow.extras.account_selected = true;
+    next::advance(&mut tx, &state, &meta, &mut flow, &fa, &account).await?;
+    model::save(&mut tx, &flow).await?;
+    let response = respond(
+        &mut tx,
+        &state,
+        &meta,
+        None,
+        &flow,
+        &fa,
+        signed.cookie.into_iter().collect(),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(response)
 }

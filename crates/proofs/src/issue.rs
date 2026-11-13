@@ -66,10 +66,25 @@ pub async fn user_verification(
     )
     .await?;
     let audiences = vec![receiving];
+    accounts_core::repo::organizations::check(&mut conn, &subject.account.uuid, &audiences[0])
+        .await?;
     check_receivers(&mut conn, issuer.app, &audiences).await?;
     drop(conn);
 
     let mut tx = state.db.begin().await?;
+    sqlx::query("select uuid from accounts where uuid=$1 for share")
+        .bind(&subject.account.uuid)
+        .fetch_one(&mut *tx)
+        .await?;
+    subject::verify(
+        &mut tx,
+        &state.keys,
+        &body.subject_token,
+        &issuer.app.app_id,
+    )
+    .await?;
+    accounts_core::repo::organizations::check(&mut tx, &subject.account.uuid, &audiences[0])
+        .await?;
     let (family, tokens) = store::create(
         &mut tx,
         &state.keys.pepper,

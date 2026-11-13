@@ -1,0 +1,449 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Encrypted app-isolated browser refresh coordination for Silicon Vercel frontends.",
+  "Resources": {
+    "Provider": {
+      "Type": "AWS::IAM::OIDCProvider",
+      "Properties": {
+        "Url": "https://oidc.vercel.com/saketdev12-5675s-projects",
+        "ClientIdList": [
+          "https://vercel.com/saketdev12-5675s-projects"
+        ]
+      }
+    },
+    "Sessions": {
+      "Type": "AWS::DynamoDB::Table",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "TableName": "silicon-browser-sessions-production",
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "pk",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "pk",
+            "KeyType": "HASH"
+          }
+        ],
+        "TimeToLiveSpecification": {
+          "AttributeName": "expires",
+          "Enabled": true
+        },
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "Tags": [
+          {
+            "Key": "Service",
+            "Value": "silicon-browser-sessions"
+          },
+          {
+            "Key": "Environment",
+            "Value": "production"
+          }
+        ]
+      }
+    },
+    "WriteRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "silicon-write-browser-sessions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": {
+                  "Ref": "Provider"
+                }
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "oidc.vercel.com/saketdev12-5675s-projects:aud": "https://vercel.com/saketdev12-5675s-projects",
+                  "oidc.vercel.com/saketdev12-5675s-projects:sub": "owner:saketdev12-5675s-projects:project:silicon-write-web:environment:production"
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "BrowserSessionState",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Sessions",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "ForAllValues:StringLike": {
+                      "dynamodb:LeadingKeys": [
+                        "write#*"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "DiaryRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "silicon-diary-browser-sessions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": {
+                  "Ref": "Provider"
+                }
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "oidc.vercel.com/saketdev12-5675s-projects:aud": "https://vercel.com/saketdev12-5675s-projects",
+                  "oidc.vercel.com/saketdev12-5675s-projects:sub": "owner:saketdev12-5675s-projects:project:silicon-diary-web:environment:production"
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "BrowserSessionState",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Sessions",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "ForAllValues:StringLike": {
+                      "dynamodb:LeadingKeys": [
+                        "diary#*"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ExtendRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "silicon-extend-browser-sessions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": {
+                  "Ref": "Provider"
+                }
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "oidc.vercel.com/saketdev12-5675s-projects:aud": "https://vercel.com/saketdev12-5675s-projects",
+                  "oidc.vercel.com/saketdev12-5675s-projects:sub": "owner:saketdev12-5675s-projects:project:silicon-extend-web:environment:production"
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "BrowserSessionState",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Sessions",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "ForAllValues:StringLike": {
+                      "dynamodb:LeadingKeys": [
+                        "extend#*"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "HookRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "silicon-hook-browser-sessions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": {
+                  "Ref": "Provider"
+                }
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "oidc.vercel.com/saketdev12-5675s-projects:aud": "https://vercel.com/saketdev12-5675s-projects",
+                  "oidc.vercel.com/saketdev12-5675s-projects:sub": "owner:saketdev12-5675s-projects:project:silicon-hook-frontend:environment:production"
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "BrowserSessionState",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Sessions",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "ForAllValues:StringLike": {
+                      "dynamodb:LeadingKeys": [
+                        "hook#*"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "CommitRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "silicon-commit-browser-sessions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": {
+                  "Ref": "Provider"
+                }
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "oidc.vercel.com/saketdev12-5675s-projects:aud": "https://vercel.com/saketdev12-5675s-projects",
+                  "oidc.vercel.com/saketdev12-5675s-projects:sub": "owner:saketdev12-5675s-projects:project:silicon-commit-frontend:environment:production"
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "BrowserSessionState",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Sessions",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "ForAllValues:StringLike": {
+                      "dynamodb:LeadingKeys": [
+                        "commit#*"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "McportRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "silicon-mcport-browser-sessions",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": {
+                  "Ref": "Provider"
+                }
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "oidc.vercel.com/saketdev12-5675s-projects:aud": "https://vercel.com/saketdev12-5675s-projects",
+                  "oidc.vercel.com/saketdev12-5675s-projects:sub": "owner:saketdev12-5675s-projects:project:silicon-mcport:environment:production"
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "BrowserSessionState",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Sessions",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "ForAllValues:StringLike": {
+                      "dynamodb:LeadingKeys": [
+                        "mcport#*"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "TableName": {
+      "Value": {
+        "Ref": "Sessions"
+      }
+    },
+    "Region": {
+      "Value": {
+        "Ref": "AWS::Region"
+      }
+    },
+    "WriteRole": {
+      "Value": {
+        "Fn::GetAtt": [
+          "WriteRole",
+          "Arn"
+        ]
+      }
+    },
+    "DiaryRole": {
+      "Value": {
+        "Fn::GetAtt": [
+          "DiaryRole",
+          "Arn"
+        ]
+      }
+    },
+    "ExtendRole": {
+      "Value": {
+        "Fn::GetAtt": [
+          "ExtendRole",
+          "Arn"
+        ]
+      }
+    },
+    "HookRole": {
+      "Value": {
+        "Fn::GetAtt": [
+          "HookRole",
+          "Arn"
+        ]
+      }
+    },
+    "CommitRole": {
+      "Value": {
+        "Fn::GetAtt": [
+          "CommitRole",
+          "Arn"
+        ]
+      }
+    },
+    "McportRole": {
+      "Value": {
+        "Fn::GetAtt": [
+          "McportRole",
+          "Arn"
+        ]
+      }
+    }
+  }
+}

@@ -6,7 +6,7 @@
 
 This understanding contains the understanding for the entire Silicon Accounts, the service and the account site at `accounts.teamofsilicons.com`.
 
-Silicon Accounts is the account system for every Carbon and Silicon, and the authentication layer for any app that wants one. Every Carbon and Silicon has a single personal account that they carry into every app they sign into. For apps, we handle the entire auth for them: the sign-in methods, the sign up, the pages the user sees, and the app's own user base.
+Silicon Accounts is the account system for every Carbon and Silicon, and the authentication layer for any app that wants one. Every Carbon and Silicon has a personal account that they carry into every app they sign into, and can also have work accounts from the orgs they're in. For apps, we handle the entire auth for them: the sign-in methods, the sign up, the pages the user sees, and the app's own user base.
 
 We should be as simple as Supabase and as deep as WorkOS or Okta. Turning on sign-in for an app should be a one click thing, and yet every part of it should be configurable for the apps that want that control. An app should never be able to graduate from us.
 
@@ -15,10 +15,14 @@ We should be as simple as Supabase and as deep as WorkOS or Okta. Turning on sig
 
 `Carbon` - The human in the system. Every human account is called a carbon.
 `Silicon` - Our AI Agent account is referred to as a Silicon.
-`Custodian` - The Carbon responsible for a Silicon. Every Silicon always has exactly one custodian.
+`Custodian` - The Carbon responsible for a Silicon, or the org for a Silicon an org creates. Every Silicon always has exactly one custodian.
 `App` - Any application that uses Silicon Accounts to sign its users in. Apps are created in Silicon Apps.
 `uuid` - The permanent identifier of an account. It never changes.
 `c:id` / `si:id` - The public, changeable ID of a Carbon / Silicon.
+`Org` - An organization, created and run in Silicon Organizations.
+`Personal account` - A Carbon's or Silicon's own account, for example `c:saket`. It belongs only to them.
+`Work account` - The account an org has for one of its members, for example `c:saket.tos`. It belongs to the org.
+`Main account` - The account linked accounts are linked to: the personal account, or a work account when there's no personal account.
 
 
 # Where things live
@@ -27,6 +31,7 @@ There are three sites:
 - `accounts.teamofsilicons.com` - this one. It's where every Carbon manages their own account. User facing.
 - `apps.teamofsilicons.com` - Silicon Apps. Where people discover and install apps. App creation and management take them to the developer platform.
 - `developers.teamofsilicons.com` - the developer platform. A single shared frontend for Silicon Apps and Silicon Accounts, where developers maintain everything they build with us. Each service keeps its own backend. App discovery lives in Silicon Apps, not in the developer platform.
+- `organizations.teamofsilicons.com` - Silicon Organizations, with its own backend. Where orgs are created and run: their members, owners, admins, teams, app access and logs. The work accounts themselves live here in Silicon Accounts.
 
 Everything about creating and setting up an app's authentication happens on `developers.teamofsilicons.com`: its sign-in methods, Google and Apple, its flows and pages, the details it asks for, its redirect URLs, its user base and imports, its webhooks and its App verification tokens. The settings themselves are stored in Silicon Accounts.
 
@@ -43,7 +48,7 @@ This feature is the real request and notification flow for manual follow-up. It 
 
 # Accounts
 
-There are no Teams in Silicon Accounts, there are just personal accounts. Every account is either a Carbon or a Silicon, and it belongs only to that Carbon or Silicon. The only relationship between accounts is a Silicon's custodian.
+There are no Teams in Silicon Accounts; orgs, their teams and their roles live in Silicon Organizations. Every account is either a Carbon or a Silicon. It's either a personal account, which belongs only to that Carbon or Silicon, or a work account, which belongs to an org. The only relationships between accounts are a Silicon's custodian and linked accounts.
 
 ## Identifiers
 
@@ -57,7 +62,9 @@ The handle after `c:` or `si:` is `a-z`, `0-9`, `-` and `_`, case-insensitive an
 
 The uuid can always be used to fetch the current c:id or si:id.
 
-An account's membership with an app is `{app_id}:{uuid}`, for example `briefcase:a8K`. This is the same for Carbons and Silicons.
+A work account's ID is `c:{handle}.{org_id}` or `si:{handle}.{org_id}`, for example `c:saket.tos` or `si:udd.tos`. The handle follows the same rules and is unique within the org; the `.` is only ever the separator before the org_id, so a work account can never be mistaken for a personal one. The org's owners and admins set the handle and can change it like any c:id, with the same 10 days reservation. The org_id part never changes.
+
+An account's membership with an app is `{app_id}:{uuid}`, for example `briefcase:a8K`. This is the same for Carbons and Silicons, and for personal and work accounts.
 
 ## Carbon account
 
@@ -76,6 +83,7 @@ The STK is the Silicon's password, in the format `stk-{12 digit hexadecimal} as 
 A Silicon account can be created in two ways:
 1) A Silicon creates its own account and names a Carbon as its custodian, using their c:id or email. The Carbon has to accept before they become the custodian. A carbon has upto 2 weeks to accept to be the custodian.
 2) A Carbon creates an account for a Silicon, which automatically makes them its custodian.
+3) An org creates a Silicon for itself in Silicon Organizations, which automatically makes the org its custodian.
 
 If a silicon is making their own account in case of the cli they can hold the request until the custodian approves, or set their webhook endpoint and get notified there instead.
 
@@ -96,6 +104,33 @@ Every Silicon always has exactly one custodian. The custodian manages the Silico
 A custodian can transfer a Silicon to another Carbon, and the new Carbon has to accept the transfer before it happens. It is never possible to remove a custodian without transferring the Silicon to another Carbon, so a Carbon can't delete their account while they are still the custodian of a Silicon.
 
 Every transfer is kept in the Silicon's history: who it moved from, who it moved to, and when.
+
+For a Silicon an org creates, the custodian is the org itself, stored by the org and shown as the org. The org's owners and admins act as its custodian: they manage its details, rotate its STK and can close it. It doesn't move when any one person leaves the org.
+
+
+# Work accounts
+
+An org in Silicon Organizations has a work account for each of its members. A work account is a full account here, with its own uuid, details, sign-ins and memberships with apps, so an app sees it as a different user from the personal account. It belongs to the org: the org decides which apps it can sign into, sees everything it does, and can close it. Everything about the orgs themselves, their members, roles, teams and app access, lives in Silicon Organizations.
+
+A Carbon's work account is created when they accept an org's invite, sent to their email or c:id. The invited email becomes the work account's email. An email can still only ever be on one account, so if the invited email is already on an account, or the Carbon was invited by their c:id, the work account is linked to that account and signed into through it. Before they accept, show a small popup telling them the work account will be linked to that account.
+
+When a member leaves or is removed from an org, their work account is closed: it's signed out of every app, can't sign in again, and every app it signed into is told the account was deleted. Its uuid is never reused.
+
+## Linked accounts
+
+Linking is optional, and a work account doesn't have to be linked to anything. Linking is only there so a Carbon or Silicon can easily sign in and run all their accounts: they sign in once and pick any of their linked accounts, whether a work account uses the same email as their personal account or a new one.
+
+Linked accounts always have one main account, and any number of work accounts can be linked to it:
+- a personal account, for example `c:saket` on saketdev12@gmail.com, with the work accounts of the 4 orgs they joined through it.
+- a work account when there's no personal account, for example `c:saket.tos` on saket@teamofsilicons.com, used as their main account, with their work accounts in other orgs linked to it.
+
+There's only ever one personal account among linked accounts, and when there is one, it's the main account. If a personal account is made or linked later, it becomes the main account, with every work account linked to it.
+
+Linking always needs the Carbon or Silicon to be signed in to both accounts, so nobody can link an account they don't control. For a Silicon, the Silicon or its custodian accepts.
+
+Linking doesn't merge anything. Linked accounts keep their own uuids, details, apps and history. An org never sees anything about the other accounts linked to its work account, and being linked gives the org no control over them.
+
+If a personal account is deleted, its work accounts stay, since they belong to their orgs; they just aren't linked to it anymore. If a work account that is the main account is closed, the work accounts linked to it stay, and one of them can become the new main account.
 
 
 # Signing in
@@ -131,6 +166,20 @@ Once they've connected the account (email, phone, Google or Apple) we show them 
 
 Once they continue they're redirected back to the app they were signing into.
 
+## Picking an account
+
+Once a Carbon has proven who they are, with email, phone, Google or Apple, the sign-in page shows all their linked accounts, personal and work kept apart:
+- `Personal` - their personal account.
+- `Work` - each of their work accounts, with its org's name and logo.
+
+They pick the one they want to sign in as. A work account whose org doesn't allow this app is still shown, but can't be picked, and says why. If someone has only one account, there's nothing to pick and the page is skipped. The what's-shared screen and everything after it is for the account they picked.
+
+## Org app access
+
+Each org decides in Silicon Organizations which apps its work accounts can sign into. Silicon Accounts checks it on every sign-in and token refresh. A sign-in to an app the org doesn't allow is refused, saying which org doesn't allow it. When an app stops being allowed, the work account is signed out of it straight away and the app is told its access was removed. Silicon Accounts and Silicon Organizations are always allowed, so nobody can be locked out of their account or out of running their org.
+
+Every sign-in, sign-out, refused sign-in, User verification proof and change of a work account is sent to Silicon Organizations as it happens, for the org's logs. Nothing about a personal account is ever sent.
+
 ## What's shared with the app
 
 During sign-in to an app we show another small screen with what information is going to be shared with that app. We show it the first time a Carbon signs into an app and again whenever the app asks for more.
@@ -144,6 +193,8 @@ When an app picks a detail it's required by default; the app can switch it to op
 ## Silicons
 
 A Silicon signs in with its si:id and STK. To sign into an app, the Silicon uses the Accounts CLI or package to get a short-lived token for that app, and the app exchanges it for the Silicon's tokens. Silicons never go through the app's sign-in page.
+
+A Silicon signs into a work account with that account's si:id and STK. A Silicon with linked accounts can also get a short-lived app token for any of them through any account it's linked to.
 
 ## Tokens
 
@@ -221,8 +272,8 @@ Each app can register a webhook endpoint. Whenever something changes about an ac
 - the c:id or si:id changed
 - any detail the app has access to changed
 - a Silicon's custodian changed
-- the account signed out of the app or removed the app's access
-- the account was deleted
+- the account signed out of the app or removed the app's access, or its org stopped allowing the app
+- the account was deleted, or its work account was closed
 
 Every event has an `event_id` so apps can deduplicate, and is signed so apps know it came from us. Deliveries are retried until they succeed, and failed deliveries can be replayed.
 
@@ -262,8 +313,10 @@ This is where a Carbon manages their account. They should be able to:
 - see every app they've signed into, and remove an app's access
 - see and revoke their User verification proofs
 - see the Silicons they're custodian of, create a new Silicon, rotate its STK, and transfer it to another Carbon
+- see their main account and every work account linked to it, each with its org, and link accounts
+- when the main account is a work account, create a personal account, which then becomes the main account
 
-Anything about building apps lives on `developers.teamofsilicons.com`, not here.
+Anything about building apps lives on `developers.teamofsilicons.com`, not here. Anything about running an org lives on `organizations.teamofsilicons.com`.
 
 
 # developers.teamofsilicons.com
@@ -283,7 +336,7 @@ The top-level App verification page brings together all verification records and
 
 # History
 
-Keep a good store of everything: sign-in history per account and per app, every c:id and si:id change, every custodian transfer, every App verification and User verification proof issued, refreshed and revoked, and every change to an app's sign-in setup.
+Keep a good store of everything: sign-in history per account and per app, every c:id and si:id change, every custodian transfer, every work account created and closed, every link between accounts, every sign-in refused by an org, every App verification and User verification proof issued, refreshed and revoked, and every change to an app's sign-in setup.
 
 For externally initiated changes include idempotency keys, so retrying something never does it twice.
 
@@ -335,6 +388,8 @@ Install the latest Accounts CLI with `silicon-apps install silicon-accounts` on 
 # Identifier schema
 
 Carbon IDs use `c:{handle}` (for example `c:saket`), Silicon IDs use `si:{handle}` (for example `si:head_of_growth`), and app IDs are the bare `{app_id}` (for example `briefcase`). Each prefix appears exactly once.
+
+Work accounts use `c:{handle}.{org_id}` (for example `c:saket.tos`) and `si:{handle}.{org_id}` (for example `si:udd.tos`). Org IDs are the bare `{org_id}` (for example `tos`).
 
 The uuid is what identifies an account; the c:id and si:id are only what people see. A membership with an app is `{app_id}:{uuid}`.
 

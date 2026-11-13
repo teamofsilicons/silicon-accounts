@@ -38,6 +38,7 @@ pub const FLOW_CREATE_PER_IP: Limit = Limit::new(300, 60);
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct CreateFlowBody {
+    pub link_id: Option<String>,
     pub app_id: Option<String>,
     /// Alias of `app_id` (OAuth clients send `client_id`).
     pub client_id: Option<String>,
@@ -406,6 +407,27 @@ pub async fn create_flow(
         },
     )
     .await?;
+    if let Some(raw) = body.link_id.as_deref() {
+        if app_id != accounts_core::FIRST_PARTY_APP_ID || !prompt.login {
+            return Err(ApiError::forbidden(
+                "link_fresh_authentication_required",
+                "Linking requires a fresh Accounts sign-in with prompt=login.",
+            ));
+        }
+        let link = uuid::Uuid::parse_str(raw)
+            .map_err(|_| ApiError::unprocessable("invalid_link_id", "link_id must be a UUID."))?;
+        let source:Option<String>=sqlx::query_scalar("select source_uuid from account_link_requests where id=$1 and expires_at>now() and completed_at is null").bind(link).fetch_optional(&mut *tx).await?;
+        let source = source
+            .ok_or_else(|| ApiError::gone("link_expired", "This linking request expired."))?;
+        let browser = browser::current(&mut tx, &state, &headers).await?;
+        if browser.as_ref().map(|b| b.account.uuid.as_str()) != Some(source.as_str()) {
+            return Err(ApiError::forbidden(
+                "link_initiator_required",
+                "Begin linking from the account that requested it.",
+            ));
+        }
+        flow.extras.link_request_id = Some(link);
+    }
     flow.extras.intent = intent;
     flow.extras.browser_timezone = clean(&body.timezone).and_then(|t| normalize_timezone(t).ok());
 
@@ -563,5 +585,22 @@ async fn silent_sign_in(
     flow.account_uuid = Some(b.account.uuid.clone());
     flow.extras.auth_method = Some(accounts_core::repo::audit::method::SESSION.to_string());
     flow.extras.browser_session_id = Some(b.session_id);
+    let choices = accounts_core::repo::organizations::linked_accounts(
+        conn,
+        &b.account.uuid,
+        Some(&fa.app.app_id),
+    )
+    .await?;
+    if choices["accounts"].as_array().is_some_and(|a| a.len() > 1) {
+        return next::fail(
+            state,
+            flow,
+            FlowError::new(
+                "interaction_required",
+                "Choose the account to use for this app.",
+                "Sign in with an account picker.",
+            ),
+        );
+    }
     next::complete(conn, state, meta, flow, fa, &b.account, next::Grant::Auto).await
 }

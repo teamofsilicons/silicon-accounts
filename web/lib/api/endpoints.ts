@@ -83,6 +83,7 @@ export const flows = {
   continueAs: (id: string) => flowCall(`/v1/flows/${seg(id)}/continue`),
   /** Forget the chosen account for this flow (back to choose_method). */
   switchAccount: (id: string) => flowCall(`/v1/flows/${seg(id)}/switch`),
+  selectAccount: (id: string, account_uuid: string) => flowCall(`/v1/flows/${seg(id)}/select-account`, { account_uuid }),
   /** Send a sign-in code to an email. */
   email: (id: string, email: string) => flowCall(`/v1/flows/${seg(id)}/email`, { email }),
   /** Send a sign-in code by SMS; `country` is the default for local-format numbers (omit it for "+CC…" numbers). */

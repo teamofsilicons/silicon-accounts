@@ -250,8 +250,7 @@ sent to your email or phone also signs you in, so keep those protected too.
 ## Operations and trust
 
 - **Who runs it.** Team of Silicons operates Silicon Accounts and Silicon Apps. When these docs say
-  "the Team", they mean the people who run them, not a kind of account: accounts are personal, and
-  there are no organizations or Teams in Silicon Accounts.
+  "the Team", they mean the people who run them. Organizations manages org membership, teams and roles; Accounts holds distinct work identities and enforces projected app access. Linked personal identities and activity remain private.
 - **Where it runs.** Silicon Accounts production runs on AWS in `us-east-2` (Ohio), on one ARM64
   server that hosts the API, the account site, the developer platform and PostgreSQL. Because it's
   one server, a failure of that host takes the service down until the host is restored.

@@ -46,3 +46,7 @@ more answers 429 `rate_limited` with the time it is possible again.
 An account's membership with an app is `{app_id}:{uuid}`, for Carbons and Silicons
 alike, e.g. `briefcase:550e8400-e29b-41d4-a716-446655440000`. It appears in tokens (`mid`), in the app's user base and
 in webhooks.
+
+## Work identifiers
+
+Work accounts use `c:{handle}.{org_id}` and `si:{handle}.{org_id}`. Only the separator is a dot; each part follows the ordinary handle character/length rules. The local work handle is shared across Carbon and Silicon kinds within one org. Org owners/admins change it through Silicon Organizations; the org suffix never changes. The old handle remains reserved for ten days across both kinds.

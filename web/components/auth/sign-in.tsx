@@ -102,7 +102,7 @@ function SignInRoundTrip() {
   const startFlow = (returnTo: string | null, prompt?: FlowPrompt) => {
     const method = METHODS.find(value => value === search.get("method"));
     const intent = search.get("intent") === "signup" ? "signup" : undefined;
-    router.replace(firstPartySignInUrl(returnTo, { prompt, method, intent }));
+    router.replace(firstPartySignInUrl(returnTo, { prompt, method, intent, link_id: search.get("link_id") ?? undefined }));
   };
 
   const onReady = useEffectEvent(() => {

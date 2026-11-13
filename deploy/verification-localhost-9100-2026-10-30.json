@@ -1,0 +1,57 @@
+{
+  "verified_at": "2026-10-30T13:37:25.192302+00:00",
+  "origin": "http://localhost:9100",
+  "api_source_revision": "9aa23451173851dab5e24a37132e146f7492d400",
+  "api_sha256": "d1e5b9eef85b2169af2d0ee0cc701931e0bb8464e0ea519c205abc91e8126c9a",
+  "base_release": "f94d0bf089d5912503f7be157742d6ec18d0b3ad",
+  "active_release": "f94d0bf089d5912503f7be157742d6ec18d0b3ad-api-9aa234511738",
+  "production_web_replaced": false,
+  "provider_callback_urls_changed": false,
+  "workspace_tests": {
+    "passed": 985,
+    "failed": 0,
+    "ignored": 3
+  },
+  "web_typecheck": "passed",
+  "web_lint": "passed",
+  "web_build": "passed",
+  "developer_typecheck": "passed",
+  "developer_lint": "passed",
+  "live_checks": [
+    {
+      "provider": "google",
+      "wrong_browser": false,
+      "handoff": "passed",
+      "single_use": "passed",
+      "error": "provider_cancelled"
+    },
+    {
+      "provider": "google",
+      "wrong_browser": true,
+      "handoff": "passed",
+      "single_use": "passed",
+      "error": "provider_answer_elsewhere"
+    },
+    {
+      "provider": "apple",
+      "wrong_browser": false,
+      "handoff": "passed",
+      "single_use": "passed",
+      "error": "provider_cancelled"
+    },
+    {
+      "provider": "apple",
+      "wrong_browser": true,
+      "handoff": "passed",
+      "single_use": "passed",
+      "error": "provider_answer_elsewhere"
+    },
+    {
+      "local_proxy": "production",
+      "unlisted_port_9101": "rejected",
+      "version": "0.7.0"
+    }
+  ],
+  "browser_check": "Local account homepage displayed production session data. No account data was edited.",
+  "fresh_google_signup_completed": false
+}

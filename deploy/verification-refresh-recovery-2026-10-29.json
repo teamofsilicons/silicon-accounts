@@ -1,0 +1,97 @@
+{
+  "source_revision": "13a70d74883c205c91fa54f36906bf61a1f80e1e",
+  "previous_revision": "ea8196d50736489e26147956b70a6e30f3191cff",
+  "verified_at": "2026-10-28T21:56:56Z",
+  "archive_type": "verified-file-delta",
+  "archive_sha256": "538bffc06626baefd652eae150a52d5364a62d77f2a2a3aee1052bfb1a33846c",
+  "full_bundle_sha256": "758f2fa747efac88139ba508e1d48a03496caef4104729701504fb1463d08b57",
+  "s3_object": {
+    "Size": 51117796,
+    "VersionId": "UdoQc6Lh5YyBWnrHUOAMgKovFoaIOtR2",
+    "Sha256": "538bffc06626baefd652eae150a52d5364a62d77f2a2a3aee1052bfb1a33846c"
+  },
+  "installer_sha256": "f67ae0f1d038e7e7294ac92b0d0cf619542d612d24770789af8d20b93f0bd2bf",
+  "api_binary_sha256": "535ba67ec23b6ff7c9d6ce203d6bb56c8f03974105bd314fdc96610a49b81612",
+  "install_command_id": "174ac577-705d-40fb-8142-7b2b6370256b",
+  "verification_command_id": "8b222bbc-7f47-4eb7-b807-2cc9994f52f8",
+  "backup": {
+    "backup_key": "backups/predeploy-refresh-recovery-20261028T215614Z.dump",
+    "backup_sha256": "400150961e88827c0ecad77b8ab7025462496991c2a1611e48c16e581555c470"
+  },
+  "backup_format_checked": true,
+  "new_backup_restore_performed": false,
+  "reconstructed_release_files_verified": 8519,
+  "changed_files": 127,
+  "migration_version": 24,
+  "prior_cells_migrations_preserved": [
+    21,
+    22,
+    23
+  ],
+  "runtime_configuration_preserved": true,
+  "services_healthy": [
+    "accounts-api",
+    "accounts-web",
+    "accounts-developer",
+    "accounts-caddy",
+    "accounts-backup.timer"
+  ],
+  "validation": {
+    "workspace_tests_passed": 982,
+    "workspace_tests_ignored": 3,
+    "frontend_typechecks": "passed",
+    "frontend_lint": "passed",
+    "frontend_builds": "passed",
+    "frontend_production_routing": "passed",
+    "rust_clippy": "passed",
+    "migration": 24
+  },
+  "public_checks": {
+    "checks": [
+      {
+        "url": "https://accounts.teamofsilicons.com/readyz",
+        "http": 200
+      },
+      {
+        "url": "https://accounts.teamofsilicons.com/sign-in",
+        "http": 200
+      },
+      {
+        "url": "https://accounts.teamofsilicons.com/openapi.json",
+        "http": 200
+      },
+      {
+        "url": "https://developers.teamofsilicons.com/docs/accounts/reference/api/oauth",
+        "http": 200
+      },
+      {
+        "url": "https://developers.teamofsilicons.com/auth/session",
+        "http": 200
+      }
+    ],
+    "passed": true
+  },
+  "live_refresh_checks": {
+    "verified_at": "2026-10-28T21:56:56Z",
+    "base_url": "https://accounts.teamofsilicons.com",
+    "checks": [
+      "Uses the authorized shared Silicon identity",
+      "Fresh real sign-in over public HTTPS",
+      "Initial keyed refresh succeeds",
+      "Token responses are not cached",
+      "Six concurrent retries recover the identical token pair",
+      "Recovery preserves original access expiry",
+      "Recovered token authenticates successfully",
+      "Successor refresh advances the session normally",
+      "Late retry returns a conflict instead of revoking the session",
+      "Session remains usable after the late retry",
+      "Only the disposable verification sign-in is revoked",
+      "Recovery cannot resurrect a revoked sign-in"
+    ],
+    "passed": true
+  },
+  "verification_session_revoked": true,
+  "app_clients_updated": false,
+  "sdk_package_published": false,
+  "next_step": "App clients must persist and share the same refresh operation key across retries and workers."
+}

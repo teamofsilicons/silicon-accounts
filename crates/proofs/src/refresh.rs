@@ -61,6 +61,12 @@ pub async fn refresh(
         return Err(ApiError::internal("proof token without a family"));
     };
     let family = locked.family;
+    if let Some(uuid) = family.account_uuid.as_deref() {
+        accounts_core::repo::organizations::check(&mut tx, uuid, &family.issuing_app).await?;
+        for app in &family.audiences {
+            accounts_core::repo::organizations::check(&mut tx, uuid, app).await?;
+        }
+    }
     let kind = family.kind();
     let proof_id = family.id.to_string();
     if family.issuing_app != caller.app_id {
@@ -188,6 +194,17 @@ pub async fn refresh(
     )
     .await?;
     store::touch_refreshed(&mut tx, family.id).await?;
+    if let Some(uuid) = family.account_uuid.as_deref() {
+        accounts_core::repo::organizations::record(
+            &mut tx,
+            uuid,
+            None,
+            Some(&family.issuing_app),
+            "proof.refreshed",
+            json!({"proof_id":family.id,"receiving_apps":family.audiences}),
+        )
+        .await?;
+    }
     audit::record(
         &mut tx,
         &AuditEntry {

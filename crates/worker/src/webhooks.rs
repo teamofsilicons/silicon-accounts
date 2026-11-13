@@ -77,6 +77,7 @@ pub struct ClaimedDelivery {
     pub target_kind: WebhookTargetKind,
     /// app_id or Silicon uuid.
     pub target_id: String,
+    pub cell_uuid: Option<Uuid>,
     /// The URL stored when the event was emitted (the current URL is looked up per attempt).
     pub url: String,
     /// Attempts made before this one (since the last replay).
@@ -149,7 +150,7 @@ pub async fn claim_due(
            from due, webhook_events e \
           where d.id = due.id and e.event_id = d.event_id and e.identity_migrated_at is null \
          returning d.id, d.event_id, e.type as event_type, d.target_kind, d.target_id, d.url, d.attempts, \
-                   d.manual_replays, d.created_at, d.requeued_at, d.locked_until as lease, e.payload",
+                   d.manual_replays, d.created_at, d.requeued_at, d.locked_until as lease, e.payload, e.cell_uuid",
     )
     .bind(limit)
     .bind(lease_seconds as f64)
@@ -175,7 +176,19 @@ async fn load_target(
     conn: &mut PgConnection,
     kind: WebhookTargetKind,
     id: &str,
+    cell_uuid: Option<Uuid>,
 ) -> ApiResult<Option<Target>> {
+    if let Some(cell) = cell_uuid {
+        let row: Option<(String, Option<Vec<u8>>, bool)> = sqlx::query_as(
+            "select replace(l.callback_uri,'/auth/callback','/auth/accounts-webhook'),l.webhook_secret_enc,a.status!='active' \
+             from cells_app_links l join apps a on a.app_id=l.app_id where l.cell_uuid=$1 and l.app_id=$2 and l.revoked_at is null"
+        ).bind(cell).bind(id).fetch_optional(conn).await?;
+        return Ok(row.map(|(url, secret_enc, disabled)| Target {
+            url: Some(url),
+            secret_enc,
+            disabled,
+        }));
+    }
     Ok(match kind {
         WebhookTargetKind::App => {
             let row: Option<(AppStatus, Option<String>, Option<Vec<u8>>)> = sqlx::query_as(
@@ -358,7 +371,7 @@ impl WebhookDeliverer {
     async fn attempt(&self, d: &ClaimedDelivery) -> ApiResult<Attempt> {
         let target = {
             let mut conn = self.state.db.acquire().await?;
-            load_target(&mut conn, d.target_kind, &d.target_id).await?
+            load_target(&mut conn, d.target_kind, &d.target_id, d.cell_uuid).await?
         };
         let who = describe_target(d.target_kind, &d.target_id);
         let Some(target) = target else {

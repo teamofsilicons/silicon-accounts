@@ -55,6 +55,10 @@ pub fn router() -> Router<AppState> {
         // Hosted sign-in flow.
         .route("/v1/flows", post(flow::create::create_flow))
         .route("/v1/flows/{id}", get(flow::handlers::get_flow))
+        .route(
+            "/v1/flows/{id}/select-account",
+            post(flow::handlers::select_account),
+        )
         .route("/v1/flows/{id}/continue", post(flow::handlers::continue_as))
         .route(
             "/v1/flows/{id}/switch",

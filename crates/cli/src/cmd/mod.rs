@@ -26,6 +26,7 @@ pub async fn run(ctx: &Ctx, command: Commands) -> CliResult<Outcome> {
         Commands::Login(args) => login::login(ctx, args).await,
         Commands::Logout => login::logout(ctx).await,
         Commands::Whoami => account::whoami(ctx).await,
+        Commands::LinkedAccounts(args) => account::linked_accounts(ctx, args).await,
         Commands::Id(args) => account::id(ctx, args).await,
         Commands::Lookup(args) => account::lookup(ctx, &args.target).await,
         Commands::Profile(args) => account::profile(ctx, args).await,

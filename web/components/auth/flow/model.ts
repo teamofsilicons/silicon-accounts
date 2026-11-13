@@ -14,7 +14,7 @@ export type HostedStep = FlowView["step"];
 export type { AccountSummary, FlowChallenge };
 
 /** The order steps usually come in, for the direction of the card morph. */
-export const STEP_ORDER: readonly HostedStep[] = ["choose_method", "verify_code", "signup", "details", "review", "complete", "failed"];
+export const STEP_ORDER: readonly HostedStep[] = ["choose_method", "verify_code", "signup", "select_account", "details", "review", "complete", "failed"];
 
 /** Which page the app asked for: the sign-in page (default) or the sign-up page. */
 export const intentOf = (flow: Pick<HostedFlow, "intent">): FlowIntent => (flow.intent === "signup" ? "signup" : "signin");
@@ -328,6 +328,8 @@ export function heroCopyFor({ name: app, copy, intent = "signin", step, firstVis
       const importer = importerName(importedBy);
       return { title: `Welcome to ${app}`, subtitle: `${importer ?? "An app you use"} set up an account for you. Check what it filled in, and you are in.` };
     }
+    case "select_account":
+      return { title: "Choose your account", subtitle: `Your personal and work accounts stay separate in ${app}.` };
     case "details":
       return knowsApp && !firstVisit
         ? { title: `Welcome back to ${app}`, subtitle: `${app} is asking for a little more than before. You choose what it sees.` }

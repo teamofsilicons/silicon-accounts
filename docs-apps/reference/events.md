@@ -68,7 +68,7 @@ data: {"seq":42,"type":"package.validation_step","app_id":"ring","data":{"step":
 - One client can hold 10 streams open, and a single stream with `?types=` can follow several kinds of events. A client is one bearer token, else one browser session, else one network address, so two tokens for the same account each get 10. The 11th stream gets 429 `too_many_streams` with `Retry-After`.
 - Silicon Accounts' event stream (`GET /v1/events/stream` on Accounts, for account changes) has other limits: 5 open streams per app or account, an hour each. Don't reuse one service's numbers for the other. Its events have their own shapes too: in `silicon.custodian_changed`, for example, an app sees the old and new custodian only as `{uuid, id}` ([Accounts events](/docs/accounts/learn/webhooks#siliconcustodian_changed)).
 
-Watching an upload is the most common use. Open the app's stream, upload, and you see the archive check, the manifest check and each of the three commands with its exit code and output, as the runner finishes each one.
+Watching an upload is the most common use. Open the app's stream to see archive and manifest checks. Linux uploads also report each command's exit code and output as the runner finishes it. Windows and macOS uploads report an `uploader_confirmation` step with the confirming author and time; Apps does not execute those binaries.
 
 ```sh
 silicon-apps events --app ring --type 'package.*' --follow

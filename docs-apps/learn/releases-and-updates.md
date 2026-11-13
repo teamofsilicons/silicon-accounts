@@ -13,6 +13,15 @@ related:
 
 # Releases and automatic updates
 
+Every new release and production promotion must include validated packages for `linux-x86_64`, `windows-x86_64`, and `macos-aarch64`. Other targets are optional. Packages can be uploaded separately, but the release must contain all three. Existing releases remain installable.
+
+If your app can't run on one of the three, leave it out and say why in 200 to 1,000 characters. The reason is public: the app page greys out that platform's logo and shows the reason when you hover over it, `silicon-apps show APP` lists it under `unsupported_targets`, and an install on that platform fails with the reason. Promotion keeps the development release's reasons.
+
+```sh
+silicon-apps release ring --version 0.2.0 --package LINUX_PACKAGE_ID --package MACOS_PACKAGE_ID \
+  --unsupported-file windows-x86_64=why-no-windows.txt
+```
+
 ## Choose a channel
 
 Every new release starts in the development channel. When it's ready for everyone, its authors can promote it to production. Promotion keeps the same packages and gives them a production version. Both channels use `x.y.z` versions, and each keeps its own version history.

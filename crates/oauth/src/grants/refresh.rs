@@ -32,6 +32,7 @@ pub(crate) async fn exchange(
     client: &ClientAuth,
     params: &TokenParams,
     meta: &ClientMeta,
+    key: Option<&str>,
 ) -> Result<TokenResponse, OAuthError> {
     let presented = opt(params.refresh_token.as_deref()).ok_or_else(|| {
         OAuthError::invalid_request(
@@ -50,11 +51,11 @@ pub(crate) async fn exchange(
             let mut conn = state.db.acquire().await?;
             refresh_token_info(&mut conn, &state.keys.pepper, presented).await?
         };
-        // Only a live, unused token of this client is checked here; everything else (unknown,
-        // other app, revoked, expired, reused) gets core's precise answer below.
-        if let Some(info) =
-            info.filter(|i| i.app_id == client.app.app_id && i.family_active && !i.used)
-        {
+        // Check live tokens, including recognized recovery candidates. Unknown, wrong-app,
+        // expired and revoked tokens get core's precise answer below.
+        if let Some(info) = info.filter(|i| {
+            i.app_id == client.app.app_id && i.family_active && (!i.used || key.is_some())
+        }) {
             // Silicon Accounts' own apps (`silicon-accounts`, `developer`) have no memberships.
             if !is_first_party_app_id(&info.app_id)
                 && info.membership_status != Some(MembershipStatus::Active)
@@ -66,12 +67,19 @@ pub(crate) async fn exchange(
             }
         }
     }
-    match tokens::refresh(
+    let canonical_scope = requested.as_ref().map(|scopes| {
+        let mut names: Vec<_> = scopes.iter().map(Scope::as_str).collect();
+        names.sort_unstable();
+        names.dedup();
+        names.join(" ")
+    });
+    match tokens::refresh_with_operation(
         &state.db,
         &state.keys,
         &state.settings,
         presented,
         &client.app.app_id,
+        key.map(|key| (key, canonical_scope.as_deref())),
     )
     .await
     {

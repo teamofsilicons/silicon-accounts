@@ -83,6 +83,21 @@ export interface OAuthErrorBody {
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 /** Public-ish identity used in lookups, custodian references and lists. `id` is null once an account is deleted. */
+export interface OrganizationRef {
+  org_id: string;
+  name: string;
+  logo_url: string | null;
+}
+
+export interface LinkedAccount extends AccountSummary {
+  org: OrganizationRef | null;
+  is_main: boolean;
+  allowed?: boolean;
+  reason?: string | null;
+}
+
+export interface LinkedAccounts { main_uuid: string; accounts: LinkedAccount[] }
+
 export interface AccountSummary {
   uuid: string;
   kind: AccountKind;
@@ -132,6 +147,8 @@ export interface IdentityView {
 }
 
 interface MeBase {
+  org?: OrganizationRef | null;
+  org_custodian?: OrganizationRef | null;
   uuid: string;
   kind: AccountKind;
   id: AccountId | null;
@@ -338,6 +355,7 @@ export interface Meta {
    * servers before it existed (the site then uses the production address).
    */
   developer_url?: string | null;
+  organizations_url?: string | null;
 }
 
 export interface OidcDiscovery {
@@ -851,7 +869,7 @@ export const SILICON_EVENT_TYPES = [
  * flow of its own), `review` the optional page of everything shared. `failed` is used for prompt=none: its redirect_to
  * carries the error and the page should go there.
  */
-export type FlowStep = "choose_method" | "verify_code" | "signup" | "details" | "review" | "complete" | "failed";
+export type FlowStep = "choose_method" | "verify_code" | "signup" | "select_account" | "details" | "review" | "complete" | "failed";
 
 export type FlowPrompt = "login" | "consent" | "select_account" | "none";
 
@@ -867,6 +885,7 @@ export type FlowIntent = "signin" | "signup";
  * forward it).
  */
 export interface FlowCreate {
+  link_id?: string;
   app_id?: string;
   /** Alias of app_id. */
   client_id?: string;
@@ -981,6 +1000,7 @@ export interface FlowReview {
 
 /** The state of a hosted sign-in, driven by `step`. */
 export interface FlowView {
+  accounts?: LinkedAccount[];
   id: string;
   step: FlowStep;
   expires_at: Timestamp;

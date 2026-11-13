@@ -57,13 +57,13 @@ Only the fields listed above are accepted. Use separate development and producti
 | `macos-x86_64` | macOS, Intel 64-bit |
 | `macos-aarch64` | macOS, Apple Silicon |
 
-Pick the targets your app supports. You don't need every one, but each release needs at least one.
+Every new release and production promotion requires `linux-x86_64`, `windows-x86_64`, and `macos-aarch64`. Other targets are optional. An individual package can contain one target; all three required targets must be included together when creating a release, unless the release gives a public reason for leaving one out (see [Releases and automatic updates](../learn/releases-and-updates.md)).
 
 Run `silicon-apps targets` to see which validation workers are configured and how many registered accounts use each target, and `silicon-apps capabilities` to see which ones answer right now. Today the four Linux workers are live (`linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`), so those are the targets you can upload for. Windows and macOS have no worker yet, and an upload for one of their targets is refused until its worker is live. The counts include observed, signed-in accounts, and total reach counts an account once even when it uses several of the targets you picked. The manifest can recognise a target before its validation worker is available.
 
 ## Executable contract
 
-Every target's executable must support `--help`, `accounts --json` with its `app_id`, and `login status --json` with `authenticated` and, when someone is signed in, who it is. Upload validation tests it signed out. The [publishing guide](../start/publish.md#implement-the-three-discovery-commands) explains what each command must return.
+Every target's executable must support `--help`, `accounts --json` with its `app_id`, and `login status --json` with `authenticated` and, when someone is signed in, who it is. Linux upload validation tests it signed out; Windows and macOS uploaders confirm the same behavior. The [publishing guide](../start/publish.md#implement-the-three-discovery-commands) explains what each command must return.
 
 ## Validate, pack and extract
 
@@ -76,4 +76,4 @@ Validation reports every manifest, missing-file and safety error it finds at onc
 
 Paths must be relative, with no parent traversal, backslashes, drive prefixes or absolute roots. Archives can't contain duplicate entries, symbolic links, hard links or special files. Extracting needs an empty destination. The package library caps archives at 512 MiB compressed, 1 GiB extracted and 20,000 entries, and a hosted server or proxy may set a lower upload limit.
 
-The package crate never runs what you upload. The server validates commands in isolated target runners. Optional scripts run on the user's machine only with [explicit installation consent](../learn/releases-and-updates.md#installation-and-scripts).
+The package crate never runs what you upload. The server validates Linux commands in an isolated runner. For Windows and macOS, the uploader must confirm that the commands work on the selected platform. Optional scripts run on the user's machine only with [explicit installation consent](../learn/releases-and-updates.md#installation-and-scripts).

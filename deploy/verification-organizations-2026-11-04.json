@@ -1,0 +1,31 @@
+{
+  "verified_at": "2026-11-03T22:37:18+00:00",
+  "release": "b95321b-web-46d8b41-org-bridge",
+  "api_revision": "b95321b74e3f5598ff4f4a772fdda52ebeee4431",
+  "web_revision": "46d8b418a45a1bdfeac84e90854f6f827736cf1f",
+  "web_branch": "feat/organizations-production-web",
+  "developer_preserved_content_sha256": "58c871219633445976611cdb626e4f966acd1d49b20404b8e88d44b748cdaff5",
+  "archive_sha256": "138ac57a4299bafdaa4bd2f982a4580a7f297f6c95cfa0cc7a546bfde8d97a31",
+  "migration_version": 28,
+  "pre_migration_backup_key": "backups/predeploy-20261103T223520Z.dump",
+  "install_command_id": "056825fb-8bb2-4168-84e4-03100466ce44",
+  "stage_command_id": "ee82f19e-4c2e-427f-97c6-ee741d9d2aae",
+  "checks": {
+    "host_staged_archive_integrity_and_web_smoke": true,
+    "api_and_web_and_developer_readiness": true,
+    "public_accounts_landing_and_metadata": true,
+    "public_app_registration": true,
+    "unauthenticated_bridge_denied": true,
+    "authenticated_bridge_read": true,
+    "google_provider_authorization_handoff": true,
+    "apple_provider_authorization_handoff": true,
+    "external_provider_login_completed": false,
+    "developer_content_preserved": true,
+    "local_backend_organization_tests": 9,
+    "local_backend_provider_tests": 23,
+    "local_web_tests": 29,
+    "local_web_redirect_browser_scenarios": 6,
+    "local_work_account_screen_captures": 28
+  },
+  "pre_migration_backup_sha256": "a23215ad860961e6b34bf9f10360883017b4fd337e9d5063ab444e78bb68cfb7"
+}

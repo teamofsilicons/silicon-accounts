@@ -1,0 +1,10 @@
+.group { display: grid; gap: var(--space-group); margin-block: var(--space-block); }
+.group h2 { margin: 0; font: var(--caption); letter-spacing: var(--caption-tracking); color: var(--text-muted); }
+.choice { background: var(--sq-fill); border: 1px solid var(--sq-stroke); --sq-r: 16px; --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; align-items: center; gap: var(--space-group); padding: var(--space-inset); }
+.choice[data-blocked] { --sq-fill: var(--surface-subtle); }
+.icon { flex: none; color: var(--text-muted); }
+.identity { display: grid; gap: var(--space-hair); flex: 1; min-width: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
+.identity strong { font-size: var(--text-base); }
+.identity span, .identity p { color: var(--text-muted); }
+.identity p { margin: var(--space-related) 0 0; }
+@media (max-width: 420px) { .choice { flex-wrap: wrap; } .choice > button { width: 100%; } }

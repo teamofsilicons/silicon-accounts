@@ -79,6 +79,14 @@ pub async fn login(ctx: &Ctx, args: LoginArgs) -> CliResult<Outcome> {
     if let Some(LoginCommand::Status(status_args)) = &args.command {
         return status(ctx, status_args).await;
     }
+    if let (Some(account), Some(app)) = (&args.account, &args.app) {
+        let uuid = crate::cmd::account::linked_uuid(ctx, account).await?;
+        let slt = crate::with_session!(ctx, |s| s.short_lived_token_for(app, &uuid))?;
+        return Ok(Outcome::new(
+            json!({"slt":slt.slt.expose(),"app_id":slt.app_id,"account_uuid":uuid,"expires_at":json_time(Some(slt.expires_at))}),
+            slt.slt.expose().to_owned(),
+        ));
+    }
     let label = util::client_label(args.label.as_deref());
     let code_mode = args.email.is_some() || args.phone.is_some() || args.challenge.is_some();
     let silicon = args.silicon.clone().or_else(|| {

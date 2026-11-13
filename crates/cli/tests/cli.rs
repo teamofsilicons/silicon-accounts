@@ -120,13 +120,7 @@ fn help_is_a_traversable_tree() {
     ] {
         assert!(text.contains(needle), "root --help lacks `{needle}`");
     }
-    for banned in [
-        "human",
-        "organization",
-        "organisation",
-        "frontend",
-        "backend",
-    ] {
+    for banned in ["human", "organisation", "frontend", "backend"] {
         assert!(
             !text.to_lowercase().contains(banned),
             "help uses `{banned}`"

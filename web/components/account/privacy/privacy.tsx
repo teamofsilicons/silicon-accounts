@@ -19,9 +19,9 @@ import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
 import { Page } from "@/components/foundation/layout/layout";
-import type { Me, MyApp } from "@/lib/api/types";
+import type { Me, MyApp, OrganizationRef } from "@/lib/api/types";
 import { paths } from "@/lib/navigation";
-import { useMe } from "@/lib/query/session";
+import { useMe, useMeta } from "@/lib/query/session";
 import { appHref } from "../apps/apps";
 import { seen } from "../apps/app-page";
 import { AppMark } from "../parts/app-mark";
@@ -72,7 +72,11 @@ export function Privacy() {
                 <Row lead={<Tile><LayoutGrid size={16} strokeWidth={2} /></Tile>} title="No app can see anything about you." />
               )}
             </Section>
-            {carbon ? <DeleteAccount /> : silicon ? (
+            {me.data?.org ? (
+              <Section id="privacy-delete" label="Delete account">
+                <Row lead={<Tile><Trash2 size={16} strokeWidth={2} /></Tile>} title="Delete account" detail={<OrgCloses org={me.data.org} />} />
+              </Section>
+            ) : carbon ? <DeleteAccount /> : silicon ? (
               <Section id="privacy-delete" label="Delete account" tone="danger">
                 <Row lead={<Tile><Trash2 size={16} strokeWidth={2} /></Tile>} title="Delete account" detail={`${silicon.custodian?.id ?? "Your custodian"} deletes this Silicon’s account from their Silicons page.`} />
               </Section>
@@ -82,6 +86,12 @@ export function Privacy() {
       </Page>
     </div>
   );
+}
+
+/** A work account's org closes it, not the account itself (from main's work accounts, 2026-11-03). */
+export function OrgCloses({ org }: { org: OrganizationRef }) {
+  const meta = useMeta();
+  return <>This work account belongs to {org.name}. Leave the org in <a href={meta.data?.organizations_url ?? "https://organizations.teamofsilicons.com"}>Silicon Organizations</a> to close it; its last owner must name another owner first.</>;
 }
 
 /**

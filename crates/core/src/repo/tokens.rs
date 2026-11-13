@@ -102,6 +102,8 @@ pub enum GrantError {
         app_id: String,
         account_uuid: String,
     },
+    /// A recognized refresh operation cannot be replayed right now; the session is not revoked.
+    RefreshConflict(&'static str, &'static str),
     /// Device flow: not approved yet.
     AuthorizationPending,
     /// Device flow: polled faster than every 5 s.
@@ -122,6 +124,9 @@ impl GrantError {
                 "This refresh token was already used once. Presenting a used refresh token revokes the whole sign-in \
                  to protect the account, so this sign-in is now revoked; sign in again.",
             ),
+            GrantError::RefreshConflict(code, description) => {
+                OAuthError::new(axum::http::StatusCode::CONFLICT, *code, *description)
+            }
             GrantError::AuthorizationPending => OAuthError::authorization_pending(
                 "The Carbon hasn't approved this device code yet; keep polling every 5 seconds.",
             ),
@@ -327,6 +332,7 @@ async fn issue_tokens_inner(
             ),
         ));
     }
+    crate::repo::organizations::check(conn, &req.account.uuid, req.app_id).await?;
     let scopes = crate::models::normalize_scopes(req.scopes.to_vec());
     let family = create_family_for(
         conn,
@@ -429,6 +435,8 @@ async fn build_response(
         access_token,
         token_type: "Bearer".into(),
         expires_in: ttl_seconds,
+        access_token_expires_at: OffsetDateTime::from_unix_timestamp(claims.exp)
+            .map_err(|_| ApiError::internal("invalid access token expiry"))?,
         refresh_token,
         refresh_token_expires_at: family.expires_at,
         scope,
@@ -450,6 +458,19 @@ pub async fn refresh(
     presented: &str,
     app_id: &str,
 ) -> Result<TokenResponse, GrantError> {
+    refresh_with_operation(pool, keys, settings, presented, app_id, None).await
+}
+
+/// Refresh with a caller-persisted operation key and canonical requested scope.
+/// Existing callers without a key retain strict refresh-reuse detection.
+pub async fn refresh_with_operation(
+    pool: &PgPool,
+    keys: &Keys,
+    settings: &Settings,
+    presented: &str,
+    app_id: &str,
+    operation: Option<(&str, Option<&str>)>,
+) -> Result<TokenResponse, GrantError> {
     let presented = presented.trim();
     if !presented.starts_with(prefix::REFRESH) {
         let what = crate::crypto::describe_token(presented)
@@ -460,6 +481,12 @@ pub async fn refresh(
     }
     let hash = keys.pepper.hash(presented);
     let mut tx = pool.begin().await?;
+    let recovery = match operation {
+        Some((key, scope)) => {
+            Some(super::refresh_recovery::begin(&mut tx, keys, app_id, key, &hash, scope).await?)
+        }
+        None => None,
+    };
     let row: Option<(i32, Option<OffsetDateTime>, Uuid)> =
         sqlx::query_as("select generation, used_at, family_id from refresh_tokens where token_hash = $1 for update")
             .bind(&hash)
@@ -497,6 +524,44 @@ pub async fn refresh(
             crate::timefmt::format_rfc3339_ms(family.expires_at)
         )));
     }
+    let account = crate::repo::accounts::get(&mut tx, &family.account_uuid)
+        .await?
+        .ok_or_else(|| {
+            GrantError::Invalid("The account of this sign-in no longer exists.".into())
+        })?;
+    if account.status != AccountStatus::Active {
+        return Err(GrantError::Invalid(format!(
+            "The account {} is {}, so its tokens can't be refreshed.",
+            account.display_id(),
+            account.status
+        )));
+    }
+    if let Err(error) = crate::repo::organizations::check(&mut tx, &account.uuid, app_id).await {
+        tx.rollback().await?;
+        crate::repo::organizations::record_refusal(pool, &account.uuid, app_id).await?;
+        return Err(error.into());
+    }
+    if let Some(recovery) = &recovery {
+        // Replays are credentials too: check current membership inside the transaction.
+        if !crate::is_first_party_app_id(app_id) {
+            let active: Option<String> = sqlx::query_scalar(
+                "select status from memberships where app_id=$1 and account_uuid=$2 for share",
+            )
+            .bind(app_id)
+            .bind(&family.account_uuid)
+            .fetch_optional(&mut *tx)
+            .await?;
+            if active.as_deref() != Some("active") {
+                return Err(GrantError::Invalid(
+                    "This app no longer has active membership; sign in again.".into(),
+                ));
+            }
+        }
+        if let Some(result) = recovery.replay(&mut tx, keys, &family, generation).await? {
+            tx.commit().await?;
+            return Ok(result);
+        }
+    }
     if used_at.is_some() {
         sqlx::query(
             "update token_families set revoked_at = now(), revoke_reason = 'refresh_token_reuse' where id = $1 and revoked_at is null",
@@ -512,18 +577,6 @@ pub async fn refresh(
             account_uuid: family.account_uuid,
         });
     }
-    let account = crate::repo::accounts::get(&mut tx, &family.account_uuid)
-        .await?
-        .ok_or_else(|| {
-            GrantError::Invalid("The account of this sign-in no longer exists.".into())
-        })?;
-    if account.status != AccountStatus::Active {
-        return Err(GrantError::Invalid(format!(
-            "The account {} is {}, so its tokens can't be refreshed.",
-            account.display_id(),
-            account.status
-        )));
-    }
     sqlx::query("update refresh_tokens set used_at = now() where token_hash = $1")
         .bind(&hash)
         .execute(&mut *tx)
@@ -534,6 +587,18 @@ pub async fn refresh(
         .execute(&mut *tx)
         .await?;
     let response = build_response(&mut tx, keys, settings, &account, &family, next, None).await?;
+    // Once the successor rotates, no earlier result should be handed back to a stale caller.
+    sqlx::query(
+        "update refresh_recoveries set response=null where family_id=$1 and response is not null",
+    )
+    .bind(family.id)
+    .execute(&mut *tx)
+    .await?;
+    if let Some(recovery) = &recovery {
+        recovery
+            .save(&mut tx, keys, &family, generation, &response)
+            .await?;
+    }
     tx.commit().await?;
     Ok(response)
 }
@@ -762,6 +827,7 @@ pub async fn verify_access_token(
             format!("The account {} was deleted.", account.uuid),
         ));
     }
+    crate::repo::organizations::check(conn, &account.uuid, &claims.aud).await?;
     Ok(VerifiedAccess {
         claims,
         family,
@@ -1110,6 +1176,65 @@ pub async fn consume_slt(
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
+    match failure {
+        Some(m) => Err(GrantError::Invalid(m)),
+        None => Ok(t),
+    }
+}
+
+/// Consume under the caller's transaction. Commit client refusals, but commit successful
+/// consumption atomically with the issued tokens and recovery receipt.
+pub async fn consume_slt_in_transaction(
+    conn: &mut PgConnection,
+    pepper: &Pepper,
+    slt: &str,
+    app_id: &str,
+) -> Result<ShortLivedToken, GrantError> {
+    let slt = slt.trim();
+    if !slt.starts_with(prefix::SLT) {
+        let what = crate::crypto::describe_token(slt)
+            .unwrap_or("not a Silicon Accounts short-lived token");
+        return Err(GrantError::Invalid(format!(
+            "slt must be a short-lived token (it starts with slt_), but this is {what}."
+        )));
+    }
+    let row: Option<(ShortLivedToken, bool)> = sqlx::query_as::<_, SltRow>(
+        "select token_hash, account_uuid, app_id, scopes, created_at, expires_at, consumed_at, \
+                family_expires_cap, federation_id, expires_at <= now() as expired from short_lived_tokens \
+         where token_hash = $1 for update",
+    )
+    .bind(pepper.hash(slt))
+    .fetch_optional(&mut *conn)
+    .await?
+    .map(|r| (r.token, r.expired));
+    let Some((t, expired)) = row else {
+        return Err(GrantError::Invalid(
+            "The short-lived token is not known: it is mistyped or was never issued.".into(),
+        ));
+    };
+    if t.consumed_at.is_some() {
+        return Err(GrantError::Invalid(
+            "The short-lived token was already used; each one works once. Get a new one.".into(),
+        ));
+    }
+    let failure = if expired {
+        Some(format!(
+            "The short-lived token expired at {} (they last {SLT_TTL_SECONDS} seconds); get a new one with `silicon-accounts login --app {}`.",
+            crate::timefmt::format_rfc3339_ms(t.expires_at),
+            t.app_id
+        ))
+    } else if t.app_id != app_id {
+        Some(format!(
+            "The short-lived token was issued for the app '{}', not for '{app_id}'; get one for '{app_id}' with `silicon-accounts login --app {app_id}`.",
+            t.app_id
+        ))
+    } else {
+        None
+    };
+    sqlx::query("update short_lived_tokens set consumed_at = now() where token_hash = $1")
+        .bind(&t.token_hash)
+        .execute(&mut *conn)
+        .await?;
     match failure {
         Some(m) => Err(GrantError::Invalid(m)),
         None => Ok(t),

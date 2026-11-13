@@ -3,6 +3,11 @@
 /// (topic, one-line summary, content)
 pub const TOPICS: &[(&str, &str, &str)] = &[
     (
+        "work-accounts",
+        "Work identities, linking, account selection and org access",
+        include_str!("../docs/work-accounts.md"),
+    ),
+    (
         "getting-started",
         "Sign in, check who you are, and the first commands to run",
         include_str!("../docs/getting-started.md"),
@@ -102,7 +107,6 @@ mod tests {
             assert!(content.len() > 400, "{name} is too short");
             for banned in [
                 "organisation",
-                "organization",
                 "frontend",
                 "backend",
                 " AI ",

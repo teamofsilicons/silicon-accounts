@@ -46,6 +46,7 @@ async fn only_grants_expired_for_over_a_week_are_purged() {
     assert_eq!(
         purged,
         PurgedGrants {
+            refresh_recoveries: 0,
             authorization_codes: 1,
             short_lived_tokens: 1,
             device_authorizations: 1,

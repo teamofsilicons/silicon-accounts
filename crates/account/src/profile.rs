@@ -290,6 +290,18 @@ pub(crate) async fn change_id(
     key: Option<IdempotencyKey>,
     Json(body): Json<ChangeIdBody>,
 ) -> Result<Response, ApiError> {
+    {
+        let mut conn = state.db.acquire().await?;
+        if accounts_core::repo::organizations::org_id(&mut conn, me.uuid())
+            .await?
+            .is_some()
+        {
+            return Err(ApiError::forbidden(
+                "organization_handle_managed",
+                "Work handles are managed by organization owners and admins in Silicon Organizations.",
+            ));
+        }
+    }
     let scope = idem_scope(me.uuid(), "POST", "/v1/me/id");
     idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
         let new_id = AccountId::parse_for_kind(&body.id, me.kind())

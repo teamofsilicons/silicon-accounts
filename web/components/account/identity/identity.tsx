@@ -13,11 +13,15 @@
  *   dialog makes one primary, removes one or adds one with a code. A Carbon without a phone gets "Add a phone".
  *
  * A Silicon sees Profile only: it has no emails or phone numbers.
+ *
+ * A work account (one an org owns, `me.org`) can't change its CarbonID: its org manages it, so the row only says so
+ * and the palette has no "Change your CarbonID" (from main's work accounts, 2026-11-03). "Your Accounts" leads to
+ * /linked-accounts, the personal and work accounts this one can switch between.
  */
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AtSign, ChevronRight } from "lucide-react";
+import { AtSign, ChevronRight, UsersRound } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
@@ -43,7 +47,7 @@ import { PhotoControl } from "../parts/photo-control";
 import { useChangeOwnId } from "../parts/queries";
 import { ContactList } from "../sign-in-methods/sign-in-methods";
 import { AvatarEditor } from "./avatar-editor";
-import { Section } from "../parts/rows";
+import { LinkRow, Section, Tile } from "../parts/rows";
 import styles from "./identity.module.css";
 
 const RESERVED_DAYS = 10;
@@ -66,9 +70,10 @@ export function Identity() {
   const editing = editorOf(useSearchParams().get("edit"));
   const [reserved, setReserved] = useState<{ id: string; until: number } | null>(null);
 
-  useRegisterCommands(() => [
+  const org = me.data?.org ?? null;
+  useRegisterCommands(() => org ? [] : [
     { id: "identity.change-id", label: "Change your CarbonID", description: "Pick a new CarbonID; the old one stays reserved for you for 10 days", group: "Identity", icon: <AtSign size={16} strokeWidth={2} />, keywords: ["id", "handle", "username", "rename"], run: () => router.push(editHref("id"), { scroll: false }) },
-  ], [router]);
+  ], [router, org]);
 
   const account = me.data;
   const carbon = asCarbon(account);
@@ -93,8 +98,8 @@ export function Identity() {
               <Row label="Name" edit="name">{account.display_name}</Row>
               <Row
                 label="CarbonID"
-                edit="id"
-                detail={reserved ? <><span className="mono">{reserved.id}</span> stays reserved for you until {formatDate(reserved.until)}.</> : undefined}
+                edit={org ? undefined : "id"}
+                detail={org ? <>Managed by {org.name}</> : reserved ? <><span className="mono">{reserved.id}</span> stays reserved for you until {formatDate(reserved.until)}.</> : undefined}
               >
                 <span className="mono">{account.id ?? account.uuid}</span>
               </Row>
@@ -102,7 +107,10 @@ export function Identity() {
               <Row label="Timezone" edit="timezone">{account.timezone}</Row>
             </Box>
             {carbon ? <ContactBox carbon={carbon} /> : null}
-            <Editors me={account} editing={editing} onClose={close} onReserved={setReserved} />
+            <div className={styles.accounts}>
+              <LinkRow href="/linked-accounts" lead={<Tile><UsersRound size={16} strokeWidth={2} /></Tile>} title="Your Accounts" detail="Your personal and work accounts, and switching between them" />
+            </div>
+            <Editors me={account} editing={org && editing === "id" ? null : editing} onClose={close} onReserved={setReserved} />
           </>
         )}
       </Page>
@@ -134,7 +142,20 @@ function Box({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** The prototype's .srow: the whole row opens its editor (a link to ?edit=…), label, value, chevron. */
-function Row({ label, edit, detail, end, children }: { label: string; edit: Editor; detail?: ReactNode; end?: ReactNode; children: ReactNode }) {
+function Row({ label, edit, detail, end, children }: { label: string; edit?: Editor; detail?: ReactNode; end?: ReactNode; children: ReactNode }) {
+  // Without an editor (a work account's CarbonID), the row only shows its value: no link, no chevron.
+  if (!edit) return (
+    <li className={styles.item}>
+      <div className={`${styles.row} ${styles.fixed}`}>
+        <span className={styles.label}>{label}</span>
+        <span className={styles.value}>
+          {children}
+          {detail ? <span className={styles.detail}>{detail}</span> : null}
+        </span>
+        {end}
+      </div>
+    </li>
+  );
   return (
     <li className={styles.item}>
       <Link href={editHref(edit)} replace scroll={false} className={styles.row} data-edit={edit}>

@@ -48,7 +48,7 @@ export interface ProviderConnection {
  */
 export function useConnectProvider() {
   return useMutation<ProviderConnection, ApiError, { provider: Provider; returnTo: string }>({
-    mutationFn: ({ provider, returnTo }) => request<ProviderConnection>(`/v1/me/identities/${provider}`, { method: "POST", body: { return_to: returnTo } }),
+    mutationFn: ({ provider, returnTo }) => request<ProviderConnection>(`/v1/me/identities/${provider}`, { method: "POST", body: { return_to: new URL(returnTo, window.location.origin).href } }),
     meta: { errorTitle: "Could not start connecting it" },
   });
 }

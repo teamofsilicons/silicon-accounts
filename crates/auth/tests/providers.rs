@@ -1219,3 +1219,150 @@ async fn an_unreachable_provider_is_reported_with_the_reason() {
         "says the request was retried: {message}"
     );
 }
+
+// Production provider callbacks keep their registered HTTPS address. The local
+// Accounts frontend receives only a ticket and must prove the original binding.
+#[tokio::test]
+async fn local_frontend_provider_handoff_keeps_binding_and_single_use() {
+    for provider in ["google", "apple"] {
+        for wrong_browser in [false, true] {
+            let mock = MockOidc::start().await;
+            let mut settings = Settings::for_tests();
+            mock.configure(&mut settings);
+            settings.cookie_secure = true;
+            settings
+                .extra_allowed_origins
+                .push("http://localhost:9100".into());
+            let ctx = TestContext::with_settings(settings).await;
+            let mut local = Browser::new(&ctx);
+            local.origin = Some("http://localhost:9100".into());
+            let r = local
+                .post(
+                    &ctx,
+                    "/v1/flows",
+                    json!({
+                        "app_id": "silicon-accounts",
+                        "redirect_uri": "http://localhost:9100/sign-in",
+                        "state": "local-state"
+                    }),
+                )
+                .await;
+            assert_eq!(r.status, 201, "{}", r.json);
+            let id = id_of(&r.json["flow"]);
+            let r = oauth_start(&ctx, &mut local, &id, provider).await;
+            assert_eq!(r.status, 200, "{}", r.json);
+            let url = r.json["authorize_url"].as_str().unwrap();
+            assert_eq!(
+                query_param(url, "redirect_uri").unwrap(),
+                format!(
+                    "{}/v1/oauth/callback/{provider}",
+                    ctx.state.settings.public_url
+                )
+            );
+            let (code, state) = mock.authorize(url, identity("local-"));
+            let mut hosted = Browser::new(&ctx); // no localhost cookies on the live domain
+            let r = if provider == "google" {
+                google_callback(&ctx, &mut hosted, &code, &state).await
+            } else {
+                apple_post(&ctx, &mock, &[("code", &code), ("state", &state)]).await
+            };
+            assert_eq!(r.status, 303, "{}", r.json);
+            let location = r.headers["location"].to_str().unwrap();
+            let path = location.strip_prefix("http://localhost:9100").unwrap();
+            assert!(path.starts_with(&format!("/v1/oauth/callback/{provider}?ticket=")));
+            assert!(!location.contains(&code));
+            assert!(r.headers.get("set-cookie").is_none());
+            let r = if wrong_browser {
+                hosted.get(&ctx, path).await
+            } else {
+                local.get(&ctx, path).await
+            };
+            if wrong_browser {
+                assert_eq!(r.status, 403);
+            } else {
+                assert_eq!(r.status, 302, "{}", r.json);
+                assert_eq!(
+                    r.headers["location"],
+                    format!("http://localhost:9100/authorize/flow/{id}")
+                );
+            }
+            let r = local.get(&ctx, &format!("/v1/flows/{id}")).await;
+            if wrong_browser {
+                assert_eq!(r.json["flow"]["error"]["code"], "provider_answer_elsewhere");
+            } else {
+                assert_eq!(r.json["flow"]["step"], "signup", "{}", r.json);
+                assert_eq!(r.json["flow"]["signup"]["provider"], provider);
+            }
+            let replay = local.get(&ctx, path).await;
+            assert_eq!(replay.status, 400, "ticket must be single use");
+        }
+    }
+}
+
+#[tokio::test]
+async fn local_frontend_unlisted_port_is_rejected() {
+    let mut settings = Settings::for_tests();
+    settings
+        .extra_allowed_origins
+        .push("http://localhost:9100".into());
+    let ctx = TestContext::with_settings(settings).await;
+    let mut b = Browser::new(&ctx);
+    b.origin = Some("http://localhost:9101".into());
+    let r = b
+        .post(
+            &ctx,
+            "/v1/flows",
+            json!({
+                "app_id": "silicon-accounts", "redirect_uri": "http://localhost:9101/sign-in"
+            }),
+        )
+        .await;
+    assert_eq!(r.status, 403);
+    b.origin = Some("http://localhost:9100".into());
+    let r = b
+        .post(
+            &ctx,
+            "/v1/flows",
+            json!({
+                "app_id": "silicon-accounts", "redirect_uri": "http://localhost:9101/sign-in"
+            }),
+        )
+        .await;
+    assert_eq!(r.status, 400);
+    assert_eq!(r.json["error"]["code"], "redirect_uri_not_registered");
+}
+
+#[tokio::test]
+async fn ordinary_apps_do_not_receive_local_frontend_tickets() {
+    let mock = MockOidc::start().await;
+    let mut settings = Settings::for_tests();
+    mock.configure(&mut settings);
+    settings
+        .extra_allowed_origins
+        .push("http://localhost:9100".into());
+    let ctx = TestContext::with_settings(settings).await;
+    let (app, _) = app_with(
+        &ctx,
+        "local-app",
+        json!({
+            "methods": {"google": true}, "redirect_uris": ["http://localhost:9100/callback"]
+        }),
+    )
+    .await;
+    let mut b = Browser::new(&ctx);
+    let f = new_flow(
+        &ctx,
+        &mut b,
+        &app.app_id,
+        json!({"redirect_uri": "http://localhost:9100/callback"}),
+    )
+    .await;
+    let r = oauth_start(&ctx, &mut b, &id_of(&f), "google").await;
+    let (code, state) = mock.authorize(
+        r.json["authorize_url"].as_str().unwrap(),
+        identity("ordinary-"),
+    );
+    let r = google_callback(&ctx, &mut Browser::new(&ctx), &code, &state).await;
+    assert_eq!(r.status, 403);
+    assert!(r.headers.get("location").is_none());
+}

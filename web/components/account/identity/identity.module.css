@@ -5,6 +5,8 @@
 .row { display: flex; min-width: 0; min-height: var(--control-height-md); align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); color: var(--foreground); text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
 @media (hover: hover) and (pointer: fine) { .row:hover { background: var(--neutral-1); color: var(--foreground); } }
 .row:active { background: var(--surface-muted); }
+/* A row with nothing to edit (a work account's CarbonID) doesn't light up. */
+.fixed, .fixed:hover, .fixed:active { background: transparent; cursor: default; }
 .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .label { width: 9rem; flex: none; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
 .value { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); font: var(--small); letter-spacing: var(--small-tracking); overflow-wrap: anywhere; }
@@ -36,3 +38,6 @@
    (Anil, 2026-11-10: "weird gaps"). --dialog-width is Silicon UI Dialog's width variable (local patch). */
 .calendarDialog { --dialog-width: calc(328px + 2 * var(--space-section) + 2px); }
 
+
+/* "Your Accounts", after the sections, a section's distance below them. */
+.accounts { margin-top: var(--space-section); }

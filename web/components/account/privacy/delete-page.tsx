@@ -38,6 +38,7 @@ import { withAppIcon } from "../parts/app-icons";
 import { asCarbon, asSilicon, describeError, msUntil, personLabel, spanText, useNow } from "../parts/common";
 import { recipient } from "../parts/handover";
 import { PageBar } from "../parts/page-bar";
+import { OrgCloses } from "./privacy";
 import {
   useCancelTransferSettled,
   useDeleteSiliconSettled,
@@ -101,6 +102,8 @@ export function DeletePage() {
           </Alert>
         ) : !ready ? (
           <div className={styles.skeleton} aria-busy="true" aria-label="Loading"><Skeleton label="Loading" lines={6} avatar /></div>
+        ) : me.data?.org ? (
+          <p className={styles.lead}><OrgCloses org={me.data.org} /></p>
         ) : silicon ? (
           <p className={styles.lead}>{silicon.custodian?.id ?? "Your custodian"} deletes this Silicon&rsquo;s account, from their Silicons page.</p>
         ) : carbon ? (

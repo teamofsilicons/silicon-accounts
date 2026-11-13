@@ -27,7 +27,12 @@ impl std::ops::Deref for IdempotencyKey {
 }
 
 fn parse(parts: &Parts) -> Result<Option<IdempotencyKey>, ApiError> {
-    let Some(raw) = parts.headers.get(HEADER) else {
+    parse_header(&parts.headers)
+}
+
+/// Validate an optional key for endpoints with their own response/error format.
+pub fn parse_header(headers: &axum::http::HeaderMap) -> Result<Option<IdempotencyKey>, ApiError> {
+    let Some(raw) = headers.get(HEADER) else {
         return Ok(None);
     };
     let invalid = || {
@@ -38,7 +43,11 @@ fn parse(parts: &Parts) -> Result<Option<IdempotencyKey>, ApiError> {
         .hint("Send a fresh random key per operation and reuse it only when retrying that same operation.")
     };
     let v = raw.to_str().map_err(|_| invalid())?.trim();
-    if v.is_empty() || v.len() > 200 || !v.bytes().all(|b| (0x21..=0x7e).contains(&b)) {
+    if headers.get_all(HEADER).iter().count() != 1
+        || v.is_empty()
+        || v.len() > 200
+        || !v.bytes().all(|b| (0x21..=0x7e).contains(&b))
+    {
         return Err(invalid());
     }
     Ok(Some(IdempotencyKey(v.to_string())))

@@ -21,6 +21,8 @@ pub const FLOW_TTL_MINUTES: i64 = 60;
 pub enum Step {
     /// Pick a method (or continue as the browser's account).
     ChooseMethod,
+    /// Choose a proved personal or linked work identity.
+    SelectAccount,
     /// A code was sent; type it.
     VerifyCode,
     /// First time with this email/phone/identity (or finishing an imported account).
@@ -41,6 +43,7 @@ impl Step {
     pub fn as_str(&self) -> &'static str {
         match self {
             Step::ChooseMethod => "choose_method",
+            Step::SelectAccount => "select_account",
             Step::VerifyCode => "verify_code",
             Step::Signup => "signup",
             Step::Details => "details",
@@ -54,6 +57,7 @@ impl Step {
     pub fn parse(s: &str) -> Option<Step> {
         Some(match s {
             "choose_method" => Step::ChooseMethod,
+            "select_account" => Step::SelectAccount,
             "verify_code" => Step::VerifyCode,
             "signup" => Step::Signup,
             "details" => Step::Details,
@@ -316,6 +320,12 @@ pub struct LinkIntent {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct FlowExtras {
+    #[serde(default)]
+    pub authenticated_account_uuid: Option<String>,
+    #[serde(default)]
+    pub account_selected: bool,
+    #[serde(default)]
+    pub link_request_id: Option<Uuid>,
     /// The browser's `Intl` timezone sent at flow creation (sign-up suggestion fallback).
     pub browser_timezone: Option<String>,
     /// The Google/Apple leg in progress.
@@ -561,6 +571,8 @@ impl Flow {
         self.extras.auth_method = None;
         self.extras.new_account = false;
         self.extras.browser_session_id = None;
+        self.extras.authenticated_account_uuid = None;
+        self.extras.account_selected = false;
         self.extras.details = DetailsProgress::default();
     }
 

@@ -37,7 +37,7 @@ Silicon Accounts and Apps APIs, server to server:
 | `/auth/sign-in?return_to=/apps/x` | Starts a sign-in: a fresh `state` and PKCE verifier are sealed into a 10-minute httpOnly cookie (`sa_dev_signin`, up to three at once for three tabs), and the browser goes to the hosted sign-in on the accounts site as the first-party app `developer`: `{ACCOUNTS_PUBLIC_URL}/authorize?app_id=developer&redirect_uri={DEVELOPER_PUBLIC_URL}/auth/callback&state&code_challenge&code_challenge_method=S256` (`prompt=login\|select_account` passes through). |
 | `/auth/callback` | The state must be one this browser started; the code is exchanged server side (`POST /v1/oauth/token`, `client_id=developer`, no secret, the PKCE verifier), and the tokens are sealed into the session cookie. Failures land on `/sign-in?error=<code>` with fixed words per code (the address's `error_description` is never shown). |
 | `/auth/sign-out` (POST) | Revokes the refresh token (`/v1/oauth/revoke`, `client_id=developer`) and clears the cookie. The account site's own sign-in is untouched. |
-| `/auth/session` | `{"signed_in": bool}` from the sealed cookie alone (no API call). The pages ask it before `/api/accounts/me`, so a signed-out visit never logs a 401. |
+| `/auth/session` | `{"signed_in": bool}` from the durable session state. The pages ask it before `/api/accounts/me`, so a signed-out visit never logs a 401. |
 | `/api/accounts/*` | The proxy: `{ACCOUNTS_API_URL}/v1/*` with `Authorization: Bearer <access token>`. Public reads (`meta`, `apps/{id}/public`, `.well-known/openid-configuration`, `.well-known/jwks.json`) go without a token. Account reads: `me`, `me/owned-apps`, `me/app-verifications`. Everything under `apps/{app_id}/…` (the owner routes). Anything else answers 404 `not_proxied`. |
 | `/api/apps/*` | Restricted publishing proxy to `{APPS_API_URL}/v1/*`, using the same server-held `aud=developer` access token. Own-app listing requires `mine=true`. Store reviews, install receipts, package resolution, reports and platform registration are not proxied. Media paths use this proxy too, preserving private visibility checks. A 401 from Silicon Apps is never relayed as signed out on its own (see "Silicon Apps refusing the token" below). |
 | everything else | the pages |
@@ -47,11 +47,13 @@ sealed with AES-256-GCM under a key derived (HKDF-SHA256) from `DEVELOPER_SESSIO
 in as additional data (`lib/server/seal.ts`). It holds the access token (aud=developer, 30 minutes), the refresh token
 (rotates on every use, 900 days), their expiry times and the account's uuid. The browser never sees a token.
 
-**Refresh** (`lib/server/session.ts`): the proxy refreshes when the access token has under a minute left, and once more
-when the API answers 401 `invalid_token`. Refresh tokens rotate and a reused one revokes the whole sign-in, so refreshing
-is single-flight per refresh token in the process, and the result is remembered for a minute: requests the browser sent
-with the old cookie before the new one arrived get the same new tokens instead of presenting the used refresh token.
-A refused refresh (`invalid_grant`) clears the cookie and answers 401 `signed_out`.
+**Refresh** (`lib/server/session.ts`): canonical session state and random operation keys are saved before OAuth
+requests. Conditional writes prevent late responses from overwriting a newer rotation or sign-out. Existing cookies
+are adopted automatically. Recovery preserves absolute access-token expiry and saves an expired successor before
+rotating again. Only `invalid_grant` clears the sign-in; conflicts and temporary failures remain retryable.
+Production requires `REFRESH_STATE_PATH` on a persistent private volume shared by web processes on one host, or
+`REFRESH_STATE_TABLE` and `REFRESH_STATE_REGION` for DynamoDB. Vercel uses DynamoDB with `REFRESH_STATE_ROLE_ARN`.
+Keep `DEVELOPER_SESSION_SECRET` stable: it seals both cookies and durable records. DynamoDB TTL uses `expires`.
 
 **CSRF**: every state-changing request (`POST/PUT/PATCH/DELETE` to `/api/accounts/*`, `/api/apps/*` and `/auth/sign-out`) must carry an
 `Origin` of this site (`DEVELOPER_PUBLIC_URL`, `DEVELOPER_EXTRA_ORIGINS`, and in development the same port on
@@ -288,3 +290,44 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
 Components and their CSS now come from https://ui.teamofsilicons.com/r/{name}.json, with `silicon-foundation` imported once at the root. `components/silicon-ui/registry-manifest.json` records every upstream source checksum. The registry supplies native squircle geometry, semantic spacing and visible keyboard focus. Application tokens retain the configured brand colors. Local adaptations retain dialog focus return and nested Escape priority, combobox keyboard behavior, whole international phone-number entry, and timeline pagination announcements; they live beside the registry source and must survive future updates. Existing custom application surfaces retain their squircle fallback. Historical Arc notes above describe these original application adaptations.
 
 Silicon UI local keyboard fix: ConfirmMorph preserves its pointer re-arming delay, but a separate keyboard activation can confirm immediately. This retains the established revocation flow and is covered by the developer app-verification keyboard regression. Hosted branding also maps round/sharp/squircle corners to Silicon UI tokens and keeps soft/outline primary actions.
+
+## Cells workspace
+
+`CELLS_API_URL` points the server to the Cells control API. The existing sealed
+Accounts cookie is reused by `/api/cells/*`; no Accounts bearer token is sent to
+the browser. Author paths are allowlisted and every mutation requires the same
+origin. Control bodies are capped at 1 MiB; file parts stream with an enforced
+1 GiB ceiling and are not buffered by the proxy. A refresh after an upstream
+refusal asks the browser to resume the part instead of replaying a consumed body.
+
+`/cells` lists cells, creates them, displays initial credentials once, and accepts
+or declines author invitations. `/cells/[cellId]` provides overview, database,
+files, authors, settings and history. Database tools include table creation,
+row editing with primary-key and stale-row checks, column/relation/index controls,
+access presets, CSV/JSON import and result exports, encrypted saved queries, SQL,
+explicit migration source, API reference, extensions and TypeScript/Rust exports.
+Rows and source stay transient in component state; only metadata uses query caches.
+Settings cover origins, callbacks, keys, secrets, deletion and restoration.
+
+Files support paginated paths, download, copy/move/delete, expiring links,
+thirty-day trash and restoration, bucket settings and access presets, managed/S3 provider changes and migration
+retry. Storage connections can be repaired without retargeting files, including
+from a deleted cell’s Settings when erasure is blocked. Resuming an upload requires the original author session and original
+file; already persisted parts are checked before new parts are sent. No upload
+bearer capability is needed in this author UI. Uploaded active content is served
+as a sandboxed attachment through the BFF.
+
+`pnpm test` covers the proxy boundaries, streamed bodies, refresh behavior and
+resume safety. The adjacent Cells repository's
+`CELLS_PREVIEW=1 CELLS_PREVIEW_SMOKE=1 python3 scripts/test-auth.py` exercises a
+real local Accounts/Cells/Developer stack. Interactive browser validation is
+still pending; HTTP page rendering is not proof of client interactions or layout.
+The remaining Cells capabilities are tracked in that repository's `BUILD.md`.
+
+Cells History includes paginated Silicon Ting delivery records and retry controls.
+Registration uses explicit consent from the Cells CLI; the Developer bearer
+session cannot issue that proof. Files shows the latest storage permission check
+and outage state. A 2026-10-28 manual local browser pass retried a rejected
+notification and verified its transition to Accepted by Ting through a controlled
+receiver using real Accounts proofs. Production Ting compatibility and the full
+Cells acceptance pass remain outstanding; see the Cells repository ledger.

@@ -199,6 +199,16 @@ pub async fn verify(
         tracing::debug!(proof_id = %row.proof_id, verifier = %auth.app.app_id, reason, "proof did not verify");
         return Ok(no_store(Json(invalid_proof()).into_response()));
     }
+    if let Some(uuid) = row.account_uuid.as_deref() {
+        let mut conn = state.db.acquire().await?;
+        if !accounts_core::repo::organizations::allowed(&mut conn, uuid, &row.issuing_app_id)
+            .await?
+            || !accounts_core::repo::organizations::allowed(&mut conn, uuid, &auth.app.app_id)
+                .await?
+        {
+            return Ok(no_store(Json(invalid_proof()).into_response()));
+        }
+    }
     let user = match (&row.account_uuid, row.account_kind) {
         (Some(uuid), Some(kind)) => Some(ProofUser {
             uuid: uuid.clone(),

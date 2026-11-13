@@ -224,7 +224,9 @@ pub struct MemberTarget {
     pub app_id: String,
     pub membership_id: String,
     pub granted_scopes: Vec<String>,
-    pub subscription_id: uuid::Uuid,
+    pub subscription_id: Option<uuid::Uuid>,
+    /// Internal Cells destination, separate from app-managed subscriptions.
+    pub cell_uuid: Option<uuid::Uuid>,
     pub delivery: crate::models::SubscriptionDelivery,
     /// The updates the subscription wants (`null` = every update).
     pub updates: Option<Value>,
@@ -262,12 +264,18 @@ pub async fn webhook_targets(
 ) -> ApiResult<Vec<MemberTarget>> {
     Ok(sqlx::query_as::<_, MemberTarget>(
         "select m.app_id, m.membership_id, m.granted_scopes, s.id as subscription_id, s.delivery, \
-         s.updates, c.webhook_url from memberships m \
+         s.updates, c.webhook_url, null::uuid as cell_uuid from memberships m \
          join app_event_subscriptions s on s.app_id = m.app_id and s.status = 'active' \
          left join app_signin_configs c on c.app_id = m.app_id \
          where m.account_uuid = $1 and m.status in ('active', 'imported') \
            and (s.delivery = 'stream' or c.webhook_url is not null) \
-         order by m.app_id, s.delivery desc",
+         union all \
+         select m.app_id,m.membership_id,m.granted_scopes,null::uuid,'webhook',null::jsonb, \
+           replace(l.callback_uri,'/auth/callback','/auth/accounts-webhook'),l.cell_uuid \
+         from memberships m join cells_app_links l on l.app_id=m.app_id \
+         where m.account_uuid=$1 and m.status in ('active','imported') \
+           and l.revoked_at is null and l.webhook_secret_enc is not null \
+         order by app_id, delivery desc",
     )
     .bind(account_uuid)
     .fetch_all(&mut *conn)

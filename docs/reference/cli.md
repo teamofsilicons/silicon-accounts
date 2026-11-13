@@ -3101,3 +3101,7 @@ Examples, as `--help` prints them:
 ```text
 silicon-accounts delete-account --confirm c:saket
 ```
+
+## Work accounts
+
+Use `silicon-accounts linked-accounts` to list controlled identities, `linked-accounts switch ID` to select one, and `login --app APP --account ID` to obtain an app token for a linked identity. `linked-accounts create-personal ID` creates a personal Carbon from a work main. Organization Silicon requests use `linked-accounts requests`, `accept REQUEST_ID` and `decline REQUEST_ID`. See `silicon-accounts docs work-accounts`.

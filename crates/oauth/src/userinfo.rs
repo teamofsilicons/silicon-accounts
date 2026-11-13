@@ -98,7 +98,7 @@ async fn answer(state: &AppState, token: Option<String>) -> Response {
     }
 }
 
-async fn userinfo(state: &AppState, token: &str) -> Result<Value, ApiError> {
+pub(crate) async fn userinfo(state: &AppState, token: &str) -> Result<Value, ApiError> {
     let mut conn = state.db.acquire().await?;
     let now = OffsetDateTime::now_utc().unix_timestamp();
     // Core's verification allows 30 s of clock skew; this server issued the token and is the

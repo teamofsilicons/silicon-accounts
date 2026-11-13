@@ -61,6 +61,8 @@ const SIGNUP_SESSIONS: &str = "delete from signup_sessions where id in \
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct CleanupReport {
     pub signin_flows: u64,
+    /// Encrypted refresh replies retired; request bindings remain.
+    pub refresh_recoveries: u64,
     pub otp_challenges: u64,
     pub authorization_codes: u64,
     pub short_lived_tokens: u64,
@@ -76,9 +78,10 @@ pub struct CleanupReport {
 }
 
 impl CleanupReport {
-    /// Total rows deleted.
+    /// Total rows deleted or encrypted recovery replies retired.
     pub fn total(&self) -> u64 {
         self.signin_flows
+            + self.refresh_recoveries
             + self.otp_challenges
             + self.authorization_codes
             + self.short_lived_tokens
@@ -124,6 +127,11 @@ pub async fn run_once(state: &AppState) -> CleanupReport {
     let pool = &state.db;
     let mut r = CleanupReport::default();
     let e = &mut r.errors;
+    r.refresh_recoveries = tally(
+        e,
+        "refresh_recoveries",
+        accounts_core::repo::refresh_recovery::purge(pool).await,
+    );
     r.signin_flows = tally(e, "signin_flows", purge_batched(pool, SIGNIN_FLOWS).await);
     r.authorization_codes = tally(
         e,

@@ -19,6 +19,7 @@ This page walks through each step, including how to check a token and read the a
 
 ```sh
 curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/token" \
+  -H "Idempotency-Key: $SAVED_REFRESH_OPERATION_KEY" \
   -d grant_type=refresh_token -d "refresh_token=$REFRESH_TOKEN"
 ```
 
@@ -36,7 +37,12 @@ curl -s -u "${ACCOUNTS_APP_ID}:${ACCOUNTS_APP_SECRET}" "$ACCOUNTS_URL/v1/oauth/t
 }
 ```
 
-Save the new `refresh_token` the moment the answer arrives. The one you sent is now spent and won't work again, and sending it again ends the whole session. [Tokens and sessions](../learn/tokens-and-sessions.md) explains why refresh tokens work this way.
+Before refreshing, persist a random operation key with the current token and share it across
+callers. Save the new `refresh_token` atomically when the answer arrives. If the reply is lost,
+retry with the same token, key and scope: Accounts can recover the committed reply for 24 hours
+while its successor is unused. Reusing the old token without that key still ends the sign-in.
+See [refresh recovery](../reference/api/oauth.md#recovering-a-refresh-after-a-timeout-or-restart)
+for concurrency, expiry and error handling.
 
 ## The token response
 
@@ -47,6 +53,7 @@ Every grant (a code, a Silicon's short-lived token or a refresh) gets the same a
 |---|---|
 | `access_token` | A JWT (EdDSA) for your app, valid `expires_in` seconds: 1800, 30 minutes, or less in the last 30 minutes of a sign-in that ends early, because an access token never outlives its sign-in. Send it to your own API, or to Silicon Accounts' `/v1/userinfo`. |
 | `token_type` | Always `Bearer`. |
+| `access_token_expires_at` | Original JWT expiry, unchanged on recovery. `expires_in` is the remaining lifetime and may be zero for a recovered reply; save its successor before refreshing again. |
 | `refresh_token` | `sar_…`, opaque. Rotates on every refresh; one use each. |
 | `refresh_token_expires_at` | When this sign-in ends at the latest: 900 days after it started, or, for a Silicon's sign-in made from a short-lived token its CI job minted, when that CI sign-in ends. Refreshing never moves it. |
 | `scope` | What the account granted your app, space-separated, e.g. `profile email openid`. |
@@ -171,15 +178,16 @@ silicon-accounts app token refresh "$REFRESH_TOKEN" --json
 ```
 
 ```rust
-let tokens = app.refresh(refresh_token).await?;   // store tokens.refresh_token right away
+let tokens = app.refresh_with_key(refresh_token, saved_operation_key).await?;
+// Atomically store the returned tokens and access_token_expires_at.
 ```
 
-**Rotation.** Every refresh gives you a new refresh token and spends the one you sent. The new
+**Rotation.** Every new refresh operation gives you a new refresh token and spends the one you sent. The new
 one keeps the sign-in's original `refresh_token_expires_at`, so a sign-in lasts at most 900 days
 from the moment the account signed in (or until the end of the CI sign-in it came from), however
 often you refresh.
 
-**Reuse detection.** We treat a spent refresh token coming back as theft. The whole sign-in
+**Reuse detection.** A spent token without its original recovery key is treated as theft. The whole sign-in
 (every token issued from it, including the newest) is revoked at once, and your webhook gets
 `membership.signed_out` with reason `refresh_token_reuse`:
 
@@ -193,60 +201,25 @@ After that, even the newest refresh token answers:
 {"error": "invalid_grant", "error_description": "The sign-in this refresh token belongs to was revoked at 2026-10-07T02:35:29.652Z (refresh_token_reuse); sign in again."}
 ```
 
-**One refresh at a time per sign-in.** Two requests refreshing the same token in parallel (two
+**One refresh at a time per sign-in.** Without a shared recovery key, two requests refreshing the same token in parallel (two
 tabs, two workers, a retry after a timeout) look exactly like theft to us. One wins, the other
 counts as reuse, and the winner's new tokens die with the sign-in. We tested it: two parallel
 refreshes gave one `200` and one `invalid_grant`, and the winner's new refresh token was already
 revoked. So share one request between callers:
 
-```ts
-// refresh.ts: one refresh per sign-in at a time. Two parallel refreshes with the same token
-// count as reuse and end the sign-in, so callers that race share one request.
-const ACCOUNTS_URL = process.env.ACCOUNTS_URL ?? "https://accounts.teamofsilicons.com";
-const APP_ID = process.env.ACCOUNTS_APP_ID ?? "briefcase";
-const APP_SECRET = process.env.ACCOUNTS_APP_SECRET ?? "";
+Use a durable session store to coordinate refreshes across processes and tabs:
 
-type Tokens = { access_token: string; refresh_token: string; expires_in: number; scope: string };
-const inFlight = new Map<string, Promise<Tokens>>(); // refresh token → the request using it
+1. Lock the session row and re-read it; another caller may already have refreshed.
+2. Save one random operation key with the current refresh token before calling Accounts.
+3. Send both with `Idempotency-Key`. On timeout, restart or `refresh_in_progress`, reuse both.
+4. Atomically store the returned tokens and original `access_token_expires_at`, only if the
+   session still has the generation you refreshed. Never let a late reply overwrite newer tokens.
+5. A new rotation gets a new key. If recovery returns `expires_in: 0`, save its refresh token,
+   then rotate that successor with a new key before making authenticated requests.
 
-export function refreshTokens(refreshToken: string): Promise<Tokens> {
-  let pending = inFlight.get(refreshToken);
-  if (!pending) {
-    pending = (async () => {
-      const response = await fetch(new URL("/v1/oauth/token", ACCOUNTS_URL), {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${APP_ID}:${APP_SECRET}`).toString("base64")}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
-      });
-      const body = await response.json();
-      // invalid_grant: the sign-in ended (revoked, reused, access removed, 900 days): sign in again.
-      if (!response.ok) throw Object.assign(new Error(body.error_description), { code: body.error });
-      return body as Tokens; // store body.refresh_token now: the old one is spent
-    })().finally(() => setTimeout(() => inFlight.delete(refreshToken), 60_000).unref());
-    inFlight.set(refreshToken, pending);
-  }
-  return pending;
-}
-
-// Demo: three callers refresh at once; one request is made, all get the same new tokens.
-const [a, b, c] = await Promise.all([1, 2, 3].map(() => refreshTokens(process.argv[2])));
-console.log(a.refresh_token === b.refresh_token && b.refresh_token === c.refresh_token, a.scope);
-console.log((await refreshTokens(a.refresh_token)).expires_in);
-```
-
-```text
-$ node refresh.ts sar_…
-true profile email
-1800
-```
-
-The answer stays shared for a minute, so a late caller still holding the old token gets the new
-tokens instead of tripping reuse detection. If you run several server processes, put the same
-rule in your session store: lock the sign-in's row while you refresh, and write the new refresh
-token in the same transaction.
+A process-local promise map alone cannot coordinate multiple server processes or recover a
+response lost after Accounts committed. Deploy Accounts recovery support before updating clients;
+see [recovery rules and errors](../reference/api/oauth.md#recovering-a-refresh-after-a-timeout-or-restart).
 
 **Scope.** A refresh can send `scope` to repeat or narrow what was granted (the answer still
 lists the whole grant), but never to add to it:

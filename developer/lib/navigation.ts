@@ -14,6 +14,8 @@ export const paths = {
   signIn: "/sign-in",
   docs: "/docs",
   invitations: "/invitations",
+  cells: "/cells",
+  cell: (id:string,tab="overview") => `/cells/${encodeURIComponent(id)}${tab==="overview"?"":`/${tab}`}`,
   appVerification: (appId?: string) => `/app-verification${appId ? `?app_id=${encodeURIComponent(appId)}` : ""}`,
   /** The apps home. */
   developer: "/apps",

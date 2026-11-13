@@ -1,0 +1,156 @@
+{
+  "status": "activated",
+  "revision": "f94d0bf089d5912503f7be157742d6ec18d0b3ad",
+  "archive_sha256": "daac9f4a214938b3d7c952324bcfe749ed56fd6ef2210e64ed214c9cc3612adc",
+  "previous_release": "13a70d74883c205c91fa54f36906bf61a1f80e1e",
+  "rollback_directory": "/var/lib/accounts/release-rollback/f94d0bf089d5912503f7be157742d6ec18d0b3ad-daac9f4a2149",
+  "predeploy_backups": [
+    "s3://silicon-accounts-production-backups-zgctnskyqqre/backups/predeploy-20261028T222556Z.dump"
+  ],
+  "running_binaries": {
+    "api": {
+      "pid": 56219,
+      "sha256": "535ba67ec23b6ff7c9d6ce203d6bb56c8f03974105bd314fdc96610a49b81612"
+    },
+    "caddy": {
+      "pid": 56347,
+      "sha256": "0019d864a2cdee41c3675cb2a26185833c5d9540a48f5a6729142c0413461b60"
+    }
+  },
+  "services": {
+    "api": "active",
+    "web": "active",
+    "developer": "active",
+    "caddy": "active"
+  },
+  "migrations": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+  ],
+  "runtime_env_unchanged": {
+    "api": true,
+    "web": true,
+    "developer": true
+  },
+  "secret_version_unchanged": "9ea86377-5b29-4831-a61a-933fb40dfc08",
+  "cells_links": 0,
+  "private_cells_events": 0,
+  "verified_at": "2026-10-28T22:28:50.222969+00:00",
+  "deployment_command": "cf62e10e-df0b-49b4-bee3-ca243ab9fd44",
+  "preflight_command": "0510c897-1580-48c3-a9ca-70732d99829b",
+  "artifact_s3_version": "FcN7eSW0d4QBS3i8zeE34s8I.OR0lDRH",
+  "artifact_size": 121886657,
+  "archive_versioned_download_sha256_verified": true,
+  "public_checks": {
+    "accounts_ready": {
+      "status": 200,
+      "final_url": "https://accounts.teamofsilicons.com/readyz",
+      "content_type": "application/json",
+      "csp_present": true,
+      "response": {
+        "database": "ok"
+      }
+    },
+    "accounts_meta": {
+      "status": 200,
+      "final_url": "https://accounts.teamofsilicons.com/v1/meta",
+      "content_type": "application/json",
+      "csp_present": true,
+      "response": {
+        "name": "Silicon Accounts",
+        "version": "0.7.0",
+        "environment": "production",
+        "public_url": "https://accounts.teamofsilicons.com",
+        "silicon_apps_url": "https://apps.teamofsilicons.com",
+        "docs_url": "https://developers.teamofsilicons.com/docs/accounts",
+        "developer_url": "https://developers.teamofsilicons.com",
+        "providers": {
+          "google": true,
+          "apple": true
+        },
+        "delivery": "providers"
+      }
+    },
+    "developer_home": {
+      "status": 200,
+      "final_url": "https://developers.teamofsilicons.com/",
+      "content_type": "text/html; charset=utf-8",
+      "csp_present": true
+    },
+    "developer_session": {
+      "status": 200,
+      "final_url": "https://developers.teamofsilicons.com/auth/session",
+      "content_type": "application/json",
+      "csp_present": false,
+      "response": {
+        "signed_in": false
+      }
+    },
+    "checked_at": "2026-10-28T22:28:19.256084+00:00",
+    "noncanonical_cells_ready_probe": {
+      "error": "HTTPError",
+      "code": 404
+    },
+    "cells_ready": {
+      "status": 200,
+      "url": "https://api.cells.teamofsilicons.com/health/ready",
+      "response": {
+        "status": "ready"
+      }
+    }
+  },
+  "backup_verification": {
+    "bucket": "silicon-accounts-production-backups-zgctnskyqqre",
+    "key": "backups/predeploy-20261028T222556Z.dump",
+    "version_id": "NG97muHCzEuyJOGoLC.udMoHPzX49QRd",
+    "size": 1062427,
+    "sha256": "206444ff18c606c2cc6edfb4027a925640a4dff253452fa30e8ef19372e6dff1",
+    "server_side_encryption": "AES256",
+    "verified_at": "2026-10-28T22:27:58.477020+00:00",
+    "plaintext_saved": false,
+    "host_sha256_matches": true,
+    "pg_restore_list_valid": true,
+    "host_check_command": "0c4e7062-e17d-448e-848a-65acefcd3098"
+  },
+  "configuration_sha256": {
+    "/etc/accounts/api.env": "8db2f3a8ab883c6caec9abbe15d100ce0339c3ffa43104ed9f41658d911c9d60",
+    "/etc/accounts/web.env": "f85f84f9bca7225158186af3e613971cd6fe9426fe0fb12ed67e4cbdc2eb603c",
+    "/etc/accounts/developer.env": "555abdbddc6c8a9c040d4b7fc23c5e6b50a3ad8eb2e56fe24426e3500fc42370",
+    "/etc/accounts/Caddyfile": "bd51a8e1d0cce624bd2020b0ec88565d1db4d6638405542fc24f4b1d64b98ad6",
+    "/etc/accounts-caddy/Caddyfile": "bd51a8e1d0cce624bd2020b0ec88565d1db4d6638405542fc24f4b1d64b98ad6"
+  },
+  "shared_saved_identity_check": {
+    "id": "si:saket-agents",
+    "status": "active",
+    "method": "silicon-agent whoami; normal existing shared CLI home",
+    "credential_values_logged": false
+  },
+  "rollback_target": "13a70d74883c205c91fa54f36906bf61a1f80e1e",
+  "rollback_performed": false,
+  "limitations": [
+    "Hosted Developer sign-in is Carbon-only in the preserved current official Accounts flow; there is no existing Silicon SLT-to-BFF browser route. No identity switch, cookie injection, or product sign-in change was performed. Authenticated Developer browser acceptance remains unverified.",
+    "No whole-database restore or new schema migration was performed. Existing session data was preserved; the saved shared Silicon session verified live after activation."
+  ]
+}

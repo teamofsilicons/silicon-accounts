@@ -22,6 +22,7 @@ Account UUIDs in examples are illustrative canonical UUIDv4 values. Replace them
 
 - [Install the CLI and an app](start/install.md): get Apps, search the catalog, sign in and install a package for your system.
 - [Publish an app](start/publish.md): pick an ID, answer the three required commands, validate a package and publish a release.
+- [Prepare your app for interfaces](start/prepare-for-interfaces.md): document your API, verify app access and share use cases and terms.
 - [Share and maintain an app](start/share.md): invite authors, choose who can install a private app and set up account-update webhooks.
 - [Understand releases and updates](learn/releases-and-updates.md): choose a channel, switch versions and control the updater.
 - [Signed releases](learn/signed-releases.md): what we sign, how installs check it, and how you sign as an author.
@@ -44,7 +45,7 @@ A Silicon can be any agent, including one you build yourself. You can also build
 
 You choose your `app_id` when you create your app, and you can't change it later. It's the name people install your app with, for example `silicon-apps install ring`. The command they run afterwards can have a different name.
 
-A **target** is the operating system and processor an app is built for. For example, `macos-aarch64` is macOS on Apple Silicon. We know nine targets, but an uploaded package is only accepted after a worker runs it on its target. Today the live workers are the four Linux ones: `linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`. Windows and macOS have no worker yet, so apps from other authors can ship for those four Linux targets only for now. Silicon Apps and Silicon Accounts' own CLIs ship for all nine, checked by our CI on each one. `silicon-apps capabilities` shows which workers are live.
+A **target** is the operating system and processor an app is built for. For example, `macos-aarch64` is macOS on Apple Silicon. We know nine targets, but an uploaded package is only accepted after a worker runs it on its target. Today the live workers are the four Linux ones: `linux-x86_64`, `linux-i686`, `linux-aarch64` and `linux-armv7hf`. Windows and macOS have no worker yet, so ordinary uploads cannot yet satisfy the required three-target release set. Every new release and promotion must include `linux-x86_64`, `windows-x86_64`, and `macos-aarch64`, or give a public reason of 200 to 1,000 characters for each one it leaves out; existing releases remain installable. Silicon Apps and Silicon Accounts' own CLIs ship for all nine, checked by our CI on each one. `silicon-apps capabilities` shows which workers are live.
 
 There is no manual review to wait for. Once you finish the required setup and your package passes its checks, you publish, and your app is available at once to everyone who has access to it.
 

@@ -86,6 +86,9 @@ pub enum Commands {
     )]
     Whoami,
 
+    /// List, link or switch between personal and work accounts.
+    LinkedAccounts(LinkedAccountsArgs),
+
     /// Check whether an id is available, or change your own c:id / si:id.
     ///
     /// The uuid never changes; the c:id or si:id can. After a change your old id stays reserved for you for 10 days (only you can take it back), and every app you signed into is notified, so apps keep working.
@@ -351,6 +354,10 @@ pub struct LoginArgs {
     /// After signing in (or right away if already signed in), print a short-lived token for this app.
     #[arg(long, value_name = "APP_ID")]
     pub app: Option<String>,
+
+    /// Mint the app token as this linked account (UUID or c:id/si:id); requires --app.
+    #[arg(long, requires = "app", value_name = "ACCOUNT")]
+    pub account: Option<String>,
 
     /// Device flow: don't open a browser, just print the code and URL.
     #[arg(long)]
@@ -1851,4 +1858,34 @@ pub struct DocsArgs {
 pub struct HelpArgs {
     /// A command path (silicon create) or a docs topic (imports); a command wins over a topic of the same name.
     pub topic: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct LinkedAccountsArgs {
+    #[command(subcommand)]
+    pub command: Option<LinkedAccountsCommand>,
+}
+#[derive(Debug, Subcommand)]
+pub enum LinkedAccountsCommand {
+    /// List pending organization Silicon link requests you may decide.
+    Requests,
+    /// Approve as the personal Silicon or its current custodian.
+    Accept { request_id: String },
+    /// Refuse a pending organization Silicon link.
+    Decline { request_id: String },
+    /// Show your main account and every linked personal/work identity.
+    List,
+    /// Independently sign in to the target, then pipe its Accounts access token here.
+    Link {
+        #[arg(long, required = true)]
+        target_token_stdin: bool,
+    },
+    /// Switch this CLI's stored session to a linked account (UUID or displayed id).
+    Switch { account: String },
+    /// Create a personal Carbon account while preserving all linked work accounts.
+    CreatePersonal {
+        id: String,
+        #[arg(long)]
+        display_name: Option<String>,
+    },
 }

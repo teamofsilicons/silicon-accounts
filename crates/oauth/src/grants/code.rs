@@ -54,6 +54,7 @@ pub(crate) async fn exchange(
     client: &ClientAuth,
     params: &TokenParams,
     meta: &ClientMeta,
+    key: Option<&str>,
 ) -> Result<TokenResponse, OAuthError> {
     let code = opt(params.code.as_deref()).ok_or_else(|| {
         OAuthError::invalid_request(
@@ -75,6 +76,27 @@ pub(crate) async fn exchange(
     let app_id = client.app.app_id.as_str();
 
     let mut tx = state.db.begin().await?;
+    let recovery = if let Some(key) = key {
+        let request = serde_json::to_vec(&(
+            "authorization_code",
+            code,
+            redirect_uri,
+            verifier,
+            client.public,
+        ))
+        .map_err(|_| OAuthError::server_error("Could not bind exchange request."))?;
+        let (op, replay) = accounts_core::repo::exchange_recovery::Operation::begin(
+            &mut tx, state, app_id, key, &request,
+        )
+        .await?;
+        if let Some(tokens) = replay {
+            tx.commit().await?;
+            return Ok(tokens);
+        }
+        Some(op)
+    } else {
+        None
+    };
     let row = sqlx::query_as::<_, CodeRow>(concat!(
         "select ",
         accounts_core::auth_code_columns!(),
@@ -126,6 +148,21 @@ pub(crate) async fn exchange(
             return Err(refused);
         }
     };
+    if let Err(error) =
+        accounts_core::repo::organizations::check(&mut tx, &account.uuid, app_id).await
+    {
+        accounts_core::repo::organizations::record(
+            &mut tx,
+            &account.uuid,
+            Some(&account.uuid),
+            Some(app_id),
+            "account.signin_refused",
+            json!({"reason":"organization_policy","method":"authorization_code"}),
+        )
+        .await?;
+        tx.commit().await?;
+        return Err(error.into());
+    }
     let scopes = auth.scope_list();
     if !client.app.is_first_party()
         && let Some(refused) = check_membership(&mut tx, &auth, &account, &scopes).await?
@@ -155,6 +192,9 @@ pub(crate) async fn exchange(
         },
     )
     .await?;
+    if let Some(op) = recovery {
+        op.save(&mut tx, state, &response).await?;
+    }
     tx.commit().await?;
     Ok(response)
 }

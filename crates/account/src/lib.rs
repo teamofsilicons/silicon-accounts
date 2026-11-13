@@ -34,10 +34,12 @@ mod history;
 mod identities;
 mod lookup;
 mod my_apps;
+mod organizations;
 mod photos;
 mod profile;
 mod sessions;
 mod util;
+mod work_invitations;
 
 /// Photo inspection lives in core (every photo upload shares it); re-exported for callers of
 /// this crate's former `image` module.
@@ -51,6 +53,8 @@ pub use profile::{ID_CHANGE_WINDOW_SECONDS, ID_CHANGES_PER_DAY};
 /// HTTP routes of this crate (see the build spec 02-api.md, sections marked [account]).
 pub fn router() -> Router<AppState> {
     Router::new()
+        .merge(organizations::router())
+        .merge(work_invitations::router())
         .route("/v1/ids/available", get(lookup::id_available))
         .route("/v1/accounts/by-id/{id}", get(lookup::by_id))
         .route("/v1/accounts/{uuid}", get(lookup::by_uuid))

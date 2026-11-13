@@ -199,7 +199,16 @@ async fn handle(
         let response = grants::federated::exchange(state, &params, meta, trace).await?;
         return Ok(Issued::Exchanged(Box::new(response)));
     }
-    let tokens = issue(state, meta, &params, grant, &client).await?;
+    let key = if matches!(
+        grant,
+        Grant::RefreshToken | Grant::AuthorizationCode | Grant::Slt
+    ) {
+        accounts_core::http::idempotency::parse_header(headers)
+            .map_err(|e| OAuthError::invalid_request(e.message))?
+    } else {
+        None
+    };
+    let tokens = issue(state, meta, &params, grant, &client, key.as_deref()).await?;
     Ok(tokens.into())
 }
 
@@ -209,6 +218,7 @@ async fn issue(
     params: &TokenParams,
     grant: Grant,
     client: &ClientAuth,
+    key: Option<&str>,
 ) -> Result<TokenResponse, OAuthError> {
     match grant {
         Grant::AuthorizationCode => {
@@ -220,10 +230,10 @@ async fn issue(
             {
                 refuse_public_client(client, grant)?;
             }
-            grants::code::exchange(state, client, params, meta).await
+            grants::code::exchange(state, client, params, meta, key).await
         }
         // Public or not, a client only ever refreshes its own tokens (core checks the family).
-        Grant::RefreshToken => grants::refresh::exchange(state, client, params, meta).await,
+        Grant::RefreshToken => grants::refresh::exchange(state, client, params, meta, key).await,
         Grant::Slt => {
             // An app's own command-line or desktop tool has no server to keep a secret in, so an
             // app that turned on `public_client` may exchange with its client_id alone: the SLT
@@ -235,7 +245,7 @@ async fn issue(
             {
                 refuse_public_client(client, grant)?;
             }
-            grants::slt::exchange(state, client, params, meta).await
+            grants::slt::exchange(state, client, params, meta, key).await
         }
         Grant::DeviceCode => {
             require_device_client(state, client).await?;

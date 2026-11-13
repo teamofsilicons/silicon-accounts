@@ -821,3 +821,102 @@ async fn app_device_flow_uses_the_app_id_without_a_secret() {
     assert_eq!(form["client_id"], "notes");
     assert!(!form.contains_key("client_secret"));
 }
+
+#[tokio::test]
+async fn keyed_refresh_retries_preserve_operation_and_client_authentication() {
+    let mock = Mock::start().await;
+    mock.on(
+        "POST",
+        "/v1/oauth/token",
+        Reply::text(502, "lost upstream reply"),
+    );
+    mock.on(
+        "POST",
+        "/v1/oauth/token",
+        Reply::json(200, token_body("a1")),
+    );
+    let client = AccountsClient::builder()
+        .base_url(&mock.url)
+        .max_retries(1)
+        .build()
+        .unwrap();
+    client
+        .as_app("briefcase", "test-secret")
+        .refresh_with_key("sar_old", "saved-key")
+        .await
+        .unwrap();
+    let requests = mock.requests_to("POST", "/v1/oauth/token");
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0].body, requests[1].body);
+    for request in &requests {
+        assert_eq!(request.header("idempotency-key"), Some("saved-key"));
+        assert!(
+            request
+                .header("authorization")
+                .unwrap()
+                .starts_with("Basic ")
+        );
+        assert_eq!(request.form()["refresh_token"], "sar_old");
+    }
+    client
+        .refresh_first_party_with_key("sar_first", "first-key")
+        .await
+        .unwrap();
+    client
+        .refresh_public_client_with_key("developer", "sar_dev", "dev-key")
+        .await
+        .unwrap();
+    client
+        .refresh_app_public_client_with_key("notes", "sar_notes", "notes-key")
+        .await
+        .unwrap();
+    let requests = mock.requests_to("POST", "/v1/oauth/token");
+    for (request, (app, key)) in requests[2..].iter().zip([
+        ("silicon-accounts", "first-key"),
+        ("developer", "dev-key"),
+        ("notes", "notes-key"),
+    ]) {
+        assert_eq!(request.header("authorization"), None);
+        assert_eq!(request.header("idempotency-key"), Some(key));
+        assert_eq!(request.form()["client_id"], app);
+    }
+}
+
+#[tokio::test]
+async fn recovery_conflicts_are_not_unauthenticated_and_do_not_rotate_keys() {
+    let mock = Mock::start().await;
+    mock.on("POST", "/v1/oauth/token", Reply::json(409, json!({"error":"refresh_in_progress", "error_description":"Retry the original operation."})).header("retry-after", "1"));
+    let client = AccountsClient::new(&mock.url).unwrap();
+    let err = client
+        .refresh_first_party_with_key("sar_old", "persisted")
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "refresh_in_progress");
+    assert!(!err.is_unauthenticated());
+    assert_eq!(err.retry_after(), Some(Duration::from_secs(1)));
+    assert_eq!(mock.requests_to("POST", "/v1/oauth/token").len(), 1);
+}
+
+#[test]
+fn recovered_access_expiry_is_absolute_even_when_access_has_expired() {
+    let mut body = token_body("a1");
+    body["expires_in"] = json!(0);
+    body["access_token_expires_at"] = json!("2026-01-01T00:00:00.000Z");
+    let tokens: silicon_accounts_client::TokenResponse =
+        serde_json::from_value(body.clone()).unwrap();
+    let received = time::OffsetDateTime::from_unix_timestamp(1_800_000_000).unwrap();
+    assert_eq!(
+        tokens.access_expires_at(received),
+        tokens.access_token_expires_at.unwrap()
+    );
+    assert!(tokens.access_expires_at(received) < received);
+    body.as_object_mut()
+        .unwrap()
+        .remove("access_token_expires_at");
+    body["expires_in"] = json!(10);
+    let legacy: silicon_accounts_client::TokenResponse = serde_json::from_value(body).unwrap();
+    assert_eq!(
+        legacy.access_expires_at(received),
+        received + time::Duration::seconds(10)
+    );
+}

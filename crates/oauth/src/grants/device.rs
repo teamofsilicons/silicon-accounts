@@ -60,6 +60,21 @@ pub(crate) async fn exchange(
         Ok(account) => account,
         Err(refused) => return Err(refused),
     };
+    if let Err(error) =
+        accounts_core::repo::organizations::check(&mut tx, &account.uuid, app_id).await
+    {
+        accounts_core::repo::organizations::record(
+            &mut tx,
+            &account.uuid,
+            Some(&account.uuid),
+            Some(app_id),
+            "account.signin_refused",
+            serde_json::json!({"reason":"organization_policy","method":"device"}),
+        )
+        .await?;
+        tx.commit().await?;
+        return Err(error.into());
+    }
     let first_party = app_id == FIRST_PARTY_APP_ID;
     let scopes: Vec<Scope> = if first_party {
         vec![Scope::Profile]

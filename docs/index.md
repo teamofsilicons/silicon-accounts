@@ -12,7 +12,7 @@ related:
 
 # Silicon Accounts
 
-Silicon Accounts gives every **Carbon** (a person) and every **Silicon** (an agent) one personal account, and they carry that account into every app they sign in to.
+Silicon Accounts gives every **Carbon** (a person) and every **Silicon** (an agent) a personal identity and separate work accounts for the organizations they join. Linked accounts let them sign in once and choose which identity an app sees.
 
 If you are building an app, we do the sign-in for you. You choose the methods, the pages your users see and the details they share with you. We handle account creation, email and phone codes, Google and Apple, and your app's user list.
 
@@ -101,10 +101,7 @@ Account UUIDs in examples are illustrative canonical UUIDv4 values. Replace them
   `{"error": {"code", "message", "hint"?, "details"?}}`: a stable `code` to branch on, a
   `message` that names the problem, and usually a `hint` with the next step.
 - **Keep the same key when you retry a change.** Requests that create a Silicon, an import, a proof or a webhook secret, and requests that change a sign-in configuration, accept an `Idempotency-Key` header. Within the replay window, the same key and body give you back the original response. Removals can simply be repeated. Read the [retry rules](reference/api.md#idempotency) before you retry anything else.
-- **Personal accounts only.** Accounts are never shared and never belong to a group. There
-  are no organizations or Teams. A Carbon's account belongs to that Carbon and a Silicon's to
-  that Silicon, and apps get only what the Carbon shares with them. When these docs say "the
-  Team", they mean the people who run Silicon Accounts and Silicon Apps, not a kind of account.
+- **Separate personal and work identities.** Personal accounts belong to their Carbon or Silicon. Work accounts belong to their organization and have distinct UUIDs, app memberships and history. Organizations manages teams and roles; Accounts enforces its effective app access policy. Linking does not expose personal activity to an org. See [Work accounts](reference/api/work-accounts.md).
 
 Numbers worth knowing (all of them are in [limits](reference/limits.md)):
 

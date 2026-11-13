@@ -310,6 +310,28 @@ impl AccountsClient {
         self.execute(request).await?.json()
     }
 
+    /// Recoverable refresh of an app's public tool. Persist and share the operation key
+    /// with the old token before sending. Requires server-side refresh recovery support.
+    pub async fn refresh_app_public_client_with_key(
+        &self,
+        app_id: &str,
+        refresh_token: &str,
+        key: &str,
+    ) -> Result<TokenResponse> {
+        let request = Request::new(
+            Method::POST,
+            self.endpoint(&["v1", "oauth", "token"]),
+            Auth::None,
+        )
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token.trim()),
+            ("client_id", app_id.trim()),
+        ])
+        .idempotency_key(Some(key))?;
+        self.execute(request).await?.json()
+    }
+
     /// Exchanges a Silicon's short-lived token (`slt_…`) at your app's own command-line or
     /// desktop tool, with the app's `client_id` alone: no secret, for an app that turned on
     /// `public_client` in its sign-in setup (other apps exchange with their secret through
@@ -413,6 +435,16 @@ impl AccountsClient {
             .await
     }
 
+    /// Recoverable first-party refresh. Persist the key before sending and reuse it for retries.
+    pub async fn refresh_first_party_with_key(
+        &self,
+        refresh_token: &str,
+        key: &str,
+    ) -> Result<TokenResponse> {
+        self.refresh_public_client_with_key(FIRST_PARTY_APP_ID, refresh_token, key)
+            .await
+    }
+
     /// Revokes a first-party token family (sign out). Always succeeds for unknown tokens
     /// (RFC 7009).
     pub async fn revoke_first_party(&self, token: &str) -> Result<()> {
@@ -439,6 +471,31 @@ impl AccountsClient {
             ("refresh_token", refresh_token.trim()),
             ("client_id", client_id),
         ]);
+        self.execute(request).await?.json()
+    }
+
+    /// Recoverable refresh for a public client. The same operation key and token must be
+    /// shared by concurrent callers and retained after an ambiguous transport failure.
+    /// Save a recovered successor even when `expires_in` is zero; then rotate with a new key.
+    /// Requires an Accounts server with refresh recovery support.
+    pub async fn refresh_public_client_with_key(
+        &self,
+        client_id: &str,
+        refresh_token: &str,
+        key: &str,
+    ) -> Result<TokenResponse> {
+        check_public_client(client_id)?;
+        let request = Request::new(
+            Method::POST,
+            self.endpoint(&["v1", "oauth", "token"]),
+            Auth::None,
+        )
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token.trim()),
+            ("client_id", client_id),
+        ])
+        .idempotency_key(Some(key))?;
         self.execute(request).await?.json()
     }
 
