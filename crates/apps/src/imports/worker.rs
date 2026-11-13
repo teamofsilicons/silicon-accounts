@@ -80,18 +80,20 @@ pub async fn run_pending_jobs(state: &AppState) -> ApiResult<usize> {
     .fetch_all(&state.db)
     .await?;
     for id in running {
-        let mut conn = state.db.acquire().await?.detach();
+        // Detach only once locked: a pass every POLL while another worker runs this job must
+        // not close a pooled connection, and an unlocked one holds nothing.
+        let mut pooled = state.db.acquire().await?;
         let locked: bool = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "select pg_try_advisory_lock({LOCK_KEY})"
         )))
         .bind(id)
-        .fetch_one(&mut conn)
+        .fetch_one(&mut *pooled)
         .await?;
         if !locked {
             // Another worker is on it.
-            let _ = conn.close().await;
             continue;
         }
+        let mut conn = pooled.detach();
         let job = sqlx::query_as::<_, JobRecord>(sqlx::AssertSqlSafe(format!(
             "select {} from import_jobs where id = $1 and status = 'running'",
             super::JOB_COLUMNS
@@ -114,11 +116,14 @@ pub async fn run_pending_jobs(state: &AppState) -> ApiResult<usize> {
         }
     }
     loop {
-        // An idle pass (every POLL) must not detach, and so close, a pooled connection.
-        let queued: bool =
-            sqlx::query_scalar("select exists (select 1 from import_jobs where status = 'queued')")
-                .fetch_one(&state.db)
-                .await?;
+        // A pass (every POLL) with nothing claimable must not detach, and so close, a pooled
+        // connection. Same filter as claim_next.
+        let queued: bool = sqlx::query_scalar(
+            "select exists (select 1 from import_jobs j where j.status = 'queued' \
+               and not exists (select 1 from import_jobs r where r.app_id = j.app_id and r.status = 'running'))",
+        )
+        .fetch_one(&state.db)
+        .await?;
         if !queued {
             break;
         }
