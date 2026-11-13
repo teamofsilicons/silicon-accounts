@@ -62,9 +62,6 @@ impl Step {
             "signup" => Step::Signup,
             "details" => Step::Details,
             "review" => Step::Review,
-            // Flows stored before the details pages replaced these steps continue at the
-            // details pages (`GET /v1/flows/{id}` puts them on the right one).
-            "requirements" | "consent" => Step::Details,
             "complete" => Step::Complete,
             "failed" => Step::Failed,
             _ => return None,
@@ -426,10 +423,12 @@ impl FlowRow {
             ))
         })?;
         let extras = match self.provider_state {
-            Some(v) => serde_json::from_value(v).unwrap_or_else(|e| {
-                tracing::error!(flow_id = %self.id, error = %e, "unreadable flow state; using defaults");
-                FlowExtras::default()
-            }),
+            Some(v) => serde_json::from_value(v).map_err(|e| {
+                ApiError::internal(format!(
+                    "sign-in flow {} has unreadable state: {e}",
+                    self.id
+                ))
+            })?,
             None => FlowExtras::default(),
         };
         Ok(Flow {
@@ -730,9 +729,6 @@ mod tests {
             assert_eq!(Step::parse(s.as_str()), Some(s));
         }
         assert!(Step::Complete.is_terminal() && !Step::Review.is_terminal());
-        // Flows stored by the previous version continue at the details pages.
-        assert_eq!(Step::parse("consent"), Some(Step::Details));
-        assert_eq!(Step::parse("requirements"), Some(Step::Details));
     }
 
     #[test]

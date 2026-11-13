@@ -108,7 +108,7 @@ pub async fn sign_in(
 }
 
 /// The flow's account, which must still be the browser's signed-in account (steps that act
-/// for the account: requirements and consent).
+/// for the account: details and review).
 ///
 /// Errors: 401 `session_required` (the browser signed out or the session expired), 409
 /// `account_changed` (the browser is now signed in as someone else), 403 `account_not_active`.

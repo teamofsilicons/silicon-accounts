@@ -10,7 +10,7 @@ use accounts_core::views::AccountSummary;
 use accounts_core::{ApiError, ApiResult, AppState};
 use serde::Serialize;
 use sqlx::PgConnection;
-use time::{Date, OffsetDateTime};
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use super::FlowApp;
@@ -242,9 +242,4 @@ pub(crate) async fn live_challenge(
         .await?
         .filter(|c| c.purpose == purpose && c.consumed_at.is_none())
         .map(|c| ChallengeView::from_challenge(&c)))
-}
-
-/// Today's date (UTC) — the sign-up dob suggestion is based on it.
-pub fn today() -> Date {
-    accounts_core::timefmt::today_utc()
 }

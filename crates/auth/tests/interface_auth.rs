@@ -1357,3 +1357,35 @@ async fn declining_interface_details_cannot_be_bypassed_by_verified_backend() {
     let review = ctx.call(router(), action("review", json!({}))).await;
     assert_eq!(review.error_code(), Some("identity_not_verified"));
 }
+
+#[tokio::test]
+async fn a_refresh_does_not_rewrite_receipts_already_unavailable() {
+    let ctx = TestContext::new().await;
+    let (_, cookie, _) = fixture(&ctx, "verified", true).await;
+    let flow = begin(&ctx, &cookie).await;
+    let code = code(&decide(&ctx, &cookie, flow["flow_id"].as_str().unwrap(), true).await);
+    let issued = ctx.call(router(), exchange(&code, "first")).await;
+    let second = ctx
+        .call(
+            router(),
+            refresh(issued.json["refresh_token"].as_str().unwrap(), "second"),
+        )
+        .await;
+    let version = "select xmin::text from interface_token_operations where key='first'";
+    let before: String = sqlx::query_scalar(version)
+        .fetch_one(&ctx.state.db)
+        .await
+        .unwrap();
+    let third = ctx
+        .call(
+            router(),
+            refresh(second.json["refresh_token"].as_str().unwrap(), "third"),
+        )
+        .await;
+    assert_eq!(third.status, 200, "{}", third.json);
+    let after: String = sqlx::query_scalar(version)
+        .fetch_one(&ctx.state.db)
+        .await
+        .unwrap();
+    assert_eq!(before, after, "an unavailable receipt is left as it is");
+}

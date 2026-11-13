@@ -1266,22 +1266,6 @@ async fn pages_follow_the_apps_flow_when_it_changes_mid_sign_in() {
     );
     let r = continue_page(&ctx, &mut b, &id, &[]).await;
     assert_eq!(r.json["flow"]["step"], "complete", "{}", r.json);
-
-    // A flow stored at the old consent step continues on the pages.
-    let id = id_of(&new_flow(&ctx, &mut b, &app.app_id, json!({"prompt": "consent"})).await);
-    let r = b
-        .post(&ctx, &format!("/v1/flows/{id}/continue"), json!({}))
-        .await;
-    assert_eq!(r.json["flow"]["step"], "details", "{}", r.json);
-    sqlx::query("update signin_flows set step = 'consent', provider_state = provider_state - 'details' where id = $1")
-        .bind(&id)
-        .execute(&ctx.state.db)
-        .await
-        .expect("legacy step");
-    let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
-    assert_eq!(r.status, 200, "{}", r.json);
-    assert_eq!(r.json["flow"]["step"], "details");
-    assert_eq!(r.json["flow"]["details"]["id"], "details");
 }
 
 /// The authorization code carries when the Carbon actually authenticated (OIDC `auth_time`): the

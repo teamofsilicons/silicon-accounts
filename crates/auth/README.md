@@ -74,8 +74,7 @@ prompt=none that can't sign in silently ─────────────�
 - A page stays until the Carbon continues (also once its missing detail was added elsewhere: it
   shows `missing: false`). When the app changes its flow mid-sign-in and the page is gone, actions on
   it answer 409 `flow_changed` and `GET /v1/flows/{id}` (by the browser signed in as the flow's
-  account) moves the flow to its next page. Flows stored at the old `requirements`/`consent` steps
-  continue on the details pages.
+  account) moves the flow to its next page.
 - **prompt**: `login` ignores the browser session; `consent` forces the screen; `select_account` shows
   the chooser (it is always shown when the browser is signed in — flows never auto-continue);
   `none` completes silently or ends `failed` with `login_required` / `consent_required` /
@@ -126,7 +125,7 @@ prompt=none that can't sign in silently ─────────────�
 - **auth_time**: a browser session records when its Carbon last proved who they are
   (`authenticated_at`: a code, Google, Apple or a finished sign-up moves it, also when the session
   is reused). The authorization code carries it, so the id_token's `auth_time` is the real
-  authentication (continue-as and `prompt=none` keep the earlier time).
+  authentication (continue-as, choosing a linked account and `prompt=none` keep the earlier time).
 - **App rules**: `allowed_email_domains` — every method only lets in an account with a verified
   email at one of the domains (it needn't be the primary; the app still gets the primary as
   `email`): an email is checked before its code is sent and at verify, a provider email at the

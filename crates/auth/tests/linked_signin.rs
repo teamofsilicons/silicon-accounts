@@ -265,3 +265,31 @@ async fn a_waiting_chooser_cannot_continue_after_expiry_or_disable() {
         Some("session_required")
     );
 }
+
+#[tokio::test]
+async fn choosing_an_identity_keeps_the_remembered_auth_time() {
+    let ctx = TestContext::new().await;
+    let (personal, work) = linked_pair(&ctx).await;
+    let mut b = Browser::new(&ctx);
+    remember(&ctx, &mut b, &personal).await;
+    sqlx::query("update browser_sessions set authenticated_at=now()-interval '30 days' where account_uuid=$1")
+        .bind(&personal.uuid)
+        .execute(&ctx.state.db)
+        .await
+        .unwrap();
+    // First another identity (a new session), then the browser's own one (the same session).
+    for _ in 0..2 {
+        let flow = new_flow(&ctx, &mut b, "silicon-accounts", json!({})).await;
+        assert_choices(&flow, &personal, &work);
+        let r = select(&ctx, &mut b, &flow, &work.uuid).await;
+        assert_eq!(r.json["flow"]["step"], "complete", "{}", r.json);
+        let old: bool = sqlx::query_scalar(
+            "select auth_time < now()-interval '29 days' from authorization_codes where flow_id=$1",
+        )
+        .bind(id_of(&flow))
+        .fetch_one(&ctx.state.db)
+        .await
+        .unwrap();
+        assert!(old, "choosing an account is not a new proof");
+    }
+}
