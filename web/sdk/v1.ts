@@ -172,7 +172,7 @@ function merge<T extends object>(options: T | undefined): RenderOptions & T {
       continue;
     }
     // null: leave the script tag's value out (an intent button opens no particular method).
-    if (value === null) delete out[key];
+    if (value === null) out[key] = null;
     else if (value !== undefined && value !== "") out[key] = value;
   }
   return out as RenderOptions & T;
@@ -659,6 +659,13 @@ async function renderButtons(target: Element | string, options?: RenderOptions):
   // (a class or data attribute on <html> or <body>, or the device's scheme for pages that follow it).
   let frame = 0;
   const follow = () => {
+    // A later render into the same host replaced this root: stop following for it (a failed render returns no destroy).
+    if (!root.parentNode) {
+      watcher?.disconnect();
+      media.removeEventListener("change", follow);
+      window.removeEventListener("load", follow);
+      return;
+    }
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(repaint);
   };

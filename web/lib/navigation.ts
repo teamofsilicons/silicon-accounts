@@ -55,8 +55,6 @@ export const paths = {
   privacy: "/privacy",
   privacyDelete: "/privacy/delete",
   goodbye: "/goodbye",
-  docs: "/docs",
-  embedButtons: "/embed/v1/buttons",
   kitchen: "/__kitchen",
 } as const;
 

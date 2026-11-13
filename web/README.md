@@ -159,7 +159,7 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   script pins `data-theme="light"` and clears any stored choice; there is no theme switch anywhere (dock, user menu,
   Settings, palette, public header and footer). The dark tokens in `styles/tokens.css` stay for branded subtrees: an
   app's hosted page that forces its dark look still paints dark.
-- **Data.** Never `fetch` the API from components: use the hooks in `lib/query/` (or `api` from `lib/api` inside
+- **Data.** Never `fetch` the API from components: use the hooks in `lib/query/` (or `api` from `lib/api/endpoints` inside
   them). Errors are `ApiError` (`status`, `code`, `message`, `hint`, `requestId`, `retryAfter`, `lockedUntil`,
   `redirectTo`). Failed mutations toast message + hint unless `meta: { toast: false }` (show those inline); failed
   queries render inline. Any 401 marks the session gone and the shell sends the visitor to sign in. The account's own

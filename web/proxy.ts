@@ -39,7 +39,7 @@ import { SESSION_COOKIES, hasSessionCookie } from "@/lib/server/session";
 
 const isDev = process.env.NODE_ENV === "development";
 
-const APP_ID = /^[a-z][a-z0-9-]{1,39}$/;
+const APP_ID = /^(?:[a-z0-9_-]{3,30}|[a-z][a-z0-9-]{1,39})$/;
 const ORIGIN_TTL_MS = 30_000;
 const originCache = new Map<string, { origins: string[]; until: number }>();
 
@@ -53,11 +53,12 @@ function cleanOrigins(list: unknown): string[] {
     try {
       const url = new URL(entry.trim());
       if (url.protocol !== "https:" && url.protocol !== "http:") continue;
+      if (url.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) continue;
       origin = url.origin;
     } catch {
       continue;
     }
-    if (/[\s;,'"]/.test(origin) || origin === "null" || out.includes(origin)) continue;
+    if (/[\s;,'"*]/.test(origin) || origin === "null" || out.includes(origin)) continue;
     out.push(origin);
   }
   return out;

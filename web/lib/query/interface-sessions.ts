@@ -10,5 +10,5 @@ export function useInterfaceSessions() {
 }
 export function useRemoveInterfaceAccess() {
   const client = useQueryClient();
-  return useMutation({ mutationFn: (id: string) => request<{ revoked_sessions: number }>(`/v1/me/interfaces/${encodeURIComponent(id)}`, { method: "DELETE", idempotencyKey: true }), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: key }), client.invalidateQueries({ queryKey: queryKeys.me.apps })]); } });
+  return useMutation({ meta: { toast: false }, mutationFn: (id: string) => request<{ revoked_sessions: number }>(`/v1/me/interfaces/${encodeURIComponent(id)}`, { method: "DELETE" }), onSuccess: async () => { await Promise.all([client.invalidateQueries({ queryKey: key }), client.invalidateQueries({ queryKey: queryKeys.me.apps })]); } });
 }
