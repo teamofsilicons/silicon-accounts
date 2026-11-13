@@ -10,6 +10,7 @@ const FUNCTION = "[a-z][a-z0-9_-]{0,62}";
 const TEMPLATE = "(?!catalog(?:/|$))[a-z][a-z0-9-]{0,39}";
 const JOB = `(?!preview(?:/|$))${FUNCTION}`;
 const routes: [string, RegExp][] = [
+  ["POST", new RegExp(`^cells/${CELL}/notifications/live$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/database/(reference|extensions|connections)$`)],
   ["POST", new RegExp(`^cells/${CELL}/database/password/rotate$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/database/password-rotations/${UUID}$`)],
