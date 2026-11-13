@@ -223,7 +223,7 @@ export async function refreshSession(session: StoredSession, headers: Record<str
       if (!current.operation && (current.session.ae > Date.now() + 60_000 && (!force || current.session.rt !== session.rt))) return { ok: true, session: current.session };
       if (!current.operation) {
         // Persist BEFORE sending: a crash, timeout, second process or second tab reuses this random key.
-        if (!await store.write(key, entry.version, { ...current, operation: { key: randomUUID(), token: current.session.rt } }, current.session.re)) continue;
+        await store.write(key, entry.version, { ...current, operation: { key: randomUUID(), token: current.session.rt } }, current.session.re);
         continue;
       }
       if (current.operation.token !== current.session.rt) return storageUnavailable();

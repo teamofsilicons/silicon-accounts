@@ -88,13 +88,6 @@ export type Invite = {
   status: string;
   created_at: string;
 };
-export type Review = {
-  uuid: string;
-  id: string;
-  rating: number;
-  text: string;
-  updated_at: string;
-};
 export type Readiness = {
   ready: boolean;
   errors: { field: string; message: string }[];

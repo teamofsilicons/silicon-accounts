@@ -66,7 +66,7 @@ function Details({ app, refresh }: Props) {
     "PATCH",
     refresh,
   );
-  const [tags, setTags] = useState(app.tags.join(", "));
+  const [tags, setTags] = useState(save.draft.tags.join(", "));
   return (
     <Section
       title="Make a good introduction"
@@ -451,7 +451,6 @@ function Packages({ app, refresh }: Props) {
         app={app}
         refresh={refresh}
         compact
-        packagesRevision={packages.data?.items.length || 0}
       />
     </>
   );
@@ -1071,7 +1070,9 @@ function Publish({
                       ? 3
                       : error.field.includes("access")
                         ? 2
-                        : 1,
+                        : error.field.startsWith("interface_")
+                          ? 4
+                          : 1,
                   )
                 }
               >

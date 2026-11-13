@@ -10,7 +10,7 @@ import { LLMS_FULL_TXT, LLMS_FULL_TXT_MODIFIED, LLMS_TXT, LLMS_TXT_MODIFIED } fr
 import { resolveLink, rewriteRelativeLinks } from "./links";
 import { CANONICAL_ORIGIN, DOCS_BASE } from "./site";
 
-export function publicOrigin(_headers: Headers, requestUrl: string): string {
+export function publicOrigin(requestUrl: string): string {
   const configured = process.env.DEVELOPER_PUBLIC_URL?.trim() || process.env.ACCOUNTS_DEVELOPER_URL?.trim();
   if (configured) { try { return new URL(configured).origin; } catch {} }
   if (process.env.NODE_ENV === "production") return CANONICAL_ORIGIN;

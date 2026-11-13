@@ -7,7 +7,7 @@ import { LLMS_FILES, llmsFull, publicOrigin } from "@/lib/docs/llms";
 import { preflight, publicResponse } from "@/lib/server/public-response";
 
 export function GET(request: Request) {
-  return publicResponse(request, llmsFull(publicOrigin(request.headers, request.url)), { type: "text/plain; charset=utf-8", maxAge: 3600, modified: LLMS_FILES.full.modified });
+  return publicResponse(request, llmsFull(publicOrigin(request.url)), { type: "text/plain; charset=utf-8", maxAge: 3600, modified: LLMS_FILES.full.modified });
 }
 
 export const HEAD = GET;

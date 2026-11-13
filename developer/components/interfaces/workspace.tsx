@@ -10,7 +10,6 @@ import {Input} from "@/components/silicon-ui/input/input";
 import {Textarea} from "@/components/silicon-ui/textarea/textarea";
 import {Select} from "@/components/silicon-ui/select/select";
 import {FileDropzone} from "@/components/silicon-ui/file-dropzone/file-dropzone";
-import {Alert} from "@/components/silicon-ui/alert/alert";
 import {Badge} from "@/components/silicon-ui/badge/badge";
 import {CopyButton} from "@/components/silicon-ui/copy-button/copy-button";
 import {Tabs,TabsContent,TabsList,TabsTrigger} from "@/components/silicon-ui/tabs/tabs";
@@ -18,8 +17,7 @@ import {AppIcon} from "@/components/developer/parts/app-icon";
 import {ArrowLeft} from "lucide-react";
 import appStyles from "@/components/developer/app/app.module.css";
 import {SecretReveal} from "@/components/developer/parts/secret-reveal";
-import {useCellsLeaveGuard} from "@/components/cells/shared";
-import {ApiError} from "@/lib/api/errors";
+import {Failure,useCellsLeaveGuard} from "@/components/cells/shared";
 import {request,mediaUrl,type Interface,type Kind,type Me,type Upload,type AccessRequest,type History} from "./api";
 import styles from "./interfaces.module.css";
 import {InterfaceCellSection} from "./cell";
@@ -42,7 +40,6 @@ const platforms=["web","macos","windows","linux","android","ios"] as const;
 const signInMethods=["google","apple","email","phone"] as const;
 const lines=(text:string)=>text.split("\n").map(x=>x.trim()).filter(Boolean);
 const list=(values:string[]|undefined)=>(values??[]).join("\n");
-function Failure({error}:{error:unknown}) {if (!error) return null;if(error instanceof Error && !(error instanceof ApiError))return <Alert tone="danger" title={error.message}/>;const err=ApiError.from(error);return <Alert tone="danger" title={err.message}>{err.hint}</Alert>;}
 
 export function InterfaceWorkspace({interfaceId,cellsEnabled}:{interfaceId:string;cellsEnabled:boolean}) {
   const cache=useQueryClient();const router=useRouter();const prefix=`interfaces/${encodeURIComponent(interfaceId)}`;
@@ -87,7 +84,7 @@ export function InterfaceWorkspace({interfaceId,cellsEnabled}:{interfaceId:strin
   const imageUploads=useMemo(()=>uploads.data?.uploads.filter(upload=>upload.category==="image")??[],[uploads.data]);
   const releaseUploads=useMemo(()=>uploads.data?.uploads.filter(upload=>upload.category==="release")??[],[uploads.data]);
   if(detail.isPending) return <Page><p role="status">Loading interface…</p></Page>;
-  if(detail.error || !draft) return <Page><PageHeader title="Interface" back={{href:"/interfaces",label:"Your interfaces"}}/><Failure error={detail.error}/></Page>;
+  if(!draft) return <Page><PageHeader title="Interface" back={{href:"/interfaces",label:"Your interfaces"}}/><Failure error={detail.error}/></Page>;
   const signin=draft.signin_config??{};
   const pendingOperation=detail.data?.interface.pending_operation??draft.pending_operation;
   const showType=Boolean(me.data?.eligibility?.verified || me.data?.eligibility?.trusted || detail.data?.interface.kind!=="unverified");
@@ -121,7 +118,7 @@ export function InterfaceWorkspace({interfaceId,cellsEnabled}:{interfaceId:strin
         </div></div>
       </div>
     </header>
-    <Failure error={error}/>
+    <Failure error={error??detail.error}/>
     {secret && <SecretReveal title="Your interface secret" description="Keep this secure. It will not be shown again." secrets={[{label:"Interface secret",value:secret}]} onDone={()=>setSecret("")}/>}
     {pendingOperation && <Section title="Finish the pending save" description="A previous change is waiting for Accounts. Finish it before making another change."><Surface><Stack><p>Operation: {pendingOperation.action.replaceAll("_"," ")}</p>{pendingOperation.can_resume?<Button loading={busy} onClick={()=>void run(async()=>{const result=await request<{interface:Interface;interface_secret?:string}>(`${prefix}/resume`,{method:"POST",body:{}});if(result.interface_secret)setSecret(result.interface_secret);cache.setQueryData(["interface",interfaceId],{interface:result.interface});setDirty(false);})}>Resume pending save</Button>:<p>The creator who started this change can resume it.</p>}</Stack></Surface></Section>}
     <fieldset disabled={!!pendingOperation} className={styles.editor}>

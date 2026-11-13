@@ -21,7 +21,6 @@ import {
 export const dynamic = "force-dynamic";
 
 const PREFIX = "/api/accounts/";
-/** Refresh this long before the access token expires. */
 /** Request headers passed on to the API (everything else, cookies included, stays here). */
 const FORWARD = ["accept", "content-type", "idempotency-key"];
 /** Response headers passed back. */
@@ -80,7 +79,6 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   const problem = sameOriginProblem(request);
   if (problem) return json(403, errorBody("cross_site_request", problem, "Use the developer site's own pages."));
 
-  const body = method === "GET" || method === "HEAD" ? undefined : await request.arrayBuffer();
   const unreachable = (error: unknown) => json(502, errorBody(
     "api_unreachable",
     `The developer site could not reach Silicon Accounts: ${error instanceof Error ? error.message : String(error)}.`,
@@ -89,7 +87,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
 
   if (target.kind === "public") {
     try {
-      return await relay(await call(request, target.path, body, null), null, false);
+      return await relay(await call(request, target.path, undefined, null), null, false);
     } catch (error) {
       return unreachable(error);
     }
@@ -97,6 +95,28 @@ async function handle(request: NextRequest): Promise<NextResponse> {
 
   let session = readSession(request);
   if (!session) return signedOut("This browser is not signed in to the developer site (no session, or it ended).", false);
+
+  let body: ArrayBuffer | undefined;
+  if (method !== "GET" && method !== "HEAD") {
+    // The API's largest body limit (imports: 50 MB plus its 64 KiB read allowance).
+    const maximum = 52_494_336;
+    const tooLarge = () => json(413, errorBody("body_too_large", "The request exceeds 50 MB.", "Choose a smaller request or import file."));
+    if (Number(request.headers.get("content-length") || 0) > maximum) return tooLarge();
+    const reader = request.body?.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    if (reader) for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      size += next.value.byteLength;
+      if (size > maximum) { await reader.cancel(); return tooLarge(); }
+      chunks.push(next.value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    body = bytes.buffer;
+  }
   let rotated = false;
   const headers = clientHeaders(request);
 
