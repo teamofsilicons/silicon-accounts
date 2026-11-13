@@ -127,3 +127,19 @@ CLI 0.7.0 is published on all nine targets as production release
 workflow run 42823876740, Linux server validation, and uploader attestation for
 Windows/macOS. The receipt records package hashes and publication separately
 from service deployment.
+
+## Account site redesign (PR 23) — 2026-11-13
+
+Release `accounts-redesign-b08d20a` (source `b08d20a`) is live: the account site redesign on Silicon UI
+(teamofsilicons/silicon-accounts#23) merged onto the composite production source, which is the Ting
+branch (`869bb86`) plus the live developer delta (`6844616`). It is a code-only overlay: API, web and
+Developer files over `cells-ting-dev-68446168ce4e`, with Node, Caddy, configuration and the schema
+(migration 38) unchanged. No migration ran. A verified predeployment backup was uploaded first.
+
+Also in this release: Interfaces can no longer be granted Silicon Apps (app-management) tokens, both
+sites run Next.js 16.4.6 (GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr, GHSA-p3m5-59mp-jv5r), and the
+developer site's zod is 4.6.6 (GHSA-mrhx-c7xc-m3w5). Production had no Interface or session that
+named a privileged app.
+
+Rollback is a symlink switch: no schema changed, so `/opt/accounts/previous-release` can be restored
+directly. Receipt: [verification-redesign-2026-11-13.json](verification-redesign-2026-11-13.json).

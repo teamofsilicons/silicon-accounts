@@ -1,0 +1,41 @@
+{
+  "release": "accounts-redesign-b08d20a",
+  "revision": "b08d20ac33d19627a4a47ea997d2362bf2a91616",
+  "baseline": "cells-ting-dev-68446168ce4e-c8c588c9bd36",
+  "baseline_api_sha256": "efb190bb30d31c6b0d15c6ab950720df2f73bf46d651284aca02013f49326d09",
+  "archive_sha256": "2284fd27e2a5f708cdc13c5888b5cd57920f4426a4c619d3e8b86bbd2bf5ef78",
+  "archive_files": 4898,
+  "migration_version": {
+    "before": 38,
+    "after": 38,
+    "migrations_run": false
+  },
+  "backup_key": "backups/predeploy-redesign-20261113T172519Z.dump",
+  "backup_sha256": "7ab520f30dd10eb95d3c71db4b3673518e3347b0ff0f6fd012cba96a1d0494b8",
+  "ssm_command_id": "6904320d-2ce6-4d0e-9375-c157e27afec6",
+  "unchanged_configuration": true,
+  "local_health": [
+    "http://127.0.0.1:8589/readyz",
+    "http://127.0.0.1:8590/",
+    "http://127.0.0.1:8600/docs"
+  ],
+  "public_checks": {
+    "https://accounts.teamofsilicons.com/readyz": 200,
+    "https://accounts.teamofsilicons.com/v1/meta": 200,
+    "https://accounts.teamofsilicons.com/": 200,
+    "https://accounts.teamofsilicons.com/sign-in": 200,
+    "https://accounts.teamofsilicons.com/interface-authorize": 200,
+    "https://accounts.teamofsilicons.com/__consent": 404,
+    "https://accounts.teamofsilicons.com/settings": "307 to /privacy",
+    "https://developers.teamofsilicons.com/": 200,
+    "https://developers.teamofsilicons.com/docs": 200
+  },
+  "browser_check": "Signed-in Home and Connected Apps on the redesign, no console errors (desktop Chrome)",
+  "local_validation": {
+    "rust_tests": "1030 passed, 1 failed (OpenAPI route coverage, identical on the deployed baseline)",
+    "web": "typecheck, lint (with silicon-ui-check), 29 tests, production build",
+    "developer": "typecheck, lint, 97 tests, production build",
+    "npm_audit": "no known vulnerabilities in either site"
+  },
+  "verified_at": "2026-11-13T17:25:24Z"
+}
