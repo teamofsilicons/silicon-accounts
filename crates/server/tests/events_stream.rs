@@ -404,3 +404,36 @@ async fn streams_are_limited_and_end_cleanly() {
     assert!(heartbeats >= 1, "a quiet stream sends heartbeats");
     assert_eq!(closed.json()["reason"], "max_duration");
 }
+
+#[tokio::test]
+async fn an_app_stream_outlives_a_database_outage() {
+    let ctx = TestContext::new().await;
+    let (app, secret) = ctx.app("outage").await;
+    let subscription = send(
+        &ctx,
+        Req::post(&format!("/v1/apps/{}/subscriptions", app.app_id))
+            .basic(&app.app_id, &secret)
+            .json(json!({"delivery":"stream","updates":["id_change"]})),
+    )
+    .await;
+    assert_eq!(subscription.status, 201, "{}", subscription.json);
+    let hub = StreamHub::with_timing(Timing {
+        max_duration: Duration::from_millis(900),
+        ..fast()
+    });
+    let mut s = open(
+        router(&ctx, &hub),
+        Req::get("/v1/events/stream").basic(&app.app_id, &secret),
+    )
+    .await;
+    assert_eq!(s.status, 200);
+    // The next recheck misses the credential cache and finds no database.
+    ctx.state.app_cache.invalidate(&app.app_id);
+    ctx.state.db.close().await;
+    let closed = s.event().await;
+    assert_eq!(
+        closed.json()["reason"],
+        "max_duration",
+        "a database failure is not a revoked secret"
+    );
+}

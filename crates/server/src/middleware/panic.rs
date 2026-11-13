@@ -32,7 +32,7 @@ pub async fn catch_panic(req: Request, next: Next) -> Response {
         Err(payload) => errors::render(
             &path,
             ApiError::internal(format!(
-                "the handler for {method} {path} panicked: {}",
+                "the handler for {method} panicked: {}",
                 panic_message(payload.as_ref())
             )),
         ),
