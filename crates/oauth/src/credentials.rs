@@ -156,23 +156,6 @@ pub(crate) async fn membership_state(
     .await?)
 }
 
-/// The status of an account's membership with an app, if it has one.
-pub(crate) async fn membership_status(
-    conn: &mut PgConnection,
-    app_id: &str,
-    account_uuid: &str,
-) -> ApiResult<Option<MembershipStatus>> {
-    Ok(
-        sqlx::query_scalar(
-            "select status from memberships where app_id = $1 and account_uuid = $2",
-        )
-        .bind(app_id)
-        .bind(account_uuid)
-        .fetch_optional(&mut *conn)
-        .await?,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
