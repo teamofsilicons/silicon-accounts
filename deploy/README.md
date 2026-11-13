@@ -163,6 +163,11 @@ local 0.4.0 patch removed (teamofsilicons/silicon-accounts#24). Every file the p
 identical in 0.5.0 except a hint-size fallback that tokens.css overrides site-wide. API binaries and
 the developer site are release `accounts-audit-c38050a`'s exact files (ApiSourceRevision and
 DeveloperSourceRevision stay `c38050a`). Schema unchanged at 38; verified backup first; backup
-`backups/predeploy-redesign-20261113T183320Z.dump`, SSM command `a83ebfaa-7202-424b-b79f-c0c095853160`. The host's root disk was 92% used afterwards
-(3.5 GB free); `/opt/accounts/releases` holds about 70 old releases.
+`backups/predeploy-redesign-20261113T183320Z.dump`, SSM command `a83ebfaa-7202-424b-b79f-c0c095853160`.
+
+On 2026-11-13 the 67 older releases and the staging archives (all also in S3 under `releases/`)
+were deleted, keeping only `current` and `previous-release`: the root disk went from 92% to 17%
+used. Caddy kept running from a deleted release's binary, byte-identical to the current one; its
+next restart starts `/opt/accounts/current/bin/caddy`. Keep only a few releases from now on: each
+is about 470 MB on a 40 GB disk.
 
