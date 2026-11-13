@@ -14,9 +14,6 @@
 
 /* Live preview: a stand-in page of the app with the SDK's buttons. */
 .dirtyNote { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--warning); font-size: var(--text-sm); }
-.staleNote { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); color: var(--warning); font-size: var(--text-sm); line-height: var(--leading-body); }
-.staleNote > span { display: inline-flex; min-width: 0; flex: 1 1 320px; align-items: baseline; gap: var(--space-2); }
-.staleNote svg { flex: none; translate: 0 2px; }
 .previewWrap { --sq-r: var(--radius-surface); --sq-fill: var(--surface-muted); --sq-stroke: transparent; position: relative; display: grid; gap: var(--space-2); justify-items: center; padding: var(--space-8) var(--space-4); background: var(--sq-fill); }
 .hostPage { --sq-r: var(--radius-panel); --sq-fill: var(--background); --sq-stroke: var(--border); position: relative; display: grid; width: min(100%, 420px); overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); box-shadow: var(--shadow-raised); }
 .hostBar { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 var(--space-4); border-bottom: 1px solid var(--border); background: var(--surface-muted); }
@@ -32,10 +29,8 @@
 
 .wrapCode pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .alertActions { display: block; margin-top: var(--space-3); }
-.alertLine { display: block; }
 .themeField { display: grid; min-width: 0; gap: var(--space-2); }
 .themeField > * { max-width: 100%; }
-.previewActions { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 /* Tab sets shrink with the column; their own track scrolls when the labels do not fit. */
 .tabsRoot { min-width: 0; max-width: 100%; }
 

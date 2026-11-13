@@ -36,19 +36,16 @@ export function Releases({
   app,
   refresh,
   compact = false,
-  packagesRevision = 0,
 }: {
   app: App;
   refresh: () => void;
   compact?: boolean;
-  packagesRevision?: number;
 }) {
   const releases = useResource<{ items: Release[] }>(
     `/apps/${app.app_id}/releases`,
   );
   const packages = useResource<{ items: Package[] }>(
     `/apps/${app.app_id}/packages`,
-    packagesRevision,
   );
   const mutation = useMutation(() => {
     releases.reload();

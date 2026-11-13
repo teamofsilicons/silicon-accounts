@@ -155,34 +155,6 @@ export function brandingAttributes(input: Branding | Partial<Branding> | null | 
   };
 }
 
-const applied = new WeakMap<HTMLElement, { vars: string[]; attrs: string[] }>();
-
-/**
- * Paints `branding` in `theme` onto `el` imperatively (for code without React) and returns a function that removes
- * it again. Calling it again on the same element replaces the previous branding, so it can follow a live draft.
- */
-export function applyBranding(el: HTMLElement, branding: Branding | Partial<Branding> | null | undefined, theme: PaintTheme): () => void {
-  const vars = brandingVariables(branding, theme);
-  const attrs = brandingAttributes(branding, theme);
-  const previous = applied.get(el);
-  if (previous) {
-    for (const name of previous.vars) if (!(name in vars)) el.style.removeProperty(name);
-    for (const name of previous.attrs) if (!(name in attrs)) el.removeAttribute(name);
-  }
-  for (const [name, value] of Object.entries(vars)) el.style.setProperty(name, value);
-  for (const [name, value] of Object.entries(attrs)) el.setAttribute(name, value);
-  el.style.colorScheme = theme;
-  applied.set(el, { vars: Object.keys(vars), attrs: Object.keys(attrs) });
-  return () => {
-    const current = applied.get(el);
-    if (!current) return;
-    for (const name of current.vars) el.style.removeProperty(name);
-    for (const name of current.attrs) el.removeAttribute(name);
-    el.style.removeProperty("color-scheme");
-    applied.delete(el);
-  };
-}
-
 /** The logo for a theme: the branding's own logo, else the app's logo; null when neither exists. */
 export function brandLogo(
   branding: Pick<Branding, "logo_url" | "logo_dark_url"> | null | undefined,

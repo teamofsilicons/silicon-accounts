@@ -1,6 +1,7 @@
 /**
  * Server-side settings of the developer site, read from the environment at request time (never baked into the build),
- * so one build serves every stack. Only route handlers and proxy.ts import this file.
+ * so one build serves every stack. Server code only (route handlers, proxy.ts, instrumentation, server components and
+ * lib/server) imports this file.
  *
  *   ACCOUNTS_API_URL          where the Silicon Accounts API listens, server to server   [http://127.0.0.1:8589]
  *   ACCOUNTS_PUBLIC_URL       the browser-facing accounts site (hosted sign-in, SDK)      [dev http://localhost:8590,

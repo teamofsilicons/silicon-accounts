@@ -26,8 +26,6 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   /** Sends `Idempotency-Key`. `true` generates a fresh key; pass your own to make retries of the same action safe. */
   idempotencyKey?: string | true;
-  /** Credentials for app-authenticated endpoints (tools and docs only; the account site never holds a secret). */
-  auth?: { basic: { appId: string; secret: string } } | { bearer: string };
   signal?: AbortSignal;
   /** Do not call the global 401 handler (for calls that expect 401, such as reading the session). */
   quiet401?: boolean;
@@ -82,13 +80,6 @@ export function queryString(query: Record<string, QueryValue> | undefined): stri
   return text ? `?${text}` : "";
 }
 
-function basic(appId: string, secret: string): string {
-  const bytes = new TextEncoder().encode(`${appId}:${secret}`);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return `Basic ${btoa(binary)}`;
-}
-
 async function readBody(response: Response): Promise<unknown> {
   if (response.status === 204 || response.status === 205) return null;
   const text = await response.text();
@@ -124,7 +115,6 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     headers["Content-Type"] = options.contentType ?? "application/json";
   }
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey === true ? newIdempotencyKey() : options.idempotencyKey;
-  if (options.auth) headers.Authorization = "basic" in options.auth ? basic(options.auth.basic.appId, options.auth.basic.secret) : `Bearer ${options.auth.bearer}`;
   const url = `${config.baseUrl}${bffPath(path)}${queryString(options.query)}`;
 
   let response: Response;
@@ -140,11 +130,4 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw error;
   }
   return parsed as T;
-}
-
-/** Form-encoded POST body (the OAuth endpoints accept both; forms are what generic OAuth clients send). */
-export function formBody(fields: Record<string, string | undefined>): URLSearchParams {
-  const form = new URLSearchParams();
-  for (const [key, value] of Object.entries(fields)) if (value !== undefined) form.set(key, value);
-  return form;
 }

@@ -315,7 +315,7 @@ export class ConfigEditor {
   }
 
   /** The new stored config, with the unsaved leaves of the sections not in `reset` re-applied on top. */
-  private rebase(detail: AppDetail, reset: SectionKey[], overlay?: { section: SectionKey; sent: EditableConfig }): void {
+  private rebase(detail: AppDetail, reset: SectionKey[], overlay?: { section: SectionKey; sent: EditableConfig; sentSecrets: SecretsDraft }): void {
     const state = this.state;
     const previous = state.base;
     const nextBase = normalizeConfig(detail.signin_config);
@@ -336,14 +336,17 @@ export class ConfigEditor {
     const reconciled = reconcileFlow(next.flow, next);
     if (reconciled !== next.flow) next = { ...next, flow: reconciled };
     const resetKeys = reset.flatMap(section => SECTION_KEYS[section] as readonly string[]);
-    const keepEdits = overlay ? SECTION_KEYS[overlay.section].flatMap(key => leafDiff(overlay.sent[key], state.draft[key], key)) : [];
+    // Like the leaves above, a secret typed (or Replace/Remove pressed) while the save was in flight stays.
+    const secrets = !reset.includes("signin") ? state.secrets : Object.fromEntries(Object.entries(state.secrets).map(([key, value]) =>
+      [key, overlay && value !== overlay.sentSecrets[key as keyof SecretsDraft] ? value : NO_SECRETS[key as keyof SecretsDraft]])) as SecretsDraft;
+    const keepEdits = [...(overlay ? SECTION_KEYS[overlay.section].flatMap(key => leafDiff(overlay.sent[key], state.draft[key], key)) : []), ...secretsChanged(secrets, next)];
     this.commit({
       ...state,
       base: nextBase,
       version: detail.config_version,
       stored: secretsStored(detail.signin_config),
       draft: next,
-      secrets: reset.includes("signin") ? { ...NO_SECRETS } : state.secrets,
+      secrets,
       touched: state.touched.filter(path => !resetKeys.some(key => under(path, key)) || keepEdits.some(edited => touches(edited, path))),
     });
   }
@@ -446,6 +449,7 @@ export class ConfigEditor {
       return false;
     }
     const sent = clone(view.draft);
+    const sentSecrets = view.secrets;
     const patch = sectionPatch(section, view.draft, view.base, view.secrets);
     if (!Object.keys(patch).length) return true;
     const body = { ...patch, expected_version: view.version };
@@ -456,7 +460,7 @@ export class ConfigEditor {
       const detail = await api.apps.updateSigninConfig(this.appId, body, { idempotencyKey: this.keyFor(section, body) });
       this.keys[section] = null;
       const notice = this.view.sections[section].notice;
-      this.rebase(detail, [section], { section, sent });
+      this.rebase(detail, [section], { section, sent, sentSecrets });
       this.patchSection(section, { pending: false, savedAt: Date.now(), conflict: null, notice: retried && notice ? { ...notice, saved: true } : null });
       this.hooks.onStored(detail);
       saved = true;

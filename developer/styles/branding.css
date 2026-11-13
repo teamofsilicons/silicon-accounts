@@ -1,6 +1,6 @@
 /*
  * Branded hosted pages: layout, background and button-style classes. Everything here is scoped to `.sa-brand`, the
- * element applyBranding() paints, so nothing leaks into the account site. Structure (see web/README.md):
+ * element BrandingScope paints, so nothing leaks into the account site. Structure (see web/README.md):
  *
  *   .sa-brand[data-layout][data-bg][data-corner][data-button-style][data-density]   (BrandingScope)
  *     .sa-brand-stage                     centres the content for the layout

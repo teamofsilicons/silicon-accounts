@@ -1,6 +1,4 @@
-.card { display: grid; gap: var(--space-4); align-content: start; }
 .editor { border: 0; margin: 0; padding: 0; min-width: 0; }
-.title { font-size: 1.2rem; font-weight: 650; }
 .muted { color: var(--text-secondary, #666); font-size: .9rem; }
 .field { display: grid; gap: var(--space-2); font-weight: 600; }
 fieldset.field { min-width: 0; margin: 0; padding: 0; border: 0; }
@@ -19,23 +17,6 @@ fieldset.field legend { padding: 0; }
 .linkRow { display: grid; grid-template-columns: 1fr 2fr auto; gap: var(--space-3); align-items: end; margin: var(--space-3) 0; }
 @media (max-width: 640px) { .linkRow { grid-template-columns: 1fr; } }
 
-/* Interfaces follow Accounts' blank-canvas visual language: neutral surfaces, system type,
-   ink actions and a blue accent. Keep the existing dark mode legible too. */
-.portal {
-  --font-serif: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --accent: #3460f0; --accent-strong: #2449c9; --accent-ink: #3460f0;
-  --accent-subtle: #eef2fe; --focus-ring: #eef2fe;
-  --foreground: #1e1e1c; --text-secondary: #666; --surface: #fff;
-  --surface-raised: #fff; --surface-muted: #f5f5f5; --border: #ededed; --border-subtle: #f5f5f5;
-  --primary: #1e1e1c; --primary-hover: #33322f; --primary-pressed: #0f0f0e; --primary-foreground: #fcfcfc;
-  color: var(--foreground); font-family: var(--font-serif);
-}
-:global([data-theme="dark"]) .portal {
-  --accent: #7d9bff; --accent-strong: #a9bdff; --accent-ink: #a9bdff; --accent-subtle: #1d2440;
-  --focus-ring: #1d2440; --foreground: #f5f5f5; --text-secondary: #c4c4c4; --surface: #252525;
-  --surface-raised: #2b2b2b; --surface-muted: #313131; --border: #424242; --border-subtle: #393939;
-  --primary: #f5f5f5; --primary-hover: #fff; --primary-pressed: #ddd; --primary-foreground: #1e1e1c;
-}
 .createCard { box-shadow: 0 1px 2px rgb(30 30 28 / .04); }
 .steps { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); list-style: none; padding: 0 0 var(--space-5); margin: 0 0 var(--space-6); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: .875rem; }
 .steps li { display: flex; align-items: center; gap: var(--space-2); }
@@ -60,17 +41,6 @@ fieldset.field legend { padding: 0; }
 .notice { display: grid; gap: var(--space-3); }
 @media (max-width: 480px) { .logoField { align-items: flex-start; } .review div { grid-template-columns: 1fr; gap: var(--space-1); } }
 
-:global(html):has(.portal), :global(body):has(.portal) { background: #fcfcfc; }
-:global(html[data-theme="dark"]):has(.portal), :global(html[data-theme="dark"]) :global(body):has(.portal) { background: #1e1e1e; }
-.portal > header h1 { color: var(--foreground); font-size: clamp(1.75rem, 1.5rem + 1vw, 2rem); font-weight: 500; letter-spacing: -.025em; }
-.sectionNav { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); font-size: .875rem; }
-.sectionNav a { color: var(--text-secondary); text-decoration: none; }
-.sectionNav a:hover, .sectionNav a:focus-visible { color: var(--accent-ink); text-decoration: underline; }
-.settingsGroup { border-block: 1px solid var(--border); padding: var(--space-4) 0; }
-.settingsGroup > summary { cursor: pointer; font-weight: 650; }
-.settingsGroup > summary + * { margin-top: var(--space-5); }
-/* Closed preview content has fixed virtual dimensions; keep it out of the page's scrollable bounds. */
-.settingsGroup details:not([open]) > :not(summary) { display: none; }
 .logoChooser label { display: grid; min-width: 0; gap: var(--space-2); }
 .logoChooser input[type="file"] { width: 100%; min-width: 0; }
 .saveBar { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: var(--border); position: sticky; z-index: 5; bottom: var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-6); padding: var(--space-3) var(--space-4); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-resting); }

@@ -12,6 +12,8 @@ export function useCellData<T>(id:string,tail:string){
 }
 export function Failure({error}:{error:unknown}){
   if(error==null)return null;
+  // Our own checks throw plain Errors: their message is the whole story, not a page failure to report.
+  if(error instanceof Error&&!(error instanceof ApiError))return <Alert tone="danger" title={error.message}/>;
   const problem=ApiError.from(error);
   return <Alert tone="danger" title={problem.message}>{problem.hint}</Alert>;
 }

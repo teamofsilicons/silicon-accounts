@@ -15,7 +15,6 @@
 .table th { font-weight: 500; color: var(--text-secondary); }
 .table td:first-child { max-width: 26rem; overflow-wrap: anywhere; }
 .actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
-.form { display: grid; gap: var(--space-4); }
 .codeInput { font-family: ui-monospace, monospace; min-height: 12rem; }
 
 .pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-height: 24rem; overflow: auto; }
