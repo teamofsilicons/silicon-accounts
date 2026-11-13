@@ -286,6 +286,23 @@ async fn availability_reports_invalid_and_reserved_words() {
         s.iter().map(|i| i.to_string()).collect::<Vec<_>>(),
         vec!["c:taken-one-2", "c:taken-one-3"]
     );
+
+    // A work handle is taken for both prefixes in its organization, and only there.
+    ctx.exec("insert into organization_projections(org_id,name) values('acme','Acme')")
+        .await;
+    sqlx::query("update accounts set handle='c:taken-one.acme',org_id='acme' where uuid=$1")
+        .bind(&me.uuid)
+        .execute(&mut *conn)
+        .await
+        .expect("work handle");
+    let a = accounts::id_availability(&mut conn, "si:taken-one.acme", None)
+        .await
+        .expect("q");
+    assert_eq!((a.available, a.reason), (false, Some("taken")));
+    let a = accounts::id_availability(&mut conn, "c:taken-one.other", None)
+        .await
+        .expect("q");
+    assert!(a.available, "{}", a.message);
 }
 
 #[tokio::test]

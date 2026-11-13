@@ -96,19 +96,6 @@ pub async fn by_email(conn: &mut PgConnection, email: &str) -> ApiResult<Option<
     .await?)
 }
 
-/// The account that has a row for this E.164 phone number, **verified or not**: for uniqueness
-/// checks only (see [`by_email`]; authenticate with `repo::contacts::lookup`).
-pub async fn by_phone(conn: &mut PgConnection, phone: &str) -> ApiResult<Option<Account>> {
-    Ok(sqlx::query_as::<_, Account>(concat!(
-        "select ",
-        crate::account_columns!(),
-        " from accounts where uuid = (select account_uuid from account_phones where phone = $1)"
-    ))
-    .bind(phone)
-    .fetch_optional(&mut *conn)
-    .await?)
-}
-
 /// Resolves a uuid or a current `c:`/`si:` id.
 pub async fn by_uuid_or_id(conn: &mut PgConnection, key: &str) -> ApiResult<Option<Account>> {
     let k = key.trim();
@@ -410,8 +397,9 @@ pub async fn id_availability_for(
         }
     };
     let full = id.to_string();
-    if id.org_id().is_some() {
-        let occupied:bool=sqlx::query_scalar("select exists(select 1 from accounts where split_part(handle,':',2)=split_part($1,':',2))").bind(&full).fetch_one(&mut *conn).await?;
+    if let Some((local, org)) = id.handle().split_once('.') {
+        // The predicate of accounts_work_handle_unique, so this public check uses that index.
+        let occupied:bool=sqlx::query_scalar("select exists(select 1 from accounts where org_id=$1 and handle is not null and split_part(split_part(handle,':',2),'.',1)=$2)").bind(org).bind(local).fetch_one(&mut *conn).await?;
         let reserved:bool=sqlx::query_scalar("select exists(select 1 from handle_reservations where split_part(handle,':',2)=split_part($1,':',2) and reserved_until>now() and ($2::text is null or account_uuid<>$2))").bind(&full).bind(requester_uuid).fetch_one(&mut *conn).await?;
         if occupied || reserved {
             return Ok(IdAvailability{id:full,available:false,reason:Some(if occupied{"taken"}else{"reserved"}),message:"This work handle is used or reserved by a Carbon or Silicon in the organization.".into(),reclaimable:false});
@@ -1224,13 +1212,7 @@ pub async fn delete_account(
         .is_some()
     {
         let main = crate::repo::organizations::main_uuid(&mut tx, account_uuid).await?;
-        sqlx::query("insert into organization_notification_contacts(account_uuid,email) select $1,email from account_emails where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in(select account_uuid from account_links where main_uuid=$2)) on conflict(account_uuid,email) do update set expires_at='infinity'").bind(account_uuid).bind(main).execute(&mut *tx).await?;
-    }
-    if crate::repo::organizations::org_id(&mut tx, account_uuid)
-        .await?
-        .is_some()
-    {
-        let main = crate::repo::organizations::main_uuid(&mut tx, account_uuid).await?;
+        sqlx::query("insert into organization_notification_contacts(account_uuid,email) select $1,email from account_emails where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in(select account_uuid from account_links where main_uuid=$2)) on conflict(account_uuid,email) do update set expires_at='infinity'").bind(account_uuid).bind(&main).execute(&mut *tx).await?;
         sqlx::query("insert into organization_notification_accounts(account_uuid,recipient_uuid) select $1,uuid from accounts where uuid<>$1 and status='active' and (uuid=$2 or uuid in(select account_uuid from account_links where main_uuid=$2)) on conflict(account_uuid,recipient_uuid) do update set expires_at='infinity'").bind(account_uuid).bind(main).execute(&mut *tx).await?;
     }
     crate::repo::organizations::detach_deleted(&mut tx, account_uuid).await?;
@@ -1471,20 +1453,6 @@ pub async fn reserved_id_message(
             "{full_id} was released recently and is reserved for its previous owner until {until}."
         )
     })
-}
-
-/// Live reservations held by an account (its recent old ids), newest first.
-pub async fn reservations_of(
-    conn: &mut PgConnection,
-    account_uuid: &str,
-) -> ApiResult<Vec<(String, OffsetDateTime)>> {
-    Ok(sqlx::query_as::<_, (String, OffsetDateTime)>(
-        "select handle, reserved_until from handle_reservations where account_uuid = $1 and reserved_until > now() \
-         order by reserved_until desc",
-    )
-    .bind(account_uuid)
-    .fetch_all(&mut *conn)
-    .await?)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

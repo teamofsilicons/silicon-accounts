@@ -21,7 +21,7 @@
 //! Its access tokens act for the Carbon they belong to on exactly these routes
 //! ([`developer_audience_allowed`]): `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps`,
 //! `GET /v1/me/app-verifications`, `GET /v1/apps/{app_id}/proofs/{proof_id}/history`,
-//! and every owner route of an app ([`AppOrOwner`]: `/v1/apps/{app_id}/…` — details, sign-in
+//! GET and POST `/v1/apps/{app_id}/account-verification-request`, and every owner route of an app ([`AppOrOwner`]: `/v1/apps/{app_id}/…` — details, sign-in
 //! setup and its history, user base, imports, webhook and deliveries, proofs). Everywhere else
 //! they are refused with 401 `token_wrong_audience`, so a leaked developer-platform token can't
 //! change the account itself (ids, emails, Silicons, STKs, sessions, apps signed into).

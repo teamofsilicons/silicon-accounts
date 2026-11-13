@@ -486,15 +486,6 @@ impl<'de> Deserialize<'de> for AccountId {
     }
 }
 
-/// Splits a full id into (kind, handle) without validating the handle (for stored values).
-pub fn split_full_id(full: &str) -> Option<(AccountKind, &str)> {
-    if let Some(h) = full.strip_prefix("c:") {
-        Some((AccountKind::Carbon, h))
-    } else {
-        full.strip_prefix("si:").map(|h| (AccountKind::Silicon, h))
-    }
-}
-
 /// A normalized handle base from free text (email local part, a name, a desired username):
 /// lowercase, keep `[a-z0-9_-]`, collapse every other run to `-`, trim `-`/`_` from both ends,
 /// truncate to 30 and pad short results with digits to 3. `None` when nothing usable remains.

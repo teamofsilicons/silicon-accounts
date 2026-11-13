@@ -43,10 +43,6 @@ impl Subscription {
     pub fn event_types(&self) -> Vec<&'static str> {
         events::event_types_for_updates(self.updates.as_deref())
     }
-
-    pub fn is_active(&self) -> bool {
-        self.status == SubscriptionStatus::Active
-    }
 }
 
 /// True when `updates` (`None` = every update) includes `choice`.

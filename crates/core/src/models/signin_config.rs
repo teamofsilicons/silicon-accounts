@@ -1303,19 +1303,11 @@ fn dedupe_strings(list: &mut Vec<String>, f: impl Fn(&str) -> String) {
     *list = out;
 }
 
-fn clean_serde_message(m: &str) -> String {
-    // serde_json appends " at line X column Y" for text input; values have no position.
-    match m.find(" at line ") {
-        Some(i) => m[..i].to_string(),
-        None => m.to_string(),
-    }
-}
-
 /// serde's message about a value of the wrong type in plain words: `invalid type: floating
 /// point `12.5`, expected u32` becomes `must be a whole number from 0 to 40 (pixels), not 12.5`.
 /// Other messages (an enum's "'x' is not one of …") are kept as they are.
 fn plain_serde_message(path: &str, raw: &str) -> String {
-    let m = clean_serde_message(raw);
+    let m = crate::http::extract::strip_position(raw);
     let Some((got, expected)) = m
         .strip_prefix("invalid type: ")
         .or_else(|| m.strip_prefix("invalid value: "))

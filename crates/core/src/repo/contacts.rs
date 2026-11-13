@@ -14,7 +14,7 @@
 //!
 //! **Who an address signs in to** is [`lookup`] (or [`after_proof`] once the address was
 //! proven): only a verified address of an active Carbon, or an address of an unfinished import.
-//! Never authenticate with `repo::accounts::by_email` / `by_phone`, which match any row.
+//! Never authenticate with `repo::accounts::by_email`, which matches any row.
 //!
 //! Every function takes a [`ContactKind`]; `*_email` / `*_phone` wrappers exist for the common
 //! calls. Values must already be normalized (`normalize::normalize_email` / `normalize_phone`).
@@ -573,14 +573,6 @@ pub async fn set_primary_email(
     email: &str,
 ) -> ApiResult<bool> {
     set_primary(conn, ContactKind::Email, account_uuid, email).await
-}
-
-pub async fn set_primary_phone(
-    conn: &mut PgConnection,
-    account_uuid: &str,
-    phone: &str,
-) -> ApiResult<bool> {
-    set_primary(conn, ContactKind::Phone, account_uuid, phone).await
 }
 
 pub async fn remove_email(
