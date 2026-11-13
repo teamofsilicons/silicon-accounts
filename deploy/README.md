@@ -99,6 +99,21 @@ The predeployment PostgreSQL backup was verified and uploaded. Production checks
 complete membership coverage, idempotent rerun, migration readiness, and Carbon/Silicon
 creation in a rolled-back transaction. Local verification: 348 integration tests passed.
 
+## Contacts basic directory access — 2026-11-06
+
+The API now supports an explicit `ACCOUNTS_PROFILE_DIRECTORY_APP_IDS` operator grant, empty
+by default. Production enables only `silicon-contacts`, persisted in the Accounts runtime
+secret and service environment. This grants name/photo lookup for active identities with an
+active Accounts registration; it grants no private contact fields or first-party sessions.
+
+API source `afaf544a0a667e8ae7d556aa3e6c2cac8fd60a93` was built from the deployed registration/
+interface broker source. Deployment preserved all other files in the current composite
+release, including migration 0037, Accounts web, and Developer. Both API services passed
+readiness. The integrated Contacts add-contact preview was verified in a production browser
+as `si:saket-agents`, without saving a contact.
+
+Receipt: [verification-contacts-directory-2026-11-06.json](verification-contacts-directory-2026-11-06.json).
+
 ## Silicon notifications through Ting — 2026-11-10
 
 API and web source `869bb868e6b0` are live with migration 0038. The old API was
