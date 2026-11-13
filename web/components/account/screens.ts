@@ -160,9 +160,9 @@ const shown: ScreenSpec[] = [
     await expect(fonts().last()).toBeDisabled();
     await lab.getByRole("region", { name: "Text" }).getByRole("slider", { name: "Line height" }).scrollIntoViewIfNeeded();
   } },
-  { name: "account-home-review", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => { await click(page, "Review"); await wait(page, 900); } },
+  { name: "account-home-review", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => { await page.getByRole("link", { name: "Review" }).first().click(); await wait(page, 900); } },
   { name: "account-home-new", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me/apps", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, phones: [], custodian_of: 0 } })]] },
-  { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
+  { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
   // Identity: the card, its back, the photo menu, the editors and the id dialog with a taken id.
   { name: "account-identity", path: "/personal", waitFor: card },
   { name: "account-identity-name", path: "/personal?edit=name", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
