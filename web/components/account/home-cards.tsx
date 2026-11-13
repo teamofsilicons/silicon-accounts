@@ -2,7 +2,9 @@
 
 /**
  * Home's introduction for a new Carbon: "One Account for Your Silicons & Apps" and three things it covers (You,
- * Silicons, Apps), a title and one line each; the actions live in Home's sections below (home-sections.tsx). Shown
+ * Silicons, Apps), a title and one line each. Each card does what it names (Anil, 2026-11-13): You lights the ring
+ * around the photo above (glowYou), Silicons goes to Create a Silicon (to Silicons once there is one), Apps goes to
+ * Connected Apps. Shown
  * while it is useful: until the account has a Silicon and has signed in to an app (Anil, 2026-11-11), or until
  * dismissed, which this browser remembers.
  *
@@ -18,6 +20,8 @@ import { Button } from "@teamofsilicons/silicon-ui/button";
 import { useCarbonAvatar } from "@/lib/carbon-avatar";
 import { usePicturePalette } from "@/lib/picture-colours";
 import { useMe, useSession } from "@/lib/query/session";
+import { paths } from "@/lib/navigation";
+import { glowYou } from "./home-identity";
 import { PictureCards } from "./parts/picture-cards";
 import { useEveryApp, useEverySilicon } from "./parts/queries";
 import styles from "./home-cards.module.css";
@@ -66,9 +70,9 @@ export function HomeCards() {
   if (hasSilicon && usesAnApp) return null;
   return (
     <PictureCards className={styles.place} title="One Account for Your Silicons & Apps" onDismiss={dismiss} cards={[
-      { id: "you", picture: { src: "/banner/bg-110.webp" }, title: "You", line: account.id ? `Your CarbonID across apps: ${account.id}` : "Your CarbonID across apps." },
-      { id: "silicons", picture: { src: "/banner/bg-102.webp", focus: "right center" }, title: "Silicons", line: "Give an AI agent its own account." },
-      { id: "apps", picture: { src: "/banner/bg-127.webp", focus: "center 70%" }, title: "Apps", line: "Apps for delightful agent creation and interaction." },
+      { id: "you", picture: { src: "/banner/bg-110.webp" }, title: "You", line: account.id ? `Your CarbonID across apps: ${account.id}` : "Your CarbonID across apps.", onSelect: glowYou },
+      { id: "silicons", picture: { src: "/banner/bg-102.webp", focus: "right center" }, title: "Silicons", line: "Give an AI agent its own account.", href: hasSilicon ? paths.silicons : `${paths.silicons}/new` },
+      { id: "apps", picture: { src: "/banner/bg-127.webp", focus: "center 70%" }, title: "Apps", line: "Apps for delightful agent creation and interaction.", href: paths.apps },
     ]} />
   );
 }

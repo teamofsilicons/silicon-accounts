@@ -140,6 +140,9 @@ export function devAnswer(method: string, path: string): DevAnswer | null {
   if (path === "/v1/me/sessions" && states.devices === "unused") answer.patch = real => ({ ...(real as Page<SessionInfo>), items: [...(real as Page<SessionInfo>).items.map(item => ({ ...item, last_seen_at: item.current ? item.last_seen_at : iso(-60_000) })), UNUSED_DEVICE] });
   if (path === "/v1/me/silicons" && states.silicons && states.silicons !== "real") answer.replace = page(silicons({ none: 0, one: 1, three: 3 }[states.silicons] ?? 0));
   if (path === "/v1/me/apps" && states.apps && states.apps !== "real") answer.replace = page(apps({ none: 0, two: 2, six: 6 }[states.apps] ?? 0));
+  // No apps means no permissions between apps: Connected Apps' Permissions row, and Data & Privacy's counts, go with
+  // them (Anil, 2026-11-13: it showed in Just joined).
+  if (path === "/v1/me/proofs" && states.apps === "none") answer.replace = page([]);
   return Object.keys(answer).length ? answer : null;
 }
 

@@ -200,3 +200,7 @@ Silicon's activity, automation, cloud services, per-field sharing.
   someone's).
 - **The first-party title says "Silicon Accounts"**, the prototype "Team of Silicons". Category: product name as the
   site uses it.
+- **Connected Apps with no app** keeps the prototype's "No apps yet" and its line, then adds three rows on how an app
+  gets there, with Browse Silicon Apps (Anil, 2026-11-13, /__apps-empty C). Category: Anil's choice.
+- **Home's introduction cards act** (You lights the photo's ring, Silicons and Apps are links); the prototype's cards
+  don't. Category: Anil's choice (2026-11-13).

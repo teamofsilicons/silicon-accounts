@@ -11,6 +11,8 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
 
 ## Design
 
+- **Connected Apps with no app explains how one gets there (2026-11-13).** Anil chose /__apps-empty C: "No apps yet" over three rows (open an app, with Browse Silicon Apps; sign in with Silicon Accounts; it shows up here). Why: Home's Apps card sends someone who has just joined here, and an empty state with nothing to do was a dead end. The prototype's words stay as the line under the heading.
+- **Home's introduction cards act (2026-11-13).** You lights the photo's ring; Silicons opens Create a Silicon (Silicons once there is one); Apps opens Connected Apps.
 - **Tabs have a 2px frame (2026-11-13).** Anil chose `/__tabs` version A: 2px around the tabs instead of 4px, the keyboard ring inside the tab, corners concentric; tab widths, height and the 4px between them unchanged. Why: the 4px frame made the strip heavy beside the page's controls. In Silicon UI's Tabs through the local patch, filed as teamofsilicons/silicon-ui#32.
 - **The account command menu uses Silicon UI Dialog with a hidden accessible title and top placement (2026-11-12).** The palette draws the visible surface, while Dialog owns the modal layer and focus return. Why: Silicon UI #31 supplies the missing headerless mode, so the account menu no longer needs a direct Radix layer.
 

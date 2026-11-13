@@ -6,13 +6,17 @@
  * in; then the way to Permissions between apps; then, only if there are any, the apps whose access you removed. What an
  * app can see, where it acts for you and Remove are on its page. Apps that imported you before you ever signed in are
  * listed too, since they hold data about you. Built on parts/rows.tsx, as Security is.
+ *
+ * With no app connected (someone who has just joined, sent here by Home's Apps card), the page says how an app gets
+ * here: "No apps yet" over three rows (open an app, sign in with Silicon Accounts, it shows up here) with Browse
+ * Silicon Apps on the first (Anil, 2026-11-13, /__apps-empty C).
  */
-import { ArrowUpRight, LayoutGrid, Link2 } from "lucide-react";
+import { ArrowUpRight, Link2, LogIn, MousePointerClick, ShieldCheck } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
-import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
 import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
+import { ButtonLink } from "@/components/foundation/button-link";
 import { Page } from "@/components/foundation/layout/layout";
 import type { MyApp } from "@/lib/api/types";
 import { formatDate, formatRelative } from "@/lib/format";
@@ -24,7 +28,7 @@ import { describeError, useNow } from "../parts/common";
 import { ListCap } from "../parts/list-cap";
 import { PageBar } from "../parts/page-bar";
 import { useEveryApp, useEveryProof } from "../parts/queries";
-import { LinkItem, LinkRow, Section, Strong, Tile } from "../parts/rows";
+import { LinkItem, LinkRow, Row, Section, Strong, Tile } from "../parts/rows";
 import styles from "./apps.module.css";
 
 /** An app's page. */
@@ -76,11 +80,13 @@ export function Apps() {
             {connected.length ? (
               <Section id="apps-connected" label="Your apps">{connected.map(row)}</Section>
             ) : (
-              <EmptyState
-                icon={<LayoutGrid width={24} height={24} strokeWidth={1.5} />}
-                title="No apps yet"
-                description="Apps show up here after you sign in to them with Silicon Accounts."
-              />
+              <Section id="apps-none" title="No apps yet" description="Apps appear here after you or your Silicons sign in.">
+                <Row lead={<Tile><MousePointerClick size={16} strokeWidth={2} /></Tile>} title="Open an app" detail="Any app on Silicon Apps">
+                  <ButtonLink href={meta.data?.silicon_apps_url ?? "https://apps.teamofsilicons.com"} external variant="secondary" size="sm">Browse Silicon Apps</ButtonLink>
+                </Row>
+                <Row lead={<Tile><LogIn size={16} strokeWidth={2} /></Tile>} title="Sign in with Silicon Accounts" detail="You choose what it can see" />
+                <Row lead={<Tile><ShieldCheck size={16} strokeWidth={2} /></Tile>} title="It shows up here" detail="Change what it sees, or remove it, at any time" />
+              </Section>
             )}
             {allProofs.length ? (
               <LinkRow
