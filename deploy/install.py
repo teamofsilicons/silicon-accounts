@@ -92,10 +92,10 @@ hba.write_text('local all all peer\nhost all all 127.0.0.1/32 scram-sha-256\nhos
 run('systemctl','enable','--now','postgresql');run('systemctl','reload','postgresql')
 def sql(query):
     return run('runuser','-u','postgres','--','psql','-v','ON_ERROR_STOP=1','-At',input=query,text=True,capture_output=True).stdout.strip()
-if sql("SELECT 1 FROM pg_roles WHERE rolname='accounts'")!='1':
+def role_sql(url):
     # sqlx percent-decodes the URL password, so the role must get the decoded one.
-    password=urllib.parse.unquote(urllib.parse.urlparse(s['ACCOUNTS_DATABASE_URL']).password)
-    sql("CREATE ROLE accounts LOGIN PASSWORD '"+password.replace("'","''")+"'")
+    return "CREATE ROLE accounts LOGIN PASSWORD '"+urllib.parse.unquote(urllib.parse.urlparse(url).password).replace("'","''")+"'"
+if sql("SELECT 1 FROM pg_roles WHERE rolname='accounts'")!='1':sql(role_sql(s['ACCOUNTS_DATABASE_URL']))
 if sql("SELECT 1 FROM pg_database WHERE datname='silicon_accounts'")!='1':run('runuser','-u','postgres','--','createdb','-O','accounts','silicon_accounts')
 # A pre-migration copy is retained outside the release directory.
 backup=P('/var/lib/accounts/backups');backup.mkdir(parents=True,exist_ok=True);backup.chmod(0o700)

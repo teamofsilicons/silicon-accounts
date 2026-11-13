@@ -972,14 +972,30 @@ async fn panics_and_timeouts_become_json_errors() {
     };
     let router: Router = middleware::apply(
         Router::new()
-            .route("/v1/test/panic", get(panics))
-            .route("/v1/test/slow", get(sleeps)),
+            .route("/v1/test/panic/{secret}", get(panics))
+            .route("/v1/test/slow/{secret}", get(sleeps))
+            .route(
+                "/v1/test/fail/{secret}",
+                get(|| async { (axum::http::StatusCode::BAD_GATEWAY, "upstream failed") }),
+            ),
         &ctx.state,
         policy,
     )
     .with_state(ctx.state.clone());
+    // Path segments can be tickets or emails: the error logs must never carry them.
+    const SECRET: &str = "tkt_path_secret_7f3a";
+    let log = tempfile::NamedTempFile::new().expect("log file");
+    let _logs = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(log.reopen().expect("log writer"))
+            .finish(),
+    );
 
-    let r = call(router.clone(), Req::get("/v1/test/panic")).await;
+    let r = call(router.clone(), Req::get(&format!("/v1/test/fail/{SECRET}"))).await;
+    assert_eq!(r.status, 502);
+
+    let r = call(router.clone(), Req::get(&format!("/v1/test/panic/{SECRET}"))).await;
     assert_eq!(r.status, 500);
     assert_eq!(r.error_code(), Some("internal"));
     let id = header(&r, "x-request-id").expect("request id").to_string();
@@ -990,10 +1006,15 @@ async fn panics_and_timeouts_become_json_errors() {
     );
     assert_eq!(header(&r, "x-content-type-options"), Some("nosniff"));
 
-    let r = call(router, Req::get("/v1/test/slow")).await;
+    let r = call(router, Req::get(&format!("/v1/test/slow/{SECRET}"))).await;
     assert_eq!(r.status, 503);
     assert_eq!(r.error_code(), Some("request_timeout"));
     assert_eq!(r.json["error"]["details"]["timeout_seconds"], 0);
+
+    let logged = std::fs::read_to_string(log.path()).expect("read logs");
+    assert!(logged.contains("handler exploded"), "logs were captured: {logged}");
+    assert!(logged.contains("upstream failed"), "logs were captured: {logged}");
+    assert!(!logged.contains(SECRET), "a raw path reached the logs: {logged}");
 }
 
 #[tokio::test]
