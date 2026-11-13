@@ -24,6 +24,25 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   about 12 apart: --foreground #1B1B1B (10), a new --text-soft #353535 (22) for the line under a name (an app's
   description or address), --text-secondary #505050 (34) for facts and quiet links, --text-muted #8E8E8E (59) for ids.
   Muted stays under 4.5:1 for now. On Home, --text-soft is the app cards' lines and Needs you's line under a title.
+- **Home has no apps list and, for now, no account cards (Anil, 2026-11-12).** Connected apps lists the apps, so Your
+  apps left Home. Cards to Connected Apps, Security and Personal Info (each with one live fact) were tried and parked
+  in /__account until Anil comes back to them (priorities.md, Later). Home's identity block is the "Your profile"
+  region. The entry below is history.
+- **The hosted sign-in pages are on the type roles (Anil, 2026-11-13).** Every text uses a role and its tracking, as
+  the account site does: the step title display (h1 when compact), descriptions small in --text-soft, labels label,
+  notes and errors hint in --text-secondary. styles/branding.css declares the roles again on .sa-brand so they take each
+  app's fonts. Silicon Accounts' own sign-in has no "Powered by"; a heading that names the app hides the header's name.
+- **Every Silicon has a pixel avatar (Anil, 2026-11-12).** From his mosaic generator's Silicons tab (eight forms,
+  fifteen palettes; lib/silicon-avatar.ts), drawn from the Silicon's uuid so it never changes; its Carbon will be able
+  to change it later (the API keeps no look yet). SiliconMark draws it everywhere a Silicon shows (on a light wash of
+  its palette; the gradient-and-spark mark stays as SiliconSparkMark). Home's Your Silicons are cards with the avatar in a 3:2 art area over a
+  short strip with the name and si:id (2026-11-13; first 60/40), blended by a wash of the avatar's palette (A of four in
+  /__silicon-cards; Anil asked for the background to blend or wash with the Silicon's colours on 2026-11-13); The Silicons page uses the same cards (2026-11-13), with a badge beside the name only for Handing over or Waiting for
+  a custodian (Active shows none). Home has no New Silicon card (2026-11-13); it shows the first three. Two a row on a
+  phone. Save Avatar uploads a transparent animated GIF with the editable settings in its comment; its first frame is the still picture. An older opaque PNG is recognised by its mosaic cells and its gradient background is removed in the browser, so it keeps the same card artwork without changing the stored photo. The card samples the saved creature's actual colours for its wash; a new GIF uses its first frame. Ordinary photos still fill the art (2026-11-13).
+- **The sidebar's sections in title case (Anil, 2026-11-12):** Home, Silicons, Connected Apps, Security, Personal Info,
+  Data & Privacy (lib/navigation.ts SECTIONS, so the phone sheet, the ⌘K menu and the phone bar's title follow). The
+  pages' own titles stay as they are.
 - **Home's apps are one grid, for now (Anil, 2026-11-10).** Yours + Try (a separate Try an app section, as Adobe,
   Microsoft 365 and Atlassian do) was tried and taken out: apps sit together in Your apps, the ones you sign into first
   (most recent first, Open), then Briefcase, DM or Ting not used yet ("Not signed in yet", Try), up to six, every one
@@ -478,6 +497,8 @@ on `[role="dialog"]` in `styles/tokens.css` and the `[role="dialog"] strong` rul
   pages' rows (what happened, its detail line, the time; an app's mark, else the kind's icon). The filters group the
   API's kinds: Security = sign-ins and security, Personal info = CarbonID changes, Apps = app access and permissions,
   Silicons = custodian. Rows no longer open into a details table.
+- 2026-11-13 (Anil): Activity is a sidebar section, directly below Security. Its page has the same filters and feed;
+  as a top-level section it has no Security breadcrumb. The Security page's link to Activity remains.
 
 ## 2026-11-12: Deleting an account will be recoverable for 30 days
 

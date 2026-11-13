@@ -1,0 +1,7 @@
+/* A Silicon's animated pixel avatar (silicon-avatar.tsx): crisp pixels filling its box; while moving, its halo pixels
+   fade in as they light. No up-and-down motion (Anil, 2026-11-13). */
+.avatar { display: inline-block; aspect-ratio: 1; }
+.avatar svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.avatar[data-moving] .halo { animation: glow var(--duration-considered) var(--ease-standard) both; }
+@keyframes glow { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .avatar[data-moving] .halo { animation: none; } }

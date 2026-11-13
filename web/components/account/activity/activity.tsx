@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /activity, as the prototype draws it (Anil, 2026-11-12): Security above the title, one line on what it holds and in
+ * /activity, as the prototype draws it (Anil, 2026-11-12; a sidebar section since 2026-11-13): one line on what it holds and in
  * which timezone, the prototype's filters (All, Security, Personal info, Apps, Silicons), then a section per day on the
  * account pages' rows (parts/rows.tsx): what happened, its one detail line, and the time; an app's mark when an app was
  * involved, else the kind's icon. Newest first, in the account's timezone; "Show Older Activity" reads the next page.
@@ -20,7 +20,6 @@ import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
 import { Page } from "@/components/foundation/layout/layout";
 import type { HistoryItem, HistoryKind } from "@/lib/api/types";
 import { browserTimezone } from "@/lib/format";
-import { paths } from "@/lib/navigation";
 import { useHistory } from "@/lib/query/account";
 import { useMe } from "@/lib/query/session";
 import { timezoneLabel } from "@/lib/timezones";
@@ -126,7 +125,7 @@ export function Activity() {
 
   return (
     <div>
-      <PageBar parent={{ label: "Security", href: paths.signInMethods }} title="Activity" />
+      <PageBar title="Activity" />
       <Page>
         <p className={styles.lead}>What you, your Silicons and your apps did, newest first. Times are in {timezoneLabel(timeZone)}.</p>
         <div className={styles.toolbar}>

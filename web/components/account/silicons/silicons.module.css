@@ -6,23 +6,11 @@
 .section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
 .sectionTitle { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
 
-.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-inset); margin: 0; padding: 0; list-style: none; }
+/* Silicon cards (parts/silicon-card.tsx), three a row as on Home; two on a phone. */
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: 0; padding: 0; list-style: none; }
 .cards > li { display: grid; min-width: 0; }
 
-/* A Silicon as a tile (Home's, home-sections.module.css): mark, name and si:id; then its status and its key's age. */
-.tile { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; min-width: 0; gap: var(--space-group); padding: var(--space-group); border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); text-decoration: none; transition: box-shadow var(--duration-fast) var(--ease-standard), translate var(--duration-fast) var(--ease-standard); }
-.tile:hover { color: var(--foreground); }
-@media (hover: hover) and (pointer: fine) { .tile:hover { box-shadow: var(--shadow-raised); translate: 0 calc(var(--space-hair) * -1); } }
-.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.tileTop { display: flex; min-width: 0; align-items: center; gap: var(--space-group); }
-.tileWords { display: grid; min-width: 0; gap: var(--space-hair); }
-.tileTitle { overflow: hidden; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); text-overflow: ellipsis; white-space: nowrap; }
-.tileId { overflow: hidden; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); font-family: var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
-.tileFoot { display: flex; min-width: 0; align-items: center; gap: var(--space-related); }
-.tileLine { min-width: 0; overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
-
-@media (max-width: 539px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 639px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* An experiment after OpenAI's Usage page: Add a Silicon at 15 px icons with 14 px text, the icon 4 px from its label. */
 .tight.tight { gap: var(--space-tight); }

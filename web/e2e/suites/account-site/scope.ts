@@ -11,7 +11,7 @@ import { newCarbon, signIntoApp, until } from "./_helpers";
 
 /** The account site's own sections, as its dock names them (every one a page of this site). */
 /** The sidebar's sections (lib/navigation.ts SECTIONS, 2026-11-07): every one a page of this site. */
-const OWN = ["Home", "Silicons", "Connected apps", "Security", "Personal info", "Data & privacy"];
+const OWN = ["Home", "Silicons", "Connected Apps", "Security", "Activity", "Personal Info", "Data & Privacy"];
 
 /** GET <site><path> without following redirects: the status and where it points. */
 async function redirectOf(site: string, path: string): Promise<{ status: number; location: string }> {
@@ -21,7 +21,7 @@ async function redirectOf(site: string, path: string): Promise<{ status: number;
 
 const scope: Journey = {
   name: "account-site-scope",
-  title: "the account site is the Carbon's own account and builds no apps: its six sections plus the dock's Developer item leading out to the developer site (developer_url), /developer[/*] answering 307 there (path and query kept), /apps and the landing page pointing there too, and the landing's Create your account opening the sign-up page",
+  title: "the account site is the Carbon's own account and builds no apps: its seven sections plus the dock's Developer item leading out to the developer site (developer_url), /developer[/*] answering 307 there (path and query kept), /apps and the landing page pointing there too, and the landing's Create your account opening the sign-up page",
   async run(ctx) {
     const { env, results } = ctx;
     // The developer site's signed-out probe answers 401 when the dock's Developer item opens it.
@@ -46,7 +46,7 @@ const scope: Journey = {
     const external = await linksOf(elsewhere);
     await shot(env, page, "acct-scope-01-dock");
     results.check(
-      "the sidebar's sections are the Carbon's account (Home, Silicons, Connected apps, Security, Personal info, Data & privacy), every one a page of this site",
+      "the sidebar's sections are the Carbon's account (Home, Silicons, Connected apps, Security, Activity, Personal info, Data & privacy), every one a page of this site",
       OWN.every(name => own.some(section => section.name === name && section.href.startsWith("/"))) && own.length === OWN.length,
       own.map(section => `${section.name} ${section.href}`).join(", "),
     );
@@ -108,7 +108,7 @@ const scope: Journey = {
     const sheetLinks = await sheet.getByRole("link").evaluateAll(links => links.map(link => ({ text: (link.textContent ?? "").replace(/\s+/g, " ").trim(), href: link.getAttribute("href") ?? "" })));
     const sheetDeveloper = sheetLinks.find(link => link.text.startsWith("Developers"));
     const sheetDocs = sheetLinks.find(link => link.text.startsWith("Docs"));
-    results.check("on a phone, the sheet lists the six account sections, Developers and Docs", sheetLinks.length === 8 && sheetDeveloper?.href.replace(/\/$/, "") === env.developer && sheetDocs?.href === `${env.developer}/docs`, JSON.stringify(sheetLinks.map(link => `${link.text.slice(0, 24)} ${link.href}`)));
+    results.check("on a phone, the sheet lists the seven account sections, Developers and Docs", sheetLinks.length === 9 && sheetDeveloper?.href.replace(/\/$/, "") === env.developer && sheetDocs?.href === `${env.developer}/docs`, JSON.stringify(sheetLinks.map(link => `${link.text.slice(0, 24)} ${link.href}`)));
     await page.keyboard.press("Escape");
     await page.setViewportSize({ width: 1440, height: 900 });
 

@@ -1,0 +1,56 @@
+/* A Silicon's card (silicon-card.tsx): the avatar's art (3:2) over a short strip with the name and si:id (Anil,
+   2026-11-13: a smaller bottom than the first 60/40), one surface. Home's card rules: a clear border, no resting shadow;
+   on hover it rises a little (the avatar itself doesn't move up or down). --avatar-1..3 are the avatar's
+   palette (set inline), so each card's art is its own colours. */
+.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; display: grid; min-width: 0; grid-template-rows: auto 1fr; overflow: hidden; isolation: isolate; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); text-decoration: none; transition: box-shadow var(--duration-fast) var(--ease-standard), translate var(--duration-fast) var(--ease-standard); }
+.card:hover { color: var(--foreground); }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .card:hover { box-shadow: var(--shadow-raised); translate: 0 calc(var(--space-hair) * -1); }
+}
+
+/* The art: the avatar centred, crisp pixels, a little under the art's height. */
+.art { position: relative; aspect-ratio: 3 / 2; overflow: hidden; }
+/* Absolute, so the picture never sizes the art: the art keeps its 3:2. */
+.avatar { position: absolute; inset: 0; width: auto; height: 72%; aspect-ratio: 1; margin: auto; }
+/* Maker uploads have transparent artwork, either recovered from an old PNG or stored as a GIF. Ordinary photos
+   retain their full-bleed crop; neither path needs a blur, mask or blend mode. */
+.avatarPhoto { position: absolute; inset: 0; width: auto; height: 72%; aspect-ratio: 1; margin: auto; object-fit: contain; image-rendering: pixelated; }
+.photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* The bottom is only as tall as its lines and the card's 12px inset. */
+.words { display: grid; min-width: 0; align-content: start; gap: var(--space-hair); padding: var(--space-related) var(--space-group) var(--space-group); }
+/* The name, with a state badge after it when there is one. */
+/* The name keeps its width; when the badge doesn't fit beside it, the badge moves under it. */
+.nameRow { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-hair) var(--space-related); }
+.nameRow > :last-child:not(.name) { flex: none; }
+.name { flex: none; max-width: 100%; overflow: hidden; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.id { overflow: hidden; color: var(--text-muted); font: var(--caption); font-family: var(--font-mono); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+.detail { overflow: hidden; margin-top: var(--space-tight); color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); text-overflow: ellipsis; white-space: nowrap; }
+
+/* wash: light from the creature's own colours gathers behind it, then fades into the words. */
+.card[data-blend="wash"] .art,
+.card[data-blend="pixels"] .art {
+  background:
+    linear-gradient(to bottom, transparent 35%, var(--sq-fill)),
+    radial-gradient(ellipse 82% 85% at 35% 38%, color-mix(in oklab, var(--avatar-1) 34%, var(--sq-fill)), transparent 85%),
+    radial-gradient(ellipse 82% 85% at 68% 46%, color-mix(in oklab, var(--avatar-3) 32%, var(--sq-fill)), transparent 85%),
+    linear-gradient(135deg, color-mix(in oklab, var(--avatar-1) 14%, var(--sq-fill)), color-mix(in oklab, var(--avatar-2) 12%, var(--sq-fill)) 55%, color-mix(in oklab, var(--avatar-3) 14%, var(--sq-fill)));
+}
+
+/* glow: a light of the avatar's colours behind it, gone before the words. */
+.card[data-blend="glow"] .art {
+  background:
+    radial-gradient(closest-side at 50% 58%, color-mix(in oklab, var(--avatar-2) 34%, transparent), transparent),
+    radial-gradient(closest-side at 32% 40%, color-mix(in oklab, var(--avatar-1) 22%, transparent), transparent),
+    radial-gradient(closest-side at 70% 44%, color-mix(in oklab, var(--avatar-3) 22%, transparent), transparent);
+}
+
+/* pixels: the wash, with faint pixels of the avatar's colours scattered over it, thinning towards the words. */
+.card[data-blend="pixels"] .art::before { content: ""; position: absolute; z-index: -1; inset: 0; background: var(--avatar-scatter) center / cover no-repeat; image-rendering: pixelated; }
+.card[data-blend="pixels"] .art { z-index: 0; }
+
+/* tint: the whole card in the palette's lightest wash, words on it too. */
+.card[data-blend="tint"] { --sq-fill: color-mix(in oklab, var(--avatar-2) 12%, var(--surface)); --sq-stroke: color-mix(in oklab, var(--avatar-2) 22%, var(--border)); }
+.card[data-blend="tint"] .art { background: radial-gradient(closest-side at 50% 60%, color-mix(in oklab, var(--avatar-2) 20%, transparent), transparent); }
+
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } }

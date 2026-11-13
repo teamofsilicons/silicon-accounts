@@ -43,17 +43,15 @@
 .title {
   margin: 0;
   color: var(--foreground);
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
-  font-weight: 400;
-  letter-spacing: var(--tracking-display);
-  line-height: 1.15;
+  /* The display role (Anil, 2026-11-13: every text on a role); h1 in the compact density. */
+  font: var(--display);
+  letter-spacing: var(--display-tracking);
   text-wrap: balance;
   overflow-wrap: anywhere;
   outline: none;
 }
-.description { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); text-wrap: pretty; overflow-wrap: anywhere; }
-:global(.sa-brand[data-density="compact"]) .title { font-size: var(--text-xl); }
+.description { margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-wrap: pretty; overflow-wrap: anywhere; }
+:global(.sa-brand[data-density="compact"]) .title { font: var(--h1); letter-spacing: var(--h1-tracking); }
 /*
  * The split layout already shows the app's title beside the form: there the h1 is for screen readers only, and a
  * short visible "Sign in" heads the form instead.
@@ -73,11 +71,8 @@
     display: block;
     margin: 0;
     color: var(--foreground);
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-weight: 400;
-    letter-spacing: var(--tracking-display);
-    line-height: 1.2;
+    font: var(--h1);
+    letter-spacing: var(--h1-tracking);
   }
 }
 /* Phones: the card keeps a little more room for its content. */
@@ -109,7 +104,7 @@
 
 /* A line under a field (FieldNote). The row's space is padding inside the clipped slot, so it opens from zero. */
 .noteSlot { display: block; overflow: hidden; }
-.note { display: block; padding-top: var(--space-2); color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
+.note { display: block; padding-top: var(--space-2); color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); overflow-wrap: anywhere; }
 .note[data-tone="error"] { color: var(--danger); }
 .note[data-tone="status"] { color: var(--text-secondary); }
 
@@ -129,7 +124,7 @@
 .segments button { flex: 1 1 0; }
 .continueAs { display: grid; gap: var(--space-3); }
 
-.divider { display: flex; align-items: center; gap: var(--space-3); color: var(--text-muted); font-size: var(--text-xs); line-height: 1; }
+.divider { display: flex; align-items: center; gap: var(--space-3); color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); }
 .divider::before, .divider::after { flex: 1; height: 1px; background: var(--border); content: ""; }
 
 
@@ -141,9 +136,7 @@
   padding: 0 var(--space-2);
   background: none;
   color: var(--text-secondary);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 500;
+  font: var(--label); letter-spacing: var(--label-tracking);
   text-decoration: underline;
   text-decoration-color: var(--border-strong);
   text-underline-offset: 3px;
@@ -182,11 +175,11 @@
  */
 :is(.accountRow, .destination) > :is(.accountText, .destinationText) { flex: 1 1 auto; max-width: calc(100% - var(--row-lead) - var(--space-3)); }
 .destination > :is(.accountText, .destinationText) { padding-block: var(--space-2); }
-.accountName { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; overflow-wrap: anywhere; }
-.accountId { color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0; overflow-wrap: anywhere; }
+.accountName { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); overflow-wrap: anywhere; }
+.accountId { color: var(--text-secondary); font: var(--caption); font-family: var(--font-mono); letter-spacing: 0; overflow-wrap: anywhere; }
 .destinationIcon { display: grid; place-items: center; color: var(--text-secondary); }
-.provenNote { color: var(--text-secondary); font-size: var(--text-xs); }
-.destinationText { min-width: 0; color: var(--foreground); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.provenNote { color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); }
+.destinationText { min-width: 0; color: var(--foreground); font: var(--small); letter-spacing: var(--small-tracking); overflow-wrap: anywhere; }
 .rowAction { display: flex; flex: none; align-items: center; margin-left: auto; }
 
 /* ------------------------------------------------------------------------------------------------ code entry */
@@ -200,7 +193,7 @@
 /* The six cells share the card's width (one row as wide as the button under it); Arc's focus ring follows them. */
 .otp > [role="group"] > div { width: auto; flex: 1 1 0; }
 .resendRow { display: flex; min-height: var(--control-height-sm); flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
-.resendNote { color: var(--text-secondary); font-size: var(--text-xs); }
+.resendNote { color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); }
 .resend {
   position: relative;
   display: inline-flex;
@@ -212,14 +205,11 @@
   padding: 0 var(--space-2);
   background: none;
   color: var(--foreground);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  line-height: var(--leading-body);
+  font: var(--label); letter-spacing: var(--label-tracking);
   cursor: pointer;
   transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
 }
-.resend[aria-disabled="true"] { color: var(--text-muted); font-weight: 400; cursor: default; }
+.resend[aria-disabled="true"] { color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); cursor: default; }
 /* Keyboard focus shows while it counts down too (it stays a Tab stop): the fill, with the waiting state's muted ink. */
 .resend:focus-visible { outline: none; background: var(--surface-muted); }
 .resendLabel { display: inline-flex; align-items: baseline; gap: .3em; white-space: nowrap; }
@@ -243,7 +233,7 @@
 }
 .photoBusy svg { filter: drop-shadow(0 1px 2px rgb(0 0 0 / .25)); }
 .photoText { display: grid; min-width: 0; flex: 1; gap: var(--space-2); }
-.fieldLabel { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
+.fieldLabel { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
 .photoActions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .buttonIcon { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -266,7 +256,7 @@
 @media (hover: hover) and (pointer: fine) { .idControl:hover:not([data-invalid]) { --sq-stroke: var(--foreground); } }
 .idControl:focus-within { --sq-stroke: var(--foreground); }
 .idControl[data-invalid] { --sq-stroke: var(--danger); }
-.idPrefix { flex: none; padding-left: var(--space-3); color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: 0; user-select: none; }
+.idPrefix { flex: none; padding-left: var(--space-3); color: var(--text-muted); font: var(--body); font-family: var(--font-mono); letter-spacing: 0; user-select: none; }
 .idInput {
   min-width: 0;
   flex: 1;
@@ -276,13 +266,14 @@
   padding: 0 var(--space-2) 0 1px;
   background: transparent;
   color: var(--foreground);
+  /* What you type is body (the dialog rules), in mono; the prefix matches it. */
+  font: var(--body);
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
   letter-spacing: 0;
   outline: none;
 }
 .idStatus { display: grid; width: 36px; flex: none; place-items: center; }
-.suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding-top: var(--space-2); font-size: var(--text-xs); }
+.suggestions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding-top: var(--space-2); font: var(--hint); letter-spacing: var(--hint-tracking); }
 .suggestion {
   --sq-r: 10px;
   --sq-fill: var(--surface);
@@ -293,8 +284,8 @@
   padding: 0 var(--space-2);
   background: var(--sq-fill);
   color: var(--foreground);
+  font: var(--hint);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
   letter-spacing: 0;
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
@@ -303,7 +294,7 @@
 .ok { color: var(--success); }
 .bad { color: var(--danger); }
 .spin { animation: spin 900ms linear infinite; }
-.fieldError { display: block; padding-top: var(--space-2); color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
+.fieldError { display: block; padding-top: var(--space-2); color: var(--danger); font: var(--hint); letter-spacing: var(--hint-tracking); }
 
 /* ------------------------------------------------------------------------------------------------ opening */
 /* The Opening page: the provider's mark in a tile, a quiet "on its way" pulse, a bar that fills while it waits. */
@@ -341,7 +332,7 @@
 
 /* ------------------------------------------------------------------------------------------------ details */
 /* "Step 1 of 3" over a details page: a dot per page, the current one long. */
-.pageProgress { display: flex; align-items: center; gap: var(--space-3); color: var(--text-secondary); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.pageProgress { display: flex; align-items: center; gap: var(--space-3); color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); font-variant-numeric: tabular-nums; }
 .pageDots { display: inline-flex; align-items: center; gap: 4px; }
 .pageDots > span {
   width: 6px;
@@ -352,17 +343,16 @@
 }
 .pageDots > span[data-state="done"] { background: var(--accent-ink, var(--primary)); }
 .pageDots > span[data-state="current"] { width: 18px; background: var(--primary); }
-.pageCount { line-height: 1; }
 
 /* Adding a missing email or phone, under the list. */
 .adder { display: grid; min-width: 0; gap: var(--space-3); }
 .adderHead { display: grid; gap: var(--space-1); }
-.adderTitle { margin: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
-.adderText { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); text-wrap: pretty; }
+.adderTitle { margin: 0; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.adderText { margin: 0; color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); text-wrap: pretty; }
 
 /* What the review leaves out. */
 .keptBack { display: grid; gap: var(--space-2); }
-.keptTitle { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); font-weight: 500; }
+.keptTitle { margin: 0; color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
 .quietList { --sq-stroke: var(--border); }
 .quietList .shareLabel { color: var(--text-secondary); }
 
@@ -403,11 +393,11 @@ label.shareText { cursor: pointer; }
 label.shareText[data-disabled] { cursor: default; }
 .shareCheck { display: grid; flex: none; place-items: center; }
 .shareCheck > div { display: contents; }
-.shareOptional { color: var(--text-muted); font-size: var(--text-xs); font-weight: 400; }
+.shareOptional { color: var(--text-muted); font: var(--hint); letter-spacing: var(--hint-tracking); }
 .shareValue[data-missing] { color: var(--text-muted); }
-.shareLabel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; line-height: var(--leading-body); }
-.shareValue { color: var(--text-secondary); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
-.shareLock { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--text-muted); font-size: var(--text-xs); }
+.shareLabel { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.shareValue { color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); overflow-wrap: anywhere; }
+.shareLock { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--text-muted); font: var(--hint); letter-spacing: var(--hint-tracking); }
 .actions { display: grid; gap: var(--space-2); }
 
 /* ------------------------------------------------------------------------------------------------ complete */
@@ -438,15 +428,15 @@ label.shareText[data-disabled] { cursor: default; }
 /* Keyboard focus: the link takes the text colour, a full underline and a soft fill (no rings on these pages). */
 .footer a:focus-visible { background: var(--surface-muted); color: var(--foreground); text-decoration-color: currentColor; box-shadow: 0 0 0 2px var(--surface-muted); }
 .skeleton { display: grid; gap: var(--space-4); }
-.noscript { margin: 0; color: var(--foreground); font-size: var(--text-sm); line-height: var(--leading-body); }
+.noscript { margin: 0; color: var(--foreground); font: var(--small); letter-spacing: var(--small-tracking); }
 .problem { display: grid; gap: var(--brand-gap, var(--space-4)); }
 .details {
   display: grid;
   margin: 0;
   gap: 2px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  font: var(--hint);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
   letter-spacing: 0;
   overflow-wrap: anywhere;
 }
@@ -466,7 +456,7 @@ label.shareText[data-disabled] { cursor: default; }
 .fieldWithSwitch { display: grid; gap: var(--space-tight); }
 .fieldSwitch { justify-self: start; }
 /* The sign-in page's last line: no passwords, and how Silicons sign in. */
-.methodsNote { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+.methodsNote { margin: 0; color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); }
 
 /* The sign-in code: the address in the sentence, in the text colour; "Use a Different Email" and Resend share a row. */
 .codeAddress { color: var(--foreground); font-weight: var(--weight-medium); overflow-wrap: anywhere; }

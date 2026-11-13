@@ -17,6 +17,21 @@
  * split layout on a wide branded area; there the panel's own header, title and subtitle hide, so nothing repeats.
  */
 
+/* The type roles (styles/tokens.css), declared again on the branded area so each resolves with the app's own fonts
+   (applyBranding sets --font-body and --font-display here; a role declared only on :root would carry the site's). Same
+   formulas as tokens.css: keep them in step (Anil, 2026-11-13: every hosted text on a role). */
+.sa-brand {
+  --display: var(--weight-title) var(--text-2xl)/var(--leading-display) var(--font-display);
+  --h1: var(--weight-title) var(--text-xl)/var(--leading-display) var(--font-display);
+  --h2: var(--weight-title) var(--text-lg)/var(--leading-body) var(--font-display);
+  --h3: var(--weight-medium) var(--text-base)/var(--leading-body) var(--font-body);
+  --body: var(--weight-regular) var(--text-base)/var(--leading-body) var(--font-body);
+  --label: var(--weight-medium) var(--text-sm)/var(--leading-body) var(--font-body);
+  --small: var(--weight-regular) var(--text-sm)/var(--leading-body) var(--font-body);
+  --caption: var(--weight-medium) var(--text-xs)/var(--leading-body) var(--font-body);
+  --hint: var(--weight-regular) var(--text-xs)/var(--leading-body) var(--font-body);
+}
+
 .sa-brand {
   /* Layout responds to the branded area's own width, so a phone-width preview inside a wide page folds correctly. */
   container: sa-brand / inline-size;
@@ -92,11 +107,11 @@
 
 .sa-brand-header { display: flex; min-width: 0; align-items: center; gap: var(--space-3); }
 .sa-brand-logo { display: block; width: auto; max-width: 100%; height: var(--brand-logo-height, 36px); object-fit: contain; }
-.sa-brand-name { min-width: 0; overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.sa-brand-title { margin: 0; color: var(--foreground); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1.15; text-wrap: balance; }
-.sa-brand-subtitle { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); text-wrap: pretty; }
+.sa-brand-name { min-width: 0; overflow: hidden; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.sa-brand-title { margin: 0; color: var(--foreground); font: var(--display); letter-spacing: var(--display-tracking); text-wrap: balance; }
+.sa-brand-subtitle { margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-wrap: pretty; }
 .sa-brand-body { display: grid; min-width: 0; gap: var(--brand-gap, 16px); }
-.sa-brand-legal { margin: 0; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-body); }
+.sa-brand-legal { margin: 0; color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); }
 .sa-brand-legal a { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); }
 
 /* Split: the app's side on the left, the form on the right. Folds into a card on narrow screens. */
@@ -136,13 +151,9 @@
 /* Minimal: no card chrome, a narrower column and more air. */
 .sa-brand[data-layout="minimal"] .sa-brand-panel { --sq-fill: transparent; --sq-stroke: transparent; width: min(100%, 360px); padding-inline: 0; border-color: transparent; background: transparent; box-shadow: none; }
 
-/* The Silicon Accounts look (an app that kept the defaults, and Silicon Accounts' own pages): the site's faces, with
-   headings in BDO Grotesk DemiBold as on the account site and the developer site. */
-.sa-brand[data-look="silicon"] { --tracking-display: -.025em; }
-.sa-brand[data-look="silicon"] :is(h1, h2, .sa-brand-title) { font-weight: 600; }
 
 /* Density. */
-.sa-brand[data-density="compact"] .sa-brand-title { font-size: var(--text-xl); }
+.sa-brand[data-density="compact"] .sa-brand-title { font: var(--h1); letter-spacing: var(--h1-tracking); }
 
 /* Button styles for primary actions (Arc Button and ActionButton expose data-variant). */
 .sa-brand.sa-brand[data-button-style="soft"] [data-variant="primary"] {

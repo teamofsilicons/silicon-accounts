@@ -160,7 +160,9 @@ function FlowPage({ id }: { id: string }) {
   const frameApp = flow?.app ?? (look ? { app_id: look.app_id, name: look.name, branding: look.branding } : null);
   const site = flow ? flow.app.first_party : !look;
   const hero = flow ? heroCopy(flow, { firstVisit }) : { title: look ? `Sign in to ${look.name}` : "Signing in", subtitle: null };
-  const hideName = !!flow && view.startsWith("choose_method") && appTitle(flow).trim().toLowerCase() === flow.app.name.trim().toLowerCase();
+  // The heading already names the app ("Sign in to Briefcase"): the header shows the logo alone, so the name isn't said
+  // twice (Anil, 2026-11-13).
+  const hideName = !!flow && view.startsWith("choose_method") && appTitle(flow).trim().toLowerCase().includes(flow.app.name.trim().toLowerCase());
   // A flow page may choose its own layout; every other page follows the branding's.
   const layout = flow?.step === "details" ? flow.details?.layout ?? null : null;
 
@@ -172,6 +174,8 @@ function FlowPage({ id }: { id: string }) {
         title={hero.title}
         subtitle={hero.subtitle}
         busy={ctl.loading}
+        // "Powered by Silicon Accounts" says nothing on Silicon Accounts' own sign-in (the developer site keeps it).
+        poweredBy={flow?.app.app_id !== "silicon-accounts"}
         hideName={hideName}
         layout={layout}
         footer={flow ? <FlowFooter flow={flow} step={view} /> : null}

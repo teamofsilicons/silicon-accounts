@@ -17,4 +17,6 @@
 .form { display: grid; min-width: 0; gap: var(--space-inset); }
 .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); padding-top: var(--space-related); }
 .start { justify-self: start; }
+/* The Photo dialog's other ways, as link buttons in a row under the upload. */
+.photoLinks { display: flex; flex-wrap: wrap; gap: var(--space-related) var(--space-group); }
 .error { margin: 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); }

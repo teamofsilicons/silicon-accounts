@@ -45,6 +45,8 @@ import { addReveal, dismissReveal, dismissRevealsOf, usePendingReveals } from ".
 import { Row, Section, Strong, Tile } from "../parts/rows";
 import { SecretReveal } from "../parts/secret-reveal";
 import { SiliconMark } from "../parts/silicon-mark";
+import { SiliconAvatarEditor } from "./silicon-avatar-editor";
+import { useSiliconPicture } from "@/lib/silicon-picture";
 import { ChangeKeyDialog } from "./change-key";
 import styles from "./silicon-page.module.css";
 
@@ -107,7 +109,7 @@ export function SiliconPage({ uuid }: { uuid: string }) {
   return shell(silicon.display_name || silicon.id || "Silicon", (
     <>
       <div className={styles.intro}>
-        <SiliconMark seed={silicon.uuid} size={40} />
+        <SiliconMark seed={silicon.uuid} photo={silicon.pfp_url} size={40} />
         <span className={styles.introText}>
           <span className={styles.introTitle}><span className="mono">{silicon.id ?? silicon.uuid}</span><Badge size="sm" tone={status.tone}>{status.text}</Badge></span>
           <span className={styles.introLine}>In your care since {formatDate(silicon.created_at, me.data?.timezone)}</span>
@@ -263,9 +265,12 @@ function About({ silicon, me, now }: { silicon: ManagedSilicon; me: CarbonMe; no
   const cancelTransfer = useCancelTransferSettled();
   const id = idOf(silicon);
   const ownPhoto = isDefaultPhoto(silicon.pfp_url) ? null : silicon.pfp_url;
+  // What the Photo row says, and what the mark shows: the look made for it, its default avatar, or its own photo.
+  const picture = useSiliconPicture(silicon);
+  const [photoByLink, setPhotoByLink] = useState(false);
   const transfer = silicon.pending_transfer;
   const left = msUntil(transfer?.expires_at, now);
-  const close = () => { setEditing(null); setError(null); };
+  const close = () => { setEditing(null); setError(null); setPhotoByLink(false); };
   const save = (patch: { display_name?: string; timezone?: string; pfp_url?: string | null }) => update.mutateAsync({ uuid: silicon.uuid, patch });
 
   const saveName = async (event: FormEvent) => {
@@ -306,7 +311,7 @@ function About({ silicon, me, now }: { silicon: ManagedSilicon; me: CarbonMe; no
 
   return (
     <Section id="silicon-about" title="About">
-      <Row lead={<Avatar name={silicon.display_name} src={silicon.pfp_url} size="sm" />} title="Name" detail={silicon.display_name}>
+      <Row lead={<SiliconMark seed={silicon.uuid} photo={silicon.pfp_url} size={28} />} title="Name" detail={silicon.display_name}>
         <Button variant="secondary" size="sm" onClick={() => { setName(silicon.display_name); setEditing("name"); }}>Edit</Button>
       </Row>
       <Row lead={<Tile><UserRound size={16} strokeWidth={2} /></Tile>} title="Id" detail={<span className="mono">{silicon.id ?? "No id yet"}</span>}>
@@ -315,7 +320,7 @@ function About({ silicon, me, now }: { silicon: ManagedSilicon; me: CarbonMe; no
       <Row lead={<Tile><Clock size={16} strokeWidth={2} /></Tile>} title="Timezone" detail={`${timezoneLabel(silicon.timezone)} · UTC${utcOffset(silicon.timezone)}`}>
         <Button variant="secondary" size="sm" onClick={() => setEditing("timezone")}>Change</Button>
       </Row>
-      <Row lead={<Tile><ImageUp size={16} strokeWidth={2} /></Tile>} title="Photo" detail={ownPhoto ? "A photo of its own" : "The default photo"}>
+      <Row lead={<Tile><ImageUp size={16} strokeWidth={2} /></Tile>} title="Photo" detail={picture.kind === "photo" ? "A photo of its own" : picture.customised ? "An avatar you made" : "Its own avatar, made for it"}>
         <Button variant="secondary" size="sm" onClick={() => setEditing("photo")}>Change</Button>
       </Row>
       <Row
@@ -345,26 +350,33 @@ function About({ silicon, me, now }: { silicon: ManagedSilicon; me: CarbonMe; no
       <Ask open={editing === "timezone"} onClose={close} title="Timezone" description={<>Apps show times to <strong>{id}</strong> in this timezone.</>}>
         <TimezoneForm value={silicon.timezone} onSave={timezone => save({ timezone })} onDone={close} autoFocus />
       </Ask>
-      <Ask open={editing === "photo"} onClose={close} title="Photo" description={<>Apps show it next to <strong>{silicon.display_name}</strong>. Upload one, or use a link.</>}>
-        <div className={styles.form}>
-          <FileUpload
-            label="Upload a photo"
-            description="A PNG, JPEG, WebP or GIF, up to 2 MB."
-            accept={PHOTO_ACCEPT}
-            maxSize={PHOTO_MAX_BYTES}
-            onUpload={async file => {
-              const problem = photoProblem(file);
-              if (problem) throw new Error(problem);
-              await upload.mutateAsync({ uuid: silicon.uuid, file });
-              close();
-            }}
-          />
-          <PhotoUrlForm value={ownPhoto} name={silicon.display_name} onSave={url => save({ pfp_url: url })} onDone={close} />
-          {ownPhoto ? (
-            <Button variant="link" size="sm" className={styles.start} loading={defaultPhoto.isPending} onClick={() => void defaultPhoto.mutateAsync(silicon.uuid).then(close, raw => setError(describeError(raw)))}>Use the Default Photo</Button>
-          ) : null}
-          {error ? <p className={styles.error} role="alert">{error}</p> : null}
-        </div>
+      <Ask open={editing === "photo"} onClose={close} title="Photo" description={<>Apps show it next to <strong>{silicon.display_name}</strong>. Make its avatar, or use a photo.</>}>
+        {editing !== "photo" ? null : photoByLink ? (
+          <div className={styles.form}>
+            <PhotoUrlForm value={ownPhoto} name={silicon.display_name} onSave={url => save({ pfp_url: url })} onDone={close} autoFocus />
+            <Button variant="link" size="sm" className={styles.start} onClick={() => setPhotoByLink(false)}>Make Its Avatar Instead</Button>
+          </div>
+        ) : (
+          <SiliconAvatarEditor silicon={silicon} onDone={close}>
+            <FileUpload
+              label="Or use a photo"
+              description="A PNG, JPEG, WebP or GIF, up to 2 MB. Apps show it instead of its avatar."
+              accept={PHOTO_ACCEPT}
+              maxSize={PHOTO_MAX_BYTES}
+              onUpload={async file => {
+                const problem = photoProblem(file);
+                if (problem) throw new Error(problem);
+                await upload.mutateAsync({ uuid: silicon.uuid, file });
+                close();
+              }}
+            />
+            <span className={styles.photoLinks}>
+              <Button variant="link" size="sm" onClick={() => setPhotoByLink(true)}>Use a Link Instead</Button>
+              {ownPhoto ? <Button variant="link" size="sm" loading={defaultPhoto.isPending} onClick={() => void defaultPhoto.mutateAsync(silicon.uuid).then(close, raw => setError(describeError(raw)))}>Use Its Default Avatar</Button> : null}
+            </span>
+            {error ? <p className={styles.error} role="alert">{error}</p> : null}
+          </SiliconAvatarEditor>
+        )}
       </Ask>
       <Ask open={editing === "handover"} onClose={close} busy={start.isPending} title={`Hand ${id} over`} description="The Carbon you name looks after it once they accept. Until then nothing changes.">
         <form className={styles.form} onSubmit={event => void sendHandover(event)} noValidate>

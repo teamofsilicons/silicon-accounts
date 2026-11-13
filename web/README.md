@@ -381,6 +381,10 @@ under 1024 px. The choices live in the address
 `/__kitchen` (`components/kitchen/layouts/`).
 
 `/__text` (2026-11-10) compares text grey ladders with a step between the text and the secondary text (Now, A to E, from Refactoring UI's palette), on a Home column beside today's greys (`components/kitchen/text/`, the ladders in `lib/text-ladders.ts`).
+`/__consent` (2026-11-13) shows designs for the consent step of an app's sign-in inside the real hosted frame (round two in `components/auth/steps/consent-v2.tsx`: Sentence, Card, One tap, Band; the earlier tries in `consent-aligned.tsx` and `consent-designs.tsx`), with an app in the default look or its own colours and three cases; today's `details` and `review` steps are unchanged until Anil picks.
+`/__request` (2026-11-12) shows a custodian request rethought as a decision in four designs (Choice, Pass, Sheet in `components/account/silicons/request-designs.tsx`, and the ordered list in `request-view.tsx`) with sample requests; the live page keeps its card until Anil picks.
+`/__silicon-cards` (2026-11-12) shows Silicon cards with their pixel avatars (`lib/silicon-avatar.ts`, `components/account/parts/silicon-card.tsx`) in four blends and the generator's range; its saved-file row reproduces old opaque PNGs and a new transparent GIF. `SiliconMark` and `SiliconCard` draw a Silicon's picture everywhere (`lib/silicon-picture.ts`: the look made for it, its default pixel avatar, or its own photo). The Silicon page's Photo dialog makes its avatar (`silicons/silicon-avatar-editor.tsx`) and uploads a transparent animated GIF as the Silicon's public photo. The GIF contains its editable settings; the editor can recover them on another browser. A card reads an older opaque PNG through the site's own `/v1/photos` proxy, recognises the mosaic cells, removes only the gradient background, and samples the saved creature's colours for its blended wash (`lib/silicon-photo-asset.ts`); a new GIF supplies colours from its first frame, while ordinary photos remain full bleed. At large sizes `SiliconAvatar` (`components/account/parts/silicon-avatar.tsx`) animates it from the generator's frames: shimmer, glances, blinks and a twinkling halo (no up-and-down motion); reduced motion shows a still frame.
+`/__account` (2026-11-12) compares designs for Home's Your account cards (picture, band, cover, gradient; `components/account/parts/account-cards.tsx`, the lab in `components/kitchen/account/`).
 `/__cards` (2026-11-11) compares card systems for Your Silicons and Your apps (tile, tile + footer, picture, stacked), both sections in one anatomy, and Home's app card in six paddings (`components/kitchen/cards/`).
 `/__links` (2026-11-10) compares the phone field's switches as Silicon UI Button's `link` variant (local patch), underlined at rest or on hover only, beside today's ghost xs button (`components/kitchen/links/`).
 `/__dialog` (2026-11-10) shows the Text code dialog now beside the same dialog on four tiers (title; the field and Send Code; the description; the hint and the way out), set with Silicon UI's field size variables `--field-text-size` and `--field-hint-size` (local patch) (`components/kitchen/dialog/`).
@@ -512,6 +516,7 @@ Every shared-foundation request from the area builders, resolved in the shared c
 
 ### Fix round: shared changes (web-developer, 2026-10-07)
 
+- **Hosted type** (2026-11-13, `styles/branding.css`, `components/auth/flow/flow.module.css`): every hosted text uses a type role with its tracking; `.sa-brand` declares the roles again (same formulas as tokens.css, keep them in step) so they resolve with the app's fonts.
 - **Branding runtime** (`lib/branding/apply.ts`, `contrast.ts`, `styles/branding.css`): `--accent-ink` and the new
   `--accent-line` stay readable on any palette (see Branding runtime); an outline button's edge uses `--accent-line`.
 - **Shell**: while the shell is up, `html` has `scroll-padding-block` of 24 px at the top and the height of the dock
@@ -699,9 +704,9 @@ documented in the library: https://github.com/teamofsilicons/silicon-ui/tree/mai
 
 Per "Silicon Accounts Redesign Design Review" (repository root):
 
-- **Four pillars** in the dock (`lib/navigation.ts` SECTIONS): Identity `/`, Security `/sign-in-methods`, Access
-  `/apps`, Custodianship `/silicons`. URLs did not change. `/activity` belongs to Security and `/proofs` to Access
-  (`includes`), reached from ⌘K (MORE_DESTINATIONS) and links. Nothing in the dock leaves the site.
+- **Seven sections** in the sidebar (`lib/navigation.ts` SECTIONS): Home `/`, Silicons `/silicons`, Connected Apps
+  `/apps`, Security `/sign-in-methods`, Activity `/activity`, Personal Info `/personal`, and Data & Privacy `/privacy`.
+  Activity was added as its own sidebar section on 2026-11-13; `/proofs` remains under Connected Apps (`includes`) and in ⌘K.
 - **Top bar**: brand, ⌘K search, Developers and Docs (marked as leaving), and the account menu (Settings, sign out;
   on phones also Developers and Docs).
 - **Attention strip** (`components/account/attention/`): at the top of `/`, only when something needs a decision.
@@ -740,7 +745,8 @@ in `redesign/api-gaps.md`).
   The dock (`dock.tsx`) is gone; sections are no longer called pillars. Its width comes in steps (200, 248, 296 px)
   from a handle on the page box's left edge (`sidebar-resize.tsx`, remembered in localStorage `sa.sidebar-step`).
 - **Dev tools** (`components/foundation/dev/dev-states.tsx`, 2026-10-31, regrouped 2026-11-08 and 2026-11-09): in
-  `next dev` only, a round flask button at the account shell's lower right (a dot counts what is changed, a crosshair
+  `next dev` only, a round flask button at the lower right of every page in `app/(app)` (mounted in its layout since
+  2026-11-13: the account pages, the sign-in pages, device approval and the playgrounds; not the embed) (a dot counts what is changed, a crosshair
   while inspecting) opens a panel in three groups. **Data** (`lib/dev-states.ts`): segmented controls for account
   (joined today / no id), Silicon requests (none / a request / a handover / both), devices (all used lately / one
   unused), Silicons (0 / 1 / 3), apps (0 / 2 / 6) and network (slow / lists fail), then the Just joined scenario and
@@ -811,7 +817,7 @@ in `redesign/api-gaps.md`).
 
 - **Home** (`/`, `components/account/overview/`): the prototype's home. A greeting with your id, Needs you (custodian
   requests, on `--warning`) or "You're all set", a dismissible introduction (remembered in this browser), Your Silicons
-  (two tiles and New Silicon, which opens Create a Silicon through `/silicons?new`) and Your apps (up to six tile + footer cards: apps you sign into, then Briefcase, DM or Ting not used yet).
+  (two tiles and New Silicon, which opens Create a Silicon through `/silicons?new`) (no apps section or account cards for now, 2026-11-12; the card designs wait in /__account).
 - **Personal info** (`/personal`, sidebar section 5, number key 5): the identity card, moved from `/`; the metric cards
   beside it are gone (Home's tiles lead into each section).
 - **Coherence pass**: `--canvas` (neutral-2) under the top bar and sidebar; the page is a white panel on it. Home is one

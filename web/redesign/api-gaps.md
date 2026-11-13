@@ -19,3 +19,5 @@ them out until the API ships them; nothing is mocked in the product. For the API
 
 Already supported, so not gaps: date of birth and timezone (`me.update`), custodian requests and handover, STK
 rotation, webhooks, proofs, sessions, history by kind.
+
+- **A Silicon's avatar look (2026-11-13):** a made avatar is uploaded as the Silicon's photo; its look (form, palette, eyes, facing, seed) is remembered only in the browser that made it (lib/silicon-picture.ts), as with a Carbon's. Another browser shows the uploaded photo, not the moving avatar, until the API keeps the look.

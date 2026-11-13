@@ -13,30 +13,27 @@
  *   visit (silicons-intro.tsx): what a Silicon is, what it gets, and the three ways to add one.
  */
 import { useEffect } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowUpRight, Cpu, Plus } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Button } from "@teamofsilicons/silicon-ui/button";
-import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuRoot, DropdownMenuTrigger } from "@teamofsilicons/silicon-ui/dropdown-menu";
 import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
 import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
 import { Page } from "@/components/foundation/layout/layout";
 import type { ManagedSilicon } from "@/lib/api/types";
 import { useRegisterCommands } from "@/lib/commands";
-import { formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useMe } from "@/lib/query/session";
 import { SiliconRequests } from "../home-needs";
 import { NEW_SILICON_PARAM } from "../parts/anchors";
-import { asCarbon, asSilicon, describeError, personLabel, stkRotatedAt, useNow } from "../parts/common";
+import { asCarbon, asSilicon, describeError, personLabel } from "../parts/common";
 import { handFocus, pageMain } from "../parts/focus";
 import { ListCap } from "../parts/list-cap";
 import { useEverySilicon } from "../parts/queries";
 import { dismissReveal, usePendingReveals, type Reveal } from "../parts/reveals";
 import { SecretReveal } from "../parts/secret-reveal";
-import { SiliconMark } from "../parts/silicon-mark";
+import { SiliconCard } from "../parts/silicon-card";
 import { PageBar } from "../parts/page-bar";
 import { STARTER_URL, SiliconsIntro } from "./silicons-intro";
 import styles from "./silicons.module.css";
@@ -55,7 +52,6 @@ export function Silicons() {
   const me = useMe();
   const silicons = useEverySilicon();
   const reveals = usePendingReveals();
-  const now = useNow(30_000);
   const params = useSearchParams();
   const router = useRouter();
   const create = () => router.push(NEW_SILICON_HREF);
@@ -123,7 +119,7 @@ export function Silicons() {
                 <CardsSkeleton />
               ) : (
                 <ul className={styles.cards}>
-                  {list.map(item => <li key={item.uuid}><SiliconTile silicon={item} now={now} /></li>)}
+                  {list.map(item => <li key={item.uuid}><SiliconTile silicon={item} /></li>)}
                 </ul>
               )}
               <ListCap page={silicons.data} noun="Silicons" command="silicon-accounts silicon list" />
@@ -159,28 +155,15 @@ function AddSilicon({ onCreate }: { onCreate: () => void }) {
  * One Silicon as a tile, as the prototype draws it and as Home does (Anil, 2026-11-12): its mark, its name and si:id,
  * then its status and when its key last changed (or who it is being handed to). The whole tile opens its page.
  */
-function SiliconTile({ silicon, now }: { silicon: ManagedSilicon; now: number }) {
-  const rotated = stkRotatedAt(silicon);
+/** A Silicon as Home draws it (parts/silicon-card.tsx), with a badge for a state worth noticing and who it is handed to. */
+function SiliconTile({ silicon }: { silicon: ManagedSilicon }) {
   const status = silicon.status === "pending_custodian" ? { tone: "warning" as const, text: "Waiting for a custodian" }
     : silicon.pending_transfer ? { tone: "info" as const, text: "Handing over" }
       : { tone: "success" as const, text: "Active" };
-  const line = silicon.pending_transfer ? `to ${personLabel(silicon.pending_transfer.to)}`
-    : rotated ? `Key changed ${formatRelative(rotated, now)}` : `Key made ${formatRelative(silicon.created_at, now)}`;
-  return (
-    <Link href={siliconHref(silicon)} data-sq="surface" className={styles.tile} data-silicon-card="">
-      <span className={styles.tileTop}>
-        <SiliconMark seed={silicon.uuid} size={28} />
-        <span className={styles.tileWords}>
-          <span className={styles.tileTitle}>{silicon.display_name || silicon.id || "A Silicon"}</span>
-          {silicon.id ? <span className={styles.tileId}>{silicon.id}</span> : null}
-        </span>
-      </span>
-      <span className={styles.tileFoot}>
-        <Badge size="sm" tone={status.tone}>{status.text}</Badge>
-        <span className={styles.tileLine}>{line}</span>
-      </span>
-    </Link>
-  );
+  // Only a handover gets a line ("to c:shubham"). The key's age was a stand-in for the prototype's last sign-in, which
+  // the API doesn't give yet (api-gaps.md #5); it stays on the Silicon's own page (Anil, 2026-11-13).
+  const line = silicon.pending_transfer ? `to ${personLabel(silicon.pending_transfer.to)}` : null;
+  return <SiliconCard uuid={silicon.uuid} photo={silicon.pfp_url} name={silicon.display_name || silicon.id || "A Silicon"} id={silicon.id} href={siliconHref(silicon)} blend="wash" status={status} detail={line} />;
 }
 
 function CardsSkeleton() {

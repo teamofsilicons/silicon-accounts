@@ -1,0 +1,36 @@
+/* A custodian request as a decision (request-view.tsx): one left-aligned column in the order a Carbon decides. The
+   question (h2) with when it was asked and the time left; the parties as cards; the check, a quiet tinted line;
+   "If you accept" and "If you decline" as short icon lists (h3); the answer at the foot with the days left beside it. */
+.view { display: grid; gap: var(--space-section); margin-top: var(--space-section); }
+
+.head { display: grid; gap: var(--space-related); }
+.question { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); text-wrap: balance; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+.parties { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-group); }
+.party { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; min-width: 0; align-items: center; gap: var(--space-inset); padding: var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.partyWords { display: grid; min-width: 0; gap: var(--space-hair); }
+.partyRole { color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
+.partyName { overflow: hidden; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.partyId { overflow: hidden; color: var(--text-muted); font: var(--caption); font-family: var(--font-mono); letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The check: the one warning on the page, a warm tint with its icon. */
+.check { --sq-r: var(--radius-container); --sq-fill: color-mix(in oklab, var(--warning) 10%, var(--surface)); display: flex; gap: var(--space-group); margin: calc(var(--space-group) - var(--space-section)) 0 0; padding: var(--space-group) var(--space-inset); background: var(--sq-fill); color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.check strong { color: var(--foreground); font-weight: var(--weight-medium); }
+.checkIcon { display: grid; flex: none; place-items: start; padding-top: var(--space-hair); color: var(--warning); }
+
+.block { display: grid; gap: var(--space-group); }
+.blockTitle { margin: 0; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); }
+.list { display: grid; gap: var(--space-group); margin: 0; padding: 0; list-style: none; }
+.item { display: flex; align-items: flex-start; gap: var(--space-group); color: var(--text-soft); font: var(--body); letter-spacing: var(--body-tracking); }
+/* The icon sits on the first line when the text wraps. */
+.itemIcon { display: grid; flex: none; height: calc(1em * var(--leading-body)); place-items: center; color: var(--text-secondary); }
+.note { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.mono { font-family: var(--font-mono); letter-spacing: 0; }
+
+.answer { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); padding-top: var(--space-inset); border-top: 1px solid var(--border-subtle); }
+.left { margin-left: auto; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); font-variant-numeric: tabular-nums; }
+.error { margin: 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); padding-top: var(--space-related); }
+
+@media (max-width: 539px) { .left { width: 100%; margin-left: 0; } }

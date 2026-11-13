@@ -154,12 +154,6 @@ const apps: Journey = {
     const removedText = await openApp(page, env.site, "briefcase");
     results.check("Briefcase's page: it can see nothing, how to give access back, and no Remove or Open", removedText.includes("Nothing") && removedText.includes("Sign in to it again to give it access.") && (await page.locator("main").getByRole("button", { name: "Remove", exact: true }).count()) === 0 && (await page.getByRole("link", { name: "Open" }).count()) === 0, removedText.slice(0, 300));
 
-    // Home's Your apps opens only the apps with access (Briefcase isn't signed in any more).
-    await page.goto(`${env.site}/`);
-    const homeApps = page.getByRole("region", { name: "Your apps", exact: true });
-    await homeApps.waitFor({ timeout: 30_000 });
-    const opens = await homeApps.getByRole("link", { name: /^Open / }).evaluateAll(links => links.map(link => link.getAttribute("aria-label")));
-    results.check("Home's Your apps offers Open for Commit only", JSON.stringify(opens) === '["Open Commit"]', JSON.stringify(opens));
 
     // It hears nothing more: an id change and a name change reach Commit, not Briefcase; its user base stays blank.
     const beforeCommit = (await inbox(env, "commit")).last_seq;

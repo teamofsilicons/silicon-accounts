@@ -260,6 +260,12 @@ const shown: ScreenSpec[] = [
 
   // Silicons: the deck and tiles, the create drawer, a Silicon's drawer section by section.
   { name: "account-silicons", path: "/silicons" },
+  // A Silicon's Photo dialog: make its avatar (form, colour, eyes, facing, shuffle), or a photo, a link, its default.
+  { name: "account-silicon-photo", path: "/silicons/Qz4?tab=settings", fullPage: false, prepare: async page => {
+    await page.getByRole("listitem").filter({ hasText: "Photo" }).getByRole("button", { name: "Change" }).click();
+    await page.getByRole("dialog", { name: "Photo" }).waitFor();
+    await wait(page, 900);
+  } },
   { name: "account-silicons-new", path: "/silicons?new", fullPage: false, prepare: async page => { await page.waitForSelector(drawer); await wait(page, 900); } },
   { name: "account-silicons-create", path: "/silicons", fullPage: false, prepare: async page => {
     await page.locator("[data-create-silicon]").click();

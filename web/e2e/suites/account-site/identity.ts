@@ -15,7 +15,7 @@ function pngHeader(width: number, height: number): Buffer {
 
 const identityCard: Journey = {
   name: "account-site-identity-card",
-  title: "Home and Personal info show the account exactly as /v1/me has it: the welcome, the CarbonID chip (copies it), since when, the Iris photo, Briefcase on Your apps; Personal info's name, CarbonID, date of birth, timezone, both emails (Primary) and no phone; both fit a phone",
+  title: "Home and Personal info show the account exactly as /v1/me has it: the welcome, the CarbonID chip (copies it), since when, the Iris photo, no apps section; Personal info's name, CarbonID, date of birth, timezone, both emails (Primary) and no phone; both fit a phone",
   async run(ctx) {
     const { env, results } = ctx;
     const carbon = await newCarbon(ctx, "acct-card");
@@ -34,10 +34,10 @@ const identityCard: Journey = {
     const tagPart = local.split(".").pop() ?? "";
     results.check("the sign-up defaults: the c:id and display name from the email, the date of birth exactly 18 years before sign-up", me.id === `c:${local.replace(/\./g, "-")}` && me.display_name.toLowerCase().includes(tagPart.toLowerCase()) && (me.dob === eighteen || (eighteen.endsWith("-02-29") && me.dob === eighteen.replace("-02-29", "-02-28"))), `${carbon.email} → ${me.id}, "${me.display_name}", dob ${me.dob} (signed up ${signupDay}, want ${eighteen})`);
 
-    // Home (2026-11-11): "Your account" (the welcome, the CarbonID chip, since when, the photo), then Your apps.
+    // Home (2026-11-12): "Your profile" (the welcome, the CarbonID chip, since when, the photo), no apps section after it.
     const started = Date.now();
     await page.goto(`${env.site}/`);
-    const yours = page.getByRole("region", { name: "Your account", exact: true });
+    const yours = page.getByRole("region", { name: "Your profile", exact: true });
     await yours.waitFor({ timeout: 30_000 });
     results.metric("Home's account section visible after navigation", Date.now() - started);
     await sleep(900);
@@ -57,10 +57,7 @@ const identityCard: Journey = {
       const copiedId = await page.evaluate(() => navigator.clipboard.readText()).catch(error => `error: ${String(error)}`);
       results.check("the chip puts exactly the CarbonID on the clipboard", copiedId === me.id, copiedId);
     }
-    const appsSection = page.getByRole("region", { name: "Your apps", exact: true });
-    await appsSection.waitFor({ timeout: 20_000 });
-    const openBriefcase = appsSection.getByRole("link", { name: /^Open Briefcase/ });
-    results.check("Your apps on Home has Briefcase, signed in, with Open", (await openBriefcase.count()) === 1, (await appsSection.innerText()).replace(/\s+/g, " ").slice(0, 200));
+    results.check("Home has no apps section (Connected apps lists them; Anil, 2026-11-12)", (await page.getByRole("region", { name: /^Your (apps|account)$/ }).count()) === 0);
 
     // Personal info: every detail as /v1/me has it, each row opening its editor.
     await page.goto(`${env.site}/personal`);

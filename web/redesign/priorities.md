@@ -5,18 +5,18 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
 ## Now
-1. Home's Your apps: which apps show (Anil is thinking of a different logic, 2026-11-10); Your Silicons follows his
-   2026-11-11 tiles.
-## Next
 1. developer-site e2e suites still use the old hosted sign-in words ("Email", "Create account": j-pages, b-bff-session,
    f-signin-tab, h-details, i-flows); auth-flows-oidc needs openid-client installed.
+## Next
+1. The developer site's vendored Silicon UI: bring in #30 and #31 (6 of the overlays audit's last 7 failures; its ⌘K
+   menu and docs search can then drop direct Radix).
 2. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
 3. Identity screens: `pnpm screens --only account-identity` fails while a real API runs on 8589; run with it stopped.
 
-Done since 2026-11-10 (ab05095 and after): Silicons, Connected apps and Permissions, Security (Unlink dialog, row links,
+Done since 2026-11-10 (ab05095 and after): Home without Your apps (2026-11-12), Silicons, Connected apps and Permissions, Security (Unlink dialog, row links,
 Change key on the page), Personal info, Data & privacy with the delete page, sign-in and sign-up, /goodbye.
 
 ## Waiting on the API
@@ -24,6 +24,12 @@ Change key on the page), Personal info, Data & privacy with the delete page, sig
   stats, wrong-keys alerts, automation, cloud services, per-field sharing.
 
 ## Later
+- The consent step: pick a design in /__consent (round two: 1 Sentence, 2 Card, 3 One tap, 4 Band; earlier tries under Earlier), then rebuild the details and review steps on it (components/auth/steps/details.tsx, review.tsx) with their e2e words; move account/parts/rows.tsx to foundation so auth can share it.
+- The request page: pick a design in /__request (A Choice, B Pass, C Sheet, D list), then move /silicons/requests/[id] onto it.
+- Silicon cards: A Wash now follows the colours of each saved avatar image (Anil, 2026-11-13); decide whether to keep it after reviewing /__silicon-cards. The avatar editor is on the Silicon's page and saves its look in the uploaded GIF.
+- Home's account cards (Anil, 2026-11-12: "we'll get back on this"): Home shows no apps section and no account cards for
+  now. Four designs for cards to Connected Apps, Security and Personal Info, each with one live fact, wait in
+  /__account (parts/account-cards.tsx: picture, band, cover, gradient); pick one and put it back on Home.
 - Publish Silicon UI and update this site's package dependency when Anil resumes the release. Deferred at his request (2026-11-08). `silicon-ui-unreleased-through-31.patch` is the current cumulative upstream patch; the earlier Select and #28/#29 patches remain for reference. The site uses the tested pnpm patch for 0.4.0 in the meantime.
 - Add a Silicon's chevron: Silicon UI's DropdownMenuTrigger draws it at stroke 1.8 (about 1.13 px at 15 px) with no prop, while our icons are at 2. Anil wants 2 everywhere; choose between our own Button trigger via `asChild` (loses the flip on open) or a Silicon UI request for a chevron stroke option (2026-11-07).
 - Make a Silicon's optional webhook URL easy to find now it's out of the create wizard; it lives in the Silicon page's settings (decisions.md, 2026-11-07).
@@ -50,6 +56,8 @@ Change key on the page), Personal info, Data & privacy with the delete page, sig
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+- 2026-11-13 Activity is its own sidebar section below Security, also in the phone sheet and command menu (uncommitted).
+- 2026-11-13 Old opaque Silicon avatar PNGs recover transparent artwork in cards; new saves upload a transparent animated GIF with embedded settings (uncommitted).
 - 2026-11-12 Silicon UI #30 CommandPalette name, focus sequence and quiet text, and #31 headerless/top Dialog implemented in shared source and the account site's local patch; the account command menu now uses the shared Dialog (uncommitted; release deferred).
 - 2026-11-10 PhoneInput country picker no longer clips inside the Security dialog and matches the field radius and corner shape; local patch and upstream artifact refreshed (uncommitted)
 - 2026-11-10 PhoneInput audit: unsupported and overlong numbers preserved with validation, restricted default and form/accessibility fixes; local Silicon UI package patch refreshed (uncommitted)

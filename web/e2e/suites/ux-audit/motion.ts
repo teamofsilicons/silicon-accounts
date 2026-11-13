@@ -130,7 +130,7 @@ export const journeys: Journey[] = [
         await page.locator("main").first().waitFor({ timeout: 30_000 });
         await settle(page, 800);
       }, async page => {
-        await page.locator("nav[aria-label='Account sections']").getByRole("link", { name: "Connected apps" }).click();
+        await page.locator("nav[aria-label='Account sections']").getByRole("link", { name: "Connected Apps" }).click();
         await page.waitForURL(`${env.site}/apps`, { timeout: 15_000 });
       }, 1_200);
       // The theme switch left the account pages (the shell's account menu hides it, 2026-11-07), so there is no eclipse

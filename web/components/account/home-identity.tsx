@@ -68,8 +68,9 @@ export function HomeIdentity() {
   // GET /v1/me carries when the account was made (in its own time zone); the session's summary does not, so this waits.
   const since = me.data ? new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: me.data.timezone }).format(new Date(me.data.created_at)) : null;
 
+  // data-home: Home is drawn (the screens and checks wait for it; the old Home had it on its column).
   return (
-    <section className={styles.identity} aria-label="Your account">
+    <section className={styles.identity} aria-label="Your profile" data-home="">
       {/* A click on the picture lights the ring (a flourish, not a control: nothing else happens). */}
       <span className={styles.halo} style={ringStyle} data-glow={glow ? (glow % 2 ? "a" : "b") : undefined} onClick={glowYou}>
         <span ref={ring} className={styles.ring} style={ringStyle}>

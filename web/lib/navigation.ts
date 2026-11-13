@@ -3,10 +3,9 @@
  * SECTIONS) and the route paths every page links to. Link with `paths`, never string literals.
  *
  * The sections follow the lead designer's prototype (redesign/prototype-map.md): Home (what needs you, then your
- * Silicons and apps), Silicons, Connected apps, Security, Personal info and Data &
- * privacy. Pages that are part of a section without being its front page (Proofs, Activity) are listed under it in
- * `includes`, so the sidebar marks the right section there, and reached from the palette (MORE_DESTINATIONS) and from
- * links.
+ * Silicons and apps), Silicons, Connected apps, Security, Activity, Personal info and Data &
+ * privacy. Pages that are part of a section without being its front page (Proofs) are listed under it in
+ * `includes`, so the sidebar marks the right section there, and reached from the palette (MORE_DESTINATIONS) and links.
  *
  * Building apps is not part of the account site. The developer site and its docs (developers.teamofsilicons.com,
  * `developer_url` in GET /v1/meta) are ELSEWHERE: quiet links at the sidebar's foot and in the command palette, never a
@@ -60,7 +59,7 @@ export const paths = {
   kitchen: "/__kitchen",
 } as const;
 
-export type SectionKey = "home" | "silicons" | "apps" | "security" | "personal" | "privacy";
+export type SectionKey = "home" | "silicons" | "apps" | "security" | "activity" | "personal" | "privacy";
 
 export interface Section {
   key: SectionKey;
@@ -79,16 +78,16 @@ export interface Section {
 export const SECTIONS: readonly Section[] = [
   { key: "home", label: "Home", description: "What needs you, then your Silicons and apps", href: paths.home, icon: House, shortcut: "1" },
   { key: "silicons", label: "Silicons", description: "Silicons you look after, and requests waiting for you", href: paths.silicons, icon: Sparkles, shortcut: "2" },
-  { key: "apps", label: "Connected apps", description: "Apps you signed into, what they can see, and apps acting for you", href: paths.apps, icon: LayoutGrid, shortcut: "3", includes: [paths.proofs] },
-  { key: "security", label: "Security", description: "Your ways in, where you are signed in, and activity", href: paths.signInMethods, icon: Shield, shortcut: "4", includes: [paths.activity] },
-  { key: "personal", label: "Personal info", description: "Your card: photo, name, id, date of birth and contact details", href: paths.personal, icon: IdCard, shortcut: "5" },
-  { key: "privacy", label: "Data & privacy", description: "What each app sees, and deleting your account", href: paths.privacy, icon: Database, shortcut: "6" },
+  { key: "apps", label: "Connected Apps", description: "Apps you signed into, what they can see, and apps acting for you", href: paths.apps, icon: LayoutGrid, shortcut: "3", includes: [paths.proofs] },
+  { key: "security", label: "Security", description: "Your ways in and where you are signed in", href: paths.signInMethods, icon: Shield, shortcut: "4" },
+  { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History, shortcut: "5" },
+  { key: "personal", label: "Personal Info", description: "Your card: photo, name, id, date of birth and contact details", href: paths.personal, icon: IdCard, shortcut: "6" },
+  { key: "privacy", label: "Data & Privacy", description: "What each app sees, and deleting your account", href: paths.privacy, icon: Database, shortcut: "7" },
 ];
 
-/** Account pages that belong to a section but are not in the sidebar: reached from the command palette and from links. */
+/** Account pages that belong to a section but are not in the sidebar: reached from the command palette and links. */
 export const MORE_DESTINATIONS = [
   { key: "proofs", label: "Permissions between apps", description: "One app doing something in another app for you", href: paths.proofs, icon: ShieldCheck },
-  { key: "activity", label: "Activity", description: "Sign-ins and changes, by day", href: paths.activity, icon: History },
 ] as const;
 
 /** Another site the account site points to: always a full navigation, marked with an arrow, never the active section. */
