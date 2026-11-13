@@ -1,7 +1,9 @@
 /**
- * What the server side of the site needs from the API's GET /v1/meta: where the developer site is (`developer_url`).
- * Shared by proxy.ts (the /developer and /docs redirects) and the server-rendered public pages, cached for a minute
- * (a fallback only for five seconds, so the real answer is picked up soon). ACCOUNTS_API_URL is read at request time.
+ * What the server side of the site needs from the API's GET /v1/meta: where the developer site is (`developer_url`),
+ * and the Organizations origin a local invitation may post to (`organizations_url`).
+ * Shared by proxy.ts (the /developer and /docs redirects, the invitation pages' CSP) and the server-rendered public
+ * pages, each cached for a minute (a fallback only for five seconds, so the real answer is picked up soon).
+ * ACCOUNTS_API_URL is read at request time.
  */
 import { LINKS } from "@/lib/site";
 
@@ -10,6 +12,7 @@ export const apiUrl = () => (process.env.ACCOUNTS_API_URL ?? "http://127.0.0.1:8
 
 const DEVELOPER_TTL_MS = 60_000;
 let developerCache: { url: string; until: number } | null = null;
+let organizationsCache: { origin: string; until: number } | null = null;
 
 /** A clean http(s) origin-and-path without a trailing slash, or null. */
 export function siteUrl(value: unknown): string | null {
@@ -37,18 +40,25 @@ export async function developerUrl(): Promise<string> {
   return resolved;
 }
 
-/** Tests only: forget the cached answer. */
+/** Tests only: forget the cached answers. */
 export function resetMetaCache(): void {
   developerCache = null;
+  organizationsCache = null;
 }
 
 /** Only the explicitly configured Organizations origin may receive a local invitation POST. */
 export async function organizationsFormOrigin(): Promise<string> {
+  if (organizationsCache && organizationsCache.until > Date.now()) return organizationsCache.origin;
   let configured: unknown = process.env.ACCOUNTS_ORGANIZATIONS_URL;
+  let answered = false;
   try {
     const response = await fetch(`${apiUrl()}/v1/meta`, {cache:"no-store",signal:AbortSignal.timeout(2500)});
-    if(response.ok) configured = ((await response.json()) as {organizations_url?: unknown}).organizations_url ?? configured;
+    if(response.ok) { configured = ((await response.json()) as {organizations_url?: unknown}).organizations_url ?? configured; answered = true; }
   } catch { /* Configuration fallback is still restricted to loopback. */ }
-  if(typeof configured!=="string") return "";
-  try { const url=new URL(configured);return url.protocol==="http:" && ["localhost","127.0.0.1","[::1]"].includes(url.hostname) && !url.username && !url.password ? ` ${url.origin}` : ""; } catch { return ""; }
+  let origin = "";
+  if (typeof configured === "string") {
+    try { const url=new URL(configured); if (url.protocol==="http:" && ["localhost","127.0.0.1","[::1]"].includes(url.hostname) && !url.username && !url.password) origin = ` ${url.origin}`; } catch { /* Not a URL: no exception. */ }
+  }
+  organizationsCache = { origin, until: Date.now() + (answered ? DEVELOPER_TTL_MS : 5_000) };
+  return origin;
 }
