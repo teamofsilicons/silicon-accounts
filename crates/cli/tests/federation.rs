@@ -183,3 +183,36 @@ fn a_token_no_trust_accepts_is_refused_with_the_reason() {
         .unwrap();
     assert_eq!(output.status.code(), Some(2));
 }
+
+#[test]
+fn a_relative_token_file_is_stored_as_an_absolute_path() {
+    let mock = Mock::start();
+    let env = Env::new();
+    std::fs::write(env.path().join("id_token.jwt"), "eyJ.ci.ok").unwrap();
+    let output = env
+        .cmd()
+        .current_dir(env.path())
+        .args([
+            "--url",
+            &mock.url,
+            "login",
+            "--silicon",
+            "si:scout",
+            "--federated",
+            "@id_token.jwt",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let session: Value =
+        serde_json::from_slice(&std::fs::read(env.state_file("session.json")).unwrap()).unwrap();
+    let source = session["federation"]["source"].as_str().unwrap();
+    let path = std::path::Path::new(source.strip_prefix('@').unwrap());
+    assert!(path.is_absolute(), "{source}");
+    assert!(path.ends_with("id_token.jwt"), "{source}");
+}

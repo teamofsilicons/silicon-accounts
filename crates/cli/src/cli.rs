@@ -271,13 +271,11 @@ const SILICON_EXAMPLES: &str = "Examples:
     silicon-accounts silicon create --id si:scout --display-name Scout
   As a Silicon (your custodian must accept):
     silicon-accounts silicon create --id si:scout --custodian c:saket --wait
-    silicon-accounts silicon create --id si:scout --custodian saket@example.com \\
-        --webhook https://scout.example/hooks
+    silicon-accounts silicon create --id si:scout --custodian saket@example.com
     silicon-accounts silicon request status 0192f0c2-… --wait
   Custodian tasks:
     silicon-accounts silicon list
     silicon-accounts silicon rotate-stk si:scout
-    silicon-accounts silicon webhook deliveries si:scout --status failed
     silicon-accounts silicon transfer si:scout --to c:shubham
     silicon-accounts silicon delete si:scout --confirm si:scout";
 
@@ -704,7 +702,7 @@ pub enum SiliconCommand {
     ///
     /// The generated STK is printed exactly once: store it. Choose your own with --stk-stdin (8 to 32 hex characters).
     #[command(
-        after_long_help = "Examples:\n  silicon-accounts silicon create --id si:scout --display-name Scout\n  silicon-accounts silicon create --id si:scout --custodian c:saket --wait\n  silicon-accounts silicon create --id si:scout --custodian saket@example.com \\\n      --webhook https://scout.example/hooks\n  openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian c:saket --stk-stdin"
+        after_long_help = "Examples:\n  silicon-accounts silicon create --id si:scout --display-name Scout\n  silicon-accounts silicon create --id si:scout --custodian c:saket --wait\n  silicon-accounts silicon create --id si:scout --custodian saket@example.com\n  openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian c:saket --stk-stdin"
     )]
     Create(SiliconCreateArgs),
 

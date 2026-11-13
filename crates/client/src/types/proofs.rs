@@ -199,7 +199,7 @@ pub struct ValidProof {
 }
 
 /// Identifies a proof to revoke.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ProofRef {
     /// The proof id.
@@ -208,6 +208,16 @@ pub enum ProofRef {
     Token(String),
     /// A proof refresh token (`sapr_…`) of the proof.
     RefreshToken(String),
+}
+
+impl fmt::Debug for ProofRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Id(id) => f.debug_tuple("Id").field(id).finish(),
+            Self::Token(_) => f.write_str("Token(…)"),
+            Self::RefreshToken(_) => f.write_str("RefreshToken(…)"),
+        }
+    }
 }
 
 impl ProofRef {
@@ -364,7 +374,7 @@ pub struct ProofsQuery {
 }
 
 /// `POST /v1/proofs/user-verification`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Default, PartialEq, Eq, Serialize)]
 pub struct IssueUserVerification {
     /// The account's access token issued to the calling app (after the account consented
     /// at the calling app).
@@ -377,6 +387,17 @@ pub struct IssueUserVerification {
     /// Proof token lifetime, 60..=1800 seconds (default 1800).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_ttl_seconds: Option<u32>,
+}
+
+impl fmt::Debug for IssueUserVerification {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("IssueUserVerification")
+            .field("subject_token", &"…")
+            .field("receiving_app", &self.receiving_app)
+            .field("scopes", &self.scopes)
+            .field("access_ttl_seconds", &self.access_ttl_seconds)
+            .finish()
+    }
 }
 
 /// `POST /v1/proofs/app-verification` (or the app's App verification page, `POST /v1/apps/{app_id}/proofs/app-verification`). An

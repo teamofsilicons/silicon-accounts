@@ -1,6 +1,7 @@
 //! Silicons and custodians.
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,7 @@ use crate::serde_util::{lenient_opt_string, lenient_string};
 use crate::types::account::{AccountRef, AccountSummary, Me, PhotoInfo};
 
 /// `POST /v1/silicons`: a Silicon creates its own account and names its custodian.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Clone, Default, PartialEq, Serialize)]
 pub struct SiliconSelfCreate {
     /// The wanted id, e.g. `si:scout`.
     pub id: String,
@@ -37,6 +38,21 @@ pub struct SiliconSelfCreate {
     /// Live anonymous Ting receiver for minimal custodian-request change hints.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ting_session_id: Option<String>,
+}
+
+impl fmt::Debug for SiliconSelfCreate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SiliconSelfCreate")
+            .field("id", &self.id)
+            .field("display_name", &self.display_name)
+            .field("custodian", &self.custodian)
+            .field("timezone", &self.timezone)
+            .field("pfp_url", &self.pfp_url)
+            .field("stk", &self.stk.as_ref().map(|_| "…"))
+            .field("webhook_url", &self.webhook_url)
+            .field("ting_session_id", &self.ting_session_id)
+            .finish()
+    }
 }
 
 /// Response of a Silicon self-create. Store `stk` and `webhook_secret` now: they are
@@ -151,7 +167,7 @@ pub struct RequestSilicon {
 }
 
 /// `POST /v1/me/silicons`: a Carbon creates a Silicon and becomes its custodian.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Clone, Default, PartialEq, Serialize)]
 pub struct CreateSilicon {
     /// The wanted id, e.g. `si:scout`.
     pub id: String,
@@ -169,6 +185,19 @@ pub struct CreateSilicon {
     /// Webhook endpoint for the Silicon.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub webhook_url: Option<String>,
+}
+
+impl fmt::Debug for CreateSilicon {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CreateSilicon")
+            .field("id", &self.id)
+            .field("display_name", &self.display_name)
+            .field("timezone", &self.timezone)
+            .field("pfp_url", &self.pfp_url)
+            .field("stk", &self.stk.as_ref().map(|_| "…"))
+            .field("webhook_url", &self.webhook_url)
+            .finish()
+    }
 }
 
 /// Response of `POST /v1/me/silicons`. `stk` and `webhook_secret` are shown exactly once.
