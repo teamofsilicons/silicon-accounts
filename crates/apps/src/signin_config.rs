@@ -302,7 +302,7 @@ async fn patch_signin_config(
         let parts = split_patch(&body, true).map_err(ApiError::validation)?;
         apply(&state, &auth, parts, meta.ip.as_deref()).await?;
         let mut conn = state.db.acquire().await?;
-        let details = crate::apps::details_body(&mut conn, &state, &auth.app).await?;
+        let details = crate::apps::details_body(&mut conn, &auth.app).await?;
         Ok((StatusCode::OK, details))
     })
     .await
@@ -333,8 +333,8 @@ async fn apply(
         .detail("expected_version", expected)
         .detail("current_version", row.version));
     }
-    let stored_google = decrypt_opt(state, row.google_client_secret_enc.as_deref())?;
-    let stored_apple = decrypt_opt(state, row.apple_private_key_enc.as_deref())?;
+    let stored_google = decrypt_opt(state, row.google_client_secret_enc.as_deref());
+    let stored_apple = decrypt_opt(state, row.apple_private_key_enc.as_deref());
     let present = ConfigSecretsPresent {
         google_client_secret: present_after(&parts.google_client_secret, stored_google.is_some()),
         apple_private_key: present_after(&parts.apple_private_key, stored_apple.is_some()),
@@ -417,13 +417,10 @@ fn present_after(change: &SecretChange, stored: bool) -> bool {
     }
 }
 
-fn decrypt_opt(state: &AppState, enc: Option<&[u8]>) -> ApiResult<Option<String>> {
-    match enc {
-        // A secret that no longer decrypts (lost key version) counts as "something else", so
-        // a new value is always recorded as a change.
-        Some(bytes) => Ok(state.keys.keyring.decrypt_string(bytes).ok()),
-        None => Ok(None),
-    }
+fn decrypt_opt(state: &AppState, enc: Option<&[u8]>) -> Option<String> {
+    // A secret that no longer decrypts (lost key version) counts as "something else", so a new
+    // value is always recorded as a change.
+    enc.and_then(|bytes| state.keys.keyring.decrypt_string(bytes).ok())
 }
 
 fn new_secret_column(

@@ -972,6 +972,86 @@ async fn concurrent_imports_never_duplicate_accounts() {
     assert!(totals.iter().all(|t| t.2 == 0), "{totals:?}");
 }
 
+/// The worker polls every 2 seconds; a pass with nothing queued keeps the pool's connections.
+#[tokio::test]
+async fn an_idle_worker_pass_keeps_pooled_connections() {
+    let ctx = TestContext::new().await;
+    let held = (
+        ctx.state.db.acquire().await.expect("a"),
+        ctx.state.db.acquire().await.expect("b"),
+        ctx.state.db.acquire().await.expect("c"),
+    );
+    drop(held);
+    for _ in 0..100 {
+        if ctx.state.db.num_idle() >= 3 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    let before = ctx.state.db.size();
+    assert_eq!(run_jobs(&ctx).await, 0);
+    assert_eq!(
+        ctx.state.db.size(),
+        before,
+        "an idle pass closed a connection"
+    );
+}
+
+/// A claim waits for one in flight, so two workers never start two jobs of one app at once.
+#[tokio::test]
+async fn a_claim_in_flight_keeps_the_apps_next_job_queued() {
+    let ctx = TestContext::new().await;
+    let a = owned_app(&ctx, "claim").await;
+    for n in 0..2 {
+        let rows = json!([{"email": format!("u{n}@claim.test")}]);
+        let r = call(&ctx, import_json(&a.app_id, &a.secret, rows, json!({}))).await;
+        assert_eq!(r.status, 202, "{}", r.json);
+    }
+    // Another worker mid-claim: it holds the claim lock and marked the first job running, but
+    // has not committed yet.
+    let mut other = ctx.state.db.begin().await.expect("tx");
+    sqlx::query("select pg_advisory_xact_lock(hashtextextended('import_claim', 0))")
+        .execute(&mut *other)
+        .await
+        .expect("claim lock");
+    sqlx::query(
+        "update import_jobs set status = 'running' \
+         where id = (select id from import_jobs order by created_at, id limit 1)",
+    )
+    .execute(&mut *other)
+    .await
+    .expect("claim");
+    let state = ctx.state.clone();
+    let worker =
+        tokio::spawn(async move { accounts_apps::imports::run_pending_jobs(&state).await });
+    let mut blocked = false;
+    for _ in 0..500 {
+        let waiting: i64 = sqlx::query_scalar(
+            "select count(*) from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'",
+        )
+        .fetch_one(&ctx.state.db)
+        .await
+        .expect("activity");
+        if waiting > 0 {
+            blocked = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert!(
+        blocked,
+        "the worker claimed while another claim was in flight"
+    );
+    other.commit().await.expect("commit");
+    assert_eq!(worker.await.expect("join").expect("worker"), 0);
+    let statuses: Vec<String> =
+        sqlx::query_scalar("select status from import_jobs order by created_at, id")
+            .fetch_all(&ctx.state.db)
+            .await
+            .expect("jobs");
+    assert_eq!(statuses, vec!["running", "queued"]);
+}
+
 /// A sign-up that commits between the import's checks and its insert (same email, same id) is
 /// caught by the bulk write and the chunk is redone row by row with fresh checks.
 #[tokio::test]

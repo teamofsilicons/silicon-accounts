@@ -114,6 +114,14 @@ pub async fn run_pending_jobs(state: &AppState) -> ApiResult<usize> {
         }
     }
     loop {
+        // An idle pass (every POLL) must not detach, and so close, a pooled connection.
+        let queued: bool =
+            sqlx::query_scalar("select exists (select 1 from import_jobs where status = 'queued')")
+                .fetch_one(&state.db)
+                .await?;
+        if !queued {
+            break;
+        }
         let mut conn = state.db.acquire().await?.detach();
         let Some(job) = claim_next(&mut conn).await? else {
             let _ = conn.close().await;
@@ -211,6 +219,11 @@ async fn release(mut conn: PgConnection, id: Uuid) {
 /// can see it as running.
 async fn claim_next(conn: &mut PgConnection) -> ApiResult<Option<JobRecord>> {
     let mut tx = conn.begin().await?;
+    // One claim at a time: otherwise a claim not yet committed as running is invisible to the
+    // "no running job of this app" check below, and another worker starts the app's next job.
+    sqlx::query("select pg_advisory_xact_lock(hashtextextended('import_claim', 0))")
+        .execute(&mut *tx)
+        .await?;
     let id: Option<Uuid> = sqlx::query_scalar(
         "select j.id from import_jobs j where j.status = 'queued' \
            and not exists (select 1 from import_jobs r where r.app_id = j.app_id and r.status = 'running') \

@@ -1235,45 +1235,51 @@ pub async fn rebuild_state(conn: &mut PgConnection, ctx: &JobCtx) -> ApiResult<J
     .bind(ctx.job_id)
     .fetch_all(&mut *conn)
     .await?;
-    let mut st = JobState {
-        claims: Claims::default(),
-        counts: Counts::default(),
-        last_row: 0,
-    };
-    for (n, input, outcome, account, msgs) in processed {
-        let outcome = Outcome::parse(&outcome).unwrap_or(Outcome::Error);
-        let msgs: Vec<RowMessage> = serde_json::from_value(msgs).unwrap_or_default();
-        let warnings = msgs.iter().filter(|m| m.level == Level::Warning).count() as i64;
-        st.counts.add(outcome, warnings);
-        st.last_row = st.last_row.max(n);
-        let p = prepare_row(&input, ctx);
-        if p.fatal {
-            continue;
-        }
-        for k in p.identifier_keys() {
-            st.claims.seen.entry(k).or_insert(n);
-        }
-        if matches!(
-            outcome,
-            Outcome::Created | Outcome::Matched | Outcome::Updated
-        ) {
-            if let Some(u) = &account {
-                st.claims.accounts.entry(u.clone()).or_insert(n);
+    let ctx = ctx.clone();
+    // Up to 100,000 rows of CPU work: kept off the async workers, which serve every sign-in.
+    tokio::task::spawn_blocking(move || {
+        let mut st = JobState {
+            claims: Claims::default(),
+            counts: Counts::default(),
+            last_row: 0,
+        };
+        for (n, input, outcome, account, msgs) in processed {
+            let outcome = Outcome::parse(&outcome).unwrap_or(Outcome::Error);
+            let msgs: Vec<RowMessage> = serde_json::from_value(msgs).unwrap_or_default();
+            let warnings = msgs.iter().filter(|m| m.level == Level::Warning).count() as i64;
+            st.counts.add(outcome, warnings);
+            st.last_row = st.last_row.max(n);
+            let p = prepare_row(&input, &ctx);
+            if p.fatal {
+                continue;
             }
-            if let Some(ext) = p.external_id {
-                st.claims
-                    .external_ids
-                    .entry(ext)
-                    .or_insert((n, account.clone()));
+            for k in p.identifier_keys() {
+                st.claims.seen.entry(k).or_insert(n);
             }
-            if outcome == Outcome::Created
-                && let Some(h) = input.get("id").and_then(Value::as_str)
-            {
-                st.claims.handles.entry(h.to_string()).or_insert(n);
+            if matches!(
+                outcome,
+                Outcome::Created | Outcome::Matched | Outcome::Updated
+            ) {
+                if let Some(u) = &account {
+                    st.claims.accounts.entry(u.clone()).or_insert(n);
+                }
+                if let Some(ext) = p.external_id {
+                    st.claims
+                        .external_ids
+                        .entry(ext)
+                        .or_insert((n, account.clone()));
+                }
+                if outcome == Outcome::Created
+                    && let Some(h) = input.get("id").and_then(Value::as_str)
+                {
+                    st.claims.handles.entry(h.to_string()).or_insert(n);
+                }
             }
         }
-    }
-    Ok(st)
+        st
+    })
+    .await
+    .map_err(|e| ApiError::internal(format!("import state task: {e}")))
 }
 
 /// Processes one chunk: decide + write in one transaction (row by row on a uniqueness race),
@@ -1284,10 +1290,14 @@ pub async fn process_chunk(
     st: &mut JobState,
     chunk: &[(i32, Value)],
 ) -> ApiResult<()> {
-    let prepared: Vec<(i32, Prepared)> = chunk
-        .iter()
-        .map(|(n, v)| (*n, prepare_row(v, ctx)))
-        .collect();
+    let (rows, row_ctx) = (chunk.to_vec(), ctx.clone());
+    let prepared: Vec<(i32, Prepared)> = tokio::task::spawn_blocking(move || {
+        rows.iter()
+            .map(|(n, v)| (*n, prepare_row(v, &row_ctx)))
+            .collect()
+    })
+    .await
+    .map_err(|e| ApiError::internal(format!("import row task: {e}")))?;
     let mut tx = conn.begin().await?;
     let empty = Claims::default();
     let (results, chunk_claims) = match process_rows(&mut tx, ctx, &st.claims, &empty, &prepared)

@@ -53,7 +53,7 @@ async fn send(
                 let message=input.body["message"].as_str().filter(|m|!m.trim().is_empty() && m.len()<=20000).ok_or_else(||ApiError::invalid_request("Report message must contain 1 to 20,000 bytes."))?;
                 let pr=input.body["pr"].as_str().unwrap_or("");
                 if !pr.is_empty(){accounts_core::normalize::validate_https_url(pr).map_err(ApiError::invalid_request)?;}
-                (vec!["saketdev12@gmail.com".into(),"shubhastro2@gmail.com".into(),"bugs@teamofsilicons.com".into()],"Silicon Apps bug report".into(),format!("{message}\n\nPatch: {pr}"),"apps_report")
+                (state.settings.report_recipients.clone(),"Silicon Apps bug report".into(),format!("{message}\n\nPatch: {pr}"),"apps_report")
             },
             _ => return Err(ApiError::invalid_request("kind must be mail.invite or mail.report.")),
         };
