@@ -98,11 +98,11 @@ function Decision({ request, you, now }: { request: CustodianRequest; you: { nam
           {transfer ? (
             <>
               <Avatar name={from} src={request.from?.pfp_url} size="lg" />
-              <ArrowRight className={styles.arrow} size={18} strokeWidth={1.75} />
+              <ArrowRight className={styles.arrow} size={18} strokeWidth={2} />
             </>
           ) : null}
           <SiliconMark seed={request.silicon.uuid} size={48} pending={!transfer} />
-          <ArrowRight className={styles.arrow} size={18} strokeWidth={1.75} />
+          <ArrowRight className={styles.arrow} size={18} strokeWidth={2} />
           <Avatar name={you.name} src={you.photo} size="lg" />
         </div>
         <h2 id="request-title" className={styles.title}>{transfer ? `${from} is handing ${name} to you` : `${name} wants you to look after it`}</h2>

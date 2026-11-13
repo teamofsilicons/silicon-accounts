@@ -184,15 +184,15 @@ export function SiliconsIntro({ carbonId, onCreate }: { carbonId: string | null;
 
         <div className={styles.controls}>
           <Button variant="soft" size="xs" className={styles.control} aria-label="Previous" disabled={index === 0} onClick={() => go(index - 1)}>
-            <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+            <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
           </Button>
           {index === last ? (
             <Button variant="soft" size="xs" className={styles.control} aria-label="Watch again" onClick={() => go(0)}>
-              <RotateCcw size={14} strokeWidth={1.75} aria-hidden="true" />
+              <RotateCcw size={14} strokeWidth={2} aria-hidden="true" />
             </Button>
           ) : (
             <Button variant="soft" size="xs" className={styles.control} aria-label="Next" onClick={() => go(index + 1)}>
-              <ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
+              <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
             </Button>
           )}
         </div>

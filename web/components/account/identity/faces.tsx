@@ -133,7 +133,7 @@ export function FrontFace({ me, photo, name, stamps, appsLoading = false, appsFa
         {/* In the same corner as the back's Back button, so the card turns over under the pointer and back again. */}
         <Button variant="secondary" size="sm" className={styles.turn} onClick={card.toggle}>
           Details
-          <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
+          <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
         </Button>
       </div>
     </div>
@@ -204,11 +204,11 @@ export function BackFace({ me, dobAction, manageLink = false }: BackFaceProps) {
         {carbon && manageLink ? (
           <Link href={paths.signInMethods} className={styles.backLink}>
             Add or remove emails and phone numbers
-            <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
+            <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
           </Link>
         ) : <span />}
         <Button variant="secondary" size="sm" className={styles.turn} onClick={card.toggle}>
-          <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+          <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
           Back
         </Button>
       </div>

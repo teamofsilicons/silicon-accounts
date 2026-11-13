@@ -61,7 +61,7 @@ function SecretValue({ secret: slot, value }: { secret: SecretSlot; value: strin
         </span>
         <span className={styles.secretActions}>
           <button data-sq="surface" type="button" className={styles.iconButton} onClick={() => setHidden(value => !value)} aria-label={hidden ? `Show the ${secret.label}` : `Hide the ${secret.label}`} aria-pressed={hidden}>
-            {hidden ? <Eye size={16} strokeWidth={1.75} aria-hidden="true" /> : <EyeOff size={16} strokeWidth={1.75} aria-hidden="true" />}
+            {hidden ? <Eye size={16} strokeWidth={2} aria-hidden="true" /> : <EyeOff size={16} strokeWidth={2} aria-hidden="true" />}
           </button>
           <CopyButton value={secret.value} label={`Copy the ${secret.label}`} iconOnly variant="plain" />
         </span>
@@ -103,7 +103,7 @@ export function SecretReveal({ revealId, title, description, secrets, onDone, do
       transition={{ ...motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.standard } }}
     >
       <div className={styles.revealHead}>
-        <span className={styles.revealIcon} aria-hidden="true"><KeyRound size={20} strokeWidth={1.75} /></span>
+        <span className={styles.revealIcon} aria-hidden="true"><KeyRound size={20} strokeWidth={2} /></span>
         <div className={styles.revealText}>
           <h2 ref={heading} id={titleId} className={styles.revealTitle} tabIndex={-1}>{title}</h2>
           <p className={styles.revealDescription}>{description}</p>

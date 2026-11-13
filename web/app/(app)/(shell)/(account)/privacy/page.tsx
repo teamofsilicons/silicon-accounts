@@ -6,7 +6,7 @@
 import type { Metadata } from "next";
 import { Privacy } from "@/components/account/privacy/privacy";
 
-export const metadata: Metadata = { title: "Data & privacy" };
+export const metadata: Metadata = { title: "Data & Privacy" };
 
 export default function Page() {
   return <Privacy />;

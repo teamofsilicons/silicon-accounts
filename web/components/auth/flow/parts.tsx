@@ -250,7 +250,7 @@ export function DestinationRow({ channel, destination, action, icon, note }: { c
   return (
     <div data-sq="surface" className={styles.destination}>
       <span className={styles.destinationIcon} aria-hidden="true">
-        {icon ?? (channel === "email" ? <Mail size={16} strokeWidth={1.75} /> : <Smartphone size={16} strokeWidth={1.75} />)}
+        {icon ?? (channel === "email" ? <Mail size={16} strokeWidth={2} /> : <Smartphone size={16} strokeWidth={2} />)}
       </span>
       {note ? (
         <span className={styles.accountText}>

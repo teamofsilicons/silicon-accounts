@@ -61,12 +61,12 @@ export function Review({ flow, ctl, notice }: ReviewProps) {
             </span>
             {field.field === "profile" || field.mode === "required" ? (
               <span className={styles.shareLock} title="Always shared">
-                <Lock size={14} strokeWidth={1.75} aria-hidden="true" />
+                <Lock size={14} strokeWidth={2} aria-hidden="true" />
                 <span>{field.field === "profile" ? "Always" : "Required"}</span>
               </span>
             ) : (
               <span className={styles.shareLock}>
-                <Check size={14} strokeWidth={1.75} aria-hidden="true" />
+                <Check size={14} strokeWidth={2} aria-hidden="true" />
                 <span>You chose</span>
               </span>
             )}

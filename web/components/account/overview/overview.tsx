@@ -177,7 +177,7 @@ function NeedsYou({ me }: { me: Me }) {
       </div>
       <ul className={styles.rows}>
         {failed ? (
-          <Row lead={<span data-sq="surface" className={styles.iconTile} aria-hidden="true"><X size={16} strokeWidth={1.75} /></span>} title="Requests waiting for you did not load" detail={describeError(requests.error)}>
+          <Row lead={<span data-sq="surface" className={styles.iconTile} aria-hidden="true"><X size={16} strokeWidth={2} /></span>} title="Requests waiting for you did not load" detail={describeError(requests.error)}>
             <Button variant="secondary" size="sm" onClick={() => void requests.refetch()}>Try Again</Button>
           </Row>
         ) : null}
@@ -239,7 +239,7 @@ function Checklist({ steps }: { steps: Step[] }) {
         {left.map(step => {
           const Icon = STEP_ICON[step.key];
           return (
-            <Row key={step.key} lead={<span data-sq="surface" className={`${styles.iconTile} ${styles.iconTileWarning}`} aria-hidden="true"><Icon size={16} strokeWidth={1.75} /></span>} title={step.title} detail={step.detail}>
+            <Row key={step.key} lead={<span data-sq="surface" className={`${styles.iconTile} ${styles.iconTileWarning}`} aria-hidden="true"><Icon size={16} strokeWidth={2} /></span>} title={step.title} detail={step.detail}>
               {step.key === "devices" && step.stale ? (
                 <>
                   <Button variant="ghost" size="sm" onClick={() => step.stale && keepSession(step.stale.id)}>Keep</Button>
@@ -321,7 +321,7 @@ function Intro({ me }: { me: Me }) {
     <section data-sq="surface" className={`${styles.card} ${styles.intro}`} aria-labelledby="intro-title">
       <div className={styles.introHead}>
         <h2 id="intro-title" className={styles.introTitle}>One account for every Team of Silicons app</h2>
-        <Button variant="ghost" size="sm" aria-label="Dismiss" onClick={dismissIntro}><X size={16} strokeWidth={1.75} aria-hidden="true" /></Button>
+        <Button variant="ghost" size="sm" aria-label="Dismiss" onClick={dismissIntro}><X size={16} strokeWidth={2} aria-hidden="true" /></Button>
       </div>
       <ul className={styles.introItems}>
         <li className={styles.introItem}>
@@ -336,7 +336,7 @@ function Intro({ me }: { me: Me }) {
         </li>
         <li className={styles.introItem}>
           <span className={styles.appStack} aria-hidden="true">
-            {INTRO_APPS.map((Icon, index) => <span key={index} data-sq="surface" className={styles.introApp}><Icon size={18} strokeWidth={1.75} /></span>)}
+            {INTRO_APPS.map((Icon, index) => <span key={index} data-sq="surface" className={styles.introApp}><Icon size={18} strokeWidth={2} /></span>)}
           </span>
           <span className={styles.introLabel}>Apps</span>
           <span>Each asks what it can see.</span>
@@ -367,7 +367,7 @@ function YourSilicons() {
         <div className={styles.tiles}>
           {list.slice(0, SILICON_TILES).map(silicon => <SiliconTile key={silicon.uuid} silicon={silicon} />)}
           <Link href={`${paths.silicons}?${NEW_SILICON_PARAM}`} data-sq="surface" className={`${styles.tile} ${styles.newTile}`}>
-            <span data-sq="surface" className={styles.iconTile} aria-hidden="true"><Plus size={16} strokeWidth={1.75} /></span>
+            <span data-sq="surface" className={styles.iconTile} aria-hidden="true"><Plus size={16} strokeWidth={2} /></span>
             <span className={styles.tileName}>New Silicon</span>
           </Link>
         </div>

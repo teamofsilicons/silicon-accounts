@@ -87,7 +87,7 @@ export function PageHeader({ title, description, actions, back, className, child
       <div className={styles.headerText}>
         {back ? (
           <Link href={back.href} className={styles.back}>
-            <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+            <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
             {back.label}
           </Link>
         ) : null}

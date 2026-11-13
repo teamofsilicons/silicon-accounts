@@ -122,7 +122,7 @@ const activity: Journey = {
     results.check("entries are grouped under day headings", days.length >= 1, days.join(", "));
 
     // The filters (the prototype's five) group the history's kinds.
-    const ids = await filter(page, "Personal info");
+    const ids = await filter(page, "Personal Info");
     results.check("Personal info: the CarbonID change and the creation, nothing else", ids.rows.length === 2 && ids.rows[0]?.startsWith(`Id changed from ${carbon.id} to ${newId}`) === true && ids.rows[1]?.startsWith(`Account created with the id ${carbon.id}`) === true, ids.rows.join(" | "));
     const security = await filter(page, "Security");
     const elsewhere = (row: string) => /^(Started using|Removed .*access|Id changed|Account created with the id|Proof for |.* got a proof to act for you at )/.test(row);

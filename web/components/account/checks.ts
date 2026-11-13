@@ -364,7 +364,7 @@ const checks: Check[] = [
         const hits = words.split("\n").filter(line => people.test(line));
         if (hits.length) found.push(`${where}: ${hits.map(line => JSON.stringify(line.trim().slice(0, 120))).join(", ")}`);
       };
-      for (const [url, title] of [["/personal", "Personal info"], ["/sign-in-methods", "Security"], ["/apps", "Apps you have signed into"], ["/proofs", "Proofs about you"], ["/silicons", "Silicons in your care"], ["/activity", "Activity"], ["/privacy", "Data & privacy"]] as const) {
+      for (const [url, title] of [["/personal", "Personal Info"], ["/sign-in-methods", "Security"], ["/apps", "Apps you have signed into"], ["/proofs", "Proofs about you"], ["/silicons", "Silicons in your care"], ["/activity", "Activity"], ["/privacy", "Data & privacy"]] as const) {
         await visit(page, `${env.base}${url}`, title);
         await look(url);
       }
@@ -377,7 +377,7 @@ const checks: Check[] = [
       expect(createText.includes("What Carbons, Silicons and apps type to find it."), `the Create a Silicon id field says: ${createText.slice(0, 400)}`);
       await look("/silicons, Create a Silicon");
       await page.keyboard.press("Escape");
-      await visit(page, `${env.base}/personal`, "Personal info");
+      await visit(page, `${env.base}/personal`, "Personal Info");
       await page.getByRole("button", { name: /CarbonID/ }).first().click();
       const change = page.getByRole("dialog", { name: "CarbonID" });
       await change.waitFor({ timeout: 10_000 });

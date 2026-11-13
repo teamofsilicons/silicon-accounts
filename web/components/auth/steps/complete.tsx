@@ -63,7 +63,7 @@ export function Complete({ flow }: CompleteProps) {
         <StepHeading title="This sign-in is finished" description={`You already went back to ${appName} from here. Each sign-in link works once.`} />
         {home ? (
           <ButtonLink href={home} external className={styles.wide}>
-            <span className={styles.providerLabel}>Go to {appName} <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" /></span>
+            <span className={styles.providerLabel}>Go to {appName} <ArrowRight size={16} strokeWidth={2} aria-hidden="true" /></span>
           </ButtonLink>
         ) : null}
       </>

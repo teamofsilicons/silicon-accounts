@@ -75,7 +75,7 @@ export function AppPage({ appId }: { appId: string }) {
   return (
     <div>
       <PageBar
-        parent={{ label: "Connected apps", href: paths.apps }}
+        parent={{ label: "Connected Apps", href: paths.apps }}
         title={title}
         actions={item && home && item.status !== "access_removed" ? (
           <ButtonLink href={home} variant="secondary" size="sm" target="_blank" rel="noopener">

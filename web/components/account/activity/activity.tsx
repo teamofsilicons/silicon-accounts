@@ -38,7 +38,7 @@ type Filter = "all" | "security" | "personal" | "apps" | "silicons";
 const FILTERS: Array<{ value: Filter; label: string; kinds: HistoryKind[] }> = [
   { value: "all", label: "All", kinds: [] },
   { value: "security", label: "Security", kinds: ["signin", "security"] },
-  { value: "personal", label: "Personal info", kinds: ["id_change"] },
+  { value: "personal", label: "Personal Info", kinds: ["id_change"] },
   { value: "apps", label: "Apps", kinds: ["app_access", "proof"] },
   { value: "silicons", label: "Silicons", kinds: ["custodian"] },
 ];

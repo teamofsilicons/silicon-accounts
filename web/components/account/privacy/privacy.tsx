@@ -48,7 +48,7 @@ export function Privacy() {
 
   return (
     <div>
-      <PageBar title="Data & privacy" />
+      <PageBar title="Data & Privacy" />
       <Page>
         {(me.error && !me.data) || (apps.error && !apps.data) ? (
           <Alert tone="danger" title="Data & privacy did not load">

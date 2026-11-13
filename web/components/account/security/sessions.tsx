@@ -37,7 +37,7 @@ function SessionIcon({ session }: { session: SessionInfo }) {
   const Icon = session.kind === "cli" ? SquareTerminal : session.kind === "developer" ? Code : phone ? Smartphone : Monitor;
   return (
     <span className={styles.icon} aria-hidden="true">
-      <Icon size={20} strokeWidth={1.75} />
+      <Icon size={20} strokeWidth={2} />
     </span>
   );
 }

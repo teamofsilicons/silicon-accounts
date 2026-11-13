@@ -92,7 +92,7 @@ export function DeletePage() {
 
   return (
     <div>
-      <PageBar parent={{ label: "Data & privacy", href: paths.privacy }} title="Delete your account" />
+      <PageBar parent={{ label: "Data & Privacy", href: paths.privacy }} title="Delete your account" />
       <Page>
         {failed ? (
           <Alert tone="danger" title="This page did not load">
@@ -142,7 +142,7 @@ function DeleteChecks({ carbon, silicons, apps, devices, proofs, requests }: { c
         <ul className={styles.list} aria-labelledby="delete-before">
           {silicons.map(item => <SiliconCheck key={item.uuid} silicon={item} carbon={carbon} now={now} />)}
           {left ? null : (
-            <Row lead={<span className={styles.done} aria-hidden="true"><Check size={14} strokeWidth={2.5} /></span>} title="No Silicons in your care" detail="Nothing stops you from deleting your account" />
+            <Row lead={<span className={styles.done} aria-hidden="true"><Check size={14} strokeWidth={2} /></span>} title="No Silicons in your care" detail="Nothing stops you from deleting your account" />
           )}
           {requests.map(request => {
             const name = nameOf(request.silicon);
@@ -342,7 +342,7 @@ function Foot({ carbon, silicons, now }: { carbon: CarbonMe; silicons: ManagedSi
             </>
           ) : (
             <>
-              <span className={styles.ready} aria-hidden="true"><Check size={14} strokeWidth={2.5} /></span>
+              <span className={styles.ready} aria-hidden="true"><Check size={14} strokeWidth={2} /></span>
               <span className={styles.statusText}>
                 <span className={styles.statusTitle}>All done</span>
                 <span className={styles.statusLine}>You can delete your account now</span>

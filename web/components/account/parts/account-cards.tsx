@@ -47,7 +47,7 @@ export function AccountCards({ cards, design = "picture" }: { cards: AccountCard
                 <span className={styles.picture} style={{ backgroundImage: `url("${picture.src}")`, backgroundPosition: picture.focus }} aria-hidden="true" />
               )}
               <span className={styles.body} data-sq={design === "cover" ? "surface" : undefined}>
-                {design === "gradient" ? null : <span data-sq="surface" className={styles.icon} aria-hidden="true"><Icon size={16} strokeWidth={1.75} /></span>}
+                {design === "gradient" ? null : <span data-sq="surface" className={styles.icon} aria-hidden="true"><Icon size={16} strokeWidth={2} /></span>}
                 <span className={styles.words}>
                   <span className={styles.title}>{title}</span>
                   <span className={styles.fact}>{fact ?? " "}</span>

@@ -59,7 +59,7 @@ export function Silicons() {
   const silicon = asSilicon(me.data);
 
   useRegisterCommands(() => (carbon ? [
-    { id: "silicons.create", label: "Create a Silicon", description: "You become its custodian; its STK is shown once", group: "Silicons", icon: <Plus size={16} strokeWidth={1.75} />, keywords: ["new", "silicon", "agent", "stk"], run: create },
+    { id: "silicons.create", label: "Create a Silicon", description: "You become its custodian; its STK is shown once", group: "Silicons", icon: <Plus size={16} strokeWidth={2} />, keywords: ["new", "silicon", "agent", "stk"], run: create },
   ] : []), [!!carbon]);
 
   // Older links come with ?new (the create panel this page used to open): they go to the create page now.

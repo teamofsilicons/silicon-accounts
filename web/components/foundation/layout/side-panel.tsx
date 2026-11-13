@@ -99,7 +99,7 @@ export function SidePanel({ open, onOpenChange, title, description, returnFocus,
           {description ? <p className={styles.description}>{description}</p> : null}
         </div>
         <Button ref={closeRef} variant="ghost" size="sm" aria-label="Close" onClick={() => { onOpenChange(false); giveFocusBack(); }}>
-          <X size={16} strokeWidth={1.75} aria-hidden="true" />
+          <X size={16} strokeWidth={2} aria-hidden="true" />
         </Button>
       </header>
       <div className={styles.body}>{children}</div>

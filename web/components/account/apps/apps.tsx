@@ -62,7 +62,7 @@ export function Apps() {
 
   return (
     <div>
-      <PageBar title="Connected apps" />
+      <PageBar title="Connected Apps" />
       <Page>
         {apps.error && !apps.data ? (
           <Alert tone="danger" title="Your apps did not load">

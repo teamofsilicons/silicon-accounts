@@ -177,7 +177,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
         description: section.description,
         group: "Go to",
         shortcut: section.shortcut,
-        icon: <Icon size={16} strokeWidth={1.75} />,
+        icon: <Icon size={16} strokeWidth={2} />,
         keywords: [section.key, "go", "open"],
         run: () => void go(section.href),
       };
@@ -189,13 +189,13 @@ export function AccountShell({ children }: { children: ReactNode }) {
         label: destination.label,
         description: destination.description,
         group: "Go to",
-        icon: <Icon size={16} strokeWidth={1.75} />,
+        icon: <Icon size={16} strokeWidth={2} />,
         keywords: [destination.key, "go", "open"],
         run: () => void go(destination.href),
       };
     }),
     // The old Settings page is Data & privacy now (a section above); these words still find it.
-    { id: "go.delete-account", label: "Delete account", description: "On Data & privacy", group: "Go to", icon: <Database size={16} strokeWidth={1.75} />, keywords: ["settings", "preferences", "delete", "close account"], run: () => void go(paths.privacy) },
+    { id: "go.delete-account", label: "Delete account", description: "On Data & privacy", group: "Go to", icon: <Database size={16} strokeWidth={2} />, keywords: ["settings", "preferences", "delete", "close account"], run: () => void go(paths.privacy) },
     ...ELSEWHERE.map(site => {
       const Icon = site.icon;
       return {
@@ -203,17 +203,17 @@ export function AccountShell({ children }: { children: ReactNode }) {
         label: site.label,
         description: site.description,
         group: "Other sites",
-        icon: <Icon size={16} strokeWidth={1.75} />,
+        icon: <Icon size={16} strokeWidth={2} />,
         keywords: site.key === "developer" ? ["developer", "build", "apps", "sign-in setup", "client"] : ["docs", "documentation", "help", "guide", "api"],
         run: () => void go(site.href(developerUrl)),
       };
     }),
     ...(process.env.NODE_ENV !== "production"
       ? [
-          { id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={1.75} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) },
+          { id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={2} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) },
         ]
       : []),
-    { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
+    { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={2} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
   ], [go, doSignOut, developerUrl]);
 
   // ⌘K toggles the palette; 1 to 7 jump to sections (never while typing or with a layer open).
@@ -296,7 +296,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
               title="Your account"
               open={sheetOpen}
               onOpenChange={setSheetOpen}
-              trigger={<Button variant="ghost" size="sm" aria-label="Account sections"><Menu size={18} strokeWidth={1.75} aria-hidden="true" /></Button>}
+              trigger={<Button variant="ghost" size="sm" aria-label="Account sections"><Menu size={18} strokeWidth={2} aria-hidden="true" /></Button>}
             >
               <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} />
             </BottomSheet>

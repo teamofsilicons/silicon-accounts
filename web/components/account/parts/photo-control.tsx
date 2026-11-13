@@ -112,12 +112,12 @@ export function PhotoControl({ name, src, upload, remove, size = 112, audience =
       style={{ "--photo-size": `${size}px` } as CSSProperties}
     >
       <Avatar name={name} src={preview ?? src ?? undefined} size="xl" className={styles.portrait} />
-      <span data-sq="surface" className={styles.dropHint} aria-hidden="true"><ImageUp size={24} strokeWidth={1.75} /></span>
-      {uploading ? <span className={styles.busy} aria-hidden="true"><LoaderCircle className={styles.spinner} size={22} strokeWidth={1.75} /></span> : null}
+      <span data-sq="surface" className={styles.dropHint} aria-hidden="true"><ImageUp size={24} strokeWidth={2} /></span>
+      {uploading ? <span className={styles.busy} aria-hidden="true"><LoaderCircle className={styles.spinner} size={22} strokeWidth={2} /></span> : null}
       <span className="sr-only" role="status">{uploading ? "Uploading the photo" : ""}</span>
       <Popover open={open} onOpenChange={next => { setOpen(next); if (!next) setError(null); }}>
         <PopoverTrigger data-sq="surface" className={styles.trigger} aria-label={triggerLabel} disabled={uploading}>
-          <Camera size={16} strokeWidth={1.75} aria-hidden="true" />
+          <Camera size={16} strokeWidth={2} aria-hidden="true" />
         </PopoverTrigger>
         <PopoverContent className={styles.menu} side="bottom" align="start" sideOffset={8} aria-labelledby={titleId}>
           <p id={titleId} className={styles.menuTitle}>Profile photo</p>
@@ -133,7 +133,7 @@ export function PhotoControl({ name, src, upload, remove, size = 112, audience =
             onDragLeave={onDragLeave}
             onDrop={onDrop}
           >
-            <ImageUp size={20} strokeWidth={1.75} aria-hidden="true" />
+            <ImageUp size={20} strokeWidth={2} aria-hidden="true" />
             <span>Drop an image here, or choose one</span>
           </button>
           {error ? <p className={styles.error} role="alert">{error}</p> : null}

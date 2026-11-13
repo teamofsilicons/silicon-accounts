@@ -43,7 +43,7 @@ export function Sidebar({ activeKey, developerUrl, onNavigate, head, account }: 
             <NavItem
               key={section.key}
               href={section.href}
-              icon={<Icon strokeWidth={1.75} aria-hidden="true" />}
+              icon={<Icon strokeWidth={2} aria-hidden="true" />}
               active={section.key === activeKey}
               trailing={count > 0 ? <Badge tone="warning" size="sm" aria-label={`${count} waiting for you`}>{count}</Badge> : undefined}
             >

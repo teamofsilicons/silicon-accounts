@@ -26,13 +26,13 @@ export interface IdFieldProps {
 function statusMark(status: IdStatus): ReactNode {
   switch (status) {
     case "checking":
-      return <LoaderCircle className={styles.spin} size={16} strokeWidth={1.75} aria-hidden="true" />;
+      return <LoaderCircle className={styles.spin} size={16} strokeWidth={2} aria-hidden="true" />;
     case "available":
     case "own":
       return <Check className={styles.ok} size={16} strokeWidth={2} aria-hidden="true" />;
     case "unavailable":
     case "invalid":
-      return <CircleAlert className={styles.bad} size={16} strokeWidth={1.75} aria-hidden="true" />;
+      return <CircleAlert className={styles.bad} size={16} strokeWidth={2} aria-hidden="true" />;
     default:
       return null;
   }

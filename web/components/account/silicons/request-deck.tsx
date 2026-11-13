@@ -151,7 +151,7 @@ function DeckCard({ request, index, total, now, decide, onDecided }: DeckCardPro
       {request.kind === "transfer" && from ? (
         <div className={styles.handover} aria-hidden="true">
           <span className={styles.party}><Avatar name={from.display_name} src={from.pfp_url} size="sm" /><span className="mono">{from.id ?? from.uuid}</span></span>
-          <ArrowRight size={14} strokeWidth={1.75} />
+          <ArrowRight size={14} strokeWidth={2} />
           <span className={styles.party}><span>you</span></span>
         </div>
       ) : null}

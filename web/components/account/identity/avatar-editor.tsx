@@ -60,7 +60,7 @@ export function AvatarEditor({ me, onDone }: { me: CarbonMe; onDone: () => void 
         <div className={styles.avatarArrows}>
           {PARTS.map(({ part, noun }) => (
             <Button key={part} variant="secondary" size="sm" aria-label={`Previous ${noun}`} disabled={choice[part] <= 0} onClick={() => step(part, -1)}>
-              <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+              <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
             </Button>
           ))}
         </div>
@@ -68,7 +68,7 @@ export function AvatarEditor({ me, onDone }: { me: CarbonMe; onDone: () => void 
         <div className={styles.avatarArrows}>
           {PARTS.map(({ part, noun }) => (
             <Button key={part} variant="secondary" size="sm" aria-label={`Next ${noun}`} disabled={choice[part] >= AVATAR_PARTS[part].length - 1} onClick={() => step(part, 1)}>
-              <ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
+              <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
             </Button>
           ))}
         </div>

@@ -28,7 +28,7 @@ import type { RequestAnswer } from "./request-view";
 import styles from "./request-designs.module.css";
 
 const DAY = 86_400_000;
-const ICON = { size: 16, strokeWidth: 1.75 } as const;
+const ICON = { size: 16, strokeWidth: 2 } as const;
 
 export interface DesignProps { request: CustodianRequest; now: number; you: { name: string; photo?: string }; deciding?: RequestAnswer | null; onAnswer: (answer: RequestAnswer) => void }
 

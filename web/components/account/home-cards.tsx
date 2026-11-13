@@ -93,7 +93,7 @@ export function HomeCardsView({ account, onDismiss, onYou }: { account: { uuid: 
       <div className={styles.head}>
         <h3 id="home-cards-title" className={styles.title}>One Account for Your Silicons &amp; Apps</h3>
         <Button variant="soft" size="xs" className={styles.close} aria-label="Dismiss" onClick={onDismiss}>
-          <X size={16} strokeWidth={1.75} aria-hidden="true" />
+          <X size={16} strokeWidth={2} aria-hidden="true" />
         </Button>
       </div>
       <ul className={styles.items}>

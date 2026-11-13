@@ -238,7 +238,7 @@ function DetailsPage({ flow, ctl, notice, details }: DetailsProps & { details: F
               <span className={styles.shareValue}>{profileValue}</span>
             </span>
             <span className={styles.shareLock} title="Always shared">
-              <Lock size={14} strokeWidth={1.75} aria-hidden="true" />
+              <Lock size={14} strokeWidth={2} aria-hidden="true" />
               <span>Always</span>
             </span>
           </li>
@@ -375,7 +375,7 @@ function DetailRow({ field, isNew, ticked, onToggle, disabled, adding, onAdd }: 
         </span>
         {addButton}
         <span className={styles.shareLock} title="Always shared">
-          <Lock size={14} strokeWidth={1.75} aria-hidden="true" />
+          <Lock size={14} strokeWidth={2} aria-hidden="true" />
           <span>Required</span>
         </span>
       </li>

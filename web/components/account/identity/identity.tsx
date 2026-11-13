@@ -67,7 +67,7 @@ export function Identity() {
   const [reserved, setReserved] = useState<{ id: string; until: number } | null>(null);
 
   useRegisterCommands(() => [
-    { id: "identity.change-id", label: "Change your CarbonID", description: "Pick a new CarbonID; the old one stays reserved for you for 10 days", group: "Identity", icon: <AtSign size={16} strokeWidth={1.75} />, keywords: ["id", "handle", "username", "rename"], run: () => router.push(editHref("id"), { scroll: false }) },
+    { id: "identity.change-id", label: "Change your CarbonID", description: "Pick a new CarbonID; the old one stays reserved for you for 10 days", group: "Identity", icon: <AtSign size={16} strokeWidth={2} />, keywords: ["id", "handle", "username", "rename"], run: () => router.push(editHref("id"), { scroll: false }) },
   ], [router]);
 
   const account = me.data;
@@ -77,7 +77,7 @@ export function Identity() {
 
   return (
     <div>
-      <PageBar title="Personal info" />
+      <PageBar title="Personal Info" />
       <Page>
         {me.error && !account ? (
           <Alert tone="danger" title="Your account did not load">
@@ -96,7 +96,7 @@ export function Identity() {
                 edit="id"
                 detail={reserved ? <><span className="mono">{reserved.id}</span> stays reserved for you until {formatDate(reserved.until)}.</> : undefined}
               >
-                <span className={styles.mono}>{account.id ?? account.uuid}</span>
+                <span className="mono">{account.id ?? account.uuid}</span>
               </Row>
               <Row label="Date of birth" edit="dob">{account.dob ? formatDate(`${account.dob}T12:00:00Z`) : <span className={styles.muted}>Not added</span>}</Row>
               <Row label="Timezone" edit="timezone">{account.timezone}</Row>
@@ -144,7 +144,7 @@ function Row({ label, edit, detail, end, children }: { label: string; edit: Edit
           {detail ? <span className={styles.detail}>{detail}</span> : null}
         </span>
         {end}
-        <ChevronRight className={styles.chevron} size={16} strokeWidth={1.75} aria-hidden="true" />
+        <ChevronRight className={styles.chevron} size={16} strokeWidth={2} aria-hidden="true" />
       </Link>
     </li>
   );

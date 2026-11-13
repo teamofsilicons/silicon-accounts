@@ -144,7 +144,7 @@ function SignupForm({ flow, ctl, notice, prefill }: SignupProps & { prefill: Flo
     if (failure) errors.fail(failure);
   };
 
-  const provenIcon = prefill.provider === "google" ? <GoogleMark /> : prefill.provider === "apple" ? <AppleMark /> : prefill.email ? <Mail size={16} strokeWidth={1.75} /> : <Smartphone size={16} strokeWidth={1.75} />;
+  const provenIcon = prefill.provider === "google" ? <GoogleMark /> : prefill.provider === "apple" ? <AppleMark /> : prefill.email ? <Mail size={16} strokeWidth={2} /> : <Smartphone size={16} strokeWidth={2} />;
   const proven = prefill.email ?? prefill.phone ?? (prefill.provider === "apple" ? "your Apple account" : "your Google account");
   const providerName = prefill.provider === "apple" ? "Apple" : "Google";
 

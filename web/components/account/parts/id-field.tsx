@@ -148,9 +148,9 @@ export function IdField({ prefix, value, onValueChange, check, label = prefix ==
   })();
   const suggestions = given?.length ? given : check.status === "unavailable" ? check.suggestions : [];
   const pick = (id: string) => onValueChange(normalizeHandle(id, prefix));
-  const icon = check.status === "checking" && !error ? <LoaderCircle className={styles.spin} size={16} strokeWidth={1.75} />
+  const icon = check.status === "checking" && !error ? <LoaderCircle className={styles.spin} size={16} strokeWidth={2} />
     : tone === "success" ? <Check className={styles.success} size={16} strokeWidth={2} />
-      : tone === "danger" ? <CircleAlert className={styles.danger} size={16} strokeWidth={1.75} /> : null;
+      : tone === "danger" ? <CircleAlert className={styles.danger} size={16} strokeWidth={2} /> : null;
   return (
     <div className={styles.field}>
       <Input

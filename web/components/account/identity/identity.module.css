@@ -10,7 +10,6 @@
 .value { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); font: var(--small); letter-spacing: var(--small-tracking); overflow-wrap: anywhere; }
 .detail { color: var(--text-secondary); font: var(--caption); font-weight: var(--weight-regular); letter-spacing: var(--caption-tracking); }
 .muted { color: var(--text-secondary); }
-.mono { font-family: var(--font-mono); }
 .chevron { flex: none; color: var(--text-muted); }
 @media (max-width: 560px) {
   .row { flex-wrap: wrap; row-gap: var(--space-hair); }

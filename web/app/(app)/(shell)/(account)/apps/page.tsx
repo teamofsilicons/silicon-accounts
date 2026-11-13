@@ -4,7 +4,7 @@
 import type { Metadata } from "next";
 import { Apps } from "@/components/account/apps/apps";
 
-export const metadata: Metadata = { title: "Apps" };
+export const metadata: Metadata = { title: "Connected Apps" };
 
 export default function Page() {
   return <Apps />;

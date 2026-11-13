@@ -30,7 +30,7 @@ export function Proofs() {
 
   return (
     <div>
-      <PageBar parent={{ label: "Connected apps", href: paths.apps }} title="Permissions between apps" />
+      <PageBar parent={{ label: "Connected Apps", href: paths.apps }} title="Permissions between apps" />
       <Page>
         <p className={styles.lead}>One app doing something in another app for you. Stop one and the other app&rsquo;s next check fails at once.</p>
         {proofs.error && !proofs.data ? (
