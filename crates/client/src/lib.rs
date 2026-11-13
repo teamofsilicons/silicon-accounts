@@ -73,7 +73,7 @@ pub use error::{ApiError, Error, OAuthError, Result, TokenError, WebhookError};
 pub use federation::{TOKEN_EXCHANGE_GRANT_TYPE, TokenSource, github_actions_id_token};
 pub use interface::{
     InterfaceAccount, InterfaceAppAccess, InterfaceClient, InterfaceIntrospection,
-    InterfaceSessionInfo, InterfaceTokens,
+    InterfaceSessionInfo, InterfaceTokens, VerifiedInterfaceAction, VerifiedInterfaceFlow,
 };
 pub use jwt::{Claims, VerifyOptions, verify_access_token};
 pub use pkce::{

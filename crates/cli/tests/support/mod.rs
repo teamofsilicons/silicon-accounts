@@ -480,6 +480,14 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
             }
         }
         ("POST", "/v1/oauth/revoke") => (200, json!({})),
+        ("GET", "/v1/me/linked-accounts") if carbon_bearer => (
+            200,
+            json!({ "accounts": [{ "uuid": SILICON_UUID, "id": SILICON_ID }] }),
+        ),
+        ("POST", "/v1/me/linked-accounts/switch") if carbon_bearer => (
+            200,
+            json!({ "tokens": silicon_tokens(&st), "account": silicon_me() }),
+        ),
         ("GET", "/v1/ids/available") => {
             let q = form(&query);
             let id = q.get("id").cloned().unwrap_or_default();

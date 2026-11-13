@@ -1310,6 +1310,12 @@ async fn silicon_keys(ctx: &Ctx, command: SiliconKeysCommand) -> CliResult<Outco
                 } else {
                     given.clone()
                 };
+                if text.contains("PRIVATE KEY") {
+                    return Err(CliError::invalid(
+                        "That is a private key; only its public half may be registered.",
+                        "Pass it with --key <file> (only the public half is sent), or pass the .pub file.",
+                    ));
+                }
                 (text.trim().to_string(), None)
             } else {
                 return Err(CliError::invalid(

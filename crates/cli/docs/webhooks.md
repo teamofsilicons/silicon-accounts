@@ -7,7 +7,6 @@ into it, and tells a Silicon about its own account. Both kinds follow the same r
 
 ```sh
 silicon-accounts app webhook set https://briefcase.example/webhooks   # app; prints whsec_… the first time
-silicon-accounts webhook set https://scout.example/hooks              # a Silicon's own
 silicon-accounts app webhook test                                     # sends a `ping`
 ```
 
