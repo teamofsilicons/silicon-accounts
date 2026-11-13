@@ -156,3 +156,13 @@ API proxy caps request bodies; embeds no longer allow wildcard or plain-http fra
 client library refuses id_tokens as access tokens. The OpenAPI document now covers every route.
 Receipt: [verification-audit-2026-11-13.json](verification-audit-2026-11-13.json).
 
+## Silicon UI 0.5.0 (PR 24) — 2026-11-13
+
+Release `accounts-sui05-fb03b11` changes only the account site: Silicon UI 0.5.0 from npm, with the
+local 0.4.0 patch removed (teamofsilicons/silicon-accounts#24). Every file the patch changed is
+identical in 0.5.0 except a hint-size fallback that tokens.css overrides site-wide. API binaries and
+the developer site are release `accounts-audit-c38050a`'s exact files (ApiSourceRevision and
+DeveloperSourceRevision stay `c38050a`). Schema unchanged at 38; verified backup first; backup
+`backups/predeploy-redesign-20261113T183320Z.dump`, SSM command `a83ebfaa-7202-424b-b79f-c0c095853160`. The host's root disk was 92% used afterwards
+(3.5 GB free); `/opt/accounts/releases` holds about 70 old releases.
+
