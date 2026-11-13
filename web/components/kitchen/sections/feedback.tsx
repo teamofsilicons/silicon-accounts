@@ -2,17 +2,17 @@
 
 import { useState } from "react";
 import { CircleCheck, Cpu } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { AnimatedCounter } from "@/components/silicon-ui/animated-counter/animated-counter";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
-import { MetricCard } from "@/components/silicon-ui/metric-card/metric-card";
-import { Progress } from "@/components/silicon-ui/progress/progress";
-import { Skeleton } from "@/components/silicon-ui/skeleton/skeleton";
-import { SlotText } from "@/components/silicon-ui/slot-text/slot-text";
-import { TextMorph } from "@/components/silicon-ui/text-morph/text-morph";
-import Toast from "@/components/silicon-ui/toast/toast";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { AnimatedCounter } from "@teamofsilicons/silicon-ui/animated-counter";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
+import { MetricCard } from "@teamofsilicons/silicon-ui/metric-card";
+import { Progress } from "@teamofsilicons/silicon-ui/progress";
+import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
+import { SlotText } from "@teamofsilicons/silicon-ui/slot-text";
+import { TextMorph } from "@teamofsilicons/silicon-ui/text-morph";
+import Toast from "@teamofsilicons/silicon-ui/toast";
 import { ApiError } from "@/lib/api/errors";
 import { notify } from "@/lib/notify";
 import { Specimen, Specimens, kitchenStyles as styles } from "../specimen";
@@ -64,7 +64,7 @@ export function Feedback() {
           <Button size="sm" variant="secondary" onClick={() => {
             const id = notify.loading("Rotating the STK", "Signing si:scout out everywhere");
             setTimeout(() => notify.update(id, { type: "success", title: "STK rotated", description: "The old STK stopped working." }), 1400);
-          }}>Loading, then done</Button>
+          }}>Loading, Then Done</Button>
         </div>
         <p className={styles.note}>A single toast, in place:</p>
         <Toast title="Copied" description="c:saket is on your clipboard." open={toastOpen} duration={0} onOpenChange={open => { setToastOpen(open); if (!open) setTimeout(() => setToastOpen(true), 1600); }} />

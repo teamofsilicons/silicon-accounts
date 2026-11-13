@@ -28,7 +28,7 @@ const hinted: Journey = {
     results.watch(page, "app-entry-email");
     const before = await lastSeq(env);
     const href = await startAtApp(env, page, "briefcase", { method: "email", extra: { login_hint: email, email } });
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     await sleep(1_500);
     const filled = await field.inputValue();
@@ -45,7 +45,7 @@ const hinted: Journey = {
     const challenges = await sql(env, `select count(*) from otp_challenges where destination = '${email}'`);
     results.check("nothing is sent on arrival: no email reached the address and no code challenge exists", early === 0 && challenges[0]?.[0] === "0", `${early} message(s), ${challenges[0]?.[0]} challenge(s)`);
     await field.fill(email);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code = await codeFor(env, email, before).catch(() => null);
     results.check("…the code goes out once the Carbon presses Continue on our page", !!code && (await messagesTo(env, email, before)) === 1, `code ${code ? "received" : "missing"}`);
     await context.close();
@@ -105,7 +105,7 @@ const intents: Journey = {
 
     // The app's "Create an account" button: the sign-up version of the methods page.
     const href = await startAtApp(env, page, "briefcase", { intent: "signup" });
-    await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     await sleep(400);
     await shot(env, page, "auth-flows-intents-01-signup");
     const signupTitle = await hostedTitle(page);
@@ -119,8 +119,8 @@ const intents: Journey = {
     const osent = await sendCode(owner, os.flow.id, { email: existing });
     await drive(owner, (await owner.act(os.flow.id, "verify", { code: osent.code ?? "" })).body.flow);
     const after = await lastSeq(env);
-    await page.getByRole("textbox", { name: "Email" }).fill(existing);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).fill(existing);
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code = await codeFor(env, existing, after);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code, { delay: 25 });
@@ -135,19 +135,19 @@ const intents: Journey = {
     const p2 = await fresh.newPage();
     results.watch(p2, "intents-default");
     await startAtApp(env, p2, "commit", { intent: "signup" });
-    await p2.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await p2.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     const commitTitle = await hostedTitle(p2);
     results.check("intent=signup on an app with no sign-up copy (commit): the default \"Create your Commit account\"", commitTitle === "Create your Commit account", commitTitle);
     // A first time on the sign-in version is a sign-up all the same.
     await startAtApp(env, p2, "commit");
     const newcomer = `intent.new.${t}@example.test`;
     const mark = await lastSeq(env);
-    await p2.getByRole("textbox", { name: "Email" }).fill(newcomer);
-    await p2.getByRole("button", { name: "Continue", exact: true }).click();
+    await p2.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).fill(newcomer);
+    await p2.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const newCode = await codeFor(env, newcomer, mark);
     await p2.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await p2.keyboard.type(newCode, { delay: 25 });
-    const create = p2.getByRole("button", { name: "Create account" });
+    const create = p2.getByRole("button", { name: /^Create account$/i });
     results.check("a first time on the sign-in version is a sign-up all the same (Create account)", await create.waitFor({ timeout: 20_000 }).then(() => true, () => false));
     await fresh.close();
 

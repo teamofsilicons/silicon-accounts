@@ -11,10 +11,10 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import calendarStyles from "@/components/silicon-ui/calendar/calendar.module.css";
-import { Calendar } from "@/components/silicon-ui/calendar/calendar";
-import pickerStyles from "@/components/silicon-ui/date-picker/date-picker.module.css";
-import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
+import calendarStyles from "./dob-calendar.module.css";
+import { Calendar } from "@teamofsilicons/silicon-ui/calendar";
+import pickerStyles from "./dob-date-picker.module.css";
+import { motionTokens } from "@teamofsilicons/silicon-ui/motion-tokens";
 import { FieldNote } from "./parts";
 import styles from "./dob-field.module.css";
 
@@ -166,9 +166,9 @@ export function DobField({ label, value, onChange, minDate, maxDate, description
           onClick={() => (open ? close(true) : show())}
           onKeyDown={onTriggerKeyDown}
         >
-          <CalendarDays size={16} strokeWidth={1.75} aria-hidden="true" />
+          <CalendarDays size={16} strokeWidth={2} aria-hidden="true" />
           <span className={styles.value}>{date ? formatter.format(date) : "Pick your date of birth"}</span>
-          <ChevronDown className={pickerStyles.chevron} size={16} strokeWidth={1.75} aria-hidden="true" />
+          <ChevronDown className={pickerStyles.chevron} size={16} strokeWidth={2} aria-hidden="true" />
         </button>
         <AnimatePresence>
           {open ? (
@@ -192,15 +192,15 @@ export function DobField({ label, value, onChange, minDate, maxDate, description
               <div className={styles.header}>
                 <button type="button" className={styles.titleButton} aria-expanded={view === "years"} aria-label={`${monthLabel}, choose a year`} onClick={() => setView(view === "years" ? "days" : "years")}>
                   <span aria-live="polite">{monthLabel}</span>
-                  <ChevronDown className={styles.titleChevron} data-open={view === "years" || undefined} size={14} strokeWidth={1.75} aria-hidden="true" />
+                  <ChevronDown className={styles.titleChevron} data-open={view === "years" || undefined} size={14} strokeWidth={2} aria-hidden="true" />
                 </button>
                 {view === "days" ? (
                   <div className={calendarStyles.navigation}>
                     <button type="button" className={calendarStyles.navButton} aria-label="Previous month" aria-disabled={previousDisabled || undefined} onClick={() => { if (!previousDisabled) setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1)); }}>
-                      <ChevronLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+                      <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
                     </button>
                     <button type="button" className={calendarStyles.navButton} aria-label="Next month" aria-disabled={nextDisabled || undefined} onClick={() => { if (!nextDisabled) setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1)); }}>
-                      <ChevronRight size={16} strokeWidth={1.75} aria-hidden="true" />
+                      <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
                     </button>
                   </div>
                 ) : null}

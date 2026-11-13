@@ -23,7 +23,7 @@ export const journey: Journey = {
       results.check("the sign-up version of the page: ledgerly's sign-up title and subtitle", title === "Create your Ledgerly account" && text.includes("Bookkeeping for freelancers, set up in two steps."), `${title} | ${text.slice(0, 160)}`);
       results.check("…its email and phone choice is named \"Sign up with\"", (await page.getByRole("group", { name: "Sign up with" }).count()) === 1);
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       const walk = await completeDetails(env, page, "ledgerly", { add: { phone }, tick: ["timezone"], shotName: "i-02-ledgerly" });
       const [contact, about] = walk.pages;
       const row = (seen: typeof contact, field: string) => seen?.rows.find(entry => entry.field === field);
@@ -49,7 +49,7 @@ export const journey: Journey = {
       await startAtApp(env, page, "ledgerly");
       results.check("ledgerly's sign-in link shows the sign-in version", (await hostedTitle(page)) === "Sign in to Ledgerly", await hostedTitle(page));
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
       const walk = await completeDetails(env, page, "ledgerly", { add: { phone: randomPhone() }, tick: ["timezone"], stopAtReview: true });
       results.check("the review shows the ticked timezone as shared", walk.review?.shared.includes("timezone") === true, JSON.stringify(walk.review));
       const seen = await poweredBy(page);

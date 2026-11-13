@@ -1,0 +1,37 @@
+/* Home's Needs you (Anil, 2026-11-08; compact, the boxed version, 2026-11-11): the heading and count on the page, then
+   one white list with a clear border: a 28px mark, the title over its time left or detail, one outlined button. 48px under what comes before (the column's 24px and 24px more), like every section. */
+.group { display: grid; margin-top: var(--space-section); outline: none; }
+.section { display: grid; gap: var(--space-inset); }
+.head { display: flex; align-items: center; gap: var(--space-related); }
+.title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
+
+.rows { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; margin: 0; padding: 0; border: 1px solid var(--sq-stroke); background: var(--sq-fill); list-style: none; }
+/* Compact (Anil, 2026-11-11, the boxed version from /__needs): 8px above and below (4px felt tight), so a two-line
+   row is about 58px. */
+.row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); }
+.row + .row { border-top: 1px solid var(--border-subtle); }
+.text { display: grid; min-width: 0; flex: 1; gap: 0; }
+.rowTitle { min-width: 0; overflow: hidden; color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); text-overflow: ellipsis; white-space: nowrap; }
+/* The line under a title: its time left or detail, in --text-soft (Anil, 2026-11-10, the step under a name); time
+   left turns amber or red by how soon it ends, the one place urgency shows (no progress bar). */
+.when, .rowDetail { overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.when { font-variant-numeric: tabular-nums; }
+.when[data-tone="warning"] { color: var(--warning); }
+.when[data-tone="danger"] { color: var(--danger); }
+.actions { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--space-related); }
+/* Keep (a soft button) on a lighter grey than Silicon UI's soft fill (Anil, 2026-11-11): the tokens it reads, set here
+   only, one step lighter each (rest neutral-2, hover and press neutral-3). */
+.actions { --surface-muted: var(--neutral-2); --surface-pressed: var(--neutral-3); }
+
+/* Mark tiles, 28px like the Silicon marks: grey with the row's icon, red-tinted for a list that did not load. */
+.icon { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
+.iconDanger { --sq-fill: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--danger); }
+/* A browser's own logo, in colour, on its own: no tile or border (Anil, 2026-11-11). It keeps the 28px box so the words
+   line up with the Silicon rows. */
+.iconLogo { --sq-fill: transparent; }
+.logo { display: block; width: var(--control-height-xs); height: var(--control-height-xs); }
+
+@media (max-width: 639px) {
+  .row { flex-wrap: wrap; }
+  .actions { width: 100%; }
+}

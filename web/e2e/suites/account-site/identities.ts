@@ -5,7 +5,7 @@
  */
 import type { Journey } from "../../context";
 import { chooseMockIdentity, newContext, shot, sleep, tag } from "../../lib";
-import { call, codeOf, confirmMorph, connectProvider as connect, getMe, newCarbon, probePage, until } from "./_helpers";
+import { call, codeOf, connectProvider as connect, getMe, newCarbon, probePage, until } from "./_helpers";
 
 const identities: Journey = {
   name: "account-site-identities",
@@ -27,11 +27,15 @@ const identities: Journey = {
     const gEmail = me.emails.find(item => item.email === gmail);
     results.check("Google is linked with its email", google?.email === gmail, JSON.stringify(me.identities));
     results.check("its email is on the account, verified by Google, not primary", !!gEmail && gEmail.verified_via === "google" && !!gEmail.verified_at && !gEmail.is_primary, JSON.stringify(gEmail ?? null));
-    const linkedList = ada.page.getByRole("list", { name: "Linked Google and Apple accounts" });
-    const googleRow = linkedList.getByRole("listitem").filter({ hasText: gmail });
+    // Security's "Your sign-in" section: Google, Apple, Email code and Text code, one row each.
+    const linkedList = ada.page.getByRole("region", { name: "Your sign-in" }).getByRole("list");
+    const googleRow = linkedList.getByRole("listitem").filter({ hasText: gmail }).filter({ has: ada.page.getByRole("button", { name: "Unlink Google" }) });
     const googleText = (await googleRow.innerText().catch(() => "")).replace(/\s+/g, " ");
-    results.check("the Google row shows the account and when it was linked", /Google/.test(googleText) && googleText.includes(gmail) && /Linked /.test(googleText), googleText);
-    const emailRow = (await ada.page.getByRole("list", { name: "Your emails" }).locator(`[data-key="${gmail}"]`).innerText().catch(() => "")).replace(/\s+/g, " ");
+    results.check("the Google row shows the account", /Google/.test(googleText) && googleText.includes(gmail), googleText);
+    // The emails are in Email code's dialog (the row is a link to ?edit=email).
+    await linkedList.getByRole("listitem").filter({ hasText: "Email code" }).getByRole("link").click();
+    const emailRow = (await ada.page.getByRole("dialog").getByRole("list", { name: "Your emails" }).locator(`[data-key="${gmail}"]`).innerText().catch(() => "")).replace(/\s+/g, " ");
+    await ada.page.keyboard.press("Escape");
     results.check("the email row says it was verified by Google", /Verified by Google on/.test(emailRow), emailRow);
 
     // 2. Apple too (form_post back through the site).
@@ -74,13 +78,18 @@ const identities: Journey = {
     // 5. Unlinking Google: the row goes, the email stays.
     await ada.page.goto(`${env.site}/sign-in-methods`);
     await googleRow.waitFor({ timeout: 30_000 });
-    await confirmMorph(googleRow, "Unlink", "Unlink");
+    // Unlink asks in a dialog that names the ways in Ada keeps.
+    await googleRow.getByRole("button", { name: "Unlink Google" }).click();
+    const unlinkDialog = ada.page.getByRole("dialog", { name: "Unlink Google?" });
+    const unlinkSays = (await unlinkDialog.innerText({ timeout: 10_000 }).catch(() => "")).replace(/\s+/g, " ");
+    results.check("Unlink asks first and names the ways in Ada keeps", /still sign in with/.test(unlinkSays) && /Apple/.test(unlinkSays), unlinkSays.slice(0, 200));
+    await unlinkDialog.getByRole("button", { name: "Unlink" }).click();
     me = await until(() => getMe(ada.probe), value => !value.identities.some(item => item.provider === "google"), 10_000);
     results.check("Google is unlinked", !me.identities.some(item => item.provider === "google"), JSON.stringify(me.identities.map(item => item.provider)));
     results.check("…its email stays on the account", me.emails.some(item => item.email === gmail));
-    const offer = await until(async () => ({ buttons: await ada.page.getByRole("button", { name: "Connect Google" }).count(), rows: (await linkedList.getByRole("listitem").allInnerTexts()).map(text => text.replace(/\s+/g, " ")) }), state => state.buttons === 1 && !state.rows.some(row => row.includes(gmail)), 8_000);
+    const offer = await until(async () => ({ buttons: await ada.page.getByRole("button", { name: "Connect Google" }).count(), rows: (await linkedList.getByRole("listitem").allInnerTexts()).map(text => text.replace(/\s+/g, " ")) }), state => state.buttons === 1 && state.rows.some(row => /^Google Not connected/.test(row)), 8_000);
     await shot(env, ada.page, "acct-links-03-unlinked");
-    results.check("…and the page drops its row and offers to connect Google again", offer.buttons === 1 && !offer.rows.some(row => row.includes(gmail)), JSON.stringify(offer));
+    results.check("…and the Google row says Not connected and offers to connect it again", offer.buttons === 1 && offer.rows.some(row => /^Google Not connected/.test(row)), JSON.stringify(offer));
     // The email is still Ada's, so a Google sign-in with it is Ada signing in (and links Google again).
     const again = await signIn("google-sign-in-again");
     me = await getMe(ada.probe);

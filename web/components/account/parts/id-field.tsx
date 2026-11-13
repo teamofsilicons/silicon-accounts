@@ -9,12 +9,13 @@
  *   const check = useIdCheck("c:", handle, me.id);
  *   <IdField prefix="c:" value={handle} onValueChange={setHandle} check={check} />
  */
-import { useEffect, useId, useState, type CSSProperties, type Ref } from "react";
+import { useEffect, useState, type ReactNode, type Ref } from "react";
 import { Check, CircleAlert, LoaderCircle } from "lucide-react";
-import { Input } from "@/components/silicon-ui/input/input";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Input } from "@teamofsilicons/silicon-ui/input";
 import { describeError, readableTimes } from "./common";
 import { useIdCheckQuery } from "./queries";
-import styles from "./parts.module.css";
+import styles from "./id-field.module.css";
 
 export type IdPrefix = "c:" | "si:";
 
@@ -81,7 +82,7 @@ export function useIdCheck(prefix: IdPrefix, handle: string, current: string | n
   const query = useIdCheckQuery(wanted && settled === wanted ? wanted : null, forUuid);
   if (blank) return { status: "empty" };
   if (problem) return { status: "invalid", message: problem };
-  if (isCurrent) return { status: "current", message: `${full} is the id now. Type the new one.` };
+  if (isCurrent) return { status: "current", message: `${full} is the ${prefix === "c:" ? "CarbonID" : "id"} now. Type the new one.` };
   if (settled !== wanted) return { status: "checking" };
   if (query.error) return { status: "error", message: `Could not check ${full}: ${describeError(query.error)}` };
   const result = query.data;
@@ -104,7 +105,8 @@ export interface IdFieldProps {
   onValueChange: (handle: string) => void;
   check: IdCheck;
   label?: string;
-  description?: string;
+  /** The hint under the field while there is no status to show (the live status takes its place). */
+  description?: ReactNode;
   /** A failure from submitting (overrides the live status). */
   error?: string | null;
   /** Free ids to offer (the live check's, or a 409's `details.suggestions`). */
@@ -118,8 +120,12 @@ export interface IdFieldProps {
   inputRef?: Ref<HTMLInputElement>;
 }
 
-/** The id input with its live status line and suggestions. */
-export function IdField({ prefix, value, onValueChange, check, label = "New id", description, error, suggestions: given, autoFocus, disabled, readOnly, reclaimText, inputRef }: IdFieldProps) {
+/**
+ * The id input with its live status and suggestions (Anil, 2026-11-11 audit): the prefix is Silicon UI Input's prefix
+ * slot (local patch), so "c:" is the typed id's size and reads as one id with it; the status is the field's hint
+ * (12/400; a problem is its error), standing in for the rest hint, so no empty line is held under the field.
+ */
+export function IdField({ prefix, value, onValueChange, check, label = prefix === "c:" ? "New CarbonID" : "New id", description, error, suggestions: given, autoFocus, disabled, readOnly, reclaimText, inputRef }: IdFieldProps) {
   const tone = error ? "danger"
     : check.status === "available" ? "success"
       : check.status === "unavailable" || check.status === "invalid" || check.status === "error" ? "danger"
@@ -142,43 +148,37 @@ export function IdField({ prefix, value, onValueChange, check, label = "New id",
   })();
   const suggestions = given?.length ? given : check.status === "unavailable" ? check.suggestions : [];
   const pick = (id: string) => onValueChange(normalizeHandle(id, prefix));
-  const uid = useId();
-  const statusId = `${uid}-status`;
-  const descriptionId = `${uid}-description`;
+  const icon = check.status === "checking" && !error ? <LoaderCircle className={styles.spin} size={16} strokeWidth={2} />
+    : tone === "success" ? <Check className={styles.success} size={16} strokeWidth={2} />
+      : tone === "danger" ? <CircleAlert className={styles.danger} size={16} strokeWidth={2} /> : null;
   return (
-    <div className={styles.idField}>
-      <div className={styles.idControl} style={{ "--prefix-width": `${prefix.length}ch` } as CSSProperties}>
-        <Input
-          ref={inputRef}
-          label={label}
-          value={value}
-          onChange={event => onValueChange(normalizeHandle(event.target.value, prefix))}
-          className={styles.idInput}
-          autoComplete="off"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-          maxLength={64}
-          disabled={disabled}
-          readOnly={readOnly}
-          autoFocus={autoFocus}
-          aria-invalid={tone === "danger" ? true : undefined}
-          aria-describedby={[description ? descriptionId : null, statusId].filter(Boolean).join(" ")}
-        />
-        <span className={styles.idPrefix} aria-hidden="true">{prefix}</span>
-        <span className={styles.idSuffix} data-tone={tone} aria-hidden="true">
-          {check.status === "checking" && !error ? <LoaderCircle className={styles.spin} size={16} strokeWidth={1.75} />
-            : tone === "success" ? <Check size={16} strokeWidth={2} />
-              : tone === "danger" ? <CircleAlert size={16} strokeWidth={1.75} /> : null}
-        </span>
-      </div>
-      {description ? <p id={descriptionId} className={styles.idDescription}>{description}</p> : null}
-      <p id={statusId} className={styles.idStatus} data-tone={tone} role="status" aria-live="polite">{status}</p>
+    <div className={styles.field}>
+      <Input
+        ref={inputRef}
+        label={label}
+        value={value}
+        onChange={event => onValueChange(normalizeHandle(event.target.value, prefix))}
+        prefix={<span className={styles.mono}>{prefix}</span>}
+        suffix={icon ?? undefined}
+        className={styles.mono}
+        autoComplete="off"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        maxLength={64}
+        disabled={disabled}
+        readOnly={readOnly}
+        autoFocus={autoFocus}
+        aria-invalid={tone === "danger" ? true : undefined}
+        description={tone === "danger" ? undefined : status || description}
+        error={tone === "danger" ? status : undefined}
+      />
+      <span className="sr-only" role="status" aria-live="polite">{status}</span>
       {suggestions.length ? (
         <div className={styles.suggestions}>
           <span className={styles.suggestionsLabel}>Free ids close to it</span>
           <div className={styles.suggestionList}>
-            {suggestions.map(id => <button key={id} data-sq="surface" type="button" className={styles.suggestion} onClick={() => pick(id)}>{id}</button>)}
+            {suggestions.map(id => <Button key={id} type="button" variant="secondary" size="xs" onClick={() => pick(id)}><span className={styles.mono}>{id}</span></Button>)}
           </div>
         </div>
       ) : null}

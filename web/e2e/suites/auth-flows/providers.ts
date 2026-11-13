@@ -38,7 +38,7 @@ async function chooseNew(ctx: Ctx, page: Page, email: string, name: string): Pro
 
 /** On the sign-up step: the prefilled display name and the page text (read before "Create account"). */
 async function signupPrefill(page: Page): Promise<{ name: string; text: string }> {
-  const field = page.getByRole("textbox", { name: "Display name" });
+  const field = page.getByRole("textbox", { name: "Your name" });
   await field.waitFor({ timeout: 25_000 });
   await sleep(300);
   return { name: await field.inputValue(), text: (await page.locator("main").innerText()).replace(/\s+/g, " ") };

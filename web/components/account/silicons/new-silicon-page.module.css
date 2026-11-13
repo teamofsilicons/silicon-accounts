@@ -1,0 +1,11 @@
+/* /silicons/new: one box in the narrow column under the page bar. It isn't Silicon UI's Card, which clips (it would cut off the
+   Timezone list), and nothing here restyles a component. */
+/* A fixed 480 px, so the fields and map fill it but for one even padding. */
+.box { --sq-r: var(--radius-overlay); width: 100%; max-width: 480px; margin-inline: auto; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-raised); }
+
+/* The top of the box: the watercolour image (public/) with light text: the page's line, then the Stepper. */
+.header { --sq-r: var(--radius-overlay); --sq-bl: 0; --sq-br: 0; display: grid; min-height: 148px; align-content: space-between; gap: var(--space-group); padding: var(--space-inset); background: url("/BG%20131%20%E2%80%94%20Pastel%20Cloud%20Painting.png") left bottom / 120% auto; color: var(--on-media); }
+.description { max-width: 44ch; margin: 0; font-size: var(--text-base); line-height: 1.5; }
+
+.body { padding: var(--space-inset); }
+.alertAction { display: block; margin-top: var(--space-group); }

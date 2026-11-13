@@ -49,11 +49,10 @@ export const journeys: Journey[] = [
       const page = await context.newPage();
       results.watch(page, "cascade-remove-access");
       const outside = watchOutside(page);
-      await page.goto(`${env.site}/apps`);
-      const card = page.getByRole("list", { name: "Apps with access" }).getByRole("listitem").filter({ has: page.getByRole("heading", { name: "DM", exact: true }) });
-      await card.waitFor({ timeout: 30_000 });
-      await card.getByRole("button", { name: "Remove access" }).click();
-      await card.getByRole("button", { name: "Remove", exact: true }).click({ timeout: 10_000 });
+      await page.goto(`${env.site}/apps/dm`);
+      await page.getByRole("heading", { name: "What it can see about you" }).waitFor({ timeout: 30_000 });
+      await page.locator("main").getByRole("button", { name: "Remove", exact: true }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Remove Access", exact: true }).click({ timeout: 10_000 });
       const started = Date.now();
       let first = await verifyAs(ctx, "briefcase", toBriefcase.proof_token);
       for (let i = 0; i < 60 && !isExactlyInvalid(first.body); i++) {
@@ -85,10 +84,9 @@ export const journeys: Journey[] = [
 
       // The /proofs page shows why dm's proofs ended.
       await page.goto(`${env.site}/proofs`);
-      await page.getByRole("button", { name: /^Ended \(\d+\)/ }).click({ timeout: 30_000 });
-      const ended = page.getByRole("article", { name: "DM acts at Briefcase for you" });
-      await ended.waitFor({ timeout: 10_000 });
-      await sleep(1500); // the view switch animates; read and shoot the settled card
+      const ended = page.getByRole("region", { name: "Ended", exact: true }).getByRole("listitem").filter({ hasText: "DM in Briefcase" }).first();
+      await ended.waitFor({ timeout: 30_000 });
+      await sleep(800);
       const text = (await ended.innerText()).replace(/\s+/g, " ");
       results.check("/proofs (Ended) explains it: \"Ended when DM's access was removed\"", /Ended when DM.s access was removed/.test(text), text.slice(0, 240));
       await shot(env, page, "proofs-perf-cascade-01-ended", true);

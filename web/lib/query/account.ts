@@ -6,11 +6,11 @@
  * Failures toast with the server's message and hint unless the caller passes `meta: { toast: false }` through
  * `mutate(…, …)` options or handles them inline.
  */
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/endpoints";
 import type { ApiError } from "../api/errors";
 import type { EmailView, HistoryKind, Me, PhoneView, ProfileUpdate } from "../api/types";
-import { useIdempotentMutation, useSecretMutation } from "./idempotency";
+import { useIdempotentMutation } from "./idempotency";
 import { queryKeys } from "./keys";
 import { useWholeList } from "./pages";
 import { setMe, useSession } from "./session";
@@ -55,7 +55,7 @@ export function useChangeId() {
       setMe(client, me);
       void client.invalidateQueries({ queryKey: queryKeys.me.historyRoot });
     },
-    meta: { errorTitle: "Could not change your id" },
+    meta: { errorTitle: "Could not change your CarbonID" },
   });
 }
 
@@ -184,6 +184,18 @@ export function useUnlinkIdentity() {
 /* Apps, sessions, history and proofs                                                                                  */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
+/** Several apps' public details (name, logo, homepage; `GET /v1/apps/{app_id}/public`), for Home's popular apps. */
+export function usePublicApps(appIds: readonly string[]) {
+  return useQueries({
+    queries: appIds.map(appId => ({
+      queryKey: queryKeys.app.public(appId),
+      queryFn: ({ signal }: { signal: AbortSignal }) => api.apps.public(appId, signal),
+      staleTime: 10 * 60_000,
+      retry: false,
+    })),
+  });
+}
+
 /** Every app this account signed into (the whole list, every page of 200; see lib/query/pages.ts). */
 export function useMyApps() {
   const { status } = useSession();
@@ -242,26 +254,4 @@ export function useRevokeMyProof() {
     onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.me.proofs }),
     meta: { errorTitle: "Could not revoke the proof" },
   });
-}
-
-/* ------------------------------------------------------------------------------------------------------------------ */
-/* A Silicon's own webhook (a Silicon signed in to the site)                                                            */
-/* ------------------------------------------------------------------------------------------------------------------ */
-
-/** Sets a Silicon's own webhook; its signing secret comes back once (`run(url)`; see useSecretMutation). */
-export function useSetOwnWebhook() {
-  const client = useQueryClient();
-  return useSecretMutation((url: string) => api.me.webhook.set(url), {
-    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.me.view }),
-    meta: { errorTitle: "Could not set the webhook" },
-  });
-}
-
-export function useRemoveOwnWebhook() {
-  const client = useQueryClient();
-  return useMutation({ mutationFn: () => api.me.webhook.remove(), onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.me.view }), meta: { errorTitle: "Could not remove the webhook" } });
-}
-
-export function useTestOwnWebhook() {
-  return useMutation({ mutationFn: () => api.me.webhook.test(), meta: { errorTitle: "Could not send the test" } });
 }

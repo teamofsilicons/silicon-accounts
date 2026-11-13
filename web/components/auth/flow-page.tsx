@@ -163,7 +163,9 @@ function FlowPage({ id }: { id: string }) {
   const frameApp = flow?.app ?? (look ? { app_id: look.app_id, name: look.name, branding: look.branding } : null);
   const site = flow ? flow.app.first_party : !look;
   const hero = flow ? heroCopy(flow, { firstVisit }) : { title: look ? `Sign in to ${look.name}` : "Signing in", subtitle: null };
-  const hideName = !!flow && view.startsWith("choose_method") && appTitle(flow).trim().toLowerCase() === flow.app.name.trim().toLowerCase();
+  // The heading already names the app ("Sign in to Briefcase"): the header shows the logo alone, so the name isn't said
+  // twice (Anil, 2026-11-13).
+  const hideName = !!flow && view.startsWith("choose_method") && appTitle(flow).trim().toLowerCase().includes(flow.app.name.trim().toLowerCase());
   // A flow page may choose its own layout; every other page follows the branding's.
   const layout = flow?.step === "details" ? flow.details?.layout ?? null : null;
 
@@ -175,6 +177,8 @@ function FlowPage({ id }: { id: string }) {
         title={hero.title}
         subtitle={hero.subtitle}
         busy={ctl.loading}
+        // "Powered by Silicon Accounts" says nothing on Silicon Accounts' own sign-in (the developer site keeps it).
+        poweredBy={flow?.app.app_id !== "silicon-accounts"}
         hideName={hideName}
         layout={layout}
         footer={flow ? <FlowFooter flow={flow} step={view} /> : null}
@@ -224,7 +228,7 @@ function FlowProblem({ error, flow, look, canRestart, onRestart, onRetry }: { er
           title="This sign-in expired"
           message={`A sign-in stays open for 60 minutes, and this one ran out. ${canRestart ? "Start it again: it takes a moment, and anything you verified in the last 48 hours is still ready." : `Start again from ${name}.`}`}
           error={error}
-          actions={[...(canRestart ? [{ label: "Start again", onClick: onRestart }] : []), ...homeAction]}
+          actions={[...(canRestart ? [{ label: "Start Again", onClick: onRestart }] : []), ...homeAction]}
         />
       );
     case "flow_not_bound":
@@ -235,7 +239,7 @@ function FlowProblem({ error, flow, look, canRestart, onRestart, onRetry }: { er
           message="This sign-in belongs to the browser it started in, and this browser is a different one (or its cookies were cleared)."
           hint={canRestart ? "Start again here, or go back to the browser you started in." : `Go back to the browser you started in, or start again from ${name}.`}
           error={error}
-          actions={[...(canRestart ? [{ label: "Start again here", onClick: onRestart }] : []), ...homeAction]}
+          actions={[...(canRestart ? [{ label: "Start Again Here", onClick: onRestart }] : []), ...homeAction]}
         />
       );
     case "flow_not_found":
@@ -246,7 +250,7 @@ function FlowProblem({ error, flow, look, canRestart, onRestart, onRetry }: { er
           message="The sign-in link is no longer open: it finished, or it expired and was cleared away."
           hint={flow ? `Start again from ${name}.` : "Start again from the app you were signing in to."}
           error={error}
-          actions={[...(canRestart ? [{ label: "Start again", onClick: onRestart }] : []), ...homeAction]}
+          actions={[...(canRestart ? [{ label: "Start Again", onClick: onRestart }] : []), ...homeAction]}
         />
       );
     default: {
@@ -257,7 +261,7 @@ function FlowProblem({ error, flow, look, canRestart, onRestart, onRetry }: { er
           title={error.isNetwork ? "Silicon Accounts is unreachable" : "This sign-in can't continue"}
           message={words.text}
           error={error}
-          actions={[{ label: "Try again", onClick: onRetry }, ...homeAction]}
+          actions={[{ label: "Try Again", onClick: onRetry }, ...homeAction]}
         />
       );
     }

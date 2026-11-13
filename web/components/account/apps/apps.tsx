@@ -1,275 +1,126 @@
 "use client";
 
 /**
- * /apps: every app this account has signed into (the list is read to its end), what each one can see (with the values
- * it gets), and when it last saw you. Removing an app's access signs you out of it everywhere, revokes the proofs it holds about you and tells the
- * app; you can sign in to it again later. Apps that imported you before you ever signed in are listed too, since they
- * hold data about you.
+ * /apps, Connected apps, as the prototype draws it (Anil, 2026-11-11: "design the connected apps screen"): the page bar,
+ * then one list of the apps you've signed into, each a row that opens its page (/apps/[id]) with when it last signed you
+ * in; then the way to Permissions between apps; then, only if there are any, the apps whose access you removed. What an
+ * app can see, where it acts for you and Remove are on its page. Apps that imported you before you ever signed in are
+ * listed too, since they hold data about you. Built on parts/rows.tsx, as Security is.
+ *
+ * With no app connected (someone who has just joined, sent here by Home's Apps card), the page says how an app gets
+ * here: "No apps yet" over three rows (open an app, sign in with Silicon Accounts, it shows up here) with Browse
+ * Silicon Apps on the first (Anil, 2026-11-13, /__apps-empty C).
  */
-import { useEffect, useState } from "react";
-import { animate } from "motion/react";
-import { ArrowUpRight, LayoutGrid } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
-import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
-import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
-import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
-import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { Page, PageHeader } from "@/components/foundation/layout/layout";
-import type { Me, MyApp, Scope } from "@/lib/api/types";
-import { formatDate, formatPhone, formatRelative, plural } from "@/lib/format";
-import { useDeveloperUrl, useMe, useMeta } from "@/lib/query/session";
-import { timezoneLabel } from "@/lib/timezones";
-import { AnimatedRows } from "../parts/animated-rows";
+import { ArrowUpRight, Link2, LogIn, MousePointerClick, ShieldCheck } from "lucide-react";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
+import { ButtonLink } from "@/components/foundation/button-link";
+import { Page } from "@/components/foundation/layout/layout";
+import type { MyApp } from "@/lib/api/types";
+import { formatDate, formatRelative } from "@/lib/format";
+import { paths } from "@/lib/navigation";
+import { useDeveloperUrl, useMeta } from "@/lib/query/session";
 import { AppMark } from "../parts/app-mark";
-import { asCarbon, describeError, useNow } from "../parts/common";
-import { FitPrompt } from "../parts/fit-prompt";
-import { focusAfterRemoval, pageMain, pressedViewOption } from "../parts/focus";
+import { withAppIcon } from "../parts/app-icons";
+import { describeError, useNow } from "../parts/common";
 import { ListCap } from "../parts/list-cap";
-import { useEveryApp, useRemoveAccess } from "../parts/queries";
-import styles from "./apps.module.css";
+import { PageBar } from "../parts/page-bar";
+import { useEveryApp, useEveryProof } from "../parts/queries";
+import { LinkItem, LinkRow, Row, Section, Strong, Tile } from "../parts/rows";
 import { InterfaceAccess } from "./interface-access";
+import styles from "./apps.module.css";
 
-type View = "access" | "removed";
+/** An app's page. */
+export const appHref = (appId: string) => `${paths.apps}/${encodeURIComponent(appId)}`;
 
-/** What a scope shows about this account: a label and, where it is a value, the value the app gets. */
-function shared(scope: Scope, me: Me | undefined): { label: string; value: string | null } | null {
-  const carbon = asCarbon(me);
-  switch (scope) {
-    case "profile":
-      return { label: "Name, id and photo", value: me ? `${me.display_name} · ${me.id ?? me.uuid}` : null };
-    case "email":
-      return { label: "Email", value: carbon?.emails.find(item => item.is_primary)?.email ?? null };
-    case "phone": {
-      const phone = carbon?.phones.find(item => item.is_primary)?.phone;
-      return { label: "Phone", value: phone ? formatPhone(phone) : null };
-    }
-    case "dob":
-      return { label: "Date of birth", value: me ? formatDate(me.dob) : null };
-    case "timezone":
-      return { label: "Timezone", value: me ? timezoneLabel(me.timezone) : null };
-    default:
-      return null;
-  }
+/** What the row says about an app under its name: when it last signed you in, or how it came to hold your details. */
+export function appLine(item: MyApp, now: number) {
+  if (item.status === "access_removed") return <>Access removed{item.access_removed_at ? <> <Strong>{formatDate(item.access_removed_at)}</Strong></> : null}</>;
+  if (item.status === "imported") return "Imported you. You haven’t signed in yet.";
+  return item.last_signed_in_at ? <>Signed in <Strong>{formatRelative(item.last_signed_in_at, now)}</Strong></> : "You haven’t signed in yet";
 }
-
-const host = (url: string | null) => {
-  if (!url) return null;
-  try {
-    return new URL(url).host;
-  } catch {
-    return null;
-  }
-};
 
 export function Apps() {
   const apps = useEveryApp();
+  const proofs = useEveryProof();
   const meta = useMeta();
   const developerUrl = useDeveloperUrl();
-  const me = useMe();
-  const [view, setView] = useState<View>("access");
   const now = useNow(30_000);
-  const remove = useRemoveAccess();
   const items = apps.data?.items ?? [];
-  const withAccess = items.filter(item => item.status !== "access_removed");
+  const connected = items.filter(item => item.status !== "access_removed");
   const removed = items.filter(item => item.status === "access_removed");
-  const shown = view === "access" ? withAccess : removed;
+  const allProofs = proofs.data?.items ?? [];
+  const activeProofs = allProofs.filter(proof => proof.status === "active").length;
 
-  const removeAccess = async (appId: string) => {
-    await remove.mutateAsync(appId);
-    // "Access removed" shows in place first, then the card moves to the removed apps; focus goes to the next card,
-    // else to the view switch.
-    window.setTimeout(() => focusAfterRemoval(() => pageMain()?.querySelector('[role="list"][aria-label="Apps with access"]'), pressedViewOption), 960);
-  };
-
-  // A stamp on the identity card links here as /apps#app-<id>: bring that card into view and mark it for a moment.
-  const loaded = !!apps.data;
-  useEffect(() => {
-    if (!loaded) return;
-    const target = window.location.hash.replace(/^#/, "");
-    if (!target.startsWith("app-")) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let timer = 0;
-    const frame = requestAnimationFrame(() => {
-      const card = document.getElementById(target);
-      if (!card) return;
-      card.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
-      card.setAttribute("data-highlight", "");
-      if (!reduced) animate(card, { scale: [1, 1.012, 1] }, { duration: 0.6, delay: 0.25 });
-      timer = window.setTimeout(() => card.removeAttribute("data-highlight"), 2200);
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-      window.clearTimeout(timer);
-    };
-  }, [loaded]);
+  const row = (item: MyApp) => (
+    <LinkItem
+      key={item.membership_id}
+      href={appHref(item.app.app_id)}
+      lead={<AppMark app={withAppIcon(item.app)} size={32} className={styles.mark} decorative />}
+      title={item.app.name}
+      detail={appLine(item, now)}
+      end={item.status === "imported" ? <Badge size="sm" tone="warning">Imported you</Badge> : undefined}
+    />
+  );
 
   return (
-    <Page width="default">
-      <PageHeader
-        title="Apps you have signed into"
-        description="What each app can see about you and when it last saw you. Removing an app's access signs you out of it everywhere and ends its user verifications for you."
-      />
-      <InterfaceAccess />
-      {apps.error && !apps.data ? (
-        <Alert tone="danger" title="Your apps did not load">
-          {describeError(apps.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void apps.refetch()}>Try again</Button></span>
-        </Alert>
-      ) : !apps.data ? (
-        <AppsSkeleton />
-      ) : (
-        <>
-          <div className={styles.toolbar}>
-            <SegmentedControl
-              label="Which apps"
-              value={view}
-              onValueChange={value => setView(value as View)}
-              options={[
-                { value: "access", label: `With access (${withAccess.length})` },
-                { value: "removed", label: `Access removed (${removed.length})` },
-              ]}
-            />
-          </div>
-          {/* Names what the switch shows, so the headings below it (each app's name, or the empty state's) sit one level
-              under the page's: h1, h2, h3. */}
-          <h2 className="sr-only">{view === "access" ? "Apps with access" : "Apps whose access you removed"}</h2>
-          {shown.length ? (
-            <AnimatedRows items={shown} keyOf={item => item.membership_id} layout="grid" className={styles.grid} label={view === "access" ? "Apps with access" : "Apps whose access you removed"}>
-              {item => <AppCard item={item} me={me.data} now={now} onRemove={() => removeAccess(item.app.app_id)} />}
-            </AnimatedRows>
-          ) : (
-            <div data-sq="surface" className={styles.empty}>
-              <EmptyState
-                icon={<LayoutGrid width={24} height={24} strokeWidth={1.5} />}
-                title={view === "access" ? "No apps yet" : "No removed apps"}
-                description={view === "access" ? "When you sign in to an app with Silicon Accounts, it shows up here with what it can see." : "Apps whose access you remove show up here. You can sign in to them again whenever you like."}
+    <div>
+      <PageBar title="Connected Apps" />
+      <Page>
+        {apps.error && !apps.data ? (
+          <Alert tone="danger" title="Your apps did not load">
+            {describeError(apps.error)}
+            <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void apps.refetch()}>Try Again</Button></span>
+          </Alert>
+        ) : !apps.data ? (
+          <div className={styles.skeleton} aria-busy="true" aria-label="Loading your apps"><Skeleton label="Loading" lines={4} avatar /></div>
+        ) : (
+          <>
+            {connected.length ? (
+              <Section id="apps-connected" label="Your apps">{connected.map(row)}</Section>
+            ) : (
+              <Section id="apps-none" title="No apps yet" description="Apps appear here after you or your Silicons sign in.">
+                <Row lead={<Tile><MousePointerClick size={16} strokeWidth={2} /></Tile>} title="Open an app" detail="Any app on Silicon Apps">
+                  <ButtonLink href={meta.data?.silicon_apps_url ?? "https://apps.teamofsilicons.com"} external variant="secondary" size="sm">Browse Silicon Apps</ButtonLink>
+                </Row>
+                <Row lead={<Tile><LogIn size={16} strokeWidth={2} /></Tile>} title="Sign in with Silicon Accounts" detail="You choose what it can see" />
+                <Row lead={<Tile><ShieldCheck size={16} strokeWidth={2} /></Tile>} title="It shows up here" detail="Change what it sees, or remove it, at any time" />
+              </Section>
+            )}
+            <InterfaceAccess />
+            {allProofs.length ? (
+              <LinkRow
+                href={paths.proofs}
+                lead={<Tile><Link2 size={16} strokeWidth={2} /></Tile>}
+                title="Permissions between apps"
+                detail="One app doing something in another app for you"
+                end={activeProofs ? <Badge size="sm" tone="neutral">{activeProofs} active</Badge> : undefined}
               />
-            </div>
-          )}
-          <ListCap page={apps.data} noun="apps" command="silicon-accounts apps list" />
-          <p className={styles.footnote}>
-            Making an app? Apps are created in{" "}
-            {/* The link and its comma stay on one line: the link is an inline-flex box, so a phone could otherwise
-                start the next line with the comma. */}
-            <span className={styles.keep}>
-              <a data-sq="surface" href={meta.data?.silicon_apps_url ?? "https://apps.teamofsilicons.com"} target="_blank" rel="noopener">
-                Silicon Apps<ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
-              </a>
-              ,
-            </span>{" "}
-            and you set up how people sign in to the ones you build on the{" "}
-            <span className={styles.keep}>
-              <a data-sq="surface" href={developerUrl}>
-                developer site<ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
-              </a>
-              .
-            </span>
-          </p>
-        </>
-      )}
-    </Page>
-  );
-}
-
-function AppCard({ item, me, now, onRemove }: { item: MyApp; me: Me | undefined; now: number; onRemove: () => Promise<unknown> }) {
-  const [error, setError] = useState<string | null>(null);
-  const app = item.app;
-  const scopes: Scope[] = item.granted_scopes.includes("profile") ? item.granted_scopes : ["profile", ...item.granted_scopes];
-  const rows = scopes.map(scope => shared(scope, me)).filter((row): row is { label: string; value: string | null } => !!row);
-  const removed = item.status === "access_removed";
-  const imported = item.status === "imported";
-  const domain = host(app.homepage_url);
-  return (
-    <article id={`app-${app.app_id}`} data-sq="surface" className={styles.card} data-status={item.status}>
-      <header className={styles.cardHead}>
-        <AppMark app={app} size={44} />
-        <div className={styles.cardTitle}>
-          <h3 className={styles.name}>{app.name}</h3>
-          {domain ? (
-            <a className={styles.sub} href={app.homepage_url ?? undefined} target="_blank" rel="noopener">
-              {domain}
-              <ArrowUpRight size={12} strokeWidth={1.75} aria-hidden="true" />
-            </a>
-          ) : <span className={styles.sub}>{app.app_id}</span>}
-        </div>
-        {imported ? <Badge size="sm" tone="warning">Imported you</Badge>
-          : removed ? <Badge size="sm">Access removed</Badge>
-            : item.active_sessions > 0 ? <Badge size="sm" tone="success">Signed in</Badge> : null}
-      </header>
-
-      {removed ? (
-        <p className={styles.lead}>It can no longer see anything about you{item.access_removed_at ? `, since ${formatDate(item.access_removed_at)}` : ""}. Sign in to it again to give it access.</p>
-      ) : imported ? (
-        <p className={styles.lead}>{app.name} imported your account, so it holds what it imported. It gets nothing more until you sign in to it.</p>
-      ) : (
-        <div className={styles.shares}>
-          <span className={styles.sharesLabel}>It can see</span>
-          <ul className={styles.chips} role="list">
-            {rows.map(row => (
-              <li key={row.label} data-sq="surface" className={styles.chip}>
-                <span className={styles.chipLabel}>{row.label}</span>
-                {row.value ? <span className={styles.chipValue} title={row.value}>{row.value}</span> : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <dl className={styles.facts}>
-        <div>
-          <dt>Last signed in</dt>
-          <dd>{item.last_signed_in_at ? formatRelative(item.last_signed_in_at, now) : "Never"}</dd>
-        </div>
-        <div>
-          <dt>First signed in</dt>
-          <dd>{item.first_signed_in_at ? formatDate(item.first_signed_in_at) : "Never"}</dd>
-        </div>
-        <div>
-          <dt>Sessions</dt>
-          <dd>{item.active_sessions ? plural(item.active_sessions, "active session") : "None active"}</dd>
-        </div>
-      </dl>
-
-      <footer className={styles.cardFoot}>
-        <span className={styles.membership}>
-          <span className={styles.membershipLabel}>Membership</span>
-          <span className="mono" title={item.membership_id}>{item.membership_id}</span>
-          <CopyButton value={item.membership_id} label={`Copy ${app.name}'s membership id`} iconOnly variant="plain" className={styles.copy} />
-        </span>
-        {!removed ? (
-          <ConfirmMorph
-            label="Remove access"
-            prompt={<FitPrompt full={`Remove ${app.name}'s access?`} short="Remove its access?" tiny="Remove it?" />}
-            confirmLabel="Remove"
-            pendingLabel="Removing"
-            doneLabel="Access removed"
-            onConfirm={async () => {
-              setError(null);
-              try {
-                await onRemove();
-              } catch (raw) {
-                setError(describeError(raw));
-                throw raw;
-              }
-            }}
-          />
-        ) : null}
-      </footer>
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
-    </article>
-  );
-}
-
-function AppsSkeleton() {
-  return (
-    <div className={styles.skeleton} aria-busy="true" aria-label="Loading your apps">
-      <SkeletonBlock width="300px" height="40px" radius="14px" />
-      <div className={styles.grid}>
-        {[0, 1, 2, 3].map(index => <SkeletonBlock key={index} width="100%" height="268px" radius="var(--radius-surface)" index={index + 1} />)}
-      </div>
+            ) : null}
+            {removed.length ? <Section id="apps-removed" title="Access removed">{removed.map(row)}</Section> : null}
+            <ListCap page={apps.data} noun="apps" command="silicon-accounts apps list" />
+            <p className={styles.footnote}>
+              Making an app? Apps are created in{" "}
+              {/* The link and its comma stay on one line, so a phone can't start the next line with the comma. */}
+              <span className={styles.keep}>
+                <a href={meta.data?.silicon_apps_url ?? "https://apps.teamofsilicons.com"} target="_blank" rel="noopener">
+                  Silicon Apps<ArrowUpRight size={14} strokeWidth={2} aria-hidden="true" />
+                </a>
+                ,
+              </span>{" "}
+              and you set up how people sign in to the ones you build on the{" "}
+              <span className={styles.keep}>
+                <a href={developerUrl}>
+                  developer site<ArrowUpRight size={14} strokeWidth={2} aria-hidden="true" />
+                </a>
+                .
+              </span>
+            </p>
+          </>
+        )}
+      </Page>
     </div>
   );
 }

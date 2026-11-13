@@ -1,7 +1,9 @@
 "use client";
 
 /**
- * /sign-in-methods: every way to sign in to this account. Up to 10 emails and 10 phone numbers, all verified with a
+ * /sign-in-methods, the Security pillar: your ways in, where you are signed in, and the way to Activity.
+ *
+ * The ways in: every way to sign in to this account. Up to 10 emails and 10 phone numbers, all verified with a
  * 6-digit code before they count; one of each is primary (apps that can see your email or phone get the primary one),
  * and the primary one cannot be removed until another is made primary. Below them, the Google and Apple accounts
  * connected to this account: connecting one adds its verified email without a code.
@@ -9,19 +11,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { AnimatedCounter } from "@/components/silicon-ui/animated-counter/animated-counter";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
-import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { AnimatedCounter } from "@teamofsilicons/silicon-ui/animated-counter";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { ConfirmMorph } from "@teamofsilicons/silicon-ui/confirm-morph";
+import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, PageHeader, Section } from "@/components/foundation/layout/layout";
 import type { CarbonMe, EmailView, IdentityView, Meta, PhoneView, Provider } from "@/lib/api/types";
 import { formatDate, formatPhone, formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useMakePrimaryEmail, useMakePrimaryPhone } from "@/lib/query/account";
-import { sameSitePath, useMe, useMeta } from "@/lib/query/session";
+import { useMe, useMeta } from "@/lib/query/session";
 import { asCarbon, asSilicon, describeError, useNow } from "../parts/common";
 import { FitPrompt } from "../parts/fit-prompt";
 import { focusAfterRemoval } from "../parts/focus";
@@ -29,10 +31,12 @@ import { AnimatedRows } from "../parts/animated-rows";
 import { useConnectProvider, useLinkFlow, useRemoveContact, useSetMeView, useUnlinkProvider } from "../parts/queries";
 import { guessCountry } from "@/components/foundation/phone-field/phone-data";
 import { ContactAdder } from "./contact-adder";
+import { ActivityLink } from "../security/activity-link";
+import { Sessions } from "../security/sessions";
 import styles from "./sign-in-methods.module.css";
 
 const LIMIT = 10;
-const PROVIDER_NAMES: Record<Provider, string> = { google: "Google", apple: "Apple" };
+export const PROVIDER_NAMES: Record<Provider, string> = { google: "Google", apple: "Apple" };
 
 /** The visitor's likely country for local phone numbers: the timezone's country, else the browser language's region. */
 const defaultCountry = (): string => guessCountry();
@@ -40,19 +44,15 @@ const defaultCountry = (): string => guessCountry();
 export function SignInMethods() {
   const me = useMe();
   const meta = useMeta();
-  const router = useRouter();
-  const params = useSearchParams();
-  const returnTo = params.get("return_to");
   const carbon = asCarbon(me.data);
   const silicon = asSilicon(me.data);
   return (
     <Page width="narrow">
-      <PageHeader title="Sign-in methods" description="Every email, phone number and Google or Apple account here signs you in to the same account." />
-      {returnTo?.startsWith("/interface-authorize?") ? <Alert tone="info" title="Return to your Interface"><span>Add and verify the required detail, then continue your sign-in.</span> <Button variant="secondary" size="sm" onClick={() => { const safe = sameSitePath(returnTo); if (safe) router.push(safe); }}>Return to sign-in</Button></Alert> : null}
+      <PageHeader title="Security" description="Your ways in, where you are signed in, and what happened. Every email, phone number and Google or Apple account here signs you in to the same account." />
       {me.error && !me.data ? (
         <Alert tone="danger" title="Your sign-in methods did not load">
           {describeError(me.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try again</Button></span>
+          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try Again</Button></span>
         </Alert>
       ) : silicon ? (
         <EmptyState
@@ -70,6 +70,12 @@ export function SignInMethods() {
       ) : (
         <MethodsSkeleton />
       )}
+      {me.data ? (
+        <>
+          <Sessions />
+          <ActivityLink />
+        </>
+      ) : null}
     </Page>
   );
 }
@@ -82,6 +88,24 @@ type Contact = EmailView | PhoneView;
 const valueOf = (item: Contact) => ("email" in item ? item.email : item.phone);
 
 function ContactSection({ channel, carbon }: { channel: "email" | "phone"; carbon: CarbonMe }) {
+  const isEmail = channel === "email";
+  const count = (isEmail ? carbon.emails : carbon.phones).length;
+  const pluralNoun = isEmail ? "emails" : "phone numbers";
+  return (
+    <Section
+      title={isEmail ? "Emails" : "Phone numbers"}
+      description={isEmail
+        ? "A code sent to any of these signs you in. Apps that can see your email get the primary one."
+        : "A code texted to any of these signs you in. Apps that can see your phone number get the primary one."}
+      actions={<span className={styles.count} aria-label={`${count} of ${LIMIT} ${pluralNoun}`}><AnimatedCounter value={count} /> of {LIMIT}</span>}
+    >
+      <ContactList channel={channel} carbon={carbon} />
+    </Section>
+  );
+}
+
+/** An account's emails or phone numbers: make one primary, remove one, add one with a code (here and in Personal info). */
+export function ContactList({ channel, carbon }: { channel: "email" | "phone"; carbon: CarbonMe }) {
   const isEmail = channel === "email";
   const items: Contact[] = isEmail ? carbon.emails : carbon.phones;
   const shown = (value: string) => (isEmail ? value : formatPhone(value));
@@ -123,14 +147,8 @@ function ContactSection({ channel, carbon }: { channel: "email" | "phone"; carbo
   const count = items.length;
 
   return (
-    <Section
-      title={isEmail ? "Emails" : "Phone numbers"}
-      description={isEmail
-        ? "A code sent to any of these signs you in. Apps that can see your email get the primary one."
-        : "A code texted to any of these signs you in. Apps that can see your phone number get the primary one."}
-      actions={<span className={styles.count} aria-label={`${count} of ${LIMIT} ${pluralNoun}`}><AnimatedCounter value={count} /> of {LIMIT}</span>}
-    >
-      <div ref={group} data-sq="surface" className={styles.group}>
+    <div ref={group} className={styles.list}>
+      {count ? (
         <AnimatedRows items={sorted} keyOf={valueOf} label={isEmail ? "Your emails" : "Your phone numbers"}>
           {item => (
             <ContactRow
@@ -145,14 +163,14 @@ function ContactSection({ channel, carbon }: { channel: "email" | "phone"; carbo
             />
           )}
         </AnimatedRows>
-        {count === 0 ? <p className={styles.emptyRow}>No {noun} yet. Add one to sign in with a code.</p> : null}
-        <div className={styles.adderRow} data-adder="">
-          {count < LIMIT
-            ? <ContactAdder channel={channel} existing={items.map(valueOf)} defaultCountry={country} />
-            : <p className={styles.limit}>You have {LIMIT} {pluralNoun}, the most an account can hold. Remove one to add another.</p>}
-        </div>
+      ) : null}
+      {/* Nothing yet: the dialog was opened to add one, so the form opens at once (no "No phone number yet" line). */}
+      <div className={styles.adderRow} data-adder="" data-first={count ? undefined : ""}>
+        {count < LIMIT
+          ? <ContactAdder channel={channel} existing={items.map(valueOf)} defaultCountry={country} startOpen={count === 0} />
+          : <p className={styles.limit}>You have {LIMIT} {pluralNoun}, the most an account can hold. Remove one to add another.</p>}
       </div>
-    </Section>
+    </div>
   );
 }
 
@@ -174,42 +192,53 @@ interface ContactRowProps {
   onRemove: () => Promise<unknown>;
 }
 
+/**
+ * One email or phone number, on Home's rules (Anil, 2026-11-10): the value in body (a quiet Primary badge on the primary
+ * one) over one line in --text-soft (how it was verified, or why the primary can't go); Make Primary and Remove as
+ * outlined buttons. Remove asks in place: the row's buttons become Cancel and a red Remove.
+ */
 function ContactRow({ value, shown, item, noun, promoting, busy, onMakePrimary, onRemove }: ContactRowProps) {
   const [error, setError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const remove = async () => {
+    setError(null);
+    setRemoving(true);
+    try {
+      await onRemove();
+    } catch (raw) {
+      setError(describeError(raw));
+      setRemoving(false);
+      setAsking(false);
+    }
+  };
   return (
     <div className={styles.row} data-primary={item.is_primary || undefined}>
       <div className={styles.rowMain}>
         <div className={styles.rowTitle}>
           <span className={styles.value} title={value}>{shown}</span>
-          {item.is_primary ? <Badge size="sm" tone="info">Primary</Badge> : null}
-          {!item.verified_at ? <Badge size="sm" tone="warning">Not verified</Badge> : null}
+          {item.is_primary ? <Badge size="sm" tone="neutral">Primary</Badge> : null}
+          {!item.verified_at ? <Badge size="sm" tone="warning">Not Verified</Badge> : null}
         </div>
         <span className={styles.rowMeta}>
-          {item.is_primary ? `Your primary ${noun}. To remove it, make another ${noun} primary first.` : verifiedText(item)}
+          {asking ? `Remove ${shown}? It stops signing you in.` : item.is_primary ? `Your primary ${noun}. To remove it, make another one primary first.` : verifiedText(item)}
         </span>
         {error ? <span className={styles.rowError} role="alert">{error}</span> : null}
       </div>
       <div className={styles.rowActions}>
-        {!item.is_primary && item.verified_at ? (
-          <Button variant="ghost" size="sm" onClick={onMakePrimary} loading={promoting} disabled={busy && !promoting}>Make primary</Button>
-        ) : null}
-        <ConfirmMorph
-          label="Remove"
-          prompt={<FitPrompt full={`Remove ${shown}?`} short={noun === "email" ? "Remove this email?" : "Remove this number?"} tiny="Remove it?" />}
-          confirmLabel="Remove"
-          pendingLabel="Removing"
-          doneLabel="Removed"
-          disabled={item.is_primary}
-          onConfirm={async () => {
-            setError(null);
-            try {
-              await onRemove();
-            } catch (raw) {
-              setError(describeError(raw));
-              throw raw;
-            }
-          }}
-        />
+        {asking ? (
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setAsking(false)} disabled={removing}>Cancel</Button>
+            <Button variant="danger" size="sm" onClick={() => void remove()} loading={removing}>Remove</Button>
+          </>
+        ) : (
+          <>
+            {!item.is_primary && item.verified_at ? (
+              <Button variant="secondary" size="sm" onClick={onMakePrimary} loading={promoting} disabled={busy && !promoting}>Make Primary</Button>
+            ) : null}
+            {!item.is_primary ? <Button variant="secondary" size="sm" onClick={() => setAsking(true)} aria-label={`Remove ${shown}`}>Remove</Button> : null}
+          </>
+        )}
       </div>
     </div>
   );
@@ -219,7 +248,7 @@ function ContactRow({ value, shown, item, noun, promoting, busy, onMakePrimary, 
 /* Google and Apple                                                                                                    */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-function ProviderMark({ provider }: { provider: Provider }) {
+export function ProviderMark({ provider }: { provider: Provider }) {
   return (
     <span className={styles.providerMark} aria-hidden="true">
       {provider === "google" ? (
@@ -286,7 +315,7 @@ function ProvidersSection({ carbon, meta, metaError, metaPending, metaRetrying, 
           <div className={styles.connect} data-connect="">
             <Alert tone="danger" title="Connecting Google or Apple is unavailable for now">
               {describeError(metaError)}{identities.length ? " The accounts linked above still sign you in." : ""}
-              <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={onRetryMeta} loading={metaRetrying}>Try again</Button></span>
+              <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={onRetryMeta} loading={metaRetrying}>Try Again</Button></span>
             </Alert>
           </div>
         ) : metaPending ? (
@@ -378,8 +407,25 @@ const LINK_ERRORS: Record<string, string> = {
   flow_expired: "It took too long, so the connection expired. Connect it again.",
 };
 
+/**
+ * The Interface sign-in that sent you here to add a detail it needs (interface-authorize.tsx). Anything else is dropped;
+ * a value starting "/interface-authorize?" is always a path on this site, so the server and the browser agree on it.
+ */
+export function interfaceReturn(value: string | null): string | null {
+  return value?.startsWith("/interface-authorize?") ? value : null;
+}
+
+/** /sign-in-methods, opening a list (`edit`) and keeping the way back to an Interface sign-in (`return_to`). */
+export function securityHref(backTo: string | null, edit?: "email" | "phone"): string {
+  const query = new URLSearchParams();
+  if (edit) query.set("edit", edit);
+  if (backTo) query.set("return_to", backTo);
+  const text = query.toString();
+  return text ? `${paths.signInMethods}?${text}` : paths.signInMethods;
+}
+
 /** The outcome of connecting Google or Apple (`?linked=…` or `?link_error=…`), read once; the address is cleaned up. */
-function LinkResult() {
+export function LinkResult() {
   const search = useSearchParams();
   const router = useRouter();
   const [result] = useState(() => {
@@ -392,8 +438,8 @@ function LinkResult() {
   const [open, setOpen] = useState(true);
   const flow = useLinkFlow(result && !result.linked ? result.flow : null);
   useEffect(() => {
-    if (result) router.replace(paths.signInMethods, { scroll: false });
-  }, [result, router]);
+    if (result) router.replace(securityHref(interfaceReturn(search.get("return_to"))), { scroll: false });
+  }, [result, router, search]);
   if (!result) return null;
   const name = result.provider ? PROVIDER_NAMES[result.provider] : "The account";
   if (result.linked) {

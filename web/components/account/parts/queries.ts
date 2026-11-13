@@ -11,7 +11,7 @@
  * - `useSetMeView`: replaces or patches the cached Me view (optimistic edits, answers that carry a new Me).
  * - `useEveryApp`, `useEveryProof`, `useEverySilicon`, `useEveryCustodianRequest`, `useEverySession`: the shared list
  *   hooks, which read whole lists now (lib/query/pages.ts); the names stay for the pages that use them.
- * - `useCreateSiliconOnce`, `useRotateStkOnce`, `useSetSiliconWebhookOnce`: the shared secret actions (lib/query
+ * - `useCreateSiliconOnce`, `useRotateStkOnce`: the shared secret actions (lib/query
  *   useSecretMutation: never cached, reset after hand-off); the names stay for the pages that use them.
  * - `useChangeOwnId`, `useChangeSiliconIdInForm`: id changes whose refusals the id form explains in place (no toast).
  */
@@ -66,7 +66,7 @@ export function useLinkFlow(flowId: string | null) {
 
 /**
  * Writes to the cached Me view: `set(me)` replaces it with an answer from the server (and the session summary the
- * dock shows), `patch(fn)` edits it in place (optimistic changes; returns the previous value to roll back with).
+ * account menu shows), `patch(fn)` edits it in place (optimistic changes; returns the previous value to roll back with).
  */
 export function useSetMeView() {
   const client = useQueryClient();
@@ -224,18 +224,6 @@ export function useSiliconDefaultPhoto() {
   );
 }
 
-/** Removes a Silicon's webhook; "Removed" shows first. */
-export function useRemoveSiliconWebhookSettled() {
-  return useSettledMutation(
-    (uuid: string) => api.me.silicons.removeWebhook(uuid),
-    (client, _data, uuid) => {
-      storeSiliconItem(client, uuid, current => ({ ...current, webhook_url: null }));
-      refreshSiliconViews(client);
-    },
-    { errorTitle: "The webhook was not removed" },
-  );
-}
-
 /** Cancels a pending transfer; "Cancelled" shows first. */
 export function useCancelTransferSettled() {
   return useSettledMutation(
@@ -361,4 +349,4 @@ function upsertSilicon(client: ReturnType<typeof useQueryClient>, silicon: Manag
     : page));
 }
 
-export { useCreateSilicon as useCreateSiliconOnce, useRotateStk as useRotateStkOnce, useSetSiliconWebhook as useSetSiliconWebhookOnce } from "@/lib/query/silicons";
+export { useCreateSilicon as useCreateSiliconOnce, useRotateStk as useRotateStkOnce } from "@/lib/query/silicons";

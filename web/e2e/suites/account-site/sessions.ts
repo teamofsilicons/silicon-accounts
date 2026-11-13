@@ -1,5 +1,5 @@
 /**
- * Settings → "Where you are signed in": every browser session, first-party (silicon-accounts CLI) sign-in and developer
+ * Security (/sign-in-methods) → "Where you are signed in": every browser session, first-party (silicon-accounts CLI) sign-in and developer
  * platform sign-in (developers.teamofsilicons.com, the first-party app `developer`, 06-v2 §2) of the Carbon, with how
  * and from where; signing one out ends it at once (the other browser lands signed out, the CLI's tokens stop working
  * also after a refresh rotated them, the developer site is signed out at its next call); signing out here ends this
@@ -20,7 +20,7 @@ interface SessionInfo {
 
 const sessions: Journey = {
   name: "account-site-sessions",
-  title: "sessions on Settings: this browser, another browser, an silicon-accounts CLI sign-in and a developer-site sign-in listed with how and from where; signing the other browser, the CLI and the developer site out ends each at once (refresh included); signing out here",
+  title: "sessions on Security: this browser, another browser, an silicon-accounts CLI sign-in and a developer-site sign-in listed with how and from where; signing the other browser, the CLI and the developer site out ends each at once (refresh included); signing out here",
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
@@ -71,10 +71,10 @@ const sessions: Journey = {
 
     // The page.
     const started = Date.now();
-    await page.goto(`${env.site}/settings`);
+    await page.goto(`${env.site}/sign-in-methods`);
     const list = page.getByRole("list", { name: "Signed-in sessions" });
     await list.waitFor({ timeout: 30_000 });
-    results.metric("/settings sessions visible after navigation", Date.now() - started);
+    results.metric("/sign-in-methods sessions visible after navigation", Date.now() - started);
     await sleep(900);
     await shot(env, page, "acct-sessions-01-list", true);
     const rows = await rowsOf(page, "Signed-in sessions");
@@ -147,7 +147,7 @@ const sessions: Journey = {
     await signInOnDeveloper(env, developer, null);
     const devAgain = await developerApi<{ uuid?: string }>(env, developer, "/me");
     results.check("setup: signed in to the developer site again", devAgain.status === 200 && devAgain.body.uuid === carbon.uuid, String(devAgain.status));
-    await page.goto(`${env.site}/settings`);
+    await page.goto(`${env.site}/sign-in-methods`);
     await list.waitFor({ timeout: 30_000 });
     await until(() => rowsOf(page, "Signed-in sessions"), current => current.length === 2, 8_000);
     await sleep(600);

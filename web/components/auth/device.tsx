@@ -13,9 +13,9 @@
  */
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Button } from "@/components/silicon-ui/button/button";
-import { Input } from "@/components/silicon-ui/input/input";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Input } from "@teamofsilicons/silicon-ui/input";
 import { ApiError } from "@/lib/api/errors";
 import type { AccountSummary, DeviceRequest } from "@/lib/api/types";
 import { formatRelative } from "@/lib/format";
@@ -258,7 +258,7 @@ function DeviceApproval() {
             {signedInAs}
             {actionError ? <Alert tone="danger" title="That did not go through" data-error-code={actionError.code}>{describe(actionError) ?? ""}</Alert> : null}
             <div className={flow.actions}>
-              <Button className={flow.wide} loading={acting === "approve"} disabled={acting === "deny"} onClick={() => void answer(true)}>Approve sign-in</Button>
+              <Button className={flow.wide} loading={acting === "approve"} disabled={acting === "deny"} onClick={() => void answer(true)}>Approve Sign-In</Button>
               <Button variant="secondary" className={flow.wide} loading={acting === "deny"} disabled={acting === "approve"} onClick={() => void answer(false)}>Deny</Button>
             </div>
           </>
@@ -283,35 +283,35 @@ function DeviceApproval() {
               title="This sign-in was already approved"
               description={<>Someone approved this code before this page loaded (perhaps you, in another tab), so the terminal signs in as the account that approved it. If you did not expect that, {app ? "start the sign-in again in your terminal for a new code." : <>run <code className={flow.mono}>silicon-accounts login</code> again in your terminal for a new code.</>}</>}
             />
-            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
+            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter Another Code</Button>
           </>
         );
       case "denied":
         return (
           <>
             <StepHeading title="Sign-in denied" description="The terminal was not signed in, and its code no longer works. If you did not start this sign-in, nothing else is needed." />
-            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
+            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter Another Code</Button>
           </>
         );
       case "expired":
         return (
           <>
             <StepHeading title="This code expired" description={<>Codes work for 10 minutes. {again}</>} />
-            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
+            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter Another Code</Button>
           </>
         );
       case "used":
         return (
           <>
             <StepHeading title="This code was already used" description={<>A terminal already signed in with it, and each code works once. {app ? "Start the sign-in again in your terminal if you need a new one." : <>Run <code className={flow.mono}>silicon-accounts login</code> again in your terminal if you need a new sign-in.</>}</>} />
-            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter another code</Button>
+            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter Another Code</Button>
           </>
         );
       case "unknown":
         return (
           <>
             <StepHeading title={`No sign-in uses ${code ?? "that code"}`} description="Check the code in your terminal and enter it again. Codes are 8 letters and digits, like WDJB-MJHT." />
-            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter the code again</Button>
+            <Button variant="secondary" className={flow.wide} onClick={enterAnother}>Enter the Code Again</Button>
           </>
         );
       case "silicon":
@@ -322,7 +322,7 @@ function DeviceApproval() {
         return (
           <>
             <StepHeading title={current === "offline" ? "Silicon Accounts is unreachable" : "This sign-in request could not be loaded"} description={describe(problem) ?? "Check your connection, then try again."} />
-            <Button className={flow.wide} onClick={() => (current === "offline" ? refetch() : void request.refetch())}>Try again</Button>
+            <Button className={flow.wide} onClick={() => (current === "offline" ? refetch() : void request.refetch())}>Try Again</Button>
           </>
         );
       }
@@ -346,5 +346,5 @@ function DeviceApproval() {
 
 /** Who approves: the signed-in Carbon, with a way to switch. */
 function SignedInAs({ account, onSwitch }: { account: AccountSummary; onSwitch: () => void }) {
-  return <AccountRow account={account} size="sm" action={<Button variant="ghost" size="sm" onClick={onSwitch}>Not you?</Button>} />;
+  return <AccountRow account={account} size="sm" action={<Button variant="ghost" size="sm" onClick={onSwitch}>Not You?</Button>} />;
 }

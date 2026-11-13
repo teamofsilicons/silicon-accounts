@@ -247,8 +247,11 @@ export async function setTicked(page: Page, field: string, want: boolean): Promi
   );
 }
 
-/** The page's main button by its exact label ("Continue", "Review", "Start messaging", "Share and continue"…). */
-export const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
+/**
+ * The page's main button by its whole label ("Continue", "Review", "Start messaging", "Share and continue"…), in any
+ * case: the pages title-case their buttons ("Share and Continue").
+ */
+export const button = (page: Page, name: string) => page.getByRole("button", { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") });
 
 /**
  * lib.ts signInWithCode for any app: an app whose field starts on Phone (dm's method order is phone, email) shows
@@ -256,9 +259,8 @@ export const button = (page: Page, name: string) => page.getByRole("button", { n
  */
 export async function codeSignIn(env: Env, page: Page, who: { email: string } | { phone: string }): Promise<string> {
   if ("email" in who) {
-    await page.getByRole("textbox", { name: /^(Email|Phone number)$/ }).first().waitFor({ timeout: 30_000 });
-    const choice = page.getByRole("button", { name: "Email", exact: true });
-    if (await choice.isVisible().catch(() => false)) await choice.click();
+    // One "Email or phone" field when the app offers both (2026-11-12); an email-only app's "Email".
+    await page.getByRole("textbox", { name: /^(Email or phone|Email|Phone number)$/ }).first().waitFor({ timeout: 30_000 });
   }
   return signInWithCode(env, page, who);
 }
@@ -291,7 +293,7 @@ export async function sendOnPage(env: Env, page: Page, field: "email" | "phone",
   const adder = live(page, `[data-adding="${field}"]`).first();
   sentAfter = await lastSeq(env);
   if (field === "email") {
-    const input = adder.getByRole("textbox", { name: "Email" });
+    const input = adder.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await input.waitFor({ timeout: 10_000 });
     await input.fill(value);
   } else {

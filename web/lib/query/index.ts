@@ -19,11 +19,10 @@ export {
   useEmails, useAddEmail, useVerifyEmail, useMakePrimaryEmail, useRemoveEmail,
   usePhones, useAddPhone, useVerifyPhone, useMakePrimaryPhone, useRemovePhone, useIdentities, useUnlinkIdentity,
   useMyApps, useRemoveAppAccess, useSessions, useRevokeSession, useHistory, useMyProofs, useRevokeMyProof,
-  useSetOwnWebhook, useRemoveOwnWebhook, useTestOwnWebhook,
 } from "./account";
 export {
   useSilicons, useSilicon, useCreateSilicon, useUpdateSilicon, useChangeSiliconId, useUploadSiliconPhoto, useRotateStk,
-  useSetSiliconWebhook, useRemoveSiliconWebhook, useTransferSilicon, useCancelTransfer, useDeleteSilicon,
+  useTransferSilicon, useCancelTransfer, useDeleteSilicon,
   useCustodianRequests, useAcceptCustodianRequest, useDeclineCustodianRequest,
 } from "./silicons";
 export { useCreateFlow, useFlow, useFlowAction, useRefreshFlow, useDeviceRequest, useDecideDevice } from "./auth";

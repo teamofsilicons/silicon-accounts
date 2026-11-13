@@ -128,12 +128,12 @@ export const journeys: Journey[] = [
       await page.goto(`${env.developer}/sign-in`);
       await page.getByRole("link", { name: /Continue with Silicon Accounts/ }).click({ timeout: 30_000 });
       await page.waitForURL(url => url.href.startsWith(`${env.site}/authorize`), { timeout: 30_000 });
-      await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+      await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
       await stepReady(page);
       await auditStep(ctx, page, findings, "developer-hosted-signin", VARIANTS, { expectedConsole: expected });
       const email = freshEmail("uxa.devsignin");
       await signInWithCode(env, page, { email });
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
       await page.waitForURL(url => url.href.startsWith(env.developer) && !url.pathname.startsWith("/auth/"), { timeout: 30_000 });
       const home = await openDeveloperPage(ctx, page, "/");
       results.check("developer-signin: back on the developer site, signed in, on the apps home", /apps/i.test(home), home.slice(0, 160));
@@ -238,7 +238,7 @@ export const journeys: Journey[] = [
         results.watch(page, "developer-briefcase-user");
         await startAtApp(env, page, "briefcase");
         await signInWithCode(env, page, { email: freshEmail("uxa.devuser") });
-        await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+        await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
         await page.getByRole("button", { name: "Share and continue" }).click({ timeout: 30_000 });
         await page.waitForURL(url => url.href.startsWith(`${env.apps}/briefcase/`), { timeout: 30_000 });
         const account = await appAccount(page);
@@ -329,7 +329,7 @@ export const journeys: Journey[] = [
         results.watch(page, "preview-real");
         await startAtApp(env, page, "briefcase");
         await signInWithCode(env, page, { email: freshEmail("uxa.preview") });
-        await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+        await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
         await live(page, 'ul[aria-label^="Details shared with"]').first().waitFor({ timeout: 30_000 });
         await stepReady(page);
         await page.screenshot({ path: `${env.shots}/uxa-preview-real-details-390.png`, fullPage: true });

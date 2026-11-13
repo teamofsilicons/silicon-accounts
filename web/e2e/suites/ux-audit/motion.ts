@@ -92,11 +92,11 @@ export const journeys: Journey[] = [
       const codes: Partial<Record<Mode, string>> = {};
       await compare(ctx, findings, pages, "the hosted card moving from email to code", async (page, mode) => {
         await page.goto(await hostedLink(env, page, "briefcase"));
-        await page.getByRole("textbox", { name: "Email" }).fill(emails[mode], { timeout: 30_000 });
+        await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).fill(emails[mode], { timeout: 30_000 });
         await stepReady(page);
       }, async (page, mode) => {
         const after = await lastSeq(env);
-        await page.getByRole("button", { name: "Continue", exact: true }).click();
+        await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
         codes[mode] = await codeFor(env, emails[mode], after);
       }, 1_600);
       // The first five digits before the probe (each keystroke moves the code field's ring one cell, which is input,
@@ -109,7 +109,7 @@ export const journeys: Journey[] = [
         await settle(page, 300);
       }, async (page, mode) => {
         await page.keyboard.type((codes[mode] ?? "").slice(5), { delay: 10 });
-        await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
+        await page.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 30_000 });
       }, 1_800);
       const hiddenSignup = await kit<Array<{ el: string; opacity: number }>>(pages.reduce, "hiddenContent()");
       results.check("reduced motion: setting up shows everything (no entrance left at opacity 0)", hiddenSignup.length === 0, JSON.stringify(hiddenSignup));
@@ -125,31 +125,23 @@ export const journeys: Journey[] = [
         results.watch(page, `motion-signed-${mode}`);
         collectConsole(page);
       }
-      await compare(ctx, findings, signed, "a page change along the dock (Identity → Apps)", async page => {
+      await compare(ctx, findings, signed, "a page change along the sidebar (Home → Connected apps)", async page => {
         await page.goto(`${env.site}/`);
         await page.locator("main").first().waitFor({ timeout: 30_000 });
         await settle(page, 800);
       }, async page => {
-        await page.locator("nav[aria-label='Account sections']").getByRole("link", { name: "Apps" }).click();
+        await page.locator("nav[aria-label='Account sections']").getByRole("link", { name: "Connected Apps" }).click();
         await page.waitForURL(`${env.site}/apps`, { timeout: 15_000 });
       }, 1_200);
-      let eclipse: Record<Mode, boolean> = { "no-preference": false, reduce: false };
-      await compare(ctx, findings, signed, "changing the theme from the dock", async page => {
-        await settle(page, 600);
-        await page.evaluate("(() => { window.__uxaEclipse = false; new MutationObserver(() => { if (document.documentElement.getAttribute('data-transition') === 'eclipse') window.__uxaEclipse = true; }).observe(document.documentElement, { attributes: true }); })()");
-      }, async (page, mode) => {
-        await page.locator("nav[aria-label='Account sections']").getByRole("button", { name: /^Switch to (dark|light) mode$/ }).first().click();
-        await sleep(900);
-        eclipse = { ...eclipse, [mode]: (await page.evaluate("window.__uxaEclipse === true")) === true };
-      }, 1_400);
-      results.check("reduced motion: the theme changes without the eclipse (no data-transition=eclipse)", !eclipse.reduce, `reduce: ${eclipse.reduce}, without the preference: ${eclipse["no-preference"]}`);
-      await compare(ctx, findings, signed, "opening the Create a Silicon drawer", async page => {
-        await page.goto(`${env.site}/silicons`);
-        await page.getByRole("button", { name: "Create a Silicon" }).first().waitFor({ timeout: 30_000 });
+      // The theme switch left the account pages (the shell's account menu hides it, 2026-11-07), so there is no eclipse
+      // to check here any more; the hosted pages keep theirs.
+      await compare(ctx, findings, signed, "opening a dialog (Personal info's Name)", async page => {
+        await page.goto(`${env.site}/personal`);
+        await page.locator('main [data-edit="name"]').first().waitFor({ timeout: 30_000 });
         await settle(page, 800);
       }, async page => {
-        await page.getByRole("button", { name: "Create a Silicon" }).first().click();
-        await page.getByRole("dialog", { name: "Create a Silicon" }).waitFor({ timeout: 10_000 });
+        await page.locator('main [data-edit="name"]').first().click();
+        await page.getByRole("dialog", { name: "Name" }).waitFor({ timeout: 10_000 });
       }, 1_200);
       await compare(ctx, findings, signed, "opening the command palette (⌘K)", async page => {
         await page.keyboard.press("Escape");
@@ -162,7 +154,7 @@ export const journeys: Journey[] = [
       await signed.reduce.keyboard.press("Escape");
 
       // Every account page at rest under reduced motion: no endless animation, nothing left invisible.
-      for (const path of ["/", "/sign-in-methods", "/apps", "/silicons", "/proofs", "/activity", "/settings"]) {
+      for (const path of ["/", "/sign-in-methods", "/apps", "/silicons", "/proofs", "/activity", "/privacy"]) {
         const page = signed.reduce;
         await page.goto(`${env.site}${path}`);
         await page.locator("main").first().waitFor({ timeout: 30_000 });
@@ -190,7 +182,7 @@ export const journeys: Journey[] = [
         await compare(ctx, findings, flows, "a flow's details page moving to the next (ledgerly Step 1 → Step 2)", async page => {
           await startAtApp(env, page, "ledgerly", { intent: "signup" });
           await signInWithCode(env, page, { email: freshEmail("uxa.motion.flow") });
-          await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+          await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
           await page.getByText("Step 1 of 2", { exact: true }).first().waitFor({ timeout: 30_000 });
           await completeStepOne(env, page);
           await settle(page, 600);

@@ -1,0 +1,11 @@
+/* /__apps-empty (apps-empty-lab.tsx): each version in a stage drawn like the page, the page bar over its content. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.version { display: grid; gap: var(--space-inset); }
+.name { margin: 0; font: var(--h3); letter-spacing: var(--h3-tracking); }
+.note { max-width: 70ch; margin: var(--space-tight) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.stage { overflow: hidden; border-radius: var(--radius-container); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.page { padding: 0 var(--gutter) var(--space-block); }
+.lead { margin: var(--space-section) 0 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }

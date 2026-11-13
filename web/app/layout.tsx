@@ -10,7 +10,7 @@
  *   embed   /embed/v1/buttons, a transparent document inside an app's iframe (no theme boot)
  * Every page is rendered per request (the nonce changes each time), so `headers()` is fine here.
  */
-import "@/components/silicon-ui/foundation.css";
+import "@teamofsilicons/silicon-ui/styles.css";
 import "@/styles/fonts.css";
 import "@/styles/tokens.css";
 import "@/styles/squircle.css";
@@ -45,7 +45,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#FFFDF9",
+  themeColor: "#FCFCFC",
   colorScheme: "light",
 };
 
@@ -63,11 +63,6 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         {surface !== "embed" ? (
           <>
             <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-            {/* Every face the first paint uses, fetched with the page so text never paints in a fallback first (styles/fonts.css). */}
-            <link rel="preload" href="/fonts/bdo-grotesk/BDOGrotesk-Regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-            <link rel="preload" href="/fonts/bdo-grotesk/BDOGrotesk-Medium.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-            <link rel="preload" href="/fonts/hedvig-letters-serif/HedvigLettersSerif-Regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-            <link rel="preload" href="/fonts/geist-pixel/GeistPixel-Square.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
           </>
         ) : null}
       </head>

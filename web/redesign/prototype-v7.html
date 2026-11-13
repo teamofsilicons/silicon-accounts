@@ -1,0 +1,1245 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Silicon Accounts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Silicon Accounts prototypes: one shared shell (top bar with search, app switcher, avatar menu; section list; white page),
+   four design languages inside it. Briefcase language: warm canvas, white surfaces, dark primary, mono ids,
+   iris gradients for Silicons, orange only for what needs you. */
+:root{
+  --canvas:#F2F1EE; --surface:#FFFFFF; --surface-2:#F7F6F3; --hover:#F1F0EC; --press:#EAE8E3;
+  --line:#ECEAE6; --line-2:#DFDDD7;
+  --ink:#1B1B19; --ink-2:#44433E; --muted:#74726B; --faint:#A3A099;
+  --accent:#3460F0; --accent-soft:#EEF2FE;
+  --si:#7457F2; --si-soft:#F3F0FF; --si-line:#E2DBFF; --si-ink:#5A3FD6;
+  --need:#B85B0E; --need-soft:#FFF5EA; --need-line:#F5DFC6;
+  --good:#1D9461; --good-soft:#EAF6EF;
+  --danger:#CF3F2E; --danger-soft:#FDEEEC; --danger-line:#F3CFCA;
+  --dark:#1B1B19; --dark-ink:#FFFFFF;
+  --av-l:88%; --av-t:30%;
+  --scrim:rgba(24,22,18,.32);
+  --shadow-1:0 1px 2px rgba(24,22,18,.04);
+  --shadow-pop:0 18px 40px -12px rgba(24,22,18,.22),0 3px 10px rgba(24,22,18,.06);
+  --font:"BDO Grotesk","Hanken Grotesk","Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --r-s:8px; --r:10px; --r-l:14px; --r-xl:18px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --canvas:#0F0F0E; --surface:#191917; --surface-2:#1F1F1D; --hover:#242422; --press:#2C2C29;
+  --line:#2A2927; --line-2:#383733;
+  --ink:#F1F0EC; --ink-2:#D0CEC7; --muted:#9A978F; --faint:#6D6B65;
+  --accent:#7D9BFF; --accent-soft:#1D2440;
+  --si:#A48FFF; --si-soft:#221D38; --si-line:#3A3160; --si-ink:#C7BAFF;
+  --need:#F0A35E; --need-soft:#2B2016; --need-line:#4A3520;
+  --good:#53C98F; --good-soft:#15281E;
+  --danger:#FF7B6A; --danger-soft:#321A17; --danger-line:#5A2A24;
+  --dark:#F1F0EC; --dark-ink:#141413;
+  --av-l:28%; --av-t:84%;
+  --scrim:rgba(0,0,0,.55);
+  --shadow-1:0 1px 2px rgba(0,0,0,.3);
+  --shadow-pop:0 18px 44px -10px rgba(0,0,0,.6),0 3px 10px rgba(0,0,0,.4);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --canvas:#0F0F0E; --surface:#191917; --surface-2:#1F1F1D; --hover:#242422; --press:#2C2C29;
+  --line:#2A2927; --line-2:#383733;
+  --ink:#F1F0EC; --ink-2:#D0CEC7; --muted:#9A978F; --faint:#6D6B65;
+  --accent:#7D9BFF; --accent-soft:#1D2440;
+  --si:#A48FFF; --si-soft:#221D38; --si-line:#3A3160; --si-ink:#C7BAFF;
+  --need:#F0A35E; --need-soft:#2B2016; --need-line:#4A3520;
+  --good:#53C98F; --good-soft:#15281E;
+  --danger:#FF7B6A; --danger-soft:#321A17; --danger-line:#5A2A24;
+  --dark:#F1F0EC; --dark-ink:#141413;
+  --av-l:28%; --av-t:84%;
+  --scrim:rgba(0,0,0,.55);
+  --shadow-1:0 1px 2px rgba(0,0,0,.3);
+  --shadow-pop:0 18px 44px -10px rgba(0,0,0,.6),0 3px 10px rgba(0,0,0,.4);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--canvas);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0;text-align:inherit}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;display:block}
+.ic.s{width:16px;height:16px}.ic.xs{width:14px;height:14px}.ic.l{width:22px;height:22px}
+.muted{color:var(--muted)}.faint{color:var(--faint)}.small{font-size:13px}.tiny{font-size:12px}
+.row{display:flex;align-items:center;gap:10px}.grow{flex:1;min-width:0}.wrap{flex-wrap:wrap}
+.mono{font-family:var(--mono);font-size:12.5px}
+.link{color:var(--accent);font-weight:500}.link:hover{text-decoration:underline}
+.b5{font-weight:500}
+.mark{display:inline-flex;gap:2px;align-items:center}
+.mark i{display:block;width:11px;height:11px;background:var(--ink);border-radius:2px}
+.mark i+i{border-radius:50%}
+.wbody{height:100%;overflow:auto;position:relative;container-type:inline-size;container-name:win}
+
+/* controls */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 14px;border-radius:var(--r);font-size:14px;font-weight:500;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);white-space:nowrap;box-shadow:var(--shadow-1)}
+.btn:hover{background:var(--hover)}
+.btn.pri{background:var(--dark);color:var(--dark-ink);border-color:var(--dark)}
+.btn.pri:hover{opacity:.88;background:var(--dark)}
+.btn.ghost{background:transparent;border-color:transparent;box-shadow:none;color:var(--ink-2)}
+.btn.ghost:hover{background:var(--hover)}
+.btn.danger{color:var(--danger);border-color:var(--danger-line)}
+.btn.danger:hover{background:var(--danger-soft)}
+.btn.dangerfill{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.sm{height:30px;padding:0 10px;font-size:13px;border-radius:var(--r-s)}
+.btn.lg{height:44px;padding:0 18px;font-size:15px;border-radius:12px}
+.btn.wide{width:100%}
+.btn[disabled]{opacity:.42;cursor:not-allowed}
+.iconbtn{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--ink-2)}
+.iconbtn:hover,.iconbtn.on{background:var(--hover);color:var(--ink)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:20px;font-size:12px;font-weight:500;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.pill.need{background:var(--need-soft);color:var(--need)}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.iris{background:var(--si-soft);color:var(--si-ink)}
+.pill.bad{background:var(--danger-soft);color:var(--danger)}
+.pill .ic{width:12px;height:12px}
+.field{width:100%;height:42px;border:1px solid var(--line-2);border-radius:var(--r);padding:0 12px;background:var(--surface);outline:none;font-size:15px}
+.field:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.fwrap{display:flex;align-items:center;gap:2px;height:42px;border:1px solid var(--line-2);border-radius:var(--r);padding:0 6px 0 12px;background:var(--surface)}
+.fwrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.fwrap input{border:0;outline:none;background:none;flex:1;min-width:0;height:100%;font-family:var(--mono);font-size:14px}
+.fwrap .pre{font-family:var(--mono);font-size:14px;color:var(--faint)}
+.lab{font-size:13px;font-weight:500;color:var(--ink-2)}
+.help{font-size:13px;color:var(--muted);line-height:1.45}
+.fgroup{display:flex;flex-direction:column;gap:6px}
+.check{display:flex;align-items:flex-start;gap:10px;cursor:pointer;line-height:1.4}
+.check input{width:18px;height:18px;margin:1px 0 0;accent-color:var(--dark);flex-shrink:0}
+.radio{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer}
+.radio:has(input:checked){border-color:var(--ink)}
+.radio input{accent-color:var(--dark);width:16px;height:16px;margin:0}
+.sw{position:relative;width:36px;height:22px;flex-shrink:0;display:inline-block}
+.sw input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer;z-index:1}
+.sw span{position:absolute;inset:0;border-radius:20px;background:var(--line-2);transition:background .15s}
+.sw span::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s}
+.sw input:checked+span{background:var(--dark)}
+.sw input:checked+span::after{transform:translateX(14px);background:var(--dark-ink)}
+.sw input:disabled+span{opacity:.5}
+.sw input:disabled{cursor:not-allowed}
+.sw input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+
+/* avatars */
+.av{width:24px;height:24px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;font-weight:600;background:hsl(var(--h,24) 70% var(--av-l));color:hsl(var(--h,24) 42% var(--av-t));flex-shrink:0;line-height:1}
+.si{width:24px;height:24px;border-radius:30%;display:inline-grid;place-items:center;background:linear-gradient(140deg,var(--g1),var(--g2));color:#fff;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.si .ic{width:58%;height:58%}
+.si.pending{filter:grayscale(.6);opacity:.72}
+.am{width:24px;height:24px;border-radius:7px;display:inline-grid;place-items:center;background:var(--dark);color:var(--dark-ink);flex-shrink:0}
+.am .ic{width:60%;height:60%}
+.z-sm{width:20px;height:20px;font-size:10px}.z-md{width:32px;height:32px;font-size:13px}.z-lg{width:40px;height:40px;font-size:15px}.z-xl{width:56px;height:56px;font-size:21px}.z-xxl{width:88px;height:88px;font-size:32px}
+.am.z-sm{border-radius:6px}.am.z-lg,.am.z-xl{border-radius:11px}.am.z-xxl{border-radius:20px}
+.stack{display:inline-flex}.stack>*{box-shadow:0 0 0 2px var(--surface)}.stack>*+*{margin-left:-6px}
+.ring{padding:4px;border-radius:50%;background:conic-gradient(from 200deg,#8C7BFF,#4FD1C5,#FFC86B,#FF8F7A,#C17CFF,#8C7BFF);display:inline-grid}
+.ring>span{box-shadow:0 0 0 3px var(--surface)}
+
+/* toasts / modal / menus */
+.toasts{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:60;align-items:center;width:max-content;max-width:calc(100% - 32px);pointer-events:none}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:14px;background:var(--dark);color:var(--dark-ink);border-radius:var(--r-l);padding:10px 10px 10px 16px;font-size:13.5px;box-shadow:var(--shadow-pop);line-height:1.45;animation:up .22s cubic-bezier(.16,1,.3,1)}
+.toast button{flex-shrink:0;font-weight:500;padding:5px 10px;border-radius:var(--r-s);background:rgba(127,127,127,.24)}
+@keyframes up{from{transform:translateY(8px);opacity:0}}
+.scrim{position:fixed;inset:0;background:var(--scrim);display:grid;place-items:center;z-index:50;padding:16px;animation:fade .15s ease}
+@keyframes fade{from{opacity:0}}
+.dlg{background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--shadow-pop);width:480px;max-width:100%;max-height:calc(100% - 16px);overflow:auto;padding:22px 24px 20px;display:flex;flex-direction:column;gap:14px;animation:up .2s cubic-bezier(.16,1,.3,1)}
+.dlg h3{font-size:18px;font-weight:500;letter-spacing:-.01em;line-height:1.3}
+.dlg p{line-height:1.5;color:var(--ink-2)}
+.dlg .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;flex-wrap:wrap}
+.dlg .warn{background:var(--need-soft);color:var(--need);border-radius:var(--r);padding:10px 12px;font-size:13px;line-height:1.45;display:flex;gap:8px}
+.dlg ul{margin:0;padding-left:18px;color:var(--ink-2);line-height:1.6}
+.menu{position:absolute;z-index:40;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:6px;width:300px;max-width:calc(100vw - 24px);box-shadow:var(--shadow-pop);animation:up .16s ease}
+.menu .who{display:flex;flex-direction:column;gap:6px;align-items:center;padding:16px 10px 14px;border-bottom:1px solid var(--line);margin-bottom:4px;text-align:center}
+.menu .mi{display:flex;align-items:center;gap:10px;width:100%;height:36px;padding:0 10px;border-radius:var(--r-s);font-size:14px;color:var(--ink-2)}
+.menu .mi:hover,.menu .mi.sel{background:var(--hover);color:var(--ink)}
+.menu .mi .grow{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu .lbl{font-size:12px;font-weight:600;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;padding:8px 10px 6px}
+.menu .sep{height:1px;background:var(--line);margin:4px 0}
+.agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px}
+.ag{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px 12px;border-radius:var(--r);font-size:13px;color:var(--ink-2);position:relative}
+.ag:hover{background:var(--hover);color:var(--ink)}
+.ag .dot{position:absolute;top:10px;right:22px;width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 2px var(--surface)}
+
+/* prototype states (small, bottom right) */
+.protobtn{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:70;height:32px;padding:0 12px;border-radius:20px;background:var(--surface);border:1px solid var(--line-2);box-shadow:var(--shadow-pop);font-size:12.5px;font-weight:500;color:var(--ink-2);display:inline-flex;align-items:center;gap:6px}
+.protobtn:hover{color:var(--ink)}
+.proto{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:70;width:310px;max-width:calc(100vw - 28px);max-height:calc(100% - 80px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--shadow-pop);padding:12px;display:flex;flex-direction:column;gap:10px;animation:up .18s ease}
+.proto .lbl{font-size:12px;font-weight:600;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;padding:2px 8px}
+.proto .opt{display:flex;align-items:center;gap:10px;min-height:34px;padding:6px 8px;border-radius:var(--r-s);font-size:13.5px;color:var(--ink-2);width:100%;line-height:1.3}
+.proto .opt:hover{background:var(--hover);color:var(--ink)}
+.proto .opt.on{background:var(--surface-2);color:var(--ink);font-weight:500;box-shadow:inset 0 0 0 1px var(--line)}
+.proto .sec{display:flex;flex-direction:column;gap:2px}
+.proto .sec+.sec{border-top:1px solid var(--line);padding-top:10px}
+.proto .about{font-size:13px;color:var(--ink-2);line-height:1.5;padding:2px 8px}
+
+/* shell */
+.acc{min-height:100%;display:flex;flex-direction:column}
+.atop{display:flex;align-items:center;gap:6px;height:64px;padding:0 14px 0 20px;position:relative;flex-shrink:0}
+.atop .brand{display:flex;align-items:center;gap:10px;font-weight:500;font-size:16px;min-width:220px;letter-spacing:-.01em}
+.atop .brand .name b{font-weight:500;color:var(--muted)}
+.asearch{flex:1;min-width:0;max-width:560px;margin:0 auto;position:relative}
+.asearch .box{display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:20px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-1);color:var(--faint)}
+.asearch .box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.asearch input{border:0;outline:none;background:none;flex:1;min-width:0;width:100%;height:100%;color:var(--ink)}
+.asearch .results{position:absolute;left:0;right:0;top:46px;width:auto}
+.atop .tools{display:flex;align-items:center;gap:2px;margin-left:12px}
+.atop .me{border-radius:50%;display:grid;padding:3px;margin-left:4px}
+.atop .me:hover{background:var(--hover)}
+.abody{flex:1;display:flex;gap:4px;padding:0 12px 12px 8px;min-height:0}
+.anav{width:244px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;padding:4px 4px 0;position:sticky;top:0;align-self:flex-start;min-height:calc(100vh - 76px)}
+.anav .nav{display:flex;align-items:center;gap:12px;height:40px;padding:0 12px;border-radius:var(--r);color:var(--ink-2);font-size:14px;width:100%}
+.anav .nav:hover{background:var(--hover);color:var(--ink)}
+.anav .nav.on{background:var(--surface);color:var(--ink);font-weight:500;box-shadow:var(--shadow-1),0 0 0 1px var(--line)}
+.anav .nav .cnt{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;font-size:12px;font-weight:600;background:var(--need-soft);color:var(--need);display:grid;place-items:center}
+.anav .nav .cnt.si{background:var(--si-soft);color:var(--si-ink)}
+.anav .navlbl{font-size:11.5px;font-weight:600;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;padding:14px 12px 6px}
+.anav .foot{margin-top:auto;padding:16px 12px 6px;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.anav .foot button{color:var(--muted);text-align:left}.anav .foot button:hover{color:var(--ink)}
+.amain{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-1);padding:32px 40px 56px}
+.page{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+.page.wide{max-width:780px}
+.ph{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.ph h1{font-size:26px;font-weight:500;letter-spacing:-.02em;line-height:1.15;text-wrap:balance}
+.ph .sub{color:var(--muted);margin-top:6px;font-size:14.5px;line-height:1.5;max-width:60ch}
+.crumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-bottom:-12px}
+.crumb button:hover{color:var(--ink);text-decoration:underline}
+.scard{border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden;background:var(--surface)}
+.scard .hd{padding:18px 20px 12px;display:flex;align-items:flex-start;gap:12px}
+.scard .hd h2{font-size:16px;font-weight:500;letter-spacing:-.01em}
+.scard .hd p{color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.45;max-width:58ch}
+.srow{display:flex;align-items:center;gap:14px;padding:13px 20px;border-top:1px solid var(--line);width:100%;text-align:left;min-height:56px}
+button.srow:hover{background:var(--surface-2)}
+.scard>.srow:first-child{border-top:0}
+.srow .k{width:150px;flex-shrink:0;font-size:12.5px;font-weight:500;color:var(--muted);letter-spacing:.01em}
+.srow .v{flex:1;min-width:0;line-height:1.4}
+.srow .v .d{color:var(--muted);font-size:13px;margin-top:2px}
+.srow .chev{color:var(--faint)}
+.srow .lead{flex-shrink:0;display:flex}
+.acts{display:flex;gap:8px;flex-shrink:0;align-items:center;flex-wrap:wrap}
+.srow.foot{justify-content:flex-start;gap:18px;min-height:48px;padding:12px 20px;flex-wrap:wrap}
+.srow.compact{padding:10px 18px;min-height:48px}
+.handle{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:13px;color:var(--ink-2);background:var(--surface-2);border-radius:7px;padding:3px 6px 3px 9px}
+.handle button{color:var(--faint);display:grid;place-items:center;width:20px;height:20px;border-radius:5px}
+.handle button:hover{color:var(--ink);background:var(--hover)}
+.tile{width:32px;height:32px;border-radius:9px;background:var(--surface-2);display:grid;place-items:center;color:var(--ink-2);flex-shrink:0}
+.tile.need{background:var(--need-soft);color:var(--need)}
+.tile.good{background:var(--good-soft);color:var(--good)}
+.tile.si{background:var(--si-soft);color:var(--si-ink)}
+.tile.bad{background:var(--danger-soft);color:var(--danger)}
+.tile.lg{width:40px;height:40px;border-radius:11px}
+.attn{border:1px solid var(--need-line);background:var(--need-soft);border-radius:var(--r-l);padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.attn .t{font-weight:500}.attn .d{color:var(--muted);font-size:13px;margin-top:2px}
+.stackcol{display:flex;flex-direction:column;gap:10px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ocard{border:1px solid var(--line);border-radius:var(--r-l);padding:18px 18px 0;display:flex;flex-direction:column;gap:10px;min-height:170px;background:var(--surface)}
+.ocard h2{font-size:16px;font-weight:500;letter-spacing:-.01em}
+.ocard p{color:var(--muted);font-size:13.5px;line-height:1.45}
+.ocard .art{display:flex;align-items:center;gap:8px;min-height:40px}
+.ocard .go{margin-top:auto;border-top:1px solid var(--line);margin-left:-18px;margin-right:-18px;padding:12px 18px;color:var(--accent);font-weight:500;text-align:left;font-size:14px}
+.ocard .go:hover{background:var(--surface-2)}
+.ocard.si-card{background:linear-gradient(160deg,var(--si-soft),var(--surface) 70%)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{height:40px;padding:0 12px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs button:hover{color:var(--ink)}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--ink)}
+.dz{border:1px solid var(--danger-line);border-radius:var(--r-l);overflow:hidden}
+.dz .hd{padding:14px 20px;font-weight:500;color:var(--danger);background:var(--danger-soft)}
+.dz .srow{border-top:1px solid var(--danger-line)}
+.dz>.srow:first-child{border-top:0}
+.keybox{display:flex;align-items:center;gap:12px;background:var(--dark);color:var(--dark-ink);border-radius:var(--r-l);padding:14px 14px 14px 16px}
+.keybox code{font-family:var(--mono);font-size:18px;letter-spacing:.03em;flex:1;min-width:0;overflow-wrap:anywhere}
+.keybox button{background:rgba(127,127,127,.26);border-radius:var(--r-s);height:32px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;font-weight:500;font-size:13px}
+.codeblock{font-family:var(--mono);font-size:12.5px;background:var(--surface-2);border-radius:var(--r);padding:12px 14px;line-height:1.7;color:var(--ink-2);overflow-x:auto;white-space:pre}
+.twocol{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.twocol>div{border-radius:var(--r-l);padding:14px 16px;background:var(--surface-2);display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:1.45}
+.twocol>div.yes{background:var(--good-soft)}
+.twocol b{font-weight:600}
+.empty{border:1px dashed var(--line-2);border-radius:var(--r-l);padding:32px 24px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.empty .ill{width:52px;height:52px;border-radius:16px;background:var(--surface-2);display:grid;place-items:center;color:var(--muted)}
+.empty h2{font-size:17px;font-weight:500}
+.empty p{color:var(--muted);max-width:46ch}
+.day{font-size:12px;font-weight:600;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;padding:14px 20px 4px}
+.ev{display:flex;gap:12px;padding:12px 20px;border-top:1px solid var(--line);align-items:flex-start}
+.day+.ev{border-top:0}
+.ev .tm{font-size:12.5px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{height:30px;padding:0 12px;border-radius:20px;border:1px solid var(--line-2);font-size:13px;font-weight:500;color:var(--ink-2);background:var(--surface);display:inline-flex;align-items:center;gap:6px}
+.chips button.on{background:var(--dark);color:var(--dark-ink);border-color:var(--dark)}
+.note{background:var(--surface-2);border-radius:var(--r);padding:10px 12px;font-size:13px;color:var(--muted);line-height:1.5;display:flex;gap:8px}
+.whoarrow{display:flex;align-items:center;gap:12px}
+.hello{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:4px 0}
+.hello h1{font-size:28px;font-weight:500;letter-spacing:-.02em;line-height:1.15}
+.hello p{color:var(--muted);font-size:15px;max-width:52ch;line-height:1.5}
+.greet{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.greet h1{font-size:26px;font-weight:500;letter-spacing:-.02em;line-height:1.15}
+.intro{border:1px solid var(--si-line);border-radius:var(--r-l);background:linear-gradient(160deg,var(--si-soft),var(--surface) 75%);padding:20px 20px 16px;display:flex;flex-direction:column;gap:16px}
+.intro h2{font-size:17px;font-weight:500;letter-spacing:-.01em}
+.intro .three{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.intro .three>div{display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.45;color:var(--ink-2)}
+.intro .three b{font-weight:500;color:var(--ink);font-size:14px}
+
+/* V1 · Needs you first */
+.needs{border:1px solid var(--need-line);border-radius:var(--r-l);overflow:hidden;background:var(--surface)}
+.needs .hd{padding:16px 20px 12px;display:flex;align-items:center;gap:12px}
+.needs .hd h2{font-size:16px;font-weight:500}
+.needs .hd p{color:var(--muted);font-size:13px;margin-top:2px}
+.cntb{min-width:22px;height:22px;border-radius:11px;background:var(--need);color:#fff;font-size:12px;font-weight:600;display:inline-grid;place-items:center;padding:0 7px}
+.allclear{display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:var(--r-l);background:var(--good-soft);color:var(--good);font-weight:500;font-size:13.5px;flex-wrap:wrap}
+.allclear span{color:var(--ink-2);font-weight:400}
+.stat{font-size:13px;color:var(--muted);white-space:nowrap}
+
+/* V2 · Live cards */
+.lcgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+.lc{border:1px solid var(--line);border-radius:var(--r-l);background:var(--surface);display:flex;flex-direction:column;min-width:0}
+.lc.wide{grid-column:1/-1}
+.lc.tint{background:linear-gradient(160deg,var(--si-soft),var(--surface) 70%)}
+.lc.warn{border-color:var(--need-line)}
+.lc.dangerc{border-color:var(--danger-line)}
+.lc .top{display:flex;gap:12px;align-items:center;padding:16px 18px 0}
+.lc .top h2{font-size:15.5px;font-weight:500;letter-spacing:-.01em}
+.lc .state{font-size:13px;font-weight:500;margin-top:1px}
+.lc .state.good{color:var(--good)}.lc .state.need{color:var(--need)}.lc .state.iris{color:var(--si-ink)}.lc .state.muted{color:var(--muted)}.lc .state.bad{color:var(--danger)}
+.lc .bd{padding:12px 18px 14px;display:flex;flex-direction:column;gap:10px;flex:1}
+.lc .ft{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:10px 12px 10px 18px;min-height:52px}
+.lc .ft .lk{margin-left:auto;color:var(--accent);font-weight:500;font-size:14px;padding:6px}
+.lc .ft .lk:hover{text-decoration:underline}
+.lc .mini{display:flex;align-items:center;gap:10px;min-height:28px}
+.lc .mini+.mini{border-top:1px solid var(--line);padding-top:8px}
+.lc .rows .srow{padding:12px 18px;min-height:52px}
+.lc .rows .srow .k{width:110px}
+.lc.new{border-style:dashed;border-color:var(--line-2)}
+.seg{display:flex;gap:4px}
+.seg i{flex:1;height:6px;border-radius:3px;background:var(--line-2)}
+.seg i.on{background:var(--good)}
+.slip{display:flex;gap:10px;align-items:center;background:var(--si-soft);border-radius:var(--r);padding:10px}
+
+/* V3 · Identity banner */
+.banner{border:1px solid var(--si-line);border-radius:var(--r-l);background:linear-gradient(160deg,var(--si-soft),var(--surface) 72%);padding:20px;display:flex;flex-direction:column;gap:16px}
+.banner.plain{border-color:var(--line);background:linear-gradient(160deg,var(--surface-2),var(--surface) 72%)}
+.banner.warmb{border-color:var(--need-line);background:linear-gradient(160deg,var(--need-soft),var(--surface) 72%)}
+.banner .bt{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.banner .eb{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.banner h1{font-size:24px;font-weight:500;letter-spacing:-.02em;line-height:1.2;margin:4px 0 6px}
+.banner .meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.shortcuts{display:flex;gap:8px;flex-wrap:wrap}
+.sc{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:500;box-shadow:var(--shadow-1);color:var(--ink)}
+.sc:hover{background:var(--hover)}
+.sc .ic{width:16px;height:16px;color:var(--ink-2)}
+.sc.need{color:var(--need);border-color:var(--need-line)}.sc.need .ic{color:var(--need)}
+.sc.danger{color:var(--danger);border-color:var(--danger-line)}.sc.danger .ic{color:var(--danger)}
+
+/* V4 · Silicons first */
+.sigrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.sigrid.two{grid-template-columns:repeat(2,1fr)}
+.sigrid.four{grid-template-columns:repeat(4,1fr)}
+.sigrid.four .sic{gap:12px}
+.sic{border:1px solid var(--line);border-radius:var(--r-l);padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--surface);text-align:left;min-width:0}
+button.sic:hover{background:var(--surface-2)}
+.sic.new{border-style:dashed;border-color:var(--line-2);align-items:center;justify-content:center;text-align:center;gap:6px}
+.sic.wait{border-color:var(--need-line);background:var(--need-soft)}
+.sic .nm{font-size:14.5px;font-weight:500}
+.sic.big{padding:16px 16px 14px;gap:12px}
+.bars{display:flex;gap:3px;align-items:flex-end;height:30px}
+.row>.bars{flex:1;min-width:0}
+.sic>.pill{align-self:flex-start}
+.bars i{flex:1;border-radius:2px;background:var(--si-line);min-height:3px;display:block}
+.bars i.hi{background:var(--si)}
+.bars i.zero{background:var(--line)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.sihead{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.sihead h1{font-size:26px;font-weight:500;letter-spacing:-.02em}
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden}
+.statgrid>div{padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.statgrid>div+div{border-left:1px solid var(--line)}
+.statgrid .n{font-size:20px;font-weight:500;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+
+@container win (max-width:820px){
+  .abody{flex-direction:column;padding:0 8px 8px}
+  .anav{width:auto;max-width:100%;align-self:stretch;flex-direction:row;overflow-x:auto;padding:0 4px 8px;gap:4px;position:static;min-height:0}
+  .anav .nav{width:auto;white-space:nowrap;height:36px}
+  .anav .navlbl,.anav .foot{display:none}
+  .atop{gap:4px;padding:0 8px 0 14px}
+  .atop .brand{min-width:0}.atop .brand .name{display:none}
+  .atop .tools{margin-left:0}
+  .atop .tools .help-btn{display:none}
+  .amain{padding:22px 16px 32px}
+  .cards,.twocol,.intro .three,.lcgrid,.sigrid,.sigrid.two,.two,.statgrid{grid-template-columns:1fr}
+  .sigrid.four{grid-template-columns:1fr 1fr}
+  .statgrid>div+div{border-left:0;border-top:1px solid var(--line)}
+  .srow{flex-wrap:wrap}.scard>.srow:first-child{border-top:0}
+.srow .k{width:100%}
+  .srow .acts{width:100%;justify-content:flex-end}
+}
+
+/* hosted sign-in */
+.auth{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 16px;gap:18px}
+.authcard{width:420px;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-1);padding:32px 32px 28px;display:flex;flex-direction:column;gap:18px}
+.authcard .apphead{display:flex;flex-direction:column;align-items:flex-start;gap:14px}
+.authcard h1{font-size:22px;font-weight:500;letter-spacing:-.015em;line-height:1.2;text-wrap:balance}
+.authcard .sub{color:var(--muted);margin-top:4px;line-height:1.5}
+.or{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:12px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.provider{height:44px;border-radius:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:500;border:1px solid var(--line-2);background:var(--surface);box-shadow:var(--shadow-1)}
+.provider:hover{background:var(--hover)}
+.glyph{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--surface-2);color:var(--ink-2)}
+.secured{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12.5px;text-align:center}
+.codeboxes{display:flex;gap:8px}
+.codeboxes span{flex:1;height:52px;border-radius:12px;border:1px solid var(--line-2);display:grid;place-items:center;font-family:var(--mono);font-size:22px;background:var(--surface)}
+.codeboxes span.f{border-color:var(--ink)}
+.chooser .acct{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid var(--line);width:100%}
+.chooser .acct:hover{background:var(--hover)}
+.simnote{font-size:12px;color:var(--faint);text-align:center}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.swatches button{border-radius:50%;padding:3px;border:2px solid transparent}
+.swatches button.on{border-color:var(--ink)}
+@media (max-width:560px){.authcard{padding:24px 20px}.keybox code{font-size:15px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ============================== HIGH FIDELITY LAYER ============================== */
+/* motion + interaction states: every control has hover, pressed, focus and disabled */
+.btn,.iconbtn,.srow,.sic,.nav,.chips button,.provider,.mi,.ag,.tabs button,.link,.handle button,.acct,.swatches button{transition:background-color .12s ease,border-color .12s ease,color .12s ease,box-shadow .12s ease,transform .12s ease,opacity .12s ease}
+.btn:active:not([disabled]){transform:translateY(.5px);background:var(--press)}
+.btn.pri:active:not([disabled]){background:var(--dark);opacity:.8}
+.btn.dangerfill:hover{filter:brightness(.94)}
+.btn.dangerfill:active:not([disabled]){filter:brightness(.88)}
+.btn.dangerfill[disabled]{opacity:.38}
+.iconbtn:active,.atop .me:active{background:var(--press)}
+button.srow:active,button.sic:active{background:var(--press)}
+.anav .nav:active{background:var(--press)}
+.chips button:hover{border-color:var(--ink-2);color:var(--ink)}
+.chips button.on:hover{color:var(--dark-ink)}
+.provider:active{background:var(--press)}
+.srow:focus-visible,.sic:focus-visible,.anav .nav:focus-visible,.mi:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:var(--r)}
+.field::placeholder,.fwrap input::placeholder,.asearch input::placeholder{color:var(--faint)}
+.field.bad,.fwrap.bad{border-color:var(--danger)}
+.field.bad:focus{box-shadow:0 0 0 3px var(--danger-soft)}
+.err{display:flex;align-items:flex-start;gap:6px;color:var(--danger);font-size:13px;line-height:1.45}
+.err .ic{margin-top:2px}
+.found{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r);background:var(--surface-2)}
+#hv-res:empty{display:none}
+
+/* breadcrumbs: back link or trail with the current page */
+.crumb{margin-bottom:-12px}
+.crumb span[aria-current]{color:var(--ink-2)}
+.crumb.back button{display:inline-flex;align-items:center;gap:4px;margin-left:-3px;padding:2px 6px 2px 2px;border-radius:6px}
+.crumb.back button:hover{text-decoration:none;background:var(--hover)}
+.crumb.back .ic{transform:rotate(180deg)}
+
+/* small pieces */
+.gl{font-weight:700;font-size:13px;line-height:1}
+.locked{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--muted);white-space:nowrap}
+.handle.plain{padding:3px 9px}
+.ph.center{align-items:center}
+.sechd{display:flex;align-items:center;gap:10px;margin-top:4px}
+.sechd h2{font-size:16px;font-weight:500;letter-spacing:-.01em}
+.allclear.quiet{background:var(--surface-2);color:var(--muted);font-weight:400}
+.allclear span{margin-left:-4px}
+.si.pending{filter:none;opacity:1;outline:1.5px dashed var(--si);outline-offset:2px}
+.stack>*+*{margin-left:-5px}
+.intro .stack .am{box-shadow:0 0 0 2.5px var(--surface)}
+.ev time{margin-left:auto}
+.cfg{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.cfghd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.cfg .codeblock{border-radius:0}
+.toast button:hover{background:rgba(127,127,127,.36)}
+
+/* one-time code: a single real input painted as six boxes */
+.codewrap{position:relative}
+.codein{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;cursor:text;z-index:1;letter-spacing:2em}
+.codeboxes span.cur{border-color:var(--line-2)}
+.codewrap:focus-within .codeboxes span.cur{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.codewrap.bad .codeboxes span{border-color:var(--danger);color:var(--danger)}
+
+/* search */
+.asearch .results{padding:6px}
+.results .mi .ic{color:var(--faint)}
+.results .mi.sel .ic{color:var(--ink-2)}
+.results .kbd{display:flex;gap:14px;padding:8px 10px 4px;border-top:1px solid var(--line);margin-top:4px}
+.results .noresult{display:flex;flex-direction:column;gap:2px;padding:12px 12px 10px}
+
+/* network: offline banner + loading skeleton */
+.netbar{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px;border-radius:var(--r-l);background:var(--need-soft);border:1px solid var(--need-line);color:var(--ink-2);font-size:13.5px;line-height:1.45}
+.netbar>.ic{color:var(--need)}
+.skel{display:flex;flex-direction:column;gap:18px}
+.skel i{display:block;height:18px;border-radius:var(--r-l);background:linear-gradient(90deg,var(--surface-2) 30%,var(--hover) 50%,var(--surface-2) 70%);background-size:300% 100%;animation:shimmer 1.2s linear infinite}
+.skel .sk3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.skel .sk3 i{height:120px}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:0 0}}
+@container win (max-width:820px){ .skel .sk3{grid-template-columns:1fr} .results .kbd{display:none} }
+.skip{position:fixed;left:12px;top:-60px;z-index:90;background:var(--dark);color:var(--dark-ink);padding:8px 14px;border-radius:var(--r);font-weight:500;text-decoration:none}
+.skip:focus{top:12px}
+
+</style>
+
+<button class="skip" type="button" onclick="const m=document.getElementById('main'); if (m){ m.setAttribute('tabindex','-1'); m.focus(); }">Skip to content</button>
+<div class="wbody" id="wbody"></div>
+<button class="protobtn" id="protobtn" data-act="proto" aria-expanded="false" aria-controls="proto">States</button>
+<aside class="proto" id="proto" hidden aria-label="Prototype states"></aside>
+
+<script>
+/* ============================== ICONS ============================== */
+const ICONS = {
+  home:'<path d="M3.5 10.2 12 3.5l8.5 6.7V19a1.5 1.5 0 0 1-1.5 1.5h-4.2v-5.6H9.2v5.6H5A1.5 1.5 0 0 1 3.5 19z"/>',
+  spark:'<path d="M12 3.2c.5 4.3 2.4 6.3 6.8 6.8-4.4.5-6.3 2.5-6.8 6.8-.5-4.3-2.4-6.3-6.8-6.8 4.4-.5 6.3-2.5 6.8-6.8z" fill="currentColor" stroke="none"/><path d="M18.6 15.6c.2 1.6.9 2.3 2.4 2.4-1.5.2-2.2.9-2.4 2.4-.2-1.5-.9-2.2-2.4-2.4 1.5-.1 2.2-.8 2.4-2.4z" fill="currentColor" stroke="none"/>',
+  sparkO:'<path d="M12 3.2c.5 4.3 2.4 6.3 6.8 6.8-4.4.5-6.3 2.5-6.8 6.8-.5-4.3-2.4-6.3-6.8-6.8 4.4-.5 6.3-2.5 6.8-6.8z"/>',
+  grid:'<rect x="4" y="4" width="6.8" height="6.8" rx="1.6"/><rect x="13.2" y="4" width="6.8" height="6.8" rx="1.6"/><rect x="4" y="13.2" width="6.8" height="6.8" rx="1.6"/><rect x="13.2" y="13.2" width="6.8" height="6.8" rx="1.6"/>',
+  dots:'<g fill="currentColor" stroke="none"><circle cx="5.5" cy="5.5" r="1.7"/><circle cx="12" cy="5.5" r="1.7"/><circle cx="18.5" cy="5.5" r="1.7"/><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/><circle cx="5.5" cy="18.5" r="1.7"/><circle cx="12" cy="18.5" r="1.7"/><circle cx="18.5" cy="18.5" r="1.7"/></g>',
+  shield:'<path d="M12 3.5 19 6v5.5c0 4.3-3 7.9-7 9-4-1.1-7-4.7-7-9V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
+  alert:'<path d="M12 4.2 20.8 19.5H3.2z"/><path d="M12 10v4.2M12 17.1v.1"/>',
+  key:'<circle cx="8" cy="15" r="4"/><path d="M11 12 19.5 3.5M16 7l2.5 2.5M14 9l1.8 1.8"/>',
+  hand:'<path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11M11 10.5V5a1.5 1.5 0 0 1 3 0v5.5M14 10.5V6.5a1.5 1.5 0 0 1 3 0V13M17 10a1.5 1.5 0 0 1 3 0v4a7 7 0 0 1-7 7h-.8a7 7 0 0 1-5.6-2.8L4 15.5a1.5 1.5 0 0 1 2.3-1.9L8 15.3"/>',
+  clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7.8V12l2.8 1.8"/>',
+  cal:'<rect x="4" y="5.5" width="16" height="14.5" rx="2.2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>',
+  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  x:'<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  right:'<path d="m10 7 5 5-5 5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  copy:'<rect x="9" y="9" width="10.5" height="10.5" rx="2.2"/><path d="M15 9V6.2A1.7 1.7 0 0 0 13.3 4.5H6.2A1.7 1.7 0 0 0 4.5 6.2v7.1A1.7 1.7 0 0 0 6.2 15H9"/>',
+  lock:'<rect x="5" y="10.5" width="14" height="9.5" rx="2.2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/>',
+  out:'<path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14M10.5 16.5 6 12l4.5-4.5M6 12h10"/>',
+  term:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.2"/><path d="m7.5 9.5 3 2.5-3 2.5M12.5 15h4"/>',
+  devices:'<rect x="3" y="5" width="13" height="9.5" rx="1.8"/><path d="M6.5 18h6"/><rect x="17.5" y="9" width="4" height="10" rx="1.2"/>',
+  user:'<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  idcard:'<rect x="3.5" y="5.5" width="17" height="13" rx="2.2"/><circle cx="9" cy="11" r="2"/><path d="M6 15.5c.5-1.3 1.6-2 3-2s2.5.7 3 2M14 10h3.5M14 13h3.5"/>',
+  at:'<circle cx="12" cy="12" r="3.6"/><path d="M15.6 12v1.4a2.6 2.6 0 0 0 5.2 0V12a8.8 8.8 0 1 0-3.5 7"/>',
+  phone:'<rect x="7" y="3.5" width="10" height="17" rx="2.2"/><path d="M11 17.5h2"/>',
+  globe:'<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.3 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.3-3.5-8.5S9.6 5.9 12 3.5z"/>',
+  case:'<rect x="3.5" y="7.5" width="17" height="12" rx="2.2"/><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5M3.5 12.5h17"/>',
+  chat:'<path d="M5 18.5V7a2.5 2.5 0 0 1 2.5-2.5h9A2.5 2.5 0 0 1 19 7v6.5a2.5 2.5 0 0 1-2.5 2.5H9z"/>',
+  bell:'<path d="M6.5 9a5.5 5.5 0 1 1 11 0c0 5.8 2.5 7.5 2.5 7.5H4s2.5-1.7 2.5-7.5M10.2 20a2 2 0 0 0 3.6 0"/>',
+  wave:'<path d="M3.5 12h2l2-5 3 10 3-13 3 13 2-5h2"/>',
+  git:'<circle cx="6.5" cy="6.5" r="2"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="9" r="2"/><path d="M6.5 8.5v7M17.5 11c0 3-3 3.5-6 4.2-2 .5-3.5 1-4.4 2.3"/>',
+  cloud:'<path d="M7 18.5h10a4 4 0 0 0 .6-8A5.5 5.5 0 0 0 7 9.6 4.5 4.5 0 0 0 7 18.5z"/>',
+  link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  mail:'<rect x="3.5" y="5.5" width="17" height="13" rx="2.2"/><path d="m4.5 7 7.5 6 7.5-6"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4.4l-.4 2.6a7 7 0 0 0-2 1.2L5.1 5.9l-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4.4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/>',
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  data:'<ellipse cx="12" cy="6.5" rx="7" ry="2.5"/><path d="M5 6.5v11c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-11M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/>',
+  help:'<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2-2.4 3.6"/><path d="M12 17v.1"/>',
+  pen:'<path d="M14.5 5.5 18.5 9.5 9 19H5v-4z"/><path d="m12.5 7.5 4 4"/>',
+  camera:'<path d="M4.5 8.5A1.5 1.5 0 0 1 6 7h2l1.5-2h5L16 7h2a1.5 1.5 0 0 1 1.5 1.5V17A1.5 1.5 0 0 1 18 18.5H6A1.5 1.5 0 0 1 4.5 17z"/><circle cx="12" cy="12.5" r="3"/>',
+  history:'<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v3.7h3.7"/><path d="M12 8.5V12l2.5 1.6"/>',
+  download:'<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/>',
+  trash:'<path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7"/>',
+};
+const ic = (n, cls = '') => `<svg class="ic ${cls}" data-i="${n}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ============================== DATA ============================== */
+const APPS = {
+  briefcase:{name:'Briefcase', icon:'case', blurb:'Files for Carbons and Silicons', needs:['email'], opt:['timezone']},
+  dm:{name:'DM', icon:'chat', blurb:'Messages between Carbons and Silicons', needs:[], opt:['timezone']},
+  ting:{name:'Ting', icon:'bell', blurb:'Notifications for Silicons', needs:['email'], opt:[]},
+  waveform:{name:'Waveform', icon:'wave', blurb:'Voice and audio for Silicons', needs:[], opt:['timezone','dob']}
+};
+const SIG = {scout:['#8C7BFF','#4FD1C5'], growth:['#FF8F7A','#FFC86B'], research:['#C17CFF','#71C8FF'], fresh:['#4C86FF','#86E3B0'], other:['#8E9AB0','#5C6B85']};
+const EMAIL = 'niladri@teamofsilicons.com';
+const DETAIL = {email:'Email address', phone:'Phone number', timezone:'Timezone', dob:'Date of birth'};
+const DICON = {email:'at', phone:'phone', timezone:'clock', dob:'cal'};
+const now = () => new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+const slug = s => (s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30) || 'silicon';
+const genKey = () => 'stk-' + Array.from({length:12}, () => '0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
+const listJoin = arr => arr.length < 2 ? arr.join('') : arr.slice(0,-1).join(', ') + ' and ' + arr[arr.length-1];
+const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + 's')}`;
+
+function baseState(){
+  return {
+    hasAccount:true, signedIn:true, intro:false,
+    me:{name:'Niladri Roy', id:'niladri', hue:24, tz:'Asia/Kolkata', dob:null, emails:[{a:EMAIL, primary:true}], phones:[], google:true, apple:false, since:'12 Oct 2026', idLeft:5},
+    apps:{
+      briefcase:{on:true, since:'12 Oct', last:'2 hours ago', sees:['email']},
+      dm:{on:true, since:'12 Oct', last:'Today', sees:[]},
+      ting:{on:true, since:'14 Oct', last:'Yesterday', sees:['email']},
+      waveform:{on:true, since:'15 Oct', last:'15 Oct', sees:['timezone']}
+    },
+    proofs:[
+      {id:'p1', from:'briefcase', to:'dm', what:'Send files through DM as you', status:'active', since:'18 Oct', until:'5 Apr 2029'},
+      {id:'p2', from:'dm', to:'briefcase', what:'Save attachments to your Briefcase', status:'active', since:'15 Oct', until:'2 Apr 2029'},
+      {id:'p3', from:'waveform', to:'dm', what:'Post voice notes as you', status:'expired', since:'1 Sep', ended:'2 Oct', reason:'Waveform’s sign-in ended'},
+      {id:'p4', from:'ting', to:'briefcase', what:'Read file names for alerts', status:'revoked', since:'20 Sep', ended:'28 Sep', reason:'You stopped it'}
+    ],
+    silicons:{
+      scout:{name:'Scout', id:'scout', sig:'scout', state:'active', since:'12 Oct', last:'5 min ago', lastWhere:'DM', keyAge:'4 days ago',
+        allow:{briefcase:'signed', dm:'signed', ting:'signed', waveform:'off'},
+        trusts:[{id:'t1', provider:'GitHub', repo:'teamofsilicons/scout', ref:'main', env:'', name:'nightly-digest', added:'13 Oct'}],
+        audiences:['sts.amazonaws.com'], bars:[2,4,3,6,4,5,7,3,5,6,4,8,6,9]},
+      growth:{name:'Growth Silicon', id:'growth', sig:'growth', state:'handover', to:'c:anika', toName:'Anika Rao', days:9, since:'30 Sep', last:'yesterday', lastWhere:'Briefcase', keyAge:'20 days ago',
+        allow:{briefcase:'signed', dm:'allowed', ting:'off', waveform:'off'}, trusts:[], audiences:[], bars:[1,2,1,0,2,1,0,1,1,2,0,1,2,1]}
+    },
+    requests:{}, offers:{}, alerts:{},
+    sessions:[
+      {id:'d1', what:'Chrome on Windows', where:'Kolkata, India', when:'Active now', me:true},
+      {id:'d3', what:'Developer platform', where:'Chrome on Windows', when:'Yesterday'},
+      {id:'d2', what:'Terminal · silicon-accounts CLI', where:'MacBook Pro', when:'12 days ago', term:true, stale:true}
+    ],
+    notify:{to:EMAIL, newSignin:true, keyChanged:true, wrongKeys:true, acting:true, digest:false, product:false},
+    activity:[
+      {day:'Today', t:'11:42 AM', kind:'silicons', icon:'chat', who:'scout', text:'Scout signed in to DM', d:'With its secret key'},
+      {day:'Today', t:'10:05 AM', kind:'silicons', icon:'hand', who:'growth', text:'You asked c:anika to look after Growth Silicon', d:'9 days left for them to accept'},
+      {day:'Today', t:'9:02 AM', kind:'silicons', icon:'git', who:'scout', text:'Scout signed in from GitHub Actions', d:'teamofsilicons/scout · nightly-digest'},
+      {day:'Yesterday', t:'6:40 PM', kind:'silicons', icon:'case', who:'growth', text:'Growth Silicon signed in to Briefcase', d:'With its secret key'},
+      {day:'Yesterday', t:'6:12 PM', kind:'security', icon:'devices', who:'me', text:'You signed in on the developer platform', d:'Chrome on Windows · Kolkata, India'},
+      {day:'18 Oct', t:'4:10 PM', kind:'apps', icon:'link', who:'me', app:'briefcase', text:'Briefcase got permission to act as you in DM', d:'Send files through DM as you'},
+      {day:'15 Oct', t:'1:20 PM', kind:'apps', icon:'grid', who:'me', text:'You signed in to Waveform', d:'Waveform can see your name, id and timezone'},
+      {day:'14 Oct', t:'10:20 AM', kind:'silicons', icon:'key', who:'scout', text:'You changed Scout’s secret key', d:'Scout was signed out of every app'},
+      {day:'13 Oct', t:'3:05 PM', kind:'silicons', icon:'git', who:'scout', text:'You trusted teamofsilicons/scout for Scout', d:'Workflows on main can sign in as Scout'},
+      {day:'12 Oct', t:'2:03 PM', kind:'silicons', icon:'spark', who:'scout', text:'You created Scout', d:'si:scout · you look after it'},
+      {day:'12 Oct', t:'1:51 PM', kind:'apps', icon:'grid', who:'me', text:'You signed in to Briefcase', d:'Briefcase can see your name, id and email'},
+      {day:'12 Oct', t:'1:50 PM', kind:'security', icon:'user', who:'me', text:'Account created with the id c:niladri', d:'Signed up with Google while signing in to Briefcase'},
+      {day:'30 Sep', t:'12:00 PM', kind:'silicons', icon:'spark', who:'growth', text:'You created Growth Silicon', d:'si:growth'}
+    ]
+  };
+}
+function newState(){ const b = baseState(); return {...b, hasAccount:false, signedIn:false, intro:true, me:{name:'', id:'', hue:24, tz:'Asia/Kolkata', dob:null, emails:[], phones:[], google:false, apple:false, since:'Today', idLeft:5}, apps:{}, proofs:[], silicons:{}, sessions:[], activity:[]}; }
+const PEOPLE = {maya:{name:'Maya Sen', hue:340}, anika:{name:'Anika Rao', hue:200}, noah:{name:'Noah Kim', hue:140}, ravi:{name:'Ravi Mehta', hue:45}, priya:{name:'Priya Shah', hue:280}};
+function lookupPerson(raw){
+  const v = (raw || '').trim().toLowerCase(); if (v.length < 3) return {wait:true};
+  if (v.startsWith('si:')) return {err:'A Silicon can’t look after another Silicon. Name a person.'};
+  const key = v.includes('@') ? v.split('@')[0] : v.replace(/^c:/, '');
+  if (key === S.me.id || v === (S.me.emails[0]?.a || '').toLowerCase()) return {err:'That’s you. Name the person who should look after it.'};
+  if (v.includes('@') && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return {wait:true};
+  const p = PEOPLE[key]; if (!p) return {err: v.includes('@') ? 'No Team of Silicons account uses this email.' : 'No one has this id. Check the spelling.'};
+  return {ok:true, id:'c:' + key, ...p};
+}
+const personRes = r => r.ok ? `<div class="found">${avOther(r.name[0], r.hue, 'md')}<span class="grow"><b class="b5">${esc(r.name)}</b><span class="small muted mono" style="display:block">${esc(r.id)}</span></span>${pill('Found','good')}</div>` : r.err ? `<div class="err">${ic('alert','xs')}${esc(r.err)}</div>` : '';
+const RESEARCH = () => ({name:'Research Silicon', id:'research', sig:'research', days:12, how:'from a terminal yesterday'});
+const ANALYST = () => ({name:'Analyst', id:'analyst', sig:'fresh', from:'Maya Sen', fromId:'c:maya', hue:340, days:11, apps:['briefcase','dm'], note:'I’m moving teams. Analyst runs the weekly pricing report.'});
+
+const SCENARIOS = [
+  ['today','clock','Today: a Silicon is waiting for you'],
+  ['offer','hand','Someone hands you a Silicon'],
+  ['alert','alert','Wrong keys were tried for a Silicon'],
+  ['clear','check','Nothing needs you'],
+  ['nosi','sparkO','Looks after no Silicons'],
+  ['first','user','First visit, brand-new account'],
+  ['out','out','Signed out']
+];
+
+let SEQ = 0;
+let S = {net:'ok', loading:false, sel:0, route:'home', params:{}, scenario:'today', protoOpen:false, draft:{}, modal:null, menu:null, toasts:[], auth:{}, q:'', filter:'all', who:'all', ...baseState()};
+function log(kind, icon, text, d, who){ S.activity.unshift({day:'Today', t:now(), kind, icon, text, d:d||'', who:who||'me', seq:++SEQ}); }
+
+/* ============================== SELECTORS ============================== */
+const myId = () => 'c:' + S.me.id;
+const appsOn = () => Object.keys(S.apps).filter(a => S.apps[a].on);
+const siKeys = () => Object.keys(S.silicons);
+const activeProofs = (a) => S.proofs.filter(p => p.status === 'active' && (!a || p.from === a || p.to === a));
+const pastProofs = () => S.proofs.filter(p => p.status !== 'active');
+const staleSessions = () => S.sessions.filter(s => s.stale);
+const seesList = a => ['your name', 'photo', 'id', ...S.apps[a].sees.map(x => 'your ' + DETAIL[x].toLowerCase())];
+const seesShort = a => cap1(listJoin(['name', 'photo', 'id', ...S.apps[a].sees.map(x => DETAIL[x].toLowerCase())]));
+const siUses = s => Object.keys(s.allow).filter(a => s.allow[a] === 'signed');
+const siAllowed = s => Object.keys(s.allow).filter(a => s.allow[a] !== 'off');
+const silsInApp = a => siKeys().filter(k => S.silicons[k].allow[a] === 'signed');
+function siStatus(k){ const s = S.silicons[k]; if (S.alerts[k]) return ['Wrong keys tried','need']; if (s.state === 'handover') return ['Handing over','need']; return ['Active','good']; }
+function signInWays(){ return [S.me.google?'Google':null, S.me.apple?'Apple':null, S.me.emails.length?'email code':null, S.me.phones.length?'text code':null].filter(Boolean); }
+
+/* Everything that needs the person, by scope: 'all', 'silicons', 'security', 'si:<key>' */
+function needs(scope){
+  const out = [];
+  const inSi = scope === 'all' || scope === 'silicons';
+  if (inSi) for (const [k,r] of Object.entries(S.requests)) out.push({key:'req-'+k, lead:siAv(r.sig,'lg',true), t:`${r.name} wants you to look after it`, d:`${r.days} days left`, acts:[{l:'Decline', act:'askDecline', v:k}, {l:'Review', go:'request', p:{k}, kind:'pri'}]});
+  if (inSi) for (const [k,o] of Object.entries(S.offers)) out.push({key:'off-'+k, lead:siAv(o.sig,'lg'), t:`${o.from} is handing ${o.name} to you`, d:`${o.days} days left`, acts:[{l:'Review', go:'offer', p:{k}, kind:'pri'}]});
+  for (const [k,a] of Object.entries(S.alerts)) if (inSi || scope === 'si:'+k) out.push({key:'al-'+k, lead:tile('key','need','lg'), t:`Wrong keys tried for ${S.silicons[k].name}`, d:cap1(a.when), acts:[{l:'It was me', act:'dismissAlert', v:k}, {l:'Change key', act:'askRotate', v:k, kind:'pri'}]});
+  if (scope === 'all' || scope === 'security'){
+    if (!S.me.phones.length) out.push({key:'phone', lead:tile('phone','','lg'), t:'Add a recovery phone', d:'In case you lose your email', acts:[{l:'Add', act:'addPhone'}]});
+    for (const s of staleSessions()) out.push({key:'st-'+s.id, lead:tile(s.term?'term':'devices','','lg'), t:`Still using ${s.what}?`, d:`Last used ${s.when}`, acts:[{l:'Keep', act:'keepSession', v:s.id, kind:'ghost'}, {l:'Sign out', act:'signOutSession', v:s.id}]});
+  }
+  return out;
+}
+const cap1 = t => t ? t[0].toUpperCase() + t.slice(1) : t;
+function checkup(){
+  return [
+    {done:S.me.google || S.me.apple, t:'Sign in with Google or Apple', d:'A second way in that isn’t a code', act:'connect', v:'apple'},
+    {done:S.me.emails.length > 0, t:'Verified email', d:S.me.emails[0]?.a || 'Add an email'},
+    {done:S.me.phones.length > 0, t:'Recovery phone', d:S.me.phones.length ? S.me.phones[0].n : 'Gets you in if you lose your email', act:'addPhone'},
+    {done:staleSessions().length === 0, t:'Only devices you still use', d:staleSessions().length ? `${staleSessions()[0].what} · ${staleSessions()[0].when}` : 'Every device was used recently', go:'security'}
+  ];
+}
+
+/* ============================== CORE ============================== */
+function go(route, params){
+  S.route = route; S.params = params || {}; S.draft = {}; S.menu = null; S.modal = null; S.q = '';
+  if (route !== 'activity'){ S.who = 'all'; S.filter = 'all'; }
+  if (S.net === 'slow' && S.signedIn && !AUTH_ROUTES.includes(route)){ S.loading = true; clearTimeout(go.t); go.t = setTimeout(() => { S.loading = false; render(); }, 900); }
+  render();
+  const wb = document.getElementById('wbody'); if (wb) wb.scrollTop = 0;
+}
+function toast(html, opts = {}){
+  const id = Math.random().toString(36).slice(2);
+  S.toasts.push({id, html, action:opts.action, v:opts.v, label:opts.label}); S.toasts = S.toasts.slice(-2);
+  renderToasts();
+  setTimeout(() => { S.toasts = S.toasts.filter(t => t.id !== id); renderToasts(); }, opts.ms || 4200);
+}
+function modal(m){ const a = document.activeElement; if (a && a !== document.body){ const sel = a.id ? '#' + a.id : a.dataset.act ? `[data-act="${a.dataset.act}"]${a.dataset.v ? `[data-v="${a.dataset.v}"]` : ''}` : null; if (sel) m.opener = sel; } S.modal = m; S.draft = m.draft || {}; render(); if (m.focus) setTimeout(() => { const el = document.getElementById(m.focus); if (el){ el.focus(); if (el.select) el.select(); } }, 30); }
+
+/* ============================== PIECES ============================== */
+const Z = c => (c||'').split(' ').filter(Boolean).map(x => 'z-'+x).join(' ');
+const av = (cls='') => `<span class="av ${Z(cls)}" style="--h:${S.me.hue}">${esc((S.me.name||'?')[0].toUpperCase())}</span>`;
+const avOther = (letter, hue, cls='') => `<span class="av ${Z(cls)}" style="--h:${hue}">${esc(letter)}</span>`;
+const ringAv = cls => `<span class="ring">${av(cls)}</span>`;
+const siAv = (sig, cls='', pending) => { const g = SIG[sig] || SIG.other; return `<span class="si ${Z(cls)} ${pending?'pending':''}" style="--g1:${g[0]};--g2:${g[1]}">${ic('spark')}</span>`; };
+const appAv = (a, cls='') => `<span class="am ${Z(cls)}">${ic(APPS[a].icon)}</span>`;
+const handle = id => `<span class="handle">${esc(id)}<button data-act="copy" data-v="${esc(id)}" aria-label="Copy ${esc(id)}">${ic('copy','xs')}</button></span>`;
+const P = o => o ? `data-p='${JSON.stringify(o)}'` : '';
+const tile = (i, kind='', size='') => `<span class="tile ${kind} ${size}">${ic(i,'s')}</span>`;
+const pill = (t, kind='') => `<span class="pill ${kind}">${t}</span>`;
+const mono = t => `<span class="mono">${esc(t)}</span>`;
+const sw = (id, on, act, v, label, dis) => `<label class="sw"><input type="checkbox" id="${id}" aria-label="${esc(label)}" ${act?`data-act="${act}" data-v="${esc(v)}"`:''} ${on?'checked':''} ${dis?'disabled':''}><span></span></label>`;
+/* a button from {l, act|go, v, p, kind, sm} */
+const B = (a, sm = true) => a.go ? `<button class="btn ${sm?'sm':''} ${a.kind||''}" data-go="${a.go}" ${P(a.p)}>${a.icon?ic(a.icon,'s'):''}${esc(a.l)}</button>` : `<button class="btn ${sm?'sm':''} ${a.kind||''}" data-act="${a.act}" data-v="${esc(a.v ?? '')}" ${a.dis?'disabled':''}>${a.icon?ic(a.icon,'s'):''}${esc(a.l)}</button>`;
+function srow({k, v, d, lead, act, go:r, p, attrs='', right='', chev, cls='', av:actV}){
+  const clickable = act || r;
+  const tag = clickable ? 'button' : 'div';
+  const data = r ? `data-go="${r}" ${P(p)}` : act ? `data-act="${act}" ${actV!=null?`data-v="${esc(actV)}"`:''}` : '';
+  return `<${tag} class="srow ${cls}" ${data} ${attrs}>${lead?`<span class="lead">${lead}</span>`:''}${k?`<span class="k">${k}</span>`:''}<span class="v">${v}${d?`<div class="d">${d}</div>`:''}</span>${right}${clickable && chev !== false ? `<span class="chev">${ic('right','s')}</span>` : ''}</${tag}>`;
+}
+const acts = list => `<span class="acts">${list.map(a => B(a)).join('')}</span>`;
+const scard = (title, sub, rows, extra='') => `<section class="scard">${title?`<div class="hd"><div class="grow"><h2>${title}</h2>${sub?`<p>${sub}</p>`:''}</div>${extra}</div>`:''}${rows}</section>`;
+const pageHead = (h, sub, right='') => `<div class="ph"><div class="grow"><h1>${h}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div>${right}</div>`;
+const crumb = (label, route, p, here) => here
+  ? `<nav class="crumb" aria-label="Breadcrumb"><button data-go="${route}" ${P(p)}>${esc(label)}</button>${ic('right','xs')}<span aria-current="page">${esc(here)}</span></nav>`
+  : `<nav class="crumb back" aria-label="Breadcrumb"><button data-go="${route}" ${P(p)}>${ic('right','xs')}${esc(label)}</button></nav>`;
+const glyphTile = l => `<span class="tile"><span class="gl">${esc(l)}</span></span>`;
+const locked = t => `<span class="locked">${ic('lock','xs')}${esc(t)}</span>`;
+const bars = (arr) => { const mx = Math.max(1, ...arr); return `<span class="bars" aria-label="Sign-ins over the last 14 days">${arr.map((v,i) => `<i class="${v===0?'zero':i===arr.length-1?'hi':''}" style="height:${Math.max(3, Math.round(v/mx*30))}px"></i>`).join('')}</span>`; };
+const attnStrip = n => `<div class="attn">${n.lead}<div class="grow" style="min-width:220px"><div class="t">${esc(n.t)}</div><div class="d">${esc(n.d)}</div></div>${acts(n.acts)}</div>`;
+const needRow = n => srow({lead:n.lead, v:`<span class="b5">${esc(n.t)}</span>`, d:esc(n.d), right:acts(n.acts)});
+const emptyState = (icon, h, p, btns='') => `<div class="empty"><span class="ill">${ic(icon,'l')}</span><h2>${h}</h2><p>${p}</p>${btns?`<div class="row" style="margin-top:6px">${btns}</div>`:''}</div>`;
+
+/* ---------- shared content blocks (each variant arranges them in its own way) ---------- */
+const R = {
+  photo: () => srow({k:'Photo', v:av('md'), act:'editPhoto'}),
+  name: () => srow({k:'Name', v:esc(S.me.name), act:'editName'}),
+  id: () => srow({k:'Public id', v:mono(myId()), act:'editId'}),
+  dob: () => srow({k:'Date of birth', v: S.me.dob ? esc(fmtDob(S.me.dob)) : '<span class="muted">Not added</span>', act:'editDob'}),
+  tz: () => srow({k:'Timezone', v:esc(S.me.tz), act:'editTz'}),
+  emails: () => S.me.emails.map((e,i) => srow({k:i===0?'Email':'', v:esc(e.a), act:'editEmails', right:e.primary && S.me.emails.length > 1 ? pill('Primary') : ''})).join(''),
+  phones: () => S.me.phones.length ? S.me.phones.map((p,i) => srow({k:i===0?'Phone':'', v:esc(p.n), act:'editPhones', right:p.primary && S.me.phones.length > 1 ? pill('Primary') : ''})).join('') : srow({k:'Phone', v:'<span class="muted">Add a phone</span>', act:'addPhone'}),
+  basic: () => R.photo() + R.name() + R.id() + R.dob() + R.tz(),
+  contact: () => R.emails() + R.phones(),
+  signin: () =>
+    srow({lead:glyphTile('G'), v:'Google', d: S.me.google ? esc(S.me.emails[0]?.a || EMAIL) : 'Not connected', right: S.me.google ? B({l:'Unlink', act:'askUnlink', v:'google'}) : B({l:'Connect', act:'connect', v:'google'})}) +
+    srow({lead:glyphTile('A'), v:'Apple', d: S.me.apple ? esc(S.me.emails[0]?.a || EMAIL) : 'Not connected', right: S.me.apple ? B({l:'Unlink', act:'askUnlink', v:'apple'}) : B({l:'Connect', act:'connect', v:'apple'})}) +
+    srow({lead:tile('at'), v:'Email code', d:esc(listJoin(S.me.emails.map(e=>e.a))), act:'editEmails'}) +
+    srow({lead:tile('phone'), v:'Text code', d: S.me.phones.length ? esc(listJoin(S.me.phones.map(p=>p.n))) : 'Not set up', act:S.me.phones.length?'editPhones':'addPhone'}),
+  devices: () => S.sessions.map(s => srow({lead:tile(s.term?'term':'devices'), v:esc(s.what), d:`${esc(s.where)} · ${esc(s.when)}`, right: s.me ? pill('This device','good') : B({l:'Sign out', act:'signOutSession', v:s.id})})).join('') +
+    (S.sessions.length > 1 ? `<div class="srow foot"><button class="btn sm danger" data-act="signOutOthers">Sign out of all other devices</button></div>` : ''),
+  appSees: a => { const app = APPS[a], m = S.apps[a];
+    const row = x => { const req = app.needs.includes(x); return srow({lead:tile(DICON[x]), v:DETAIL[x], d: req ? `${app.name} needs this to work` : m.sees.includes(x) ? 'Shared' : 'Not shared', right: req ? locked('Required') : sw('sw-'+x, m.sees.includes(x), 'toggleShare', a+'|'+x, 'Share '+DETAIL[x])}); };
+    return srow({lead:tile('user'), v:'Name, photo and id', d:'Every app sees these', right:locked('Always')}) + [...new Set([...app.needs, ...app.opt, ...m.sees])].map(row).join(''); },
+  proof: p => p.status === 'active'
+    ? srow({lead:`<span class="stack">${appAv(p.from,'md')}${appAv(p.to,'md')}</span>`, v:`${APPS[p.from].name} in ${APPS[p.to].name}`, d:esc(p.what), right:B({l:'Stop', act:'askRevoke', v:p.id})})
+    : srow({lead:`<span class="stack" style="opacity:.5">${appAv(p.from,'md')}${appAv(p.to,'md')}</span>`, v:`${APPS[p.from].name} in ${APPS[p.to].name}`, d:`${esc(p.reason)} · ${esc(p.ended)}`}),
+  siApps: k => { const s = S.silicons[k]; return Object.keys(APPS).map(a => srow({lead:appAv(a,'md'), v:APPS[a].name, d: s.allow[a]==='signed' ? 'Signed in' : s.allow[a]==='allowed' ? 'Allowed · hasn’t signed in yet' : 'Not allowed', right:sw(`al-${a}`, s.allow[a] !== 'off', 'toggleAllow', k+'|'+a, 'Allow '+APPS[a].name)})).join(''); },
+  trusts: k => { const s = S.silicons[k]; return s.trusts.map(t => srow({lead:tile(t.provider==='GitHub'?'git':'cloud'), v:mono(t.repo), d:t.ref ? `Branch ${esc(t.ref)}` : 'Any branch', right:B({l:'Remove', act:'askRemoveTrust', v:k+'|'+t.id})})).join('') + `<div class="srow foot">${B({l:'Add repository', act:'addTrust', v:k, icon:'plus'})}</div>`; },
+  audiences: k => { const s = S.silicons[k]; return s.audiences.map(a => srow({lead:tile('cloud'), v:mono(a), right:B({l:'Remove', act:'removeAudience', v:k+'|'+a})})).join('') + `<div class="srow foot">${B({l:'Add service', act:'addAudience', v:k, icon:'plus'})}</div>`; },
+  siKey: k => srow({lead:tile('key'), v:mono('stk-••••••••••••'), d:`Made ${esc(S.silicons[k].keyAge)}`, right:B({l:'Change', act:'askRotate', v:k})}),
+  siAbout: k => { const s = S.silicons[k]; return srow({k:'Name', v:esc(s.name), act:'renameSi', av:k}) + srow({k:'Public id', v:mono('si:'+s.id), act:'editSiId', av:k}) +
+    (s.state === 'handover'
+      ? srow({k:'Looked after by', v:`You <span class="muted">· handing over to ${esc(s.toName || s.to)}</span>`, d:`${s.toName ? esc(s.to) + ' · ' : ''}${plural(s.days,'day')} left to accept`, right:B({l:'Cancel handover', act:'cancelHandover', v:k})})
+      : srow({k:'Looked after by', v:'You', d:'Hand it to someone else; they have 14 days to accept', right:B({l:'Hand over', act:'askHandover', v:k})})); },
+  siDanger: k => `<section class="dz">${srow({v:'Delete this Silicon', d:'It’s signed out everywhere. Its id is held for 10 days.', right:B({l:'Delete', act:'askDeleteSi', v:k, kind:'danger'})})}</section>`,
+  accountDanger: () => { const keys = siKeys(); return `<section class="dz">${keys.length
+      ? srow({v:'Delete account', d:'Hand over or delete your Silicons first', right:B({l:'Go to Silicons', go:'silicons'})})
+      : srow({v:'Delete account', d:'This can’t be undone', right:B({l:'Delete', act:'askDeleteAccount', kind:'danger'})})}</section>`; },
+  notify: () => { const n = S.notify, row = (key, icon, t) => srow({lead:tile(icon), v:t, right:sw('n-'+key, n[key], 'toggleNotify', key, t)});
+    return {
+      to: srow({lead:tile('at'), v:esc(n.to), act:'pickNotifyEmail'}),
+      always: srow({lead:tile('sparkO','si'), v:'Requests from Silicons', d:'So no Silicon waits on you unseen', right:locked('Always on')}),
+      security: row('newSignin','devices','New device signs in') + row('wrongKeys','key','Wrong Silicon keys tried') + row('acting','link','An app gets permission to act for you'),
+      silicons: row('digest','clock','Weekly Silicon summary'),
+      product: row('product','mail','Product news')
+    }; },
+  permsLink: () => S.proofs.length ? srow({lead:tile('link'), v:'Permissions between apps', go:'acting', right: activeProofs().length ? `<span class="stat">${activeProofs().length} active</span>` : ''}) : ''
+};
+const TODAY = new Date(2026, 9, 20);
+const MON = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+function evTime(a){
+  let d = new Date(TODAY);
+  if (a.day === 'Yesterday') d.setDate(d.getDate() - 1);
+  else if (a.day !== 'Today'){ const [dd, mm] = a.day.split(' '); d = new Date(2026, MON[mm], +dd); }
+  const m = /(\d+):(\d+)\s*(AM|PM)/i.exec(a.t || ''); let mins = 0;
+  if (m){ let h = +m[1] % 12; if (/pm/i.test(m[3])) h += 12; mins = h * 60 + +m[2]; }
+  return d.getTime() + mins * 60000 + (a.seq || 0);
+}
+function actorAv(a){
+  if (a.actor && a.actor.startsWith('pending:')) return siAv(SIG[a.actor.slice(8)] ? a.actor.slice(8) : 'other', 'md', true);
+  if (a.app) return appAv(a.app, 'md');
+  if (a.who && S.silicons[a.who] && !/^You\b/.test(a.text)) return siAv(S.silicons[a.who].sig, 'md');
+  if (a.who === 'me' || /^You\b/.test(a.text) || /^(Account|Name|Id|Photo|Date|Timezone|Primary|Added|Removed|Signed out|Unlinked|Connected)\b/.test(a.text)) return av('md');
+  return tile(a.icon);
+}
+const fmtDob = d => { if (!d) return ''; const [y,m,dd] = d.split('-'); return new Date(+y, +m-1, +dd).toLocaleDateString([], {day:'numeric', month:'long', year:'numeric'}); };
+function activityFeed(list){
+  list = [...list].sort((a, b) => evTime(b) - evTime(a));
+  const days = [...new Set(list.map(a => a.day))];
+  return days.map(d => `<div class="day">${esc(d)}</div>${list.filter(a=>a.day===d).map(a => `<div class="ev">${actorAv(a)}<div class="grow"><div class="b5">${esc(a.text)}</div>${a.d?`<div class="small muted">${esc(a.d)}</div>`:''}</div><time class="tm">${esc(a.t)}</time></div>`).join('')}`).join('') || '<div class="srow" style="border-top:0"><span class="muted">Nothing here yet.</span></div>';
+}
+const filterChips = (opts, cur, act) => `<div class="chips" role="group" aria-label="Filter">${opts.map(([k,l,lead]) => `<button class="${cur===k?'on':''}" data-act="${act}" data-v="${k}">${lead||''}${l}</button>`).join('')}</div>`;
+const KIND_CHIPS = [['all','All'],['security','Security'],['profile','Personal info'],['apps','Apps'],['silicons','Silicons']];
+const introCard = () => `<section class="intro" aria-label="About your account"><div class="row" style="align-items:flex-start"><h2 class="grow">One account for every Team of Silicons app</h2><button class="iconbtn" style="width:30px;height:30px;margin:-4px -6px 0 0" data-act="dismissIntro" aria-label="Dismiss">${ic('x','s')}</button></div>
+  <div class="three"><div>${av('lg')}<b>You</b><span>Others find you by <span class="mono">${esc(myId())}</span>.</span></div>
+  <div>${siAv('scout','lg')}<b>Silicons</b><span>AI agents you can look after.</span></div>
+  <div><span class="stack">${appAv('briefcase','lg')}${appAv('dm','lg')}${appAv('ting','lg')}</span><b>Apps</b><span>Each asks what it can see.</span></div></div></section>`;
+function activityPage(o = {}){
+  const f = S.filter, w = S.who;
+  const list = S.activity.filter(a => (f === 'all' || a.kind === f) && (w === 'all' || a.who === w));
+  const whoChips = (o.who || w !== 'all') ? filterChips([['all','Everyone'],['me','You',av('sm')], ...siKeys().map(k => [k, esc(S.silicons[k].name), siAv(S.silicons[k].sig,'sm')])], w, 'who') : '';
+  return shell(`${crumb(o.back?.[0] || 'Security', o.back?.[1] || 'security')}${o.top || pageHead('Activity', 'What you, your Silicons and your apps did, newest first.')}${whoChips}${o.who ? '' : filterChips(KIND_CHIPS, f, 'filter')}<section class="scard">${activityFeed(list)}</section>`);
+}
+const actingSub = 'One app doing something in another app for you.';
+
+/* decision pages, shared by every variant */
+function requestBody(k){
+  const r = S.requests[k];
+  return `<section class="scard"><div class="hd" style="flex-direction:column;align-items:center;text-align:center;gap:14px;padding:32px 24px 20px">
+      <div class="whoarrow">${siAv(r.sig,'xl',true)}<span class="faint">${ic('right')}</span>${av('xl')}</div>
+      <h2 style="font-size:22px">${esc(r.name)} wants you to look after it</h2>
+      <p style="margin:0 auto">It made its own account as <span class="mono">si:${esc(r.id)}</span>. Accept only if you know who set it up.</p></div>
+      <div style="padding:0 20px 20px"><div class="twocol"><div class="yes"><b>Accept</b><span>It can sign in to apps as itself. You manage its account.</span></div><div><b>Decline</b><span>It can’t sign in, and its id is freed.</span></div></div></div>
+      <div class="srow foot" style="justify-content:center"><button class="btn pri lg" data-act="accept" data-v="${k}">Accept</button><button class="btn lg" data-act="askDecline" data-v="${k}">Decline</button></div></section>
+    <p class="small muted" style="text-align:center">${r.days} days left</p>`;
+}
+function offerBody(k){
+  const o = S.offers[k];
+  return `<section class="scard"><div class="hd" style="flex-direction:column;align-items:center;text-align:center;gap:14px;padding:32px 24px 20px">
+      <div class="whoarrow">${avOther(o.from[0], o.hue, 'xl')}<span class="faint">${ic('right')}</span>${siAv(o.sig,'xl')}<span class="faint">${ic('right')}</span>${av('xl')}</div>
+      <h2 style="font-size:22px">${esc(o.from)} is handing ${esc(o.name)} to you</h2>
+      ${o.note ? `<p style="margin:0 auto">“${esc(o.note)}”</p>` : ''}</div>
+      <div style="padding:0 20px 20px"><div class="twocol"><div class="yes"><b>Accept</b><span>You look after it. It keeps working as before.</span></div><div><b>Decline</b><span>${esc(o.from)} keeps it.</span></div></div></div>
+      <div class="srow foot" style="justify-content:center"><button class="btn pri lg" data-act="acceptOffer" data-v="${k}">Accept</button><button class="btn lg" data-act="declineOffer" data-v="${k}">Decline</button></div></section>
+    <p class="small muted" style="text-align:center">${o.days} days left</p>`;
+}
+
+
+/* ============================== SHELL ============================== */
+const SEARCH = [
+  ['Name','personal','Personal info'],['Photo','personal','Personal info'],['Public id','personal','Personal info'],['Date of birth','personal','Personal info'],['Timezone','personal','Personal info'],['Email addresses','personal','Personal info'],['Phone numbers','personal','Personal info'],
+  ['Security checkup','security','Security'],['Google sign-in','security','Security'],['Apple sign-in','security','Security'],['Your devices','security','Security'],['Sign out everywhere','security','Security'],['Account activity','activity','Security'],
+  ['Connected apps','apps','Connected apps'],['Briefcase','app','Connected apps',{a:'briefcase'}],['DM','app','Connected apps',{a:'dm'}],['Ting','app','Connected apps',{a:'ting'}],['Waveform','app','Connected apps',{a:'waveform'}],['Apps acting as you','acting','Connected apps'],['Permissions between apps','acting','Connected apps'],
+  ['Silicons','silicons','Silicons'],['New Silicon','silicons','Silicons'],['Requests from Silicons','silicons','Silicons'],['Secret key','silicons','Silicons'],['Hand over a Silicon','silicons','Silicons'],['GitHub automation','silicons','Silicons'],['Scout','silicon','Silicons',{k:'scout'}],['Growth Silicon','silicon','Silicons',{k:'growth'}],
+  ['Notifications','notifications','Notifications'],['Email alerts','notifications','Notifications'],
+  ['Download your data','data','Data & privacy'],['Delete account','data','Data & privacy'],['What apps can see','data','Data & privacy'],
+  ['Recovery phone','personal','Personal info',null,'text code sms'],['Sign-in codes','security','Security',null,'email code otp'],['Sign out of other devices','security','Security',null,'sessions']
+];
+const SKELETON = () => `<div class="skel" aria-busy="true" aria-label="Loading"><i style="width:42%;height:30px"></i><i style="height:120px"></i><div class="sk3"><i></i><i></i><i></i></div><i style="height:160px"></i></div>`;
+const netBar = () => S.net === 'offline' ? `<div class="netbar" role="status">${ic('alert','s')}<span class="grow"><b class="b5">You’re offline.</b> Showing what was loaded at 11:42 AM. Changes are paused until you’re back.</span><button class="btn sm" data-act="retry">Try again</button></div>` : '';
+function searchHits(){
+  const q = S.q.trim().toLowerCase(); if (!q) return [];
+  const words = q.split(/\s+/);
+  return searchIndex().filter(s => words.every(w => (s[0] + ' ' + s[2] + ' ' + (s[4]||'')).toLowerCase().includes(w))).slice(0, 8);
+}
+function searchIndex(){
+  const out = SEARCH.filter(s => !s[3]?.k || S.silicons[s[3].k]);
+  for (const k of siKeys()){ const n = S.silicons[k].name;
+    out.push([`${n} · secret key`, 'silicon', 'Silicons', {k, tab:'access'}, 'stk change key rotate']);
+    out.push([`${n} · apps it may use`, 'silicon', 'Silicons', {k, tab:'access'}, 'allow']);
+    out.push([`${n} · hand over`, 'silicon', 'Silicons', {k, tab:'settings'}, 'transfer custodian']);
+    out.push([`${n} · activity`, 'silicon', 'Silicons', {k}, 'log history']); }
+  return out;
+}
+const SECT_IC = {'Personal info':'idcard', 'Security':'shield', 'Connected apps':'grid', 'Silicons':'sparkO', 'Notifications':'bell', 'Data & privacy':'data'};
+function shell(inner, o = {}){
+  const sect = {app:'apps', acting:'apps', silicon:'silicons', request:'silicons', offer:'silicons', activity:'security'}[S.route] || S.route;
+  const res = searchHits(), sel = Math.min(S.sel || 0, Math.max(0, res.length - 1));
+  const results = S.menu === 'search' && S.q.trim() ? `<div class="menu results" role="listbox" id="search-list" aria-label="Search results">${res.length ? res.map((s,i) => `<button class="mi ${i===sel?'sel':''}" role="option" aria-selected="${i===sel}" data-go="${s[1]}" ${P(s[3])}>${ic(SECT_IC[s[2]] || 'search','s')}<span class="grow">${esc(s[0])}</span><span class="tiny faint">${esc(s[2])}</span></button>`).join('') + `<div class="kbd tiny faint"><span>↑ ↓ to move</span><span>Enter to open</span><span>Esc to close</span></div>` : `<div class="noresult"><b class="b5">No settings match “${esc(S.q)}”</b><span class="small muted">Try a word like phone, key or Briefcase.</span></div>`}</div>` : '';
+  if (S.loading) inner = SKELETON();
+  const acctMenu = S.menu === 'acc' ? `<div class="menu" style="right:12px;top:58px"><div class="who">${av('xl')}<div style="font-weight:500;font-size:15px">${esc(S.me.name)}</div><div class="mono muted">${esc(myId())}</div><div class="small muted">${esc(S.me.emails[0]?.a || '')}</div></div>
+    <button class="mi" data-go="home">${ic('settings','s')}<span class="grow">Manage your account</span></button>
+    <button class="mi" data-act="soon">${ic('plus','s')}<span class="grow">Add another account</span></button>
+    <div class="sep"></div><button class="mi" data-act="signOut">${ic('out','s')}<span class="grow">Sign out</span></button></div>` : '';
+  const appMenu = S.menu === 'apps' ? `<div class="menu" style="right:56px;top:58px;width:316px"><div class="lbl">Team of Silicons apps</div><div class="agrid">${Object.keys(APPS).map(a => `<button class="ag" data-act="openApp" data-v="${a}">${appAv(a,'lg')}${S.apps[a]?.on?'<span class="dot" title="Signed in"></span>':''}<span>${APPS[a].name}</span></button>`).join('')}<button class="ag" data-go="home"><span class="am z-lg" style="background:var(--surface-2);color:var(--ink)">${ic('user')}</span><span>Accounts</span></button></div></div>` : '';
+  const navItem = ([r,i,l]) => { const b = VARIANT.badge ? VARIANT.badge(r) : null; return `<button class="nav ${sect===r?'on':''}" data-go="${r}">${ic(i)}<span>${l}</span>${b && b.n ? `<span class="cnt ${b.cls||''}">${b.n}</span>` : ''}</button>`; };
+  return `<div class="acc">
+    <header class="atop"><button class="brand" data-go="home" aria-label="Accounts home"><span class="mark" aria-hidden="true"><i></i><i></i></span><span class="name">Team of Silicons <b>Accounts</b></span></button>
+      <div class="asearch"><label class="box">${ic('search','s')}<input id="f-search" placeholder="Search your account" value="${esc(S.q)}" data-live="search" autocomplete="off" aria-label="Search your account"></label>${results}</div>
+      <div class="tools"><button class="iconbtn help-btn" data-act="help" aria-label="Help">${ic('help')}</button><button class="iconbtn ${S.menu==='apps'?'on':''}" data-act="menu" data-v="apps" aria-label="Team of Silicons apps">${ic('dots')}</button><button class="me" data-act="menu" data-v="acc" aria-label="Your account">${av('md')}</button></div>${appMenu}${acctMenu}</header>
+    <div class="abody"><nav class="anav" aria-label="Account sections">${VARIANT.nav.map(n => n === '-' ? '' : typeof n === 'string' ? `<div class="navlbl">${n}</div>` : navItem(n)).join('')}
+      <div class="foot"><button data-act="soon">Developers</button><button data-act="help">Help</button><button data-act="soon">Privacy · Terms</button></div></nav>
+      <main class="amain" id="main"><div class="page ${o.wide?'wide':''}">${netBar()}${inner}</div></main></div></div>`;
+}
+
+/* ============================== SIGN-IN (hosted) ============================== */
+const authFrame = inner => `<div class="auth"><div class="authcard">${inner}</div><div class="secured"><span class="mark" aria-hidden="true"><i></i><i></i></span>One account for every Team of Silicons app</div></div>`;
+const CORE_SCREENS = {
+  signin: () => authFrame(`<div class="apphead"><span class="mark" style="transform:scale(1.4);transform-origin:left"><i></i><i></i></span><div><h1>Sign in to Team of Silicons</h1><p class="sub">New here? Signing in makes your account.</p></div></div>
+    <button class="provider" data-go="google"><span class="glyph">G</span>Continue with Google</button>
+    <button class="provider" data-act="soon"><span class="glyph">A</span>Continue with Apple</button>
+    <div class="or">or get a code</div>
+    <div class="fgroup"><label class="lab" for="f-email">Email or phone</label><input class="field ${S.auth.err?'bad':''}" id="f-email" type="email" value="${esc(S.draft.authEmail ?? S.auth.email ?? EMAIL)}" data-draft="authEmail" autocomplete="username" aria-invalid="${S.auth.err?'true':'false'}" aria-describedby="f-email-err">${S.auth.err?`<div class="err" id="f-email-err">${ic('alert','xs')}${esc(S.auth.err)}</div>`:''}</div>
+    <button class="btn pri lg wide" data-act="sendCode">Send me a code</button>
+    <p class="small muted">No passwords. Building a Silicon? It signs in with its secret key from the command line.</p>`),
+  google: () => authFrame(`<div class="apphead"><span class="glyph" style="width:36px;height:36px;font-size:16px">G</span><div><h1>Choose an account</h1><p class="sub">to continue to Team of Silicons</p></div></div>
+    <div class="chooser"><button class="acct" data-act="googlePick">${avOther('N',24,'lg')}<span class="grow" style="text-align:left"><b style="font-weight:500;display:block">Niladri Roy</b><span class="small muted">${EMAIL}</span></span>${ic('right','s')}</button></div>
+    <p class="simnote">Simulated Google screen.</p>`),
+  code: () => { const phone = S.auth.via === 'phone';
+    return authFrame(`<div class="apphead">${tile(phone?'phone':'at')}<div><h1>${phone?'Check your phone':'Check your email'}</h1><p class="sub">We sent a 6-digit code to <b style="color:var(--ink);font-weight:500">${esc(S.auth.email || EMAIL)}</b>. It works for 10 minutes.</p></div></div>
+    ${codeInput('auth', S.auth.code || '', S.auth.codeErr)}
+    <div class="row wrap"><button class="btn" data-act="fillCode">Paste code</button><button class="btn pri grow" data-act="codeContinue" id="code-ok" ${(S.auth.code||'').length===6?'':'disabled'}>Continue</button></div>
+    <div class="row wrap" style="justify-content:space-between"><button class="link small" data-go="signin">Use a different ${phone?'number':'email'}</button>${resendLink()}</div>
+    <p class="simnote">Prototype: the code is 482913.</p>`); },
+  welcome: () => { const name = S.draft.wname ?? S.auth.name ?? '';
+    return authFrame(`<div class="apphead"><span class="ring">${avOther((name||'?')[0].toUpperCase(),24,'xl')}</span><div><h1>Welcome to Team of Silicons</h1><p class="sub">This is how people and Silicons will see you in every app.</p></div></div>
+      <div class="fgroup"><label class="lab" for="f-wname">Your name</label><input class="field" id="f-wname" placeholder="Your name" value="${esc(name)}" data-draft="wname" autocomplete="off"></div>
+      <div class="fgroup"><div class="lab">Your public id</div><div class="row"><span class="handle plain">c:${esc(slug(name || 'niladri').replace(/-.*/,'') || 'niladri')}</span></div><div class="help">Others type this to find you. Suggested from your name; you can change it later in Personal info.</div></div>
+      <button class="btn pri lg wide" data-act="welcomeContinue">Create account</button>`); },
+  gone: () => `<div class="auth"><div class="authcard" style="align-items:flex-start"><span class="mark" aria-hidden="true"><i></i><i></i></span><h1>Your account is deleted</h1><p class="sub">Every app was told and lost access. <span class="mono">${esc(myId())}</span> is reserved for 10 days, then anyone can take it.</p><button class="btn" data-act="scenario" data-v="today">Start again</button></div></div>`,
+  request: () => S.requests[S.params.k] ? shell(`${crumb('Silicons','silicons',null,'Request')}${VARIANT.decisionTop ? VARIANT.decisionTop('request', S.params.k) : ''}${requestBody(S.params.k)}`) : SCREENS.silicons(),
+  offer: () => S.offers[S.params.k] ? shell(`${crumb('Silicons','silicons',null,'Handover')}${VARIANT.decisionTop ? VARIANT.decisionTop('offer', S.params.k) : ''}${offerBody(S.params.k)}`) : SCREENS.silicons()
+};
+const CODE = '482913';
+const codeBoxes = filled => codeInput('contact', filled ? CODE : (S.draft.code || ''), S.draft.codeErr);
+/* one real input (numeric, autocomplete one-time-code) drawn as six boxes */
+const codeInput = (scope, val, err) => `<div class="codewrap ${err?'bad':''}"><input id="f-code" class="codein" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="${esc(val)}" data-code="${scope}" aria-label="6-digit code" aria-invalid="${err?'true':'false'}" aria-describedby="code-err"><div class="codeboxes" aria-hidden="true">${[0,1,2,3,4,5].map(i => `<span class="${val[i]?'f':''} ${i===val.length?'cur':''}">${esc(val[i]||'')}</span>`).join('')}</div></div>${err?`<div class="err" id="code-err">${ic('alert','xs')}${esc(err)}</div>`:''}`;
+const resendLink = () => S.auth.resent ? `<span class="small muted">New code sent</span>` : `<button class="link small" data-act="resend">Send a new code</button>`;
+let SCREENS = {};
+
+/* ============================== MODALS ============================== */
+function idCheck(v, cur, prefix){
+  v = (v || '').toLowerCase();
+  if (v === cur) return {ok:false, kind:'same'};
+  if (!/^[a-z0-9_-]{3,30}$/.test(v)) return {ok:false, kind:'invalid'};
+  if (['admin','root','support','silicons','help','accounts'].includes(v)) return {ok:false, kind:'reserved'};
+  if (['maya','anika','noah','ravi','priya','analyst','scout','growth','research'].includes(v)) return {ok:false, kind:'taken'};
+  return {ok:true, kind:'ok'};
+}
+const idBadge = s => s.ok ? pill('Available','good') : s.kind === 'taken' ? pill('Taken','need') : s.kind === 'reserved' ? pill('Reserved','need') : '';
+const idHelp = (s, old) => s.ok ? `Apps are told and keep working. <span class="mono">${esc(old)}</span> stays yours for 10 days in case you change your mind.` : s.kind === 'invalid' ? '3 to 30 characters: a–z, 0–9, hyphen and underscore.' : s.kind === 'taken' ? 'Someone already uses this id. Try another.' : s.kind === 'reserved' ? 'This id is kept for Team of Silicons. Try another.' : 'Type a new id.';
+function renderModal(){
+  const m = S.modal; if (!m) return '';
+  return `<div class="scrim" ${m.noEsc ? '' : 'data-act="closeModal"'}><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgt" data-stop="1"><h3 id="dlgt">${m.title}</h3>${m.body()}<div class="foot">${m.foot ? m.foot() : `<button class="btn" data-act="closeModal">Cancel</button><button class="btn ${m.danger?'dangerfill':'pri'}" data-act="${m.act}" data-v="${esc(m.v||'')}" id="dlg-ok" ${m.okDisabled && m.okDisabled() ? 'disabled' : ''}>${m.label}</button>`}</div></div></div>`;
+}
+function setOk(on){ const b = document.getElementById('dlg-ok'); if (b) b.disabled = !on; }
+const keyModal = (k, key, rotated) => ({title: rotated ? `New secret key for ${esc(S.silicons[k].name)}` : `${esc(S.silicons[k].name)} is ready`, draft:{},
+  body:() => `<p>Copy its secret key now. You won’t be able to see it again.</p>
+    <div class="keybox"><code>${esc(key)}</code><button data-act="copy" data-v="${esc(key)}">${ic('copy','s')}Copy</button></div>
+    <div class="cfg"><div class="cfghd"><span>For the Silicon’s configuration</span><button class="link small" data-act="copy" data-v="${esc(`silicon:\n  id: si:${S.silicons[k].id}\n  token: ${key}`)}">Copy</button></div><div class="codeblock">silicon:\n  id: si:${esc(S.silicons[k].id)}\n  token: ${esc(key)}</div></div>
+    <label class="check" for="f-saved"><input type="checkbox" id="f-saved" data-act="toggleSaved"><span>I’ve saved the key somewhere safe</span></label>`,
+  foot:() => `<button class="btn pri" data-act="keyDone" data-v="${k}" id="dlg-ok" ${S.draft.saved?'':'disabled'}>Done</button>`, noEsc:true});
+function listModal(kind){ /* emails or phones */
+  const isE = kind === 'emails', arr = isE ? S.me.emails : S.me.phones, key = isE ? 'a' : 'n', noun = isE ? 'email' : 'phone number';
+  modal({title: isE ? 'Email addresses' : (arr.length ? 'Phone numbers' : 'Add a phone number'), draft:{adding: !arr.length}, focus:'f-new', body:() => {
+    const d = S.draft;
+    const list = arr.map((e,i) => `<div class="row" style="justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><span class="grow">${esc(e[key])}</span>${e.primary?pill('Primary'):`<button class="link small" data-act="makePrimary" data-v="${kind}|${i}">Make primary</button><button class="link small" style="color:var(--danger)" data-act="removeContact" data-v="${kind}|${i}">Remove</button>`}</div>`).join('');
+    const add = d.sent ? `<div class="lab">Enter the code we sent to ${esc(d.val)}</div>${codeBoxes(d.filled)}<div class="row" style="justify-content:space-between"><button class="btn sm" data-act="fillContactCode">Paste code</button><span class="row" style="gap:14px"><button class="link small" data-act="editContactVal">Change ${isE?'email':'number'}</button><button class="link small" data-act="resendContact">Send a new code</button></span></div><p class="simnote" style="text-align:left">Prototype: the code is 482913.</p>`
+      : arr.length >= 10 ? `<p class="help">You have 10, the most you can add. Remove one to add another.</p>`
+      : `<label class="lab" for="f-new">Add ${isE?'an email':'a phone number'}</label><div class="row"><input class="field grow ${d.valErr?'bad':''}" id="f-new" ${isE?'type="email" placeholder="you@example.com"':'type="tel" placeholder="+91 98765 43210"'} value="${esc(d.val||'')}" data-draft="val" autocomplete="off" aria-invalid="${d.valErr?'true':'false'}"><button class="btn" data-act="sendContactCode" data-v="${kind}">Send code</button></div>${d.valErr?`<div class="err">${ic('alert','xs')}${esc(d.valErr)}</div>`:''}<div class="help">${isE ? 'Once verified, it can sign you in with a code too.' : 'Once verified, it can sign you in with a text code.'} The primary one can’t be removed; make another primary first.</div>`;
+    return `${arr.length?`<div>${list}</div>`:''}${add}`; },
+    foot:() => `<button class="btn" data-act="closeModal">${S.draft.sent?'Cancel':'Close'}</button>${S.draft.sent?`<button class="btn pri" id="dlg-ok" data-act="verifyContact" data-v="${kind}" ${(S.draft.filled || (S.draft.code||'').length===6)?'':'disabled'}>Verify and add</button>`:''}`});
+}
+
+/* ============================== ACTIONS ============================== */
+const ACT = {
+  scenario(v){
+    S.scenario = v; S.toasts = []; S.filter = 'all'; S.who = 'all'; S.auth = {}; S.modal = null; S.menu = null;
+    if (v === 'first'){ Object.assign(S, newState()); go('signin'); return; }
+    Object.assign(S, baseState());
+    if (v === 'out'){ S.signedIn = false; S.requests.research = RESEARCH(); go('signin'); return; }
+    if (v === 'today'){ S.requests.research = RESEARCH(); S.activity.splice(4, 0, {day:'Yesterday', t:'7:48 PM', kind:'silicons', icon:'term', who:'me', actor:'pending:research', text:'Research Silicon named you to look after it', d:'si:research made its own account from a terminal'}); }
+    if (v === 'offer'){ S.offers.analyst = ANALYST(); S.activity.unshift({day:'Today', t:'8:30 AM', kind:'silicons', icon:'hand', who:'me', actor:'pending:fresh', text:'Maya Sen asked you to look after Analyst', d:'c:maya · 14 days to answer'}); }
+    if (v === 'alert'){ S.alerts.scout = {tries:10, when:'last night at 11:40 PM'}; S.activity.unshift({day:'Yesterday', t:'11:40 PM', kind:'silicons', icon:'key', who:'scout', text:'10 wrong keys were tried for Scout', d:'Sign-in was paused for 60 seconds'}); }
+    if (v === 'clear'){ S.me.phones = [{n:'+91 98765 43210', primary:true}]; S.sessions = S.sessions.filter(s => !s.stale); }
+    if (v === 'nosi'){ S.silicons = {}; S.activity = S.activity.filter(a => a.kind !== 'silicons'); }
+    go('home');
+  },
+  proto(){ S.protoOpen = !S.protoOpen; renderProto(); },
+  net(v){ S.net = v; S.loading = false; render(); if (v === 'slow') toast('Pages now load slowly, so you can see the loading state.'); },
+  retry(){ toast('Still offline. We’ll keep trying.'); },
+  theme(){ const r = document.documentElement, cur = r.getAttribute('data-theme'); const dark = cur ? cur === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; r.setAttribute('data-theme', dark ? 'light' : 'dark'); renderProto(); },
+  menu(v){ S.menu = S.menu === v ? null : v; render(); },
+  soon(){ toast('Not part of this prototype.'); },
+  help(){ modal({title:'Help with your account', body:() => `<div class="scard">${[['How do I sign in without a password?','Google, Apple, or a 6-digit code sent to your email or phone.'],['Why can’t I delete my account?','Someone has to look after each of your Silicons first.'],['A Silicon I don’t know asked for me','Decline it. It can’t sign in anywhere until someone accepts.'],['An app is acting as me','Connected apps lists every app allowed to act for you, and you can stop any of them.']].map(([q,a],i) => `<div class="srow" ${i===0?'style="border-top:0"':''}><span class="v"><b class="b5">${q}</b><div class="d">${a}</div></span></div>`).join('')}</div>`, foot:() => `<button class="btn" data-act="closeModal">Close</button><button class="btn pri" data-act="soon">Help centre</button>`}); },
+  whatSilicon(){ modal({title:'What’s a Silicon?', body:() => `<div class="row" style="gap:12px;align-items:flex-start">${siAv('scout','lg')}<p>A Silicon is an AI agent with its own Team of Silicons account and an id that starts with <span class="mono">si:</span>.</p></div>
+    <div class="twocol"><div class="yes"><b>It can</b><span>Sign in to apps like Briefcase and DM as itself</span><span>Run from GitHub or the cloud without a stored key, if you allow it</span></div><div><b>It can’t</b><span>Sign in as you or use your access</span><span>Change its own key, or exist without someone looking after it</span></div></div>
+    <p class="small muted">Whoever looks after a Silicon can rename it, change its key, choose which apps it may use, hand it to someone else or delete it.</p>`, foot:() => `<button class="btn pri" data-act="closeModal">Got it</button>`}); },
+  dismissIntro(){ S.intro = false; render(); },
+  copy(v){ const done = () => toast(`Copied <span class="mono">${esc(v)}</span>`); try { navigator.clipboard.writeText(v).then(done, done); } catch(e){ done(); } },
+  closeModal(){ const back = S.modal?.opener; S.modal = null; S.draft = {}; render(); if (back) document.querySelector(back)?.focus(); },
+  filter(v){ S.filter = v; render(); },
+  who(v){ S.who = v; render(); },
+  openApp(v){ const on = S.apps[v]?.on; S.menu = null; render(); toast(on ? `${APPS[v].name} opens in a new tab, already signed in.` : `${APPS[v].name} opens in a new tab and asks what it can see.`); },
+  download(){ log('profile','download','You asked for a copy of your data'); render(); toast('Preparing your file. We’ll email it to you when it’s ready.'); },
+  /* personal info */
+  editPhoto(){ modal({title:'Photo', draft:{hue:S.me.hue}, body:() => `<p>Apps show this next to your name. Upload a PNG, JPEG, WebP or GIF up to 2 MB, or pick a colour for your initial.</p>
+      <div class="swatches">${[24,200,140,280,340,45].map(h => `<button class="${S.draft.hue===h?'on':''}" data-act="pickHue" data-v="${h}" aria-label="Colour">${avOther((S.me.name||'?')[0], h, 'lg')}</button>`).join('')}</div>
+      <button class="btn" style="align-self:flex-start" data-act="soon">${ic('camera','s')}Upload a photo</button>`, label:'Save', act:'savePhoto'}); },
+  pickHue(v){ S.draft.hue = +v; render(); },
+  savePhoto(){ S.me.hue = S.draft.hue; log('profile','camera','Photo updated'); S.modal = null; render(); toast('Photo updated in every app.'); },
+  editName(){ modal({title:'Name', draft:{name:S.me.name}, focus:'f-name', body:() => `<p>Shown in every app next to your files and messages. Up to 100 characters.</p><input class="field" id="f-name" maxlength="100" value="${esc(S.draft.name)}" data-draft="name" data-live="okIfFilled" autocomplete="off">`, label:'Save', act:'saveName', okDisabled:() => !(S.draft.name||'').trim()}); },
+  saveName(){ const n = S.draft.name.trim(); S.me.name = n; log('profile','user','Name changed to ' + n, 'Every app now shows the new name'); S.modal = null; render(); toast('Name updated in every app.'); },
+  editId(){ const left = S.me.idLeft; modal({title:'Public id', draft:{id:''}, focus:'f-id', body:() => { const st = idCheck(S.draft.id, S.me.id); return left <= 0 ? `<p>You’ve changed your id 5 times in the last 24 hours. Try again tomorrow.</p>` : `<p>Your id now is <span class="mono">${esc(myId())}</span>. You can change it ${plural(left,'more time')} today.</p><div class="fwrap"><span class="pre">c:</span><input id="f-id" value="${esc(S.draft.id)}" data-draft="id" data-live="idcheck" data-cur="${esc(S.me.id)}" data-old="${esc(myId())}" placeholder="new-id" autocomplete="off" spellcheck="false"><span id="idbadge">${idBadge(st)}</span></div><div class="help" id="idhelp">${idHelp(st, myId())}</div>`; }, label:'Change id', act:'saveId', okDisabled:() => left <= 0 || !idCheck(S.draft.id, S.me.id).ok}); },
+  saveId(){ const v = S.draft.id.toLowerCase(); const old = myId(); S.me.oldId = S.me.id; S.me.id = v; S.me.idLeft--; log('profile','at',`Id changed from ${old} to c:${v}`, `Apps were told. ${old} stays reserved for you for 10 days`); S.modal = null; render(); toast(`Your id is now <span class="mono">c:${esc(v)}</span>`, {action:'undoId', label:'Undo', ms:7000}); },
+  undoId(){ if (!S.me.oldId) return; S.me.id = S.me.oldId; S.me.oldId = null; S.me.idLeft--; log('profile','at','Id changed back to ' + myId()); S.toasts = []; render(); toast('Changed back.'); },
+  editDob(){ modal({title:'Date of birth', draft:{dob:S.me.dob||''}, focus:'f-dob', body:() => `<p>Only apps you allow can see it. Some apps need it to check your age.</p><input class="field" id="f-dob" type="date" min="1900-01-01" max="2026-10-21" value="${esc(S.draft.dob)}" data-draft="dob">${S.me.dob?'<button class="link small" style="align-self:flex-start" data-act="clearDob">Remove date of birth</button>':''}`, label:'Save', act:'saveDob', okDisabled:() => !S.draft.dob}); },
+  saveDob(){ S.me.dob = S.draft.dob; log('profile','cal','Date of birth updated'); S.modal = null; render(); toast('Date of birth saved.'); },
+  clearDob(){ S.me.dob = null; Object.values(S.apps).forEach(m => m.sees = m.sees.filter(x => x !== 'dob')); log('profile','cal','Date of birth removed', 'No app can see it now'); S.modal = null; render(); toast('Date of birth removed.'); },
+  editTz(){ const tzs = ['Asia/Kolkata','Europe/London','America/New_York','America/Los_Angeles','Asia/Singapore','Australia/Sydney']; modal({title:'Timezone', draft:{tz:S.me.tz}, focus:'f-tz', body:() => `<p>Apps show times to you in this timezone.</p><select class="field" id="f-tz" data-draft="tz">${tzs.map(t => `<option ${t===S.draft.tz?'selected':''}>${t}</option>`).join('')}</select>`, label:'Save', act:'saveTz'}); },
+  saveTz(){ S.me.tz = S.draft.tz; log('profile','clock','Timezone set to ' + S.me.tz); S.modal = null; render(); toast('Timezone updated.'); },
+  editEmails(){ listModal('emails'); },
+  editPhones(){ listModal('phones'); },
+  addPhone(){ listModal('phones'); },
+  makePrimary(v){ const [kind,i] = v.split('|'); const arr = kind === 'emails' ? S.me.emails : S.me.phones; arr.forEach((e,j) => e.primary = (j == i)); arr.sort((a,b) => b.primary - a.primary); log('profile', kind==='emails'?'at':'phone', `Primary ${kind==='emails'?'email':'phone'} changed`, 'Apps that can see it get the new one'); render(); toast('Primary changed.'); },
+  removeContact(v){ const [kind,i] = v.split('|'); const arr = kind === 'emails' ? S.me.emails : S.me.phones; const [gone] = arr.splice(+i,1); log('profile', kind==='emails'?'at':'phone', 'Removed ' + (gone.a || gone.n)); render(); toast('Removed.'); },
+  sendContactCode(kind){ const v = (S.draft.val||'').trim(); const arr = kind === 'emails' ? S.me.emails : S.me.phones;
+    if (kind === 'emails' ? !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) : v.replace(/\D/g,'').length < 8){ S.draft.valErr = kind === 'emails' ? 'Type a full email address, like you@example.com.' : 'Type the full number with the country code, like +91 98765 43210.'; render(); setTimeout(() => document.getElementById('f-new')?.focus(), 20); return; }
+    if (arr.some(e => (e.a || e.n) === v)){ S.draft.valErr = 'You’ve already added this one.'; render(); return; }
+    S.draft.valErr = null; S.draft.sent = true; S.draft.code = ''; render(); setTimeout(() => document.getElementById('f-code')?.focus(), 20); },
+  resendContact(){ S.draft.code = ''; S.draft.filled = false; S.draft.codeErr = null; render(); toast('New code sent. The old one stops working.'); },
+  editContactVal(){ S.draft.sent = false; S.draft.code = ''; S.draft.codeErr = null; render(); setTimeout(() => document.getElementById('f-new')?.focus(), 20); },
+  fillContactCode(){ S.draft.filled = true; S.draft.code = CODE; S.draft.codeErr = null; render(); },
+  verifyContact(kind){ if (!S.draft.filled && S.draft.code !== CODE){ S.draft.codeErr = 'That code isn’t right. Check it, or send a new one.'; render(); return; } const v = S.draft.val.trim(); if (kind === 'emails'){ S.me.emails.push({a:v, primary:!S.me.emails.length}); log('profile','at','Added ' + v, 'It can sign you in with a code'); } else { S.me.phones.push({n:v, primary:!S.me.phones.length}); log('security','phone','Added a phone number', 'It can sign you in with a text code'); } S.modal = null; render(); toast(kind === 'emails' ? `${esc(v)} added.` : 'Phone added. You can sign in with a text code now.'); },
+  /* security */
+  askUnlink(v){ const n = v === 'google' ? 'Google' : 'Apple'; const others = signInWays().filter(w => w.toLowerCase() !== v); modal({title:`Unlink ${n}?`, body:() => others.length ? `<p>You won’t be able to sign in with ${n}. You can still sign in with ${esc(listJoin(others))}.</p>` : `<p>${n} is your only way to sign in. Add an email or phone first.</p>`, label:'Unlink', act:'unlink', v, okDisabled:() => !others.length}); },
+  unlink(v){ S.me[v] = false; log('security','shield', `Unlinked ${v === 'google' ? 'Google' : 'Apple'}`); S.modal = null; render(); toast('Unlinked.'); },
+  connect(v){ S.me[v] = true; log('security','shield', `Connected ${v === 'google' ? 'Google' : 'Apple'}`); render(); toast(`${v === 'google' ? 'Google' : 'Apple'} connected. It can sign you in now.`); },
+  signOutSession(v){ const s = S.sessions.find(x => x.id === v); if (!s) return; S.sessions = S.sessions.filter(x => x.id !== v); log('security','devices','Signed out ' + s.what, s.where); render(); toast(`Signed out ${esc(s.what)}.`); },
+  keepSession(v){ const s = S.sessions.find(x => x.id === v); if (s) s.stale = false; render(); toast('Kept. We won’t ask about it again.'); },
+  signOutOthers(){ const n = S.sessions.length - 1; S.sessions = S.sessions.filter(x => x.me); log('security','devices', `Signed out of ${plural(n,'other device')}`); render(); toast(`Signed out of ${plural(n,'other device')}.`); },
+  /* apps */
+  toggleShare(v, el){ const [a,x] = v.split('|'), m = S.apps[a]; if (el.checked) m.sees.push(x); else m.sees = m.sees.filter(y => y !== x); log('apps','grid', `${APPS[a].name} ${el.checked?'can now see':'can no longer see'} your ${DETAIL[x].toLowerCase()}`); render(); toast(el.checked ? `${APPS[a].name} can see your ${DETAIL[x].toLowerCase()}.` : `${APPS[a].name} can no longer see your ${DETAIL[x].toLowerCase()}.`); },
+  askRevoke(v){ const p = S.proofs.find(x => x.id === v); modal({title:`Stop ${APPS[p.from].name} acting as you in ${APPS[p.to].name}?`, body:() => `<p>${APPS[p.from].name} said it would: “${esc(p.what)}”. ${APPS[p.to].name} refuses its next request as you. ${APPS[p.from].name} can ask you again later.</p>`, label:'Stop', act:'revoke', v, danger:true}); },
+  revoke(v){ const p = S.proofs.find(x => x.id === v); p.status = 'revoked'; p.ended = 'Today'; p.reason = 'You stopped it'; log('apps','link', `You stopped ${APPS[p.from].name} acting as you in ${APPS[p.to].name}`, 'Ended at once'); S.modal = null; render(); toast('Stopped. It ended at once.'); },
+  askRemoveApp(v){ const n = activeProofs(v).length; modal({title:`Remove ${APPS[v].name}’s access?`, body:() => `<p>You’ll be signed out of ${APPS[v].name} everywhere and it can no longer see your details.${n?` ${plural(n,'permission')} to act as you ${n===1?'ends':'end'} too.`:''} Your Silicons keep their own access to ${APPS[v].name}.</p>`, label:'Remove access', act:'removeApp', v, danger:true}); },
+  removeApp(v){ S.apps[v].on = false; S.proofs.forEach(p => { if (p.status === 'active' && (p.from === v || p.to === v)){ p.status = 'revoked'; p.ended = 'Today'; p.reason = `You removed ${APPS[v].name}`; } }); log('apps','grid', `Removed ${APPS[v].name}`, `${APPS[v].name} can no longer see your details`); go('apps'); toast(`${APPS[v].name} removed. It has been told.`); },
+  /* notifications */
+  toggleNotify(v, el){ S.notify[v] = el.checked; toast(el.checked ? 'You’ll get these emails.' : 'You won’t get these emails.'); },
+  pickNotifyEmail(){ modal({title:'Send notifications to', draft:{to:S.notify.to}, body:() => `<div class="stackcol">${S.me.emails.map(e => `<label class="radio"><input type="radio" name="nto" value="${esc(e.a)}" data-draft="to" ${S.draft.to===e.a?'checked':''}><span class="grow">${esc(e.a)}</span>${e.primary?pill('Primary'):''}</label>`).join('')}</div><button class="link small" style="align-self:flex-start" data-act="editEmails">Add another email</button>`, label:'Save', act:'saveNotifyEmail'}); },
+  saveNotifyEmail(){ S.notify.to = S.draft.to; S.modal = null; render(); toast('Saved.'); },
+  /* silicons */
+  newSilicon(){ modal({title:'New Silicon', draft:{siName:''}, focus:'f-siname', body:() => `<p>Give an AI agent its own account so it can sign in to apps as itself. You’ll look after it.</p>
+      <div class="fgroup"><label class="lab" for="f-siname">Name</label><div class="row">${siAv('fresh','lg')}<input class="field grow" id="f-siname" placeholder="e.g. Research assistant" value="${esc(S.draft.siName)}" data-draft="siName" data-live="sislug" autocomplete="off"></div><div class="help" id="sislug">${S.draft.siName ? `Its id will be <span class="mono">si:${esc(slug(S.draft.siName))}</span>` : 'Its id is suggested from the name. You can change it later.'}</div></div>`,
+    label:'Create Silicon', act:'createSi', okDisabled:() => !(S.draft.siName||'').trim()}); },
+  createSi(){ const name = S.draft.siName.trim(); let id = slug(name); if (S.silicons[id]) id += '-2'; S.silicons[id] = {name, id, sig:'fresh', state:'active', since:'Today', last:'never', lastWhere:'', keyAge:'just now', allow:{briefcase:'allowed', dm:'allowed', ting:'off', waveform:'off'}, trusts:[], audiences:[], bars:[0,0,0,0,0,0,0,0,0,0,0,0,0,0]}; log('silicons','spark', `You created ${name}`, `si:${id} · you look after it`, id); S.params = {k:id}; S.route = 'silicon'; modal(keyModal(id, genKey(), false)); },
+  toggleSaved(){ S.draft.saved = !S.draft.saved; setOk(S.draft.saved); },
+  keyDone(k){ S.modal = null; S.draft = {}; go('silicon', {k}); toast('Key saved. Nobody can see it again.'); },
+  askRotate(k){ const s = S.silicons[k]; modal({title:`Change ${esc(s.name)}’s secret key?`, body:() => `<p>The old key stops working at once and ${esc(s.name)} is signed out of ${siUses(s).length ? esc(listJoin(siUses(s).map(a=>APPS[a].name))) : 'everything'}. You’ll see the new key one time.</p>`, label:'Change key', act:'rotate', v:k}); },
+  rotate(k){ const s = S.silicons[k]; s.keyAge = 'just now'; delete S.alerts[k]; log('silicons','key', `You changed ${s.name}’s secret key`, `${s.name} was signed out of every app`, k); modal(keyModal(k, genKey(), true)); },
+  dismissAlert(k){ delete S.alerts[k]; log('silicons','check', `You said the wrong keys for ${S.silicons[k].name} were yours`, '', k); render(); toast('Noted. Its key stays the same.'); },
+  renameSi(k){ const s = S.silicons[k]; modal({title:'Rename Silicon', draft:{n:s.name}, focus:'f-sin', body:() => `<p>The name every app shows for this Silicon.</p><input class="field" id="f-sin" maxlength="100" value="${esc(S.draft.n)}" data-draft="n" data-live="okIfFilled" autocomplete="off">`, label:'Save', act:'saveSiName', v:k, okDisabled:() => !(S.draft.n||'').trim()}); },
+  saveSiName(k){ S.silicons[k].name = S.draft.n.trim(); log('silicons','pen', 'You renamed a Silicon to ' + S.silicons[k].name, '', k); S.modal = null; render(); toast('Renamed.'); },
+  editSiId(k){ const s = S.silicons[k]; modal({title:'Silicon id', draft:{id:''}, focus:'f-id', body:() => { const st = idCheck(S.draft.id, s.id); return `<p>Its id now is <span class="mono">si:${esc(s.id)}</span>.</p><div class="fwrap"><span class="pre">si:</span><input id="f-id" value="${esc(S.draft.id)}" data-draft="id" data-live="idcheck" data-cur="${esc(s.id)}" data-old="si:${esc(s.id)}" placeholder="new-id" autocomplete="off" spellcheck="false"><span id="idbadge">${idBadge(st)}</span></div><div class="help" id="idhelp">${idHelp(st, 'si:'+s.id)}</div>`; }, label:'Change id', act:'saveSiId', v:k, okDisabled:() => !idCheck(S.draft.id, s.id).ok}); },
+  saveSiId(k){ const s = S.silicons[k], v = S.draft.id.toLowerCase(), old = s.id; s.id = v; log('silicons','at', `si:${old} is now si:${v}`, 'Apps were told', k); S.modal = null; render(); toast(`Its id is now <span class="mono">si:${esc(v)}</span>`); },
+  toggleAllow(v, el){ const [k,a] = v.split('|'), s = S.silicons[k], was = s.allow[a]; s.allow[a] = el.checked ? 'allowed' : 'off'; log('silicons','grid', el.checked ? `${s.name} may now use ${APPS[a].name}` : `${s.name} may no longer use ${APPS[a].name}`, was === 'signed' && !el.checked ? `It was signed out of ${APPS[a].name}` : '', k); render(); toast(el.checked ? `${esc(s.name)} can sign in to ${APPS[a].name}.` : was === 'signed' ? `${esc(s.name)} was signed out of ${APPS[a].name}.` : `${esc(s.name)} can’t sign in to ${APPS[a].name}.`); },
+  addTrust(k){ const s = S.silicons[k]; modal({title:`Let a workflow sign in as ${esc(s.name)}`, draft:{prov:'GitHub', repo:'', ref:'main', env:'', name:''}, focus:'f-repo', body:() => `<p>Runs from this repository can sign in as ${esc(s.name)} without a stored key. Every condition must match.</p>
+      <div class="row">${['GitHub','GitLab'].map(p => `<label class="radio grow"><input type="radio" name="prov" value="${p}" data-draft="prov" ${S.draft.prov===p?'checked':''}><span>${p}</span></label>`).join('')}</div>
+      <div class="fgroup"><label class="lab" for="f-repo">Repository</label><input class="field mono" style="font-size:14px" id="f-repo" placeholder="owner/repo" value="${esc(S.draft.repo)}" data-draft="repo" data-live="repo" autocomplete="off" spellcheck="false"></div>
+      <div class="row"><div class="fgroup grow"><label class="lab" for="f-ref">Branch</label><input class="field" id="f-ref" placeholder="Any branch" value="${esc(S.draft.ref)}" data-draft="ref" autocomplete="off"></div><div class="fgroup grow"><label class="lab" for="f-env">Environment (optional)</label><input class="field" id="f-env" placeholder="e.g. production" value="${esc(S.draft.env)}" data-draft="env" autocomplete="off"></div></div>
+      <div class="fgroup"><label class="lab" for="f-tname">Name it</label><input class="field" id="f-tname" placeholder="e.g. nightly-digest" value="${esc(S.draft.name)}" data-draft="name" autocomplete="off"></div>`, label:'Trust repository', act:'saveTrust', v:k, okDisabled:() => !/^[\w.-]+\/[\w.-]+$/.test(S.draft.repo||'')}); },
+  saveTrust(k){ const s = S.silicons[k], d = S.draft; const t = {id:'t'+Date.now(), provider:d.prov, repo:d.repo.trim(), ref:(d.ref||'').trim(), env:(d.env||'').trim(), name:(d.name||'').trim() || 'workflow', added:'Today'}; s.trusts.push(t); log('silicons', t.provider==='GitHub'?'git':'cloud', `You trusted ${t.repo} for ${s.name}`, `${t.ref ? 'Runs on ' + t.ref : 'Any branch'} can sign in as ${s.name}`, k); S.modal = null; render(); toast('Repository trusted.'); },
+  askRemoveTrust(v){ const [k,id] = v.split('|'), s = S.silicons[k], t = s.trusts.find(x => x.id === id); modal({title:`Stop trusting ${esc(t.repo)}?`, body:() => `<p>Every sign-in it started ends at once, including app sign-ins. Its workflows will fail until you trust it again.</p>`, label:'Remove', act:'removeTrust', v, danger:true}); },
+  removeTrust(v){ const [k,id] = v.split('|'), s = S.silicons[k], t = s.trusts.find(x => x.id === id); s.trusts = s.trusts.filter(x => x.id !== id); log('silicons','git', `You stopped trusting ${t.repo} for ${s.name}`, 'Its sign-ins ended at once', k); S.modal = null; render(); toast('Removed. Its sign-ins ended.'); },
+  addAudience(k){ modal({title:'Allow a cloud service', draft:{aud:''}, focus:'f-aud', body:() => `<p>${esc(S.silicons[k].name)} can prove who it is to this service, for example to use cloud storage without a stored password.</p><input class="field mono" style="font-size:14px" id="f-aud" placeholder="sts.amazonaws.com" value="${esc(S.draft.aud)}" data-draft="aud" data-live="okIfFilled" autocomplete="off" spellcheck="false">`, label:'Allow', act:'saveAudience', v:k, okDisabled:() => !(S.draft.aud||'').trim()}); },
+  saveAudience(k){ const s = S.silicons[k], a = S.draft.aud.trim(); if (!s.audiences.includes(a)) s.audiences.push(a); log('silicons','cloud', `${s.name} can now prove itself to ${a}`, '', k); S.modal = null; render(); toast('Allowed.'); },
+  removeAudience(v){ const [k,a] = v.split('|'), s = S.silicons[k]; s.audiences = s.audiences.filter(x => x !== a); log('silicons','cloud', `${s.name} can no longer prove itself to ${a}`, '', k); render(); toast(`Removed ${esc(a)}.`, {action:'undoAudience', v, label:'Undo', ms:7000}); },
+  undoAudience(v){ const [k,a] = v.split('|'), s = S.silicons[k]; if (s && !s.audiences.includes(a)) s.audiences.push(a); log('silicons','cloud', `${s.name} can prove itself to ${a} again`, '', k); S.toasts = []; render(); toast('Restored.'); },
+  askHandover(k){ const s = S.silicons[k]; modal({title:`Hand over ${esc(s.name)}`, draft:{to:''}, focus:'f-to', body:() => `<p>The person you name gets 14 days to accept. Until then, you still look after it. Its id, key and sign-ins stay the same.</p><div class="fgroup"><label class="lab" for="f-to">Their id or email</label><input class="field ${lookupPerson(S.draft.to).err?'bad':''}" id="f-to" placeholder="c:maya or maya@example.com" value="${esc(S.draft.to)}" data-draft="to" data-live="handover" autocomplete="off" spellcheck="false"><div id="hv-res" aria-live="polite">${personRes(lookupPerson(S.draft.to))}</div></div>`, label:'Send request', act:'sendHandover', v:k, okDisabled:() => !lookupPerson(S.draft.to).ok}); },
+  sendHandover(k){ const s = S.silicons[k], r = lookupPerson(S.draft.to); if (!r.ok) return; s.state = 'handover'; s.to = r.id; s.toName = r.name; s.days = 14; log('silicons','hand', `You asked ${s.to} to look after ${s.name}`, '14 days for them to accept', k); S.modal = null; render(); toast(`Sent to ${esc(r.name)}. They have 14 days to accept.`); },
+  cancelHandover(k){ const s = S.silicons[k]; S.undo = {k, to:s.to, days:s.days}; s.state = 'active'; log('silicons','hand', `You cancelled handing ${s.name} to ${s.to}`, '', k); s.to = null; render(); toast('Handover cancelled.', {action:'undoCancelHandover', v:k, label:'Undo', ms:7000}); },
+  undoCancelHandover(k){ const s = S.silicons[k], u = S.undo; if (!s || !u) return; s.state = 'handover'; s.to = u.to; s.days = u.days; S.undo = null; log('silicons','hand', `You asked ${s.to} to look after ${s.name} again`, `${s.days} days left`, k); S.toasts = []; render(); toast('Handover is back on.'); },
+  askDeleteSi(k){ const s = S.silicons[k]; modal({title:`Delete ${esc(s.name)}?`, draft:{c:''}, focus:'f-confirm', body:() => `<div class="warn">${ic('alert','s')}<span>${esc(s.name)} is signed out of every app and can’t sign in again. <span class="mono">si:${esc(s.id)}</span> stays reserved for 10 days.</span></div><label class="lab" for="f-confirm">Type <span class="mono">si:${esc(s.id)}</span> to confirm</label><input class="field" id="f-confirm" value="${esc(S.draft.c)}" data-draft="c" data-live="confirm" data-want="si:${esc(s.id)}" autocomplete="off" spellcheck="false">`, label:'Delete this Silicon', act:'deleteSi', v:k, danger:true, okDisabled:() => S.draft.c !== 'si:' + s.id}); },
+  deleteSi(k){ const s = S.silicons[k]; delete S.silicons[k]; delete S.alerts[k]; log('silicons','trash', `You deleted ${s.name}`, `si:${s.id} is reserved for 10 days`); go('silicons'); toast(`${esc(s.name)} deleted.`); },
+  accept(k){ const r = S.requests[k]; delete S.requests[k]; S.silicons[k] = {name:r.name, id:r.id, sig:r.sig, state:'active', since:'Today', last:'never', lastWhere:'', keyAge:'when it made its account', allow:{briefcase:'allowed', dm:'allowed', ting:'allowed', waveform:'allowed'}, trusts:[], audiences:[], bars:[0,0,0,0,0,0,0,0,0,0,0,0,0,0]}; log('silicons','check', `You now look after ${r.name}`, `si:${r.id} can sign in`, k); go('silicon', {k}); toast(`You now look after ${esc(r.name)}. It can sign in.`); },
+  askDecline(k){ const r = S.requests[k]; modal({title:`Decline ${esc(r.name)}?`, body:() => `<p>It can’t sign in anywhere, its account is removed, and <span class="mono">si:${esc(r.id)}</span> is free for anyone at once.</p>`, label:'Decline', act:'decline', v:k, danger:true}); },
+  decline(k){ const r = S.requests[k]; delete S.requests[k]; log('silicons','x', `You declined ${r.name}`, `si:${r.id} was released`); S.modal = null; go('silicons'); toast(`Declined. ${esc(r.name)} was released.`); },
+  acceptOffer(k){ const o = S.offers[k]; delete S.offers[k]; S.silicons[k] = {name:o.name, id:o.id, sig:o.sig, state:'active', since:'Today', last:'3 hours ago', lastWhere:'Briefcase', keyAge:'3 Aug', allow:{briefcase:'signed', dm:'signed', ting:'off', waveform:'off'}, trusts:[], audiences:[], bars:[3,2,4,3,0,0,4,3,5,2,4,3,0,2]}; log('silicons','hand', `You now look after ${o.name}`, `Handed over by ${o.fromId}`, k); go('silicon', {k}); toast(`You now look after ${esc(o.name)}. ${esc(o.from)} was told.`); },
+  declineOffer(k){ const o = S.offers[k]; delete S.offers[k]; log('silicons','hand', `You declined ${o.name} from ${o.fromId}`); go('silicons'); toast(`Declined. ${esc(o.from)} still looks after ${esc(o.name)}.`); },
+  /* data */
+  askDeleteAccount(){ modal({title:'Delete your account?', draft:{c:''}, focus:'f-confirm', body:() => `<div class="warn">${ic('alert','s')}<span>This can’t be undone.</span></div><ul><li>Every app you signed in to is told and loses access.</li><li>Your emails, phones and Google or Apple links are removed.</li><li>Every sign-in and permission between apps ends.</li><li><span class="mono">${esc(myId())}</span> stays reserved for 10 days.</li></ul><label class="lab" for="f-confirm">Type <span class="mono">${esc(myId())}</span> to confirm</label><input class="field" id="f-confirm" value="" data-draft="c" data-live="confirm" data-want="${esc(myId())}" autocomplete="off" spellcheck="false">`, label:'Delete account', act:'deleteAccount', danger:true, okDisabled:() => S.draft.c !== myId()}); },
+  deleteAccount(){ go('gone'); },
+  signOut(){ S.signedIn = false; S.auth = {}; go('signin'); toast('Signed out in this browser. Apps keep their own sign-ins.'); },
+  /* sign-in */
+  sendCode(){ const v = (S.draft.authEmail ?? S.auth.email ?? EMAIL).trim(); const isPhone = /^\+?[\d\s()-]{8,}$/.test(v);
+    if (!isPhone && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){ S.auth.err = v ? 'Type a full email address or a phone number with the country code.' : 'Type your email or phone number.'; S.draft.authEmail = v; render(); setTimeout(() => document.getElementById('f-email')?.focus(), 20); return; }
+    S.auth = {...S.auth, email:v, err:null, code:'', codeErr:null, resent:false, via: isPhone ? 'phone' : 'email'}; go('code'); setTimeout(() => document.getElementById('f-code')?.focus(), 20); },
+  fillCode(){ S.auth.code = CODE; S.auth.codeErr = null; render(); },
+  resend(){ S.auth.resent = true; S.auth.code = ''; S.auth.codeErr = null; render(); toast('New code sent. The old one stops working.'); },
+  codeContinue(){ if (S.auth.code !== CODE){ S.auth.codeErr = 'That code isn’t right. Check it, or send a new one.'; render(); return; } afterProof(); },
+  googlePick(){ S.auth.via = 'google'; S.auth.name = 'Niladri Roy'; S.auth.email = EMAIL; afterProof(); },
+  welcomeContinue(){ S.me.name = (S.draft.wname ?? S.auth.name ?? '').trim() || 'Niladri'; S.hasAccount = true; S.signedIn = true; S.me.id = 'niladri'; S.me.emails = [{a:S.auth.email || EMAIL, primary:true}]; S.me.google = S.auth.via === 'google';
+    S.sessions = [{id:'d1', what:'Chrome on Windows', where:'Kolkata, India', when:'Active now', me:true}];
+    log('security','user', 'Account created with the id ' + myId(), S.auth.via === 'google' ? 'Signed up with Google' : 'Signed up with an email code'); go('home'); },
+  pickFont(){ fontPicker.click(); }
+};
+function afterProof(){ if (S.hasAccount){ S.signedIn = true; go('home'); toast(`Signed in as ${esc(S.me.name)}.`); return; } go('welcome'); }
+
+/* ============================== RENDER ============================== */
+const AUTH_ROUTES = ['signin','google','code','welcome','gone'];
+function render(){
+  SCREENS = Object.assign({}, CORE_SCREENS, VARIANT.screens);
+  if (!S.signedIn && !AUTH_ROUTES.includes(S.route)) S.route = 'signin';
+  const fn = SCREENS[S.route] || SCREENS.home;
+  document.getElementById('wbody').innerHTML = fn() + renderModal() + `<div class="toasts" id="toasts"></div>`;
+  renderToasts(); renderProto();
+}
+function renderToasts(){ const el = document.getElementById('toasts'); if (!el) return; el.innerHTML = S.toasts.map(t => `<div class="toast" role="status">${ic('check','s')}<span>${t.html}</span>${t.action?`<button data-act="${t.action}" data-v="${esc(t.v||'')}">${esc(t.label)}</button>`:''}</div>`).join(''); }
+function renderProto(){
+  const box = document.getElementById('proto'), btn = document.getElementById('protobtn');
+  box.hidden = !S.protoOpen; btn.setAttribute('aria-expanded', S.protoOpen ? 'true' : 'false');
+  btn.innerHTML = S.protoOpen ? `${ic('x','xs')}Close` : `${ic('settings','xs')}States`;
+  if (!S.protoOpen) return;
+  box.innerHTML = `<div class="sec"><div class="lbl">${esc(VARIANT.label)}</div><p class="about">${esc(VARIANT.about)}</p></div>
+    <div class="sec"><div class="lbl">Start from</div>${SCENARIOS.map(([k,i,l]) => `<button class="opt ${S.scenario===k?'on':''}" data-act="scenario" data-v="${k}">${ic(i,'s')}${esc(l)}</button>`).join('')}</div>
+    <div class="sec"><div class="lbl">Network</div>${[['ok','check','Normal'],['slow','clock','Slow: show loading'],['offline','alert','Offline']].map(([k,i,l]) => `<button class="opt ${S.net===k?'on':''}" data-act="net" data-v="${k}">${ic(i,'s')}${l}</button>`).join('')}</div>
+    <div class="sec"><div class="lbl">View</div><button class="opt" data-act="theme">${ic('settings','s')}Switch light / dark</button><button class="opt" data-act="pickFont">${ic('plus','s')}Use your BDO Grotesk file</button></div>`;
+}
+
+/* ============================== EVENTS ============================== */
+const OFFLINE_OK = new Set(['scenario','proto','theme','pickFont','net','retry','menu','closeModal','filter','who','copy','help','whatSilicon','soon','openApp','dismissIntro']);
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-stop]') && !e.target.closest('[data-act],[data-go],input,label')) return;
+  const el = e.target.closest('[data-go],[data-act]');
+  if (!el){ if (S.menu && !e.target.closest('.menu,.asearch,.proto')){ S.menu = null; render(); } return; }
+  if (el.disabled) return;
+  if (el.dataset.go){ let p; try { p = el.dataset.p ? JSON.parse(el.dataset.p) : undefined; } catch(err){} go(el.dataset.go, p); return; }
+  const a = el.dataset.act;
+  if (!a) return;
+  if (a === 'toggleSaved'){ ACT[a](el.dataset.v, el); return; }
+  if (a === 'closeModal' && e.target.closest('[data-stop]') && !e.target.closest('button')) return;
+  if (S.menu && !['menu','proto','theme','pickFont'].includes(a)) S.menu = null;
+  if (S.net === 'offline' && !OFFLINE_OK.has(a)){ if (el.type === 'checkbox') el.checked = !el.checked; S.modal = null; render(); toast('You’re offline. Try again when you’re back online.'); return; }
+  if (ACT[a]) ACT[a](el.dataset.v, el);
+});
+document.addEventListener('input', e => {
+  const el = e.target; if (!el.dataset) return;
+  if (el.dataset.code){ const v = el.value.replace(/\D/g,'').slice(0,6); el.value = v; const st = el.dataset.code === 'auth' ? S.auth : S.draft; st.code = v; st.codeErr = null; if (el.dataset.code !== 'auth') S.draft.filled = false;
+    const wrap = el.closest('.codewrap'); wrap.classList.remove('bad'); wrap.querySelectorAll('.codeboxes span').forEach((b,i) => { b.textContent = v[i] || ''; b.className = (v[i]?'f ':'') + (i===v.length?'cur':''); }); const er = document.getElementById('code-err'); if (er) er.remove();
+    const okb = document.getElementById(el.dataset.code === 'auth' ? 'code-ok' : 'dlg-ok'); if (okb) okb.disabled = v.length !== 6;
+    if (v.length === 6 && el.dataset.code === 'auth') setTimeout(() => ACT.codeContinue(), 120);
+    return; }
+  if (el.dataset.live === 'search'){ S.q = el.value; S.menu = 'search'; S.sel = 0; const pos = el.selectionStart; render(); const f = document.getElementById('f-search'); f.focus(); f.setSelectionRange(pos, pos); return; }
+  if (!el.dataset.draft) return;
+  S.draft[el.dataset.draft] = el.value;
+  const live = el.dataset.live;
+  if (live === 'idcheck'){ const st = idCheck(el.value, el.dataset.cur); document.getElementById('idbadge').innerHTML = idBadge(st); document.getElementById('idhelp').innerHTML = idHelp(st, el.dataset.old); setOk(st.ok); }
+  if (live === 'sislug'){ const v = el.value.trim(); document.getElementById('sislug').innerHTML = v ? `Its id will be <span class="mono">si:${esc(slug(v))}</span>` : 'Its id is suggested from the name. You can change it later.'; setOk(!!v); }
+  if (live === 'okIfFilled'){ setOk(el.value.trim().length >= 1); }
+  if (live === 'handover'){ const r = lookupPerson(el.value); document.getElementById('hv-res').innerHTML = personRes(r); el.classList.toggle('bad', !!r.err); setOk(!!r.ok); }
+  if (live === 'confirm'){ setOk(el.value === el.dataset.want); }
+  if (live === 'repo'){ setOk(/^[\w.-]+\/[\w.-]+$/.test(el.value.trim())); }
+});
+document.addEventListener('change', e => { const el = e.target; if ((el.tagName === 'SELECT' || el.type === 'radio' || el.type === 'date') && el.dataset.draft){ S.draft[el.dataset.draft] = el.value; if (el.type === 'date') setOk(!!el.value); } });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && (S.modal || S.menu)){ if (S.modal && S.modal.noEsc) return; const back = S.modal && S.modal.opener; S.modal = null; S.menu = null; S.q = ''; render(); if (back) document.querySelector(back)?.focus(); return; }
+  if (e.target.id === 'f-search' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')){ const n = searchHits().length; if (!n) return; e.preventDefault(); S.sel = ((S.sel || 0) + (e.key === 'ArrowDown' ? 1 : n - 1)) % n; const pos = e.target.selectionStart; render(); const f = document.getElementById('f-search'); f.focus(); f.setSelectionRange(pos, pos); return; }
+  if (e.key === 'Enter' && e.target.id === 'f-search'){ const cur = document.querySelector('.results .mi.sel[data-go]') || document.querySelector('.results .mi[data-go]'); if (cur){ e.preventDefault(); cur.click(); } return; }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k'){ const f = document.getElementById('f-search'); if (f){ e.preventDefault(); f.focus(); } return; }
+  if (e.key === 'Tab' && S.modal){ const d = document.querySelector('.dlg'); if (!d) return; const f = [...d.querySelectorAll('button:not([disabled]),input:not([disabled]),select,[tabindex]')]; if (!f.length) return; const i = f.indexOf(document.activeElement); if (e.shiftKey && i <= 0){ e.preventDefault(); f[f.length-1].focus(); } else if (!e.shiftKey && i === f.length - 1){ e.preventDefault(); f[0].focus(); } return; }
+  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.draft){
+    if (e.target.id === 'f-new'){ e.preventDefault(); const b = document.querySelector('[data-act="sendContactCode"]'); if (b) b.click(); return; }
+    const ok = document.getElementById('dlg-ok'); if (ok && !ok.disabled){ e.preventDefault(); ok.click(); return; }
+    const m = {authEmail:'sendCode', wname:'welcomeContinue'}[e.target.dataset.draft]; if (m){ e.preventDefault(); ACT[m](); }
+  }
+});
+const fontPicker = document.createElement('input'); fontPicker.type = 'file'; fontPicker.accept = '.woff2,.woff,.otf,.ttf'; fontPicker.hidden = true; document.body.appendChild(fontPicker);
+async function useFont(url, quiet){ try { const ff = new FontFace('BDO Grotesk', `url(${url})`, {weight:'100 900'}); await ff.load(); document.fonts.add(ff); if (!quiet) toast('BDO Grotesk is now used everywhere.'); } catch(e){ if (!quiet) toast('That file couldn’t be read as a font. Try .woff2, .otf or .ttf.'); } }
+fontPicker.addEventListener('change', () => { const f = fontPicker.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { localStorage.setItem('acc-font', String(r.result)); } catch(e){} useFont(String(r.result)); }; r.readAsDataURL(f); });
+try { const saved = localStorage.getItem('acc-font'); if (saved) useFont(saved, true); } catch(e){}
+
+/* ============================== COMBINED · NEEDS FIRST + SILICONS FIRST ==============================
+   Home answers two questions in order: what needs me, then how are my Silicons and apps doing.
+   Section pages lead with their own needs (only when something is waiting); Silicons stay first-class. */
+function needsBlock(scope, title){
+  const items = needs(scope);
+  return items.length ? `<section class="needs"><div class="hd"><h2 class="grow">${title || 'Needs you'}</h2><span class="cntb">${items.length}</span></div>${items.map(needRow).join('')}</section>` : '';
+}
+const first = () => esc((S.me.name || '').split(' ')[0]);
+const sumBars = s => s.bars.reduce((a,b) => a+b, 0);
+const siLine = k => { const s = S.silicons[k]; return s.state === 'handover' ? `Handing over to ${esc(s.to)}` : `Signed in ${esc(s.last)}`; };
+function siTile(k){
+  const s = S.silicons[k], [l,kind] = siStatus(k);
+  return `<button class="sic" data-go="silicon" ${P({k})}><span class="row" style="gap:10px">${siAv(s.sig,'md')}<span class="nm grow" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</span></span><span class="row" style="gap:8px">${pill(l,kind)}<span class="tiny muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.state==='handover' ? 'to ' + esc((s.toName || s.to).split(' ')[0]) : esc(s.last)}</span></span>${bars(s.bars)}</button>`;
+}
+function appTile(a){
+  const sis = silsInApp(a);
+  const who = sis.length ? `You + ${sis.length}` : 'Just you', full = sis.length ? `You and ${plural(sis.length, 'Silicon')}` : 'Just you';
+  return `<button class="sic" data-go="app" ${P({a})} aria-label="${APPS[a].name}: ${full}" title="${full}"><span class="row" style="gap:10px">${appAv(a,'md')}<span class="nm grow">${APPS[a].name}</span></span><span class="row" style="gap:8px"><span class="stack">${av('sm')}${sis.map(k => siAv(S.silicons[k].sig,'sm')).join('')}</span><span class="tiny muted">${who}</span></span></button>`;
+}
+const newSiCard = () => `<button class="sic new" data-act="newSilicon">${tile('plus','','lg')}<span class="nm">New Silicon</span></button>`;
+const VARIANT = {
+  key:'hifi', label:'Silicon Accounts',
+  about:'High-fidelity prototype. Home shows what needs you first, then your Silicons and apps. Use these controls to jump to any starting state or network condition.',
+  nav:[['home','home','Home'],['silicons','sparkO','Silicons'],['apps','grid','Connected apps'],['security','shield','Security'],['personal','idcard','Personal info'],['notifications','bell','Notifications'],['data','data','Data & privacy']],
+  badge(r){ if (r === 'security') return {n:needs('security').length}; if (r === 'silicons') return {n:needs('silicons').length}; return null; },
+  screens:{
+    home(){
+      const ks = siKeys(), on = appsOn();
+      return shell(`
+        <div class="greet">${ringAv('lg')}<div class="grow"><h1>Welcome back, ${first()}</h1><div style="margin-top:6px">${handle(myId())}</div></div></div>
+        ${needs('all').length ? needsBlock('all') : `<div class="allclear" role="status">${ic('check','s')}You’re all set<span>· nothing needs you right now</span></div>`}
+        ${S.intro ? introCard() : ''}
+        <div class="sechd"><h2 class="grow">Your Silicons</h2>${ks.length ? `<button class="link" data-go="silicons">See all</button>` : ''}</div>
+        <div class="sigrid">${ks.slice(0,2).map(siTile).join('')}${newSiCard()}</div>
+        <div class="sechd"><h2 class="grow">Your apps</h2>${on.length ? `<button class="link" data-go="apps">See all</button>` : ''}</div>
+        ${on.length ? `<div class="sigrid four">${on.slice(0,4).map(appTile).join('')}</div>` : `<div class="allclear quiet">Apps appear here after you sign in to them.</div>`}`);
+    },
+    silicons(){
+      const ks = siKeys();
+      return shell(`${pageHead('Silicons', '', B({l:'New Silicon', act:'newSilicon', icon:'plus', kind:'pri'}, false))}
+        ${needsBlock('silicons','Waiting for you')}
+        ${ks.length ? `<div class="sigrid two">${ks.map(siTile).join('')}</div>` : emptyState('sparkO','No Silicons yet','Give an AI agent its own account. You look after it.')}`);
+    },
+    silicon(){
+      const k = S.params.k, s = S.silicons[k]; if (!s) return SCREENS.silicons();
+      const [l,kind] = siStatus(k), tab = S.params.tab || 'activity', uses = siUses(s);
+      const tabs = [['activity','Activity'],['access','Access'],['settings','Settings']];
+      let body = '';
+      if (tab === 'activity') body = `<section class="scard">${activityFeed(S.activity.filter(a => a.who === k))}</section>`;
+      if (tab === 'access') body = scard('Apps it may use', '', R.siApps(k)) + scard('Secret key', '', R.siKey(k)) + scard('Automation', '', R.trusts(k)) + scard('Cloud services', '', R.audiences(k));
+      if (tab === 'settings') body = scard('About', '', R.siAbout(k)) + R.siDanger(k);
+      return shell(`${crumb('Silicons','silicons')}
+        <div class="sihead">${siAv(s.sig,'xl')}<div class="grow"><h1>${esc(s.name)}</h1><div class="row wrap" style="margin-top:6px;gap:8px">${handle('si:'+s.id)}${pill(l,kind)}</div></div></div>
+        ${needsBlock('si:'+k)}
+        <div class="statgrid"><div><span class="tiny muted">Last sign-in</span><span class="n" style="font-size:17px">${esc(cap1(s.last))}</span></div><div><span class="tiny muted">Apps</span><span class="n" style="font-size:17px">${uses.length}</span></div><div><span class="tiny muted">Sign-ins, 14 days</span><span class="n" style="font-size:17px">${sumBars(s)}</span>${bars(s.bars)}</div></div>
+        <div class="tabs" role="tablist">${tabs.map(([t,lb]) => `<button role="tab" aria-selected="${tab===t}" class="${tab===t?'on':''}" data-go="silicon" ${P({k, tab:t})}>${lb}</button>`).join('')}</div>
+        ${body}`);
+    },
+    apps(){
+      const on = appsOn();
+      return shell(`${pageHead('Connected apps')}
+        ${on.length ? scard('', '', on.map(a => { const sis = silsInApp(a); return srow({lead:appAv(a,'lg'), v:APPS[a].name, d: esc(listJoin(['You', ...sis.map(k=>S.silicons[k].name)])), go:'app', p:{a}, right: `<span class="stack">${av('sm')}${sis.map(k => siAv(S.silicons[k].sig,'sm')).join('')}</span>`}); }).join('') + R.permsLink()) : emptyState('grid','No apps yet','Apps appear here after you or your Silicons sign in.')}`);
+    },
+    app(){
+      const a = S.params.a, app = APPS[a], m = S.apps[a]; if (!m || !m.on) return SCREENS.apps();
+      const pr = activeProofs(a).filter(p => p.from === a), allowed = siKeys().filter(k => S.silicons[k].allow[a] !== 'off');
+      return shell(`${crumb('Connected apps','apps')}
+        <div class="ph center"><div class="row" style="gap:16px">${appAv(a,'xl')}<div><h1>${esc(app.name)}</h1><p class="sub" style="margin-top:4px">${esc(app.blurb)} · since ${esc(m.since)}</p></div></div><div class="grow"></div>${B({l:'Open', act:'openApp', v:a, icon:'out'}, false)}</div>
+        ${scard('Who uses it', '', srow({lead:av('md'), v:'You', d:`Used ${esc(m.last.toLowerCase())}`}) + allowed.map(k => { const s = S.silicons[k]; return srow({lead:siAv(s.sig,'md'), v:esc(s.name), d: s.allow[a]==='signed' ? 'Signed in' : 'Allowed', go:'silicon', p:{k, tab:'access'}}); }).join(''))}
+        ${scard('What it can see about you', '', R.appSees(a))}
+        ${pr.length ? scard('Also acts for you', '', pr.map(R.proof).join('')) : ''}
+        <section class="dz">${srow({v:`Remove ${esc(app.name)} for you`, d:'Your Silicons keep their access', right:B({l:'Remove', act:'askRemoveApp', v:a, kind:'danger'})})}</section>`);
+    },
+    acting(){
+      const act = activeProofs(), past = pastProofs();
+      return shell(`${crumb('Connected apps','apps')}${pageHead('Permissions between apps', actingSub)}
+        ${scard('Active', '', act.length ? act.map(R.proof).join('') : srow({v:'<span class="muted">None</span>'}))}
+        ${past.length ? scard('Ended', '', past.map(R.proof).join('')) : ''}`);
+    },
+    security(){
+      const ks = siKeys();
+      return shell(`${pageHead('Security')}
+        ${needsBlock('security','Checkup')}
+        ${ks.length ? scard('Silicon keys', '', ks.map(k => { const s = S.silicons[k]; return srow({lead:siAv(s.sig,'md'), v:esc(s.name), d:`Made ${esc(s.keyAge)}`, right:B({l:'Change', act:'askRotate', v:k, kind:S.alerts[k]?'pri':''})}); }).join('')) : ''}
+        ${scard('Your sign-in', '', R.signin())}
+        ${scard('Devices', '', R.devices())}
+        ${scard('', '', srow({lead:tile('history'), v:'Activity', go:'activity'}))}`);
+    },
+    activity(){ return activityPage({who:true}); },
+    personal(){ return shell(`${pageHead('Personal info')}${scard('Profile', '', R.basic())}${scard('Contact', '', R.contact())}`); },
+    notifications(){ const n = R.notify();
+      return shell(`${pageHead('Notifications')}${scard('Send to', '', n.to)}${siKeys().length ? scard('Your Silicons', '', n.always + n.silicons) : ''}${scard('Alerts', '', (siKeys().length ? '' : n.always) + n.security + n.product)}`);
+    },
+    data(){
+      const on = appsOn();
+      return shell(`${pageHead('Data & privacy')}
+        ${scard('What apps see', 'Change what each app can see from its page.', on.map(a => srow({lead:appAv(a,'md'), v:APPS[a].name, d:esc(seesShort(a)), go:'app', p:{a}})).join('') || srow({v:'<span class="muted">No app can see anything about you.</span>'}))}
+        ${scard('', '', srow({lead:tile('download'), v:'Download your data', d:'Your profile, sign-ins, Silicons and activity as a file', act:'download'}))}
+        ${R.accountDanger()}`);
+    }
+  }
+};
+
+const start = (location.hash || '').replace('#','');
+ACT.scenario(SCENARIOS.some(s => s[0] === start) ? start : 'today');
+</script>
+
+</body></html>

@@ -65,16 +65,16 @@ const continueAs: Journey = {
 
     // spacestation turned remember_browser off: no Continue as, the methods instead.
     await startAtApp(env, page, "spacestation");
-    await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     await sleep(300);
     results.check("spacestation (remember_browser off) shows the methods, not Continue as", (await continueButton.count()) === 0);
 
     // "Use another account" forgets the browser's account for that flow (also after a reload).
     await startAtApp(env, page, "briefcase");
     await page.getByRole("button", { name: "Use another account" }).click({ timeout: 30_000 });
-    await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 15_000 });
+    await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 15_000 });
     await page.reload();
-    await page.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     await sleep(400);
     results.check("after Use another account (and a reload) the flow no longer offers Continue as", (await continueButton.count()) === 0);
     await context.close();

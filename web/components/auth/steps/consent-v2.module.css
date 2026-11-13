@@ -1,0 +1,55 @@
+/* The consent step's second round (consent-v2.tsx). One rhythm for all four: 16px between blocks, Continue the strongest
+   element, the small print at the foot. Colours come from the panel's tokens, so each app's branding paints them. */
+.page { display: grid; gap: var(--space-inset); }
+.page[data-center] { justify-items: center; text-align: center; }
+.wide.wide { width: 100%; }
+.title { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); text-wrap: balance; }
+.lead { margin: var(--space-tight) 0 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.eyebrow { margin: 0; color: var(--text-secondary); font: var(--label); letter-spacing: var(--label-tracking); }
+.ring { display: inline-grid; flex: none; padding: var(--space-hair); border-radius: var(--radius-full); corner-shape: superellipse(1); background: conic-gradient(from 200deg, var(--silicon-mark-1-from), var(--silicon-mark-1-to), var(--silicon-mark-3-to), var(--silicon-mark-2-from), var(--silicon-mark-1-from)); }
+.ring > * { corner-shape: superellipse(1); box-shadow: 0 0 0 var(--space-hair) var(--surface); }
+
+/* You, in one line. */
+.who { display: flex; align-items: center; gap: var(--space-related); color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.whoWords { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.whoName { color: var(--foreground); font-weight: var(--weight-medium); }
+.whoId { font-family: var(--font-mono); letter-spacing: 0; }
+
+/* The small print. */
+.foot { display: grid; gap: var(--space-related); }
+.fine { margin: 0; color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); text-align: center; }
+.domain { color: var(--foreground); font-family: var(--font-mono); letter-spacing: 0; }
+
+/* 1 Sentence: what's included is a success Alert; the extras as checkboxes. */
+.extras { display: grid; gap: var(--space-group); margin: 0; padding: 0; border: 0; }
+.extrasTitle { margin: 0 0 var(--space-tight); padding: 0; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.checkRow { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-group); }
+.missing { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+/* 2 Card: you as the app sees you. */
+/* The Card sits in a full-width slot; the Card itself is as Silicon UI draws it. */
+.cardSlot { display: grid; width: 100%; text-align: left; }
+.cardMedia { display: grid; place-items: center; padding: var(--space-inset) 0 var(--space-tight); }
+.cardFacts { display: grid; width: 100%; margin: var(--space-group) 0 0; padding: var(--space-group) 0 0; border-top: 1px solid var(--border-subtle); list-style: none; }
+.cardFacts li { display: flex; justify-content: space-between; gap: var(--space-group); padding: var(--space-tight) 0; font: var(--small); letter-spacing: var(--small-tracking); }
+.cardFacts li span:first-child { color: var(--text-secondary); }
+.cardFacts li span:last-child { overflow: hidden; color: var(--foreground); text-overflow: ellipsis; white-space: nowrap; }
+.chips { display: grid; width: 100%; justify-items: center; gap: var(--space-related); }
+
+/* 3 One tap: you and the question side by side; the extras folded. */
+.oneTapHead { display: flex; align-items: center; gap: var(--space-inset); }
+.foldList, .list ul { display: grid; margin: 0; padding: 0 var(--space-group) var(--space-tight); list-style: none; }
+.foldList li, .list li { display: flex; align-items: center; gap: var(--space-group); padding: var(--space-related) 0; border-top: 1px solid var(--border-subtle); }
+.foldWords { display: grid; min-width: 0; flex: 1; gap: 0; text-align: left; }
+.foldLabel { display: flex; align-items: center; gap: var(--space-related); color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.foldValue { overflow: hidden; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+
+/* 4 Band: the app's colour across the top, the marks and the question on it. */
+.bandMarks { display: flex; align-items: center; justify-content: center; gap: var(--space-related); padding: var(--space-inset) 0 var(--space-tight); }
+.bandLogo { --sq-r: var(--radius-control); display: grid; width: calc(var(--space-page) + var(--space-tight)); height: calc(var(--space-page) + var(--space-tight)); place-items: center; object-fit: cover; background: var(--primary, var(--accent)); color: var(--primary-foreground, var(--surface)); font: var(--h3); }
+.bandPlus { color: var(--text-secondary); font: var(--h3); }
+.list { display: grid; gap: 0; }
+.list ul { padding: 0; }
+.listTitle { margin: 0 0 var(--space-tight); color: var(--text-secondary); font: var(--label); letter-spacing: var(--label-tracking); }
+.listCheck { flex: none; color: var(--success); }
+

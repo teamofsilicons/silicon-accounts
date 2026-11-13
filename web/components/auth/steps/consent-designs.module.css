@@ -1,0 +1,52 @@
+/* The consent designs (consent-designs.tsx), inside the hosted panel: they take the app's branding through the panel's
+   tokens (--foreground, --surface, --border, the primary on Silicon UI's Button and Switch). */
+.consent { display: grid; gap: var(--space-inset); }
+.head { display: grid; gap: var(--space-related); }
+.head[data-center] { justify-items: center; text-align: center; }
+.title { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); text-wrap: balance; }
+.lead { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.lead strong { color: var(--foreground); font-weight: var(--weight-medium); }
+.mono { font-family: var(--font-mono); letter-spacing: 0; }
+
+/* Rows: label (with New) over value; a switch, lock or Add at the end. Off rows go quiet. */
+.box { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; margin: 0; padding: 0 var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); list-style: none; }
+.details { display: grid; margin: 0; padding: 0; list-style: none; }
+.detail { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group) 0; }
+.detail[data-compact] { padding: var(--space-related) 0; }
+.box > .detail + .detail, .details > .detail + .detail { border-top: 1px solid var(--border-subtle); }
+.detailWords { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
+.detailLabel { display: flex; align-items: center; gap: var(--space-related); color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.detailValue { overflow: hidden; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.detail[data-off] .detailValue { color: var(--text-muted); }
+.lock { display: inline-flex; flex: none; align-items: center; gap: var(--space-tight); color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
+
+.footer { display: flex; align-items: flex-start; gap: var(--space-related); margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.footer svg { flex: none; margin-top: var(--space-hair); }
+.footer strong { color: var(--foreground); font-weight: var(--weight-medium); }
+.signedIn { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.actions { display: grid; gap: var(--space-related); }
+.wide.wide { width: 100%; }
+.where { margin: 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); text-align: center; }
+.domain { color: var(--text-secondary); font-family: var(--font-mono); letter-spacing: 0; }
+
+/* A  Preview: the card the app receives; hidden facts fold away. */
+.preview { --sq-r: var(--radius-container); --sq-fill: color-mix(in oklab, var(--primary, var(--accent)) 6%, var(--surface)); --sq-stroke: color-mix(in oklab, var(--primary, var(--accent)) 25%, var(--border)); display: grid; gap: var(--space-group); padding: var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-raised); }
+.previewTop { display: flex; align-items: center; gap: var(--space-group); }
+.previewWho { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
+.previewName { color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); }
+.previewId { color: var(--text-secondary); font: var(--small); font-family: var(--font-mono); letter-spacing: 0; }
+.previewEye { color: var(--text-muted); }
+.previewFacts { display: grid; margin: 0; padding: var(--space-group) 0 0; border-top: 1px dashed var(--sq-stroke); list-style: none; }
+.previewFacts li { display: flex; justify-content: space-between; gap: var(--space-group); overflow: hidden; max-height: calc(var(--space-block) + var(--space-related)); padding: var(--space-tight) 0; color: var(--foreground); font: var(--small); letter-spacing: var(--small-tracking); transition: max-height var(--duration-standard) var(--ease-standard), opacity var(--duration-standard) var(--ease-standard), padding var(--duration-standard) var(--ease-standard); }
+.previewFacts li span:first-child { color: var(--text-secondary); }
+.previewFacts li[data-hidden] { max-height: 0; padding: 0; opacity: 0; }
+
+/* B  Handshake: the app's mark and you, joined by a dashed line. */
+.handshake { display: flex; align-items: center; justify-content: center; gap: var(--space-group); padding-top: var(--space-related); }
+.handLogo { --sq-r: var(--radius-control); width: var(--space-page); height: var(--space-page); object-fit: cover; background: var(--surface-muted); }
+.handLine { display: flex; align-items: center; gap: var(--space-tight); color: var(--text-secondary); }
+.handLine::before, .handLine::after { content: ""; width: var(--space-block); border-top: 1px dashed var(--border); }
+.group { display: grid; gap: var(--space-related); }
+.groupTitle { margin: 0; color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); text-transform: uppercase; }
+
+@media (prefers-reduced-motion: reduce) { .previewFacts li { transition: none; } }

@@ -1,0 +1,59 @@
+/* Home's "Your account" cards (account-cards.tsx), four designs. Every card is a link: a clear border, no resting
+   shadow; on hover it rises a little with the raised shadow and its picture leans in. One column under 640px. */
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: 0; padding: 0; list-style: none; }
+.cards > li { display: grid; min-width: 0; }
+
+.card { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); position: relative; display: grid; min-width: 0; grid-template-rows: auto 1fr; overflow: hidden; isolation: isolate; border: 1px solid var(--sq-stroke); background: var(--sq-fill); color: var(--foreground); text-decoration: none; transition: box-shadow var(--duration-fast) var(--ease-standard), translate var(--duration-fast) var(--ease-standard); }
+.card:hover { color: var(--foreground); }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .card:hover { box-shadow: var(--shadow-raised); translate: 0 calc(var(--space-hair) * -1); }
+  .card:hover .picture { scale: 1.04; }
+}
+
+.picture { display: block; background-repeat: no-repeat; background-size: cover; transition: scale var(--duration-considered) var(--ease-standard); }
+.body { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-related); }
+.icon { --sq-r: var(--radius-control); --sq-fill: var(--canvas); display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }
+.words { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
+.title { overflow: hidden; color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.fact { overflow: hidden; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.chevron { flex: none; color: var(--text-muted); transition: translate var(--duration-fast) var(--ease-standard); }
+.card:hover .chevron { color: var(--foreground); translate: var(--space-hair) 0; }
+
+/* picture: the introduction's card, a 16:9 picture over the words. */
+.cards[data-design="picture"] .picture { aspect-ratio: 16 / 9; border-bottom: 1px solid var(--border-subtle); }
+
+/* cover: the picture fills a 4:3 card; the words sit on a white panel inset at its foot. */
+.cards[data-design="cover"] .card { aspect-ratio: 4 / 3; grid-template-rows: 1fr; }
+.cards[data-design="cover"] .picture { position: absolute; z-index: -1; inset: 0; }
+.cards[data-design="cover"] .body { --sq-r: var(--radius-control); --sq-fill: color-mix(in oklab, var(--surface) 92%, transparent); --sq-stroke: var(--border-subtle); align-self: end; margin: var(--space-related); border: 1px solid var(--sq-stroke); background: var(--sq-fill); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.cards[data-design="cover"] .icon { --sq-fill: transparent; width: auto; color: var(--foreground); }
+
+/* band: a short band of the picture; the icon's white tile straddles its lower edge, the words under it. */
+.cards[data-design="band"] .picture { aspect-ratio: 3 / 1; border-bottom: 1px solid var(--border-subtle); }
+.cards[data-design="band"] .body { position: relative; align-items: end; padding-top: calc(var(--space-inset) + var(--space-tight)); }
+.cards[data-design="band"] .icon { --sq-fill: var(--surface); position: absolute; top: 0; left: var(--space-related); translate: 0 -50%; border: 1px solid var(--border); color: var(--foreground); box-shadow: var(--shadow-raised); }
+
+/* gradient: the earlier introduction's cards, each a 135° gradient of its page's colours, dark top left to light
+   bottom right, light words at the top left and a large outlined icon at the bottom right. */
+.cards[data-design="gradient"] .card { --sq-stroke: color-mix(in oklab, var(--neutral-0) 22%, transparent); min-height: calc(var(--space-page) * 3); grid-template-rows: 1fr; background-origin: border-box; }
+.cards[data-design="gradient"] .body { align-items: start; padding: var(--space-group); }
+.cards[data-design="gradient"] .words { width: 70%; flex: none; }
+.cards[data-design="gradient"] .title { color: var(--neutral-0); font: var(--h3); letter-spacing: var(--h3-tracking); }
+.cards[data-design="gradient"] .fact { color: color-mix(in oklab, var(--neutral-0) 78%, transparent); }
+.cards[data-design="gradient"] .bigIcon { position: absolute; z-index: -1; right: var(--space-group); bottom: var(--space-group); width: calc(var(--space-section) * 2.5); height: calc(var(--space-section) * 2.5); color: color-mix(in oklab, var(--neutral-0) 85%, transparent); transition: rotate var(--duration-considered) var(--ease-standard); }
+.cards[data-design="gradient"] .card:hover .bigIcon { rotate: -6deg; }
+.cards[data-design="gradient"] .card[data-page="apps"] { background-image: linear-gradient(135deg, color-mix(in oklab, var(--accent), var(--neutral-11) 45%), var(--accent) 45%, var(--silicon-mark-3-to)); }
+.cards[data-design="gradient"] .card[data-page="security"] { background-image: linear-gradient(135deg, color-mix(in oklab, var(--silicon-mark-4-from), var(--neutral-11) 50%), var(--silicon-mark-4-from) 45%, var(--silicon-mark-4-to)); }
+.cards[data-design="gradient"] .card[data-page="personal"] { background-image: linear-gradient(135deg, color-mix(in oklab, var(--silicon-mark-2-from), var(--neutral-11) 45%), var(--silicon-mark-2-from) 45%, var(--silicon-mark-2-to)); }
+
+@media (prefers-reduced-motion: reduce) { .card, .picture, .chevron, .bigIcon { transition: none; } }
+@media (max-width: 639px) {
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  /* One column: the picture beside the words (as the introduction does), so three cards don't fill a screen. */
+  .cards[data-design="picture"] .card { grid-template-columns: 7rem minmax(0, 1fr); grid-template-rows: auto; }
+  .cards[data-design="picture"] .picture { aspect-ratio: auto; min-height: 100%; border-bottom: 0; border-right: 1px solid var(--border-subtle); }
+  .cards[data-design="cover"] .card { aspect-ratio: 16 / 7; }
+  .cards[data-design="band"] .picture { aspect-ratio: 5 / 1; }
+  .cards[data-design="gradient"] .card { min-height: calc(var(--space-page) * 2); }
+}

@@ -99,7 +99,7 @@ export const journey: Journey = {
       await live(page, '[data-opening="google"][data-paused]').first().waitFor({ timeout: 30_000 });
       await page.getByRole("button", { name: "Other ways to sign in" }).click();
       await page.getByRole("button", { name: "Continue with Apple", exact: true }).waitFor({ timeout: 10_000 });
-      results.check("…Other ways to sign in shows briefcase's methods", (await page.getByRole("button", { name: "Continue with Google", exact: true }).count()) === 1 && (await page.getByRole("textbox", { name: "Email" }).count()) === 1);
+      results.check("…Other ways to sign in shows briefcase's methods", (await page.getByRole("button", { name: "Continue with Google", exact: true }).count()) === 1 && (await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).count()) === 1);
 
       // Cancel at Google: back on our methods page with the reason, not the Opening page again.
       await page.getByRole("button", { name: "Continue with Google", exact: true }).click();
@@ -116,7 +116,7 @@ export const journey: Journey = {
       await startAtApp(env, page, "briefcase", { method: "google" });
       await waitForOpening(env, page, "google");
       await chooseMockIdentity(env, page, email, "Opal Google");
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
       await waitForDetailsPage(page);
       await button(page, "Share and continue").click();
       const outcome = await backAtApp(env, page, "briefcase");
@@ -136,7 +136,7 @@ export const journey: Journey = {
       if (seen.movedAfterMs !== null) results.metric("Opening page shown → Apple (waveform)", seen.movedAfterMs);
       const email = freshEmail("opening-apple");
       await chooseMockIdentity(env, page, email, "Ari Apple");
-      await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+      await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
       await waitForDetailsPage(page);
       await button(page, "Share and continue").click();
       const outcome = await backAtApp(env, page, "waveform");

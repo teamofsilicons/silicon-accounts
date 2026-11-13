@@ -1,0 +1,12 @@
+/* Home's Your Silicons, in Home's section pattern: a heading row (the section heading, a quiet "See all" at the end),
+   8px above its content; 32px under what comes before, like every section. The cards are parts/silicon-card.tsx,
+   three a row (two on a phone). */
+.section { display: grid; gap: var(--space-related); margin-top: var(--space-section); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
+/* Home's section headings (h2), one style everywhere: 22px medium, display tracking (Anil, 2026-10-31). */
+.title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
+.seeAll { display: inline-flex; align-items: center; gap: var(--space-hair); color: var(--text-secondary); font: var(--label); letter-spacing: var(--label-tracking); text-decoration: none; }
+.seeAll:hover { color: var(--foreground); }
+
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: 0; padding: 0; list-style: none; }
+@media (max-width: 639px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

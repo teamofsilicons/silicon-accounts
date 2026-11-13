@@ -119,9 +119,9 @@ export const sessions: SessionInfo[] = [
 const siliconBase = { kind: "silicon" as const, custodian: carbonSummary };
 
 export const silicons: ManagedSilicon[] = [
-  { ...siliconBase, uuid: "Qz4", id: "si:scout", display_name: "Scout", pfp_url: portrait("Scout", 160), dob: "2026-09-03", timezone: "Asia/Kolkata", status: "active", created_at: "2026-09-03T10:00:00.000Z", updated_at: iso(-300), version: 3, webhook_url: "https://scout.example/hooks/accounts", stk_rotated_at: iso(-60 * 24 * 6), pending_transfer: null },
+  { ...siliconBase, uuid: "Qz4", id: "si:scout", display_name: "Scout", pfp_url: "https://iris.teamofsilicons.com/pfp/silicon?id=Qz4", dob: "2026-09-03", timezone: "Asia/Kolkata", status: "active", created_at: "2026-09-03T10:00:00.000Z", updated_at: iso(-300), version: 3, webhook_url: "https://scout.example/hooks/accounts", stk_rotated_at: iso(-60 * 24 * 6), pending_transfer: null },
   { ...siliconBase, uuid: "Lm8", id: "si:head_of_growth", display_name: "Head of Growth", pfp_url: portrait("Head of Growth", 32), dob: "2026-09-11", timezone: "Europe/London", status: "active", created_at: "2026-09-11T10:00:00.000Z", updated_at: iso(-800), version: 2, webhook_url: null, stk_rotated_at: iso(-60 * 24 * 20), pending_transfer: { id: "0192a6f0-0000-7000-8000-0000000000aa", to: { uuid: "Sh7", kind: "carbon", id: "c:shubham", display_name: "Shubham", pfp_url: portrait("Shubham", 300), status: "active" }, created_at: iso(-60 * 20), expires_at: iso(60 * 24 * 13) } },
-  { ...siliconBase, uuid: "Tb2", id: "si:atlas", display_name: "Atlas", pfp_url: portrait("Atlas", 270), dob: "2026-10-01", timezone: "UTC", status: "pending_custodian", created_at: "2026-10-01T10:00:00.000Z", updated_at: iso(-1200), version: 1, custodian: null, webhook_url: null, stk_rotated_at: null, pending_transfer: null },
+  { ...siliconBase, uuid: "Tb2", id: "si:atlas", display_name: "Atlas", pfp_url: "https://iris.teamofsilicons.com/pfp/silicon?id=Tb2", dob: "2026-10-01", timezone: "UTC", status: "pending_custodian", created_at: "2026-10-01T10:00:00.000Z", updated_at: iso(-1200), version: 1, custodian: null, webhook_url: null, stk_rotated_at: null, pending_transfer: null },
 ];
 
 export const custodianRequests: CustodianRequest[] = [

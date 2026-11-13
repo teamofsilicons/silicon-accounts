@@ -59,20 +59,21 @@ export const journey: Journey = {
       results.check("briefcase's webhook received it, signature verified: changed [timezone], Europe/Berlin", !!data && sameJson(data.changed, ["timezone"]) && data.account?.timezone === "Europe/Berlin", short(data, 300));
 
       // ---- 3. the account site: what briefcase can see, then Remove access ------------------------------------------------
-      await page.goto(`${env.site}/apps`);
-      const card = page.locator(`article#app-${APP}`);
-      await card.waitFor({ timeout: 30_000 });
-      const chips = (await card.locator("ul[role=list] li").allInnerTexts()).map(text => text.replace(/\s+/g, " ").trim());
-      results.check("the account site's apps page shows what briefcase can see: name, id and photo, email and the timezone the Carbon ticked", chips.some(text => text.startsWith("Name, id and photo")) && chips.some(text => text.startsWith("Email")) && chips.some(text => text.startsWith("Timezone")), chips.join(" | "));
+      await page.goto(`${env.site}/apps/${APP}`);
+      const sees = page.getByRole("region", { name: "What it can see about you" });
+      await sees.waitFor({ timeout: 30_000 });
+      const chips = (await sees.getByRole("listitem").allInnerTexts()).map(text => text.replace(/\s+/g, " ").trim());
+      results.check("the account site's app page shows what briefcase can see: name, photo and CarbonID, email and the timezone the Carbon ticked", chips.some(text => text.startsWith("Name, photo and CarbonID")) && chips.some(text => text.startsWith("Email")) && chips.some(text => text.startsWith("Timezone")), chips.join(" | "));
       await shot(env, page, "wh-chain-03-apps");
       const after = (await inboxEvents(env, APP, { uuid: "none" })).last_seq;
-      await card.getByRole("button", { name: "Remove access" }).click();
-      await card.getByRole("button", { name: "Remove", exact: true }).click({ timeout: 10_000 });
+      await page.locator("main").getByRole("button", { name: "Remove", exact: true }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "Remove Access", exact: true }).click({ timeout: 10_000 });
       const clicked = Date.now();
       const removedEvent = await waitEvent(env, APP, { type: "membership.access_removed", uuid, after });
       results.check("Remove access on the account site: briefcase's webhook receives membership.access_removed, signed, with {uuid, membership_id}", !!removedEvent && sameJson(removedEvent.payload.data, { uuid, membership_id: `${APP}:${uuid}` }), short(removedEvent?.payload, 300));
       if (removedEvent) results.metric("Remove access clicked → briefcase received access_removed", Date.parse(removedEvent.received_at) - clicked, "ms");
-      const done = page.getByText("Access removed").first();
+      // Removing goes back to /apps, where the app is listed under Access removed.
+      const done = page.getByRole("region", { name: "Access removed" });
       await done.waitFor({ timeout: 15_000 }).catch(() => undefined);
       results.check("…and the page says Access removed", await done.isVisible().catch(() => false));
       await shot(env, page, "wh-chain-04-removed");

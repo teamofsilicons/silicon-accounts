@@ -15,9 +15,9 @@
  */
 import { useId, useRef, useState } from "react";
 import { Lock } from "lucide-react";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { Checkbox } from "@/components/silicon-ui/checkbox/checkbox";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Checkbox } from "@teamofsilicons/silicon-ui/checkbox";
 import type { ApiError } from "@/lib/api/errors";
 import type { ContactField, FlowChallenge, FlowDetailField, FlowDetails } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
@@ -227,7 +227,7 @@ function DetailsPage({ flow, ctl, notice, details }: DetailsProps & { details: F
         <AccountRow
           account={account}
           size="sm"
-          action={<Button variant="ghost" size="sm" loading={pending === "switch"} disabled={locked && pending !== "switch"} onClick={() => void act("switch", () => ctl.switchAccount())}>Switch account</Button>}
+          action={<Button variant="ghost" size="sm" loading={pending === "switch"} disabled={locked && pending !== "switch"} onClick={() => void act("switch", () => ctl.switchAccount())}>Switch Account</Button>}
         />
       ) : null}
       <ul data-sq="surface" className={styles.shareList} aria-label={`Details shared with ${app}`}>
@@ -238,7 +238,7 @@ function DetailsPage({ flow, ctl, notice, details }: DetailsProps & { details: F
               <span className={styles.shareValue}>{profileValue}</span>
             </span>
             <span className={styles.shareLock} title="Always shared">
-              <Lock size={14} strokeWidth={1.75} aria-hidden="true" />
+              <Lock size={14} strokeWidth={2} aria-hidden="true" />
               <span>Always</span>
             </span>
           </li>
@@ -290,7 +290,7 @@ function DetailsPage({ flow, ctl, notice, details }: DetailsProps & { details: F
                     kinds={[view.endsWith("phone") ? "phone" : "email"]}
                     initialEmail={lastValue?.kind === "email" ? lastValue.value : ""}
                     initialPhone={lastValue?.kind === "phone" ? lastValue.value : ""}
-                    submitLabel="Send code"
+                    submitLabel="Send Code"
                     onSubmit={send}
                     autoFocus={fine && first && !challenge}
                     note={view.endsWith("phone") ? "We text a 6 digit code to this number." : "We email a 6 digit code to this address."}
@@ -375,7 +375,7 @@ function DetailRow({ field, isNew, ticked, onToggle, disabled, adding, onAdd }: 
         </span>
         {addButton}
         <span className={styles.shareLock} title="Always shared">
-          <Lock size={14} strokeWidth={1.75} aria-hidden="true" />
+          <Lock size={14} strokeWidth={2} aria-hidden="true" />
           <span>Required</span>
         </span>
       </li>

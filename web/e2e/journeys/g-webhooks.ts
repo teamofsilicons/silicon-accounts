@@ -39,16 +39,16 @@ export const journey: Journey = {
     const seen = (app: "briefcase" | "dm") => new Set((before[app].items ?? []).map(event => event.event_id));
     const t = tag();
 
-    // An id change on the identity card.
+    // A CarbonID change in Personal info's CarbonID dialog.
     const newId = `brook-renamed-${t}`;
-    await page.goto(`${env.site}/`);
-    await page.getByRole("button", { name: "Change id" }).click({ timeout: 30_000 });
-    const field = page.getByRole("textbox", { name: "New id" });
+    await page.goto(`${env.site}/personal?edit=id`);
+    const field = page.getByRole("dialog", { name: "CarbonID" }).getByRole("textbox", { name: "New CarbonID" });
+    await field.waitFor({ timeout: 30_000 });
     await field.fill(newId);
     await sleep(900);
     await shot(env, page, "g-01-change-id");
     const started = Date.now();
-    await page.getByRole("button", { name: "Change id", exact: true }).last().click();
+    await page.getByRole("button", { name: "Change CarbonID", exact: true }).click();
     const changedB = await waitFor(ctx, "briefcase", "account.id_changed", seen("briefcase"));
     const changedD = await waitFor(ctx, "dm", "account.id_changed", seen("dm"));
     results.check("account.id_changed reached briefcase, signature verified", !!changedB && JSON.stringify(changedB.payload).includes(`c:${newId}`), `${Date.now() - started} ms`);
@@ -56,21 +56,19 @@ export const journey: Journey = {
 
     // A display name change.
     const name = `Brook Webhook ${t}`;
-    await page.getByRole("button", { name: /^Display name:/ }).click();
-    await page.getByRole("textbox", { name: "Display name" }).fill(name);
+    await page.goto(`${env.site}/personal?edit=name`);
+    const nameField = page.getByRole("dialog", { name: "Name" }).getByRole("textbox", { name: "Your name" });
+    await nameField.waitFor({ timeout: 30_000 });
+    await nameField.fill(name);
     await page.keyboard.press("Enter");
     results.check("account.updated (display name) reached briefcase", !!(await waitFor(ctx, "briefcase", "account.updated", seen("briefcase"), event => JSON.stringify(event.payload).includes(name))));
     results.check("account.updated (display name) reached dm", !!(await waitFor(ctx, "dm", "account.updated", seen("dm"), event => JSON.stringify(event.payload).includes(name))));
 
-    // Removing dm's access on /apps. The card is the one whose heading is exactly "DM": a text filter
-    // (`hasText: "DM"`) matches case-insensitively anywhere in a card, and Briefcase's card shows Brook's id, which
-    // ends in a random tag. A tag like "n6dm2c" made Briefcase's card match first, so Briefcase lost its access and
-    // dm never heard of it.
-    await page.goto(`${env.site}/apps`);
-    const card = page.getByRole("list", { name: "Apps with access" }).getByRole("listitem").filter({ has: page.getByRole("heading", { name: "DM", exact: true }) });
-    await card.waitFor({ timeout: 30_000 });
-    await card.getByRole("button", { name: "Remove access" }).click();
-    await card.getByRole("button", { name: "Remove", exact: true }).click({ timeout: 10_000 });
+    // Removing dm's access on its own page (/apps/dm), so no other app can be the one clicked.
+    await page.goto(`${env.site}/apps/dm`);
+    await page.getByRole("heading", { name: "What it can see about you" }).waitFor({ timeout: 30_000 });
+    await page.locator("main").getByRole("button", { name: "Remove", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Remove Access", exact: true }).click({ timeout: 10_000 });
     results.check("membership.access_removed reached dm, signature verified", !!(await waitFor(ctx, "dm", "membership.access_removed", seen("dm"))));
     const mine = (await (await page.request.get(`${env.site}/v1/me/apps?limit=200`)).json()) as { items: Array<{ app: { app_id: string }; status: string }> };
     const status = (app: string) => mine.items.find(item => item.app.app_id === app)?.status ?? "missing";

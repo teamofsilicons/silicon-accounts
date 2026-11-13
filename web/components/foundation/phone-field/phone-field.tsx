@@ -18,8 +18,9 @@
  * and a visitor whose timezone belongs to such a country starts there with the calling code filled in.
  */
 import { useEffect, useRef, useState } from "react";
-import { Input } from "@/components/silicon-ui/input/input";
-import { PHONE_COUNTRIES, PhoneInput, parsePhoneNumber, type PhoneCountry } from "@/components/silicon-ui/phone-input/phone-input";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Input } from "@teamofsilicons/silicon-ui/input";
+import { PHONE_COUNTRIES, PhoneInput, parsePhoneNumber, type PhoneCountry } from "@teamofsilicons/silicon-ui/phone-input";
 import { E164_MAX_DIGITS, E164_MIN_DIGITS, callingCodeOf, callingCountry, countriesOf, guessCountry, isCallingCodePrefix } from "./phone-data";
 import styles from "./phone-field.module.css";
 
@@ -264,7 +265,7 @@ export function PhoneField({ label, hideLabel, initial, error, description, defa
             error={error ?? undefined}
             description={description}
           />
-          <button type="button" className={styles.fieldLink} onClick={() => toInternational("+")}>Country not in the list?</button>
+          <Button type="button" variant="link" size="sm" className={styles.fieldLink} onClick={() => toInternational("+")}>Enter the Country Code Yourself</Button>
         </>
       ) : (
         <>
@@ -284,7 +285,7 @@ export function PhoneField({ label, hideLabel, initial, error, description, defa
               description={error ? undefined : typedDescription}
             />
           </div>
-          <button type="button" className={styles.fieldLink} onClick={toPicker}>Choose the country from the list</button>
+          <Button type="button" variant="link" size="sm" className={styles.fieldLink} onClick={toPicker}>Choose the Country From the List</Button>
         </>
       )}
     </div>

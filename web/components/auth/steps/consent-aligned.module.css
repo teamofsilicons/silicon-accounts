@@ -1,0 +1,6 @@
+/* The consent step on the site's own parts (consent-aligned.tsx): the steps' spacing between heading, account row,
+   the list and the actions; a "New" badge beside a detail's name; the address the details go to under the buttons. */
+.step { display: grid; gap: var(--space-inset); }
+.title { display: inline-flex; align-items: center; gap: var(--space-related); }
+.where { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); text-align: center; }
+.where strong { color: var(--foreground); font-weight: var(--weight-medium); }

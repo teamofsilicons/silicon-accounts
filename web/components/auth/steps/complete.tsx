@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useReducedMotion } from "motion/react";
 import { ArrowRight } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { appHome, destinationName, firstName, markRedirected, redirectError, safeRedirect, wasRedirected, type HostedFlow } from "../flow/model";
 import { StepHeading, SuccessMark } from "../flow/parts";
@@ -78,7 +78,7 @@ export function Complete({ flow }: CompleteProps) {
         <StepHeading title="This sign-in is finished" description={`You already went back to ${appName} from here. Each sign-in link works once.`} />
         {home ? (
           <ButtonLink href={home} external className={styles.wide}>
-            <span className={styles.providerLabel}>Go to {appName} <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" /></span>
+            <span className={styles.providerLabel}>Go to {appName} <ArrowRight size={16} strokeWidth={2} aria-hidden="true" /></span>
           </ButtonLink>
         ) : null}
       </>

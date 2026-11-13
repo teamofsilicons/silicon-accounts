@@ -166,9 +166,13 @@ export class Results {
  * a full navigation) as "access control checks", the mock providers' redirect chains as an interrupted frame load, and
  * — when the app's page navigates away while the embed iframe is still settling — the iframe's "ResizeObserver loop
  * completed with undelivered notifications" (the spec's benign notice that some resize observations moved to the next
- * frame; it never reproduces with the embed on its own, resized or removed).
+ * frame; it never reproduces with the embed on its own, resized or removed). Also Home's popular apps
+ * (components/account/home-sections.tsx POPULAR_APPS, 2026-10-31): it reads each one's public page, and an app the
+ * stack doesn't register (Ting is not among the testkit's fake apps) answers 404, which Home handles by leaving it out.
+ * And a page transition cut short by a resize (a test switching to a phone's viewport mid-navigation): the browser
+ * aborts the view transition and reports it; the page itself is fine.
  */
-const BENIGN = [/_rsc=.* due to access control checks/, /Frame load interrupted/, /ResizeObserver loop completed with undelivered notifications/];
+export const BENIGN = [/Transition was aborted because of invalid state\. Viewport size changed/, /_rsc=.* due to access control checks/, /Frame load interrupted/, /ResizeObserver loop completed with undelivered notifications/, /status of 404 \(Not Found\) @ \S+\/v1\/apps\/ting\/public$/];
 
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Browsers                                                                                                            */
@@ -741,41 +745,48 @@ export async function chooseMockIdentity(env: Env, page: Page, email: string, na
 /** The code group of the step on screen ("Code from the email", "Code from the text message"). */
 const codeGroup = (page: Page) => page.getByRole("group", { name: /^Code from the/ }).first();
 
+/** The methods page's field: "Email or phone" when the app offers both (one field since 2026-11-12), else "Email". */
+const contactField = (page: Page) => page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
+/** The methods page's send button: "Send Me a Code" ("Send Code" when sending it somewhere else). */
+const sendButton = (page: Page) => page.getByRole("button", { name: /^(Send Me a Code|Send Code)$/ });
+
 /**
- * On the methods page: types an email (or, with `phone`, a phone number key by key after its "+") into the app's
- * field, continues, and types the code that arrives. The page then moves on (sign-up for a new address, the details
- * pages, or back to the app).
+ * On the methods page: types an email, or a phone number with its "+", into the app's field ("Email or phone" when it
+ * offers both; a phone-only app's own number field, key by key), sends the code, and types the code that arrives. The
+ * page then moves on (sign-up for a new address, the details pages, or back to the app).
  */
 export async function signInWithCode(env: Env, page: Page, to: { email: string } | { phone: string }): Promise<string> {
   if ("email" in to) {
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = contactField(page);
     await field.waitFor({ timeout: 30_000 });
     const after = await lastSeq(env);
     await field.fill(to.email);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await sendButton(page).click();
     const code = await codeFor(env, to.email.toLowerCase(), after);
     await codeGroup(page).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code, { delay: 25 });
     return code;
   }
-  // An app with both email and phone shows "Email | Phone" (a segmented control of pressed buttons) above one field.
-  const choice = page.getByRole("button", { name: "Phone", exact: true });
-  await page.getByRole("textbox", { name: /^(Email|Phone number)$/ }).first().waitFor({ timeout: 30_000 });
-  if (await choice.isVisible().catch(() => false)) await choice.click();
-  const field = page.getByRole("textbox", { name: "Phone number" });
-  await field.waitFor({ timeout: 30_000 });
-  await field.click();
+  // Both offered: one "Email or phone" field takes the number with its "+". A phone-only app: its own number field.
+  const either = page.getByRole("textbox", { name: "Email or phone" });
+  const phoneOnly = page.getByRole("textbox", { name: "Phone number" });
+  await page.getByRole("textbox", { name: /^(Email or phone|Phone number)$/ }).first().waitFor({ timeout: 30_000 });
   const after = await lastSeq(env);
-  await page.keyboard.type(to.phone, { delay: 20 });
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  if (await either.isVisible().catch(() => false)) {
+    await either.fill(to.phone);
+  } else {
+    await phoneOnly.click();
+    await page.keyboard.type(to.phone, { delay: 20 });
+  }
+  await sendButton(page).click();
   const code = await codeFor(env, to.phone, after);
   await codeGroup(page).waitFor({ timeout: 15_000 });
   await page.keyboard.type(code, { delay: 25 });
   return code;
 }
 
-/** The sign-up page's button: "Create account", or "Finish setup" for an account an app imported. */
-const signupButton = (page: Page) => page.getByRole("button", { name: /^(Create account|Finish setup)$/ });
+/** The sign-up page's button: "Create Account", or "Finish Setup" for an account an app imported. */
+const signupButton = (page: Page) => page.getByRole("button", { name: /^(Create account|Finish setup)$/i });
 
 /**
  * Finishes a hosted sign-in from the sign-up step: Create account (or Finish setup), then the app's details pages with
@@ -1026,7 +1037,8 @@ export async function completeDetails(env: Env, page: Page, app: string, answers
         await page.getByRole("button", { name: "Cancel signing in" }).click();
         walk.cancelled = true;
       } else {
-        await page.getByRole("button", { name: "Share and continue", exact: true }).click();
+        // The review page's button is title case ("Share and Continue"); a details page's last button isn't.
+        await page.getByRole("button", { name: "Share and Continue", exact: true }).click();
       }
       await page.waitForURL(appUrl(env, app), { timeout: timeoutMs });
       break;
@@ -1086,7 +1098,7 @@ export async function completeDetails(env: Env, page: Page, app: string, answers
 export async function signInOnSite(env: Env, page: Page, email: string): Promise<void> {
   await page.goto(`${env.site}/sign-in`);
   await signInWithCode(env, page, { email });
-  const create = page.getByRole("button", { name: "Create account" });
+  const create = signupButton(page);
   const home = page.waitForURL(`${env.site}/`, { timeout: 30_000 }).then(() => "home" as const);
   if ((await Promise.race([home, create.waitFor({ timeout: 30_000 }).then(() => "signup" as const)])) === "signup") await create.click();
   await page.waitForURL(`${env.site}/`, { timeout: 30_000 });
@@ -1118,7 +1130,7 @@ export async function signInOnDeveloper(env: Env, page: Page, email: string | nu
   await page.getByRole("link", { name: /Continue with Silicon Accounts/ }).click({ timeout: 30_000 });
   const started = await authorize;
   const continueAs = page.getByRole("button", { name: /^Continue as / });
-  const field = page.getByRole("textbox", { name: "Email" });
+  const field = contactField(page);
   const first = await Promise.race([continueAs.waitFor({ timeout: 30_000 }).then(() => "account" as const), field.waitFor({ timeout: 30_000 }).then(() => "email" as const)]);
   if (first === "account" && email === null) {
     await continueAs.click();
@@ -1126,7 +1138,7 @@ export async function signInOnDeveloper(env: Env, page: Page, email: string | nu
     if (!email) throw new Error("signInOnDeveloper: the hosted sign-in asks for an email and none was given");
     if (first === "account") await page.getByRole("button", { name: "Use another account" }).click();
     await signInWithCode(env, page, { email });
-    const create = page.getByRole("button", { name: "Create account" });
+    const create = signupButton(page);
     const back = page.waitForURL(url => url.href.startsWith(env.developer), { timeout: 30_000 }).then(() => "back" as const);
     if ((await Promise.race([back, create.waitFor({ timeout: 30_000 }).then(() => "signup" as const)])) === "signup") await create.click();
   }

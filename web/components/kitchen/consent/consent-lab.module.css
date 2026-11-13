@@ -1,0 +1,4 @@
+/* /__consent (consent-lab.tsx): the switches in a strip above the hosted page, in the page's flow, so they never cover
+   the step; they wrap on a phone. */
+.bar { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-related) var(--space-group); padding: var(--space-related) var(--space-group); border-bottom: 1px solid var(--border); background: var(--surface); }
+.said { color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }

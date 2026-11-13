@@ -149,8 +149,8 @@ function SignInRoundTrip() {
         message={copy.message}
         hint={copy.hint}
         actions={[
-          { label: "Sign in again", onClick: () => startFlow(arrival.path) },
-          { label: "Go to the home page", href: paths.home },
+          { label: "Sign In Again", onClick: () => startFlow(arrival.path) },
+          { label: "Go to the Home Page", href: paths.home },
         ]}
       />
     );

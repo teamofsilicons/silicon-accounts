@@ -18,7 +18,7 @@ export const AI_CRAWLERS = [
 
 /** The account pages (signed in), sessions, hosted sign-in, device approval, the embed and the API proxies. */
 export const DISALLOWED = [
-  "/sign-in-methods", "/apps", "/silicons", "/proofs", "/activity", "/settings", "/identity",
+  "/sign-in-methods", "/apps", "/silicons", "/proofs", "/activity", "/privacy", "/settings", "/identity",
   "/sign-in", "/authorize", "/device", "/embed/", "/developer",
   "/v1/", "/api/", "/__kitchen",
 ];

@@ -1,0 +1,34 @@
+/* /__delete-entry (delete-entry-lab.tsx): each way inside a frame shaped like the Data & privacy page. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-narrow, 56rem) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; gap: var(--space-related); }
+.titleH1 { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.way { display: grid; gap: var(--space-group); }
+.wayHead { display: grid; gap: var(--space-tight); }
+.wayName { margin: 0; font: var(--h2); letter-spacing: var(--h2-tracking); }
+.wayNote { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.frame { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border-subtle); padding: var(--space-block); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.frameTitle { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); }
+.mark { --sq-stroke: var(--border-subtle); border: 1px solid var(--sq-stroke); }
+
+/* A: red only on the bin and the title. */
+.red { color: var(--danger); }
+.redTile { --sq-r: var(--radius-control); --sq-fill: color-mix(in oklab, var(--danger) 10%, var(--surface)); display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; background: var(--sq-fill); color: var(--danger); }
+
+/* B: a heading, a sentence, a button. */
+.words { display: grid; justify-items: start; gap: var(--space-related); margin-top: var(--space-section); }
+.h2 { margin: 0; font: var(--h2); letter-spacing: var(--h2-tracking); }
+.sentence { max-width: 60ch; margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.redButton { color: var(--danger); }
+
+/* C: the page's foot. */
+.foot { display: grid; gap: var(--space-hair); margin-top: var(--space-page); padding-top: var(--space-group); border-top: 1px solid var(--border-subtle); }
+.footLink { display: inline-flex; width: fit-content; align-items: center; gap: var(--space-tight); color: var(--danger); font: var(--label); letter-spacing: var(--label-tracking); text-decoration: none; }
+.footLink:hover { text-decoration: underline; }
+.footLine { color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+
+/* D: a row with a button at its end (the rows' look, parts/rows.module.css). */
+.buttonRow { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); }
+.text { display: grid; min-width: 0; flex: 1; }
+.title { color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); }
+.detail { min-width: 0; overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }

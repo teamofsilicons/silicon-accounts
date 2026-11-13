@@ -96,9 +96,9 @@ export function carbonError(error: ErrorLike, context: ErrorContext = {}): Carbo
   const make = (title: string, text: string, action?: ErrorAction): CarbonError => ({ code, title, text, action });
   switch (code) {
     case "session_required":
-      return make("You were signed out", "This browser signed out of Silicon Accounts (in another tab, or the session ended), so it cannot continue as that account. Sign in again to go on.", { kind: "switch", label: "Sign in again" });
+      return make("You were signed out", "This browser signed out of Silicon Accounts (in another tab, or the session ended), so it cannot continue as that account. Sign in again to go on.", { kind: "switch", label: "Sign In Again" });
     case "account_changed":
-      return make("Another account signed in", "This browser signed in to a different account in another tab, so this sign-in stopped. Choose the account to continue with.", { kind: "switch", label: "Choose the account" });
+      return make("Another account signed in", "This browser signed in to a different account in another tab, so this sign-in stopped. Choose the account to continue with.", { kind: "switch", label: "Choose the Account" });
     case "flow_changed":
     case "invalid_step":
       // The app may have changed its sign-in, or another tab moved it on: the server cannot tell which, so neither do we.
@@ -108,9 +108,9 @@ export function carbonError(error: ErrorLike, context: ErrorContext = {}): Carbo
     case "flow_failed":
       return make("This sign-in ended", `It ended without signing in. Start again from ${context.app?.trim() || "the app"}.`);
     case "signup_already_completed":
-      return make("Your account is already set up", "This email or phone already finished setting up an account, in this tab or another one. Sign in with it instead.", { kind: "switch", label: "Sign in instead" });
+      return make("Your account is already set up", "This email or phone already finished setting up an account, in this tab or another one. Sign in with it instead.", { kind: "switch", label: "Sign In Instead" });
     case "signup_not_bound":
-      return make("This sign-up belongs to another browser", "The email or phone was verified in a different browser, or this browser's cookies were cleared. Verify it again here, or finish in the browser where you verified it.", { kind: "switch", label: "Verify again" });
+      return make("This sign-up belongs to another browser", "The email or phone was verified in a different browser, or this browser's cookies were cleared. Verify it again here, or finish in the browser where you verified it.", { kind: "switch", label: "Verify Again" });
     case "signup_expired":
       return make("Your sign-up expired", plainWords(error));
     case "method_not_enabled":

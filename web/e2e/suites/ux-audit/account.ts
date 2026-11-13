@@ -14,13 +14,14 @@ import { api, codeFor, completeDetails, json, lastSeq, postJson, sleep, tag } fr
 import { VARIANTS, auditPage, auditVariants, checkDock, collectConsole, findingsFor, hostedLink, openAccountPage, pageFetch, saveFindings, signedInCarbon, type Findings } from "./_audit";
 
 export const ACCOUNT_PAGES: Array<{ path: string; name: string; ready: RegExp }> = [
-  { path: "/", name: "identity", ready: /./ },
+  { path: "/", name: "home", ready: /./ },
+  { path: "/personal", name: "personal", ready: /./ },
   { path: "/sign-in-methods", name: "sign-in-methods", ready: /Email|email/ },
   { path: "/apps", name: "apps", ready: /App|app/ },
   { path: "/silicons", name: "silicons", ready: /Silicon/ },
   { path: "/proofs", name: "proofs", ready: /User verification/ },
   { path: "/activity", name: "activity", ready: /./ },
-  { path: "/settings", name: "settings", ready: /./ },
+  { path: "/privacy", name: "privacy", ready: /./ },
 ];
 
 /** Every account page in every variant, then the dock check. */
@@ -206,8 +207,8 @@ export const journeys: Journey[] = [
         await click("Change your date of birth");
       });
       await state("states-change-id-taken", "/", /./, async () => {
-        await click("Change id");
-        await page.getByRole("dialog", { name: "Change your id" }).waitFor({ timeout: 10_000 });
+        await page.goto(`${env.site}/personal?edit=id`);
+        await page.getByRole("dialog", { name: "CarbonID" }).waitFor({ timeout: 10_000 });
         await page.keyboard.type("saket", { delay: 30 });
         await sleep(1_200);
       }, /not available|taken|in use|reserved/i);
@@ -222,14 +223,18 @@ export const journeys: Journey[] = [
         await page.getByRole("group", { name: /code/i }).first().waitFor({ timeout: 20_000 });
       });
       await state("states-remove-email", "/sign-in-methods", /Email|email/, () => page.getByRole("button", { name: "Remove", exact: true }).filter({ visible: true }).nth(1).click({ timeout: 15_000 }));
-      await state("states-remove-app", "/apps", /App|app/, () => click("Remove access"));
-      await state("states-revoke-proof", "/proofs", /[Pp]roof/, () => click("Revoke"));
-      await state("states-proofs-ended", "/proofs", /[Pp]roof/, () => page.getByRole("button", { name: /^Ended/ }).or(page.getByRole("radio", { name: /^Ended/ })).first().click({ timeout: 15_000 }));
-      await state("states-delete-blocked", "/settings", /./, async () => {
-        await page.getByRole("button", { name: "Hold to delete your account" }).scrollIntoViewIfNeeded();
+      await state("states-remove-app", "/apps", /App|app/, async () => {
+        await page.getByRole("region", { name: "Your apps" }).getByRole("link").first().click({ timeout: 15_000 });
+        await page.getByRole("heading", { name: "What it can see about you" }).waitFor({ timeout: 20_000 });
+        await page.locator("main").getByRole("button", { name: "Remove", exact: true }).click({ timeout: 15_000 });
+      });
+      await state("states-revoke-proof", "/proofs", /[Pp]ermission/, () => page.getByRole("button", { name: /^Stop / }).first().click({ timeout: 15_000 }));
+      await state("states-proofs-ended", "/proofs", /[Pp]ermission/, () => page.getByRole("region", { name: "Ended", exact: true }).scrollIntoViewIfNeeded({ timeout: 15_000 }));
+      await state("states-delete-blocked", "/privacy/delete", /./, async () => {
+        await page.getByRole("button", { name: "Delete Account" }).scrollIntoViewIfNeeded();
       }, /Silicon/);
-      const hold = page.getByRole("button", { name: "Hold to delete your account" });
-      results.check("states-delete-blocked: deleting is not possible while a Silicon is in the Carbon's care (UNDERSTANDING.md: Custodian)", (await hold.isDisabled().catch(() => false)) || (await hold.getAttribute("aria-disabled")) === "true", `disabled: ${await hold.isDisabled().catch(() => "?")}`);
+      const deleteAccount = page.getByRole("button", { name: "Delete Account" });
+      results.check("states-delete-blocked: deleting is not possible while a Silicon is in the Carbon's care (UNDERSTANDING.md: Custodian)", await deleteAccount.isDisabled().catch(() => false), `disabled: ${await deleteAccount.isDisabled().catch(() => "?")}`);
       results.check("account-states: findings saved", true, saveFindings(ctx, findings));
       await carbon.context.close();
     },

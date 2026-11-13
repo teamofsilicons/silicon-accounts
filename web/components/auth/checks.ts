@@ -536,7 +536,7 @@ const hostedChecks: MockCheck[] = [
       // Legacy CRM imported them; they first sign into Briefcase.
       await expect(heading(page, "Finish setting up your account")).toBeVisible();
       await expect(page.getByText("Legacy CRM added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.")).toBeVisible();
-      await expect(page.getByText("This is the id Legacy CRM set up for you. Keep it, or pick another.")).toBeVisible();
+      await expect(page.getByText("This is the CarbonID Legacy CRM set up for you. Keep it, or pick another.")).toBeVisible();
       expect(await text()).not.toMatch(/Briefcase added you|id Briefcase set up/);
       // At Legacy CRM itself.
       await page.goto(`${base}${flowPath("legacy-crm", "signup_import")}`, { waitUntil: "networkidle" });
@@ -557,7 +557,7 @@ const hostedChecks: MockCheck[] = [
     })],
     run: async ({ page }) => {
       await expect(page.getByText("An app you use added you to Silicon Accounts. Check the details it gave us, then continue to Briefcase.")).toBeVisible();
-      await expect(page.getByText("This is the id set up for you when you were added. Keep it, or pick another.")).toBeVisible();
+      await expect(page.getByText("This is the CarbonID set up for you when you were added. Keep it, or pick another.")).toBeVisible();
       expect(await page.locator("main").innerText()).not.toMatch(/Briefcase added you|id Briefcase set up/);
     },
   },
@@ -658,7 +658,7 @@ const hostedChecks: MockCheck[] = [
     path: flowPath("briefcase", "signup"),
     run: async ({ page, requests }) => {
       const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload photo/ }).click();
+      await page.getByRole("button", { name: /Upload Photo/ }).click();
       await (await chooser).setFiles({ name: "me.png", mimeType: "image/png", buffer: png() });
       await expect(page.getByText("me.png is ready. It becomes your photo when you continue.").first()).toBeVisible();
       expect(requests.filter(request => request.method === "POST" && request.path.endsWith("/signup/photo"))).toHaveLength(1);
@@ -676,10 +676,10 @@ const hostedChecks: MockCheck[] = [
     routes: [["POST /v1/flows/:id/signup/photo", () => apiError(413, "photo_too_large", "The photo is 3145728 bytes; profile photos are limited to 2 MB (2097152 bytes).", "Resize or compress the image below 2 MB.")]],
     run: async ({ page }) => {
       const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload photo/ }).click();
+      await page.getByRole("button", { name: /Upload Photo/ }).click();
       await (await chooser).setFiles({ name: "big.png", mimeType: "image/png", buffer: png() });
       await expect(page.getByText(/Photos can be at most 2 MB/).first()).toBeVisible();
-      await expect(page.getByRole("button", { name: /Upload photo/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Upload Photo/ })).toBeVisible();
       const sent = nextPost(page, "/signup");
       await page.getByRole("button", { name: "Create account" }).click();
       expect((await sent).pfp_url).toBeUndefined();
@@ -689,7 +689,7 @@ const hostedChecks: MockCheck[] = [
     name: "sign-up: a taken id offers free ones; the date of birth opens on a year grid",
     path: flowPath("briefcase", "signup"),
     run: async ({ page }) => {
-      const field = page.getByRole("textbox", { name: "Your id" });
+      const field = page.getByRole("textbox", { name: "Your CarbonID" });
       await field.fill("saket");
       await expect(page.getByText("c:saket is taken.").first()).toBeVisible();
       const chip = page.getByRole("group", { name: "Free ids" }).getByRole("button").first();
@@ -716,7 +716,7 @@ const hostedChecks: MockCheck[] = [
       const list = page.getByRole("listbox", { name: "Timezone options" });
       const dob = page.getByRole("button", { name: "Date of birth" });
       // Tab into the field: the list stays shut, so the fields under it stay in view.
-      await page.getByRole("textbox", { name: "Your id" }).focus();
+      await page.getByRole("textbox", { name: "Your CarbonID" }).focus();
       await page.keyboard.press("Tab");
       await expect(field).toBeFocused();
       await expect(field).toHaveAttribute("aria-expanded", "false");
@@ -765,12 +765,12 @@ const hostedChecks: MockCheck[] = [
       await page.goto(`${base}${flowPath("briefcase", "signup")}`);
       await expect(heading(page, "Set up your account")).toBeVisible();
       await expect(page.getByText("The photo you uploaded becomes your photo when you continue.").first()).toBeVisible();
-      await expect(page.getByRole("button", { name: /Choose another/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Choose Another/ })).toBeVisible();
       const preview = page.locator(`main img[src="${uploaded}"]`);
       await expect(preview).toHaveCount(1);
       await page.getByRole("button", { name: "Remove", exact: true }).click();
       await expect(page.getByRole("button", { name: "Remove", exact: true })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: /Upload photo/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Upload Photo/ })).toBeVisible();
       // The preview is no longer the upload (the initials stand in for the default photo).
       await expect(preview).toHaveCount(0);
       const sent = nextPost(page, "/signup");
@@ -943,7 +943,7 @@ const hostedChecks: MockCheck[] = [
       expect(await focusShows(page.getByRole("link", { name: /^support@/ }), email), "the support link").toBe(true);
       expect(await focusShows(page.locator("[data-powered-by] a"), email), "Powered by").toBe(true);
       await page.goto(`${base}${flowPath("briefcase", "signup")}`, { waitUntil: "networkidle" });
-      expect(await focusShows(page.getByRole("button", { name: "Date of birth" }), page.getByRole("textbox", { name: "Your id" })), "the date of birth").toBe(true);
+      expect(await focusShows(page.getByRole("button", { name: "Date of birth" }), page.getByRole("textbox", { name: "Your CarbonID" })), "the date of birth").toBe(true);
       await page.goto(`${base}${flowPath("briefcase", "consent")}`, { waitUntil: "networkidle" });
       expect(await focusShows(page.getByRole("switch", { name: "Timezone" }), page.getByRole("button", { name: "Switch account" }), page.locator('li[data-scope="timezone"]')), "a consent switch").toBe(true);
     },
@@ -1512,7 +1512,7 @@ const liveChecks: LiveCheck[] = [
       await page.getByRole("textbox", { name: /digit 1 of 6/ }).click();
       await page.keyboard.type(code);
       await expect(heading(page, "Set up your account")).toBeVisible();
-      const idField = page.getByRole("textbox", { name: "Your id" });
+      const idField = page.getByRole("textbox", { name: "Your CarbonID" });
       await expect(idField).toHaveValue(/^webauth/);
       await expect(page.getByText(/is available\./).first()).toBeVisible();
       await idField.fill("saket");
@@ -1523,7 +1523,7 @@ const liveChecks: LiveCheck[] = [
       await chip.click();
       await expect(idField).toHaveValue(chosen.replace(/^c:/, ""));
       const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload photo/ }).click();
+      await page.getByRole("button", { name: /Upload Photo/ }).click();
       await (await chooser).setFiles({ name: "me.png", mimeType: "image/png", buffer: png() });
       await expect(page.getByText("me.png is ready. It becomes your photo when you continue.").first()).toBeVisible();
       await page.getByRole("textbox", { name: "Display name" }).fill("Web Auth Tester");
@@ -1801,7 +1801,7 @@ const liveChecks: LiveCheck[] = [
       await page.keyboard.type(await env.code(email, sentAt));
       await expect(heading(page, "Set up your account")).toBeVisible();
       const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload photo/ }).click();
+      await page.getByRole("button", { name: /Upload Photo/ }).click();
       await (await chooser).setFiles({ name: "me.png", mimeType: "image/png", buffer: png() });
       await expect(page.getByText("me.png is ready. It becomes your photo when you continue.").first()).toBeVisible();
       await page.reload();
@@ -1994,7 +1994,7 @@ const liveChecks: LiveCheck[] = [
       await page.getByRole("textbox", { name: "Email" }).fill(email);
       await page.getByRole("button", { name: "Send code" }).click();
       await expect(page.getByText(/Too many codes were sent to/).first()).toBeVisible();
-      await expect(page.getByRole("button", { name: /Try again in \d+:\d\d/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Try Again in \d+:\d\d/ })).toBeVisible();
       await context.close();
     },
   },
@@ -2046,7 +2046,7 @@ const liveChecks: LiveCheck[] = [
       await page.keyboard.type(await env.code(email, sentAt));
       await expect(heading(page, "Finish setting up your account")).toBeVisible({ timeout: 8000 });
       await expect(page.getByRole("textbox", { name: "Display name" })).toHaveValue("Ivy Imported");
-      await expect(page.getByRole("textbox", { name: "Your id" })).toHaveValue(handle);
+      await expect(page.getByRole("textbox", { name: "Your CarbonID" })).toHaveValue(handle);
       await page.getByRole("button", { name: "Finish setup" }).click();
       await expect(heading(page, "Share your details with Legacy CRM")).toBeVisible({ timeout: 8000 });
       await page.getByRole("button", { name: "Share and continue" }).click();

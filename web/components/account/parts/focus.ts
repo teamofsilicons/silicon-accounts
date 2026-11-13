@@ -29,7 +29,7 @@ function scroller(element: HTMLElement): HTMLElement | null {
 }
 
 /**
- * Scrolls `element` into view by moving only its own scroller (a drawer's body, or the page). `element.focus()` and
+ * Scrolls `element` into view by moving only its own scroller (a drawer's body, the shell's page box, or the page). `element.focus()` and
  * `scrollIntoView()` would also scroll every clipping ancestor, a drawer panel included, and push its header out of
  * sight. "start" puts the element near the top; "nearest" scrolls only as far as needed.
  */
@@ -46,9 +46,9 @@ export function bringIntoView(element: HTMLElement, align: "start" | "nearest" =
     if (delta) parent.scrollTo({ top: Math.max(0, parent.scrollTop + delta), behavior });
     return;
   }
-  // The page: keep clear of the top row and of the floating dock at the bottom.
+  // The page: keep clear of the sticky top bar, with room below.
   const top = 96;
-  const bottom = window.innerHeight - 120;
+  const bottom = window.innerHeight - 48;
   const delta = align === "start" ? rect.top - top : rect.top < top ? rect.top - top : rect.bottom > bottom ? Math.min(rect.bottom - bottom, rect.top - top) : 0;
   if (delta) window.scrollTo({ top: Math.max(0, window.scrollY + delta), behavior });
 }

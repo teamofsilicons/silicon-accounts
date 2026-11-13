@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join, resolve } from "node:path";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import type { Ctx } from "../../context";
-import { DEVELOPER_SIGNED_OUT, E2E_DIR, codeFor, developerApi, lastSeq, newContext, shot, signInOnDeveloper, signInOnSite, sleep, sql, tag, type ContextOptions, type Env } from "../../lib";
+import { BENIGN, DEVELOPER_SIGNED_OUT, E2E_DIR, codeFor, developerApi, lastSeq, newContext, shot, signInOnDeveloper, signInOnSite, sleep, sql, tag, type ContextOptions, type Env } from "../../lib";
 import { KIT_SOURCE } from "./_kit";
 
 /** Where every "Powered by Silicon Accounts" links (UNDERSTANDING.md "Making the pages your own"; v2: the plural host). */
@@ -112,6 +112,7 @@ export function collectConsole(page: Page, expected: RegExp[] = []): void {
       // Not a URL with a host.
     }
   });
+  // BENIGN: the browser noise e2e/lib.ts forgives everywhere (Home's unregistered Ting, a cut-short prefetch).
   const allowed = (text: string) => expected.some(pattern => pattern.test(text)) || BENIGN.some(pattern => pattern.test(text));
   /** Loads from other machines are the "nothing leaves this machine" check's (a timeout there is not the page's error). */
   const remote = (url: string) => {
@@ -138,8 +139,6 @@ export function collectConsole(page: Page, expected: RegExp[] = []): void {
   });
 }
 
-/** The same browser noise lib.ts ignores (see BENIGN there). */
-const BENIGN = [/_rsc=.* due to access control checks/, /Frame load interrupted/, /ResizeObserver loop completed with undelivered notifications/];
 
 /** This page's console problems and loads from other machines collected since the last audit (and forgets them). */
 export function drainProblems(page: Page): { console: string[]; away: string[] } {
@@ -286,6 +285,11 @@ const BANNED = /\b(org|orgs|organi[sz]ations?|teams?|workspaces?|tenants?|humans
  * Silicons, the organisation behind Silicon Accounts, named in the public pages' footer and their structured data).
  */
 const VENDOR = /\b(Apple Team ID|Team ID|Google Workspace domain|Workspace domain|Google Workspace|Team of Silicons)\b/gi;
+/**
+ * Where a page says what a Silicon is, "an AI agent" is the definition (UNDERSTANDING.md: "Our AI Agent account is
+ * referred to as a Silicon"; the prototype's "Give an AI agent its own account"), not a second name for one.
+ */
+const DEFINITION = /\bGive an AI agent its own account\b/gi;
 /** Words worth a look (not failures): generic names for accounts where Carbon or Silicon may be meant. */
 const SOFT = /\b(people|person|users?|customers?|members?|accounts holders?)\b/gi;
 
@@ -316,7 +320,9 @@ export async function auditPage(ctx: Ctx, page: Page, findings: Findings, option
   await shot(env, page, shotName, !!options.fullPage);
 
   const theme = await page.evaluate("document.documentElement.getAttribute('data-theme')").catch(() => null) as string | null;
-  if (options.siteTheme !== false && !options.forcedTheme) results.check(`${label}: the page paints the visitor's ${v.theme} theme`, theme === v.theme, `html[data-theme]=${theme}`);
+  // Both sites are light only (web/lib/theme.ts, developer/lib/theme.ts): a visitor's dark preference still paints
+  // light. The dark variants stay, to catch anything that follows prefers-color-scheme on its own.
+  if (options.siteTheme !== false && !options.forcedTheme) results.check(`${label}: the page paints the site's light theme (light only, whatever the visitor's ${v.theme})`, theme === "light", `html[data-theme]=${theme}`);
 
   const overflow = await kit<Overflow>(page, "overflow()");
   results.check(
@@ -359,7 +365,7 @@ export async function auditPage(ctx: Ctx, page: Page, findings: Findings, option
 
   const text = await kit<string>(page, "words()");
   // Google Workspace keeps its name even a few words after "Google" or its hosted_domain setting ("another Workspace").
-  const cleaned = text.replace(VENDOR, " ").replace(/teamofsilicons/gi, " ").replace(/(Google|hosted_domain)([^\n]{0,60}?)\bWorkspaces?\b/gi, "$1$2 ");
+  const cleaned = text.replace(VENDOR, " ").replace(DEFINITION, " ").replace(/teamofsilicons/gi, " ").replace(/(Google|hosted_domain)([^\n]{0,60}?)\bWorkspaces?\b/gi, "$1$2 ");
   const banned = [...new Set([...cleaned.matchAll(BANNED)].map(match => match[0]))];
   const soft = [...new Set([...cleaned.matchAll(SOFT)].map(match => contextOf(cleaned, match.index ?? 0)))].slice(0, 12);
   if (!options.skipWords) results.check(`${label}: vocabulary: no org, team, workspace or human words`, banned.length === 0, banned.map(word => contextOf(cleaned, cleaned.indexOf(word))).join(" | "));
@@ -674,14 +680,12 @@ export async function hostedLink(env: Env, page: Page, app: string): Promise<str
  * methods page opens on the phone (dm lists phone first) shows "Phone | Email": the Email segment is chosen first.
  */
 export async function sendEmailCode(env: Env, page: Page, email: string): Promise<string> {
-  const field = page.getByRole("textbox", { name: "Email" });
-  const segment = page.getByRole("button", { name: "Email", exact: true });
-  await field.or(segment).first().waitFor({ timeout: 30_000 });
-  if (!(await field.isVisible().catch(() => false))) await segment.click();
+  // One "Email or phone" field when the app offers both (2026-11-12); an email-only app's "Email".
+  const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
   await field.waitFor({ timeout: 30_000 });
   const after = await lastSeq(env);
   await field.fill(email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
   const code = await codeFor(env, email, after);
   await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 20_000 });
   return code;
@@ -700,15 +704,9 @@ export async function signedInCarbon(ctx: Ctx, who: string, options: ContextOpti
   const page = await context.newPage();
   const email = freshEmail(who);
   await page.goto(`${env.site}/sign-in`);
-  const field = page.getByRole("textbox", { name: "Email" });
-  await field.waitFor({ timeout: 30_000 });
-  const after = await lastSeq(env);
-  await field.fill(email);
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  const code = await codeFor(env, email, after);
-  await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 20_000 });
+  const code = await sendEmailCode(env, page, email);
   await page.keyboard.type(code, { delay: 25 });
-  await page.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+  await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
   await page.waitForURL(`${env.site}/`, { timeout: 30_000 });
   const me = (await (await page.request.get(`${env.site}/v1/me`)).json()) as { id?: string; uuid?: string };
   return { context, page, email, id: me.id ?? "", uuid: me.uuid ?? "" };

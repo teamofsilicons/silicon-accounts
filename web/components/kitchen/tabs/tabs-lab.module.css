@@ -1,0 +1,22 @@
+/* /__tabs (tabs-lab.tsx). The versions below reach into Silicon UI's Tabs by role, in this lab only, to try values
+   before they're made in the component itself. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.version { display: grid; gap: var(--space-inset); }
+.name { margin: 0; font: var(--h3); letter-spacing: var(--h3-tracking); }
+.note { max-width: 70ch; margin: var(--space-tight) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.stage { display: grid; justify-items: start; gap: var(--space-block); padding: var(--space-block) var(--gutter); border-radius: var(--radius-container); background: var(--background); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.header { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.mono { color: var(--foreground); font-family: var(--font-mono); letter-spacing: 0; }
+.section { margin: 0; font: var(--h2); letter-spacing: var(--h2-tracking); }
+
+/* Before: Silicon UI 0.4.0 as released, 4px around the tabs (the patched component now has 2px, version A). */
+.stage[data-version="before"] :global([role="tablist"]) { padding: var(--space-tight); }
+.stage[data-version="before"] :global([role="tab"]) { --focus-outline-offset: var(--space-hair); border-radius: calc(var(--radius-control) - var(--space-tight)); }
+.stage[data-version="before"] :global([role="tablist"] > :not([role="tab"])) { border-radius: calc(var(--radius-control) - var(--space-tight)); }
+/* B, C: each tab is its label. */
+.stage:is([data-version="thin-fit"], [data-version="thin-short"]) :global([role="tab"]) { min-width: 0; }
+/* C: 28px high. */
+.stage[data-version="thin-short"] :global([role="tab"]) { min-height: calc(var(--control-height-sm) - var(--space-tight)); }

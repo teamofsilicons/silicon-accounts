@@ -23,7 +23,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { chromium, webkit, type Browser, type Page } from "@playwright/test";
+import { chromium, expect, webkit, type Browser, type Page } from "@playwright/test";
 import { mockApi } from "./mock/api";
 import type { ScreenSpec } from "./screens-types";
 
@@ -81,18 +81,34 @@ const foundationScreens: ScreenSpec[] = [
   { name: "kitchen-compare", path: "/__kitchen?compare=1", waitFor: "[data-kitchen-ready]", widths: [1440], themes: ["light"], settle: 1200 },
   { name: "kitchen-squircle-fallback", path: "/__kitchen?squircle=fallback", waitFor: "[data-kitchen-ready]", widths: [1440], themes: ["light"], settle: 1200 },
   { name: "landing", path: "/", as: "signed-out" },
-  { name: "shell-home", path: "/", waitFor: "[data-identity-card]" },
-  { name: "shell-identity-card", path: "/", waitFor: "[data-identity-card]", element: "[data-identity-card]" },
-  { name: "shell-identity-card-details", path: "/", waitFor: "[data-identity-card]", element: "[data-identity-card]", prepare: async page => {
-    await page.getByRole("button", { name: "Details" }).click();
-    await page.waitForTimeout(1100);
-  } },
-  { name: "shell-palette", path: "/", waitFor: "[data-identity-card]", fullPage: false, prepare: async page => {
-    await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
+  { name: "shell-home", path: "/", waitFor: "[data-home]" },
+  { name: "shell-palette", path: "/personal", waitFor: "#personal-profile", fullPage: false, prepare: async page => {
+    const trigger = page.locator("button[aria-keyshortcuts]").filter({ visible: true }).first();
+    await trigger.click();
+    const dialog = page.getByRole("dialog", { name: "Search and jump" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Close dialog" })).toHaveCount(0);
+    const close = dialog.getByRole("button", { name: "Esc, close command palette" });
+    await expect(close).toBeVisible();
+    const option = dialog.getByRole("option").first();
+    await expect(option).toHaveAttribute("tabindex", "-1");
+    const input = dialog.getByRole("combobox", { name: "Search pages and actions" });
+    await input.press("ArrowDown");
+    await expect(option).toHaveAttribute("aria-selected", "true");
+    await input.press("Tab");
+    await expect(close).toBeFocused();
+    await close.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await input.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await trigger.click();
     await page.waitForTimeout(600);
   } },
   { name: "shell-nav-sheet", path: "/silicons", widths: [390], fullPage: false, prepare: async page => {
-    await page.locator("[data-vt='dock'] button[aria-haspopup='dialog']").first().click();
+    await page.getByRole("button", { name: "Account sections" }).click();
     await page.waitForTimeout(900);
   } },
   { name: "embed-buttons", path: `/embed/v1/buttons?${EMBED_QUERY("briefcase", "http://127.0.0.1:8593/briefcase/callback")}`, as: "signed-out", waitFor: "#silicon-accounts-embed[data-ready]", widths: [390] },
@@ -219,7 +235,7 @@ async function shoot(browser: Browser, base: string, spec: ScreenSpec, theme: "l
     if (spec.prepare) await spec.prepare(page);
     const file = join(options.out, `${spec.name}--${theme}-${width}.png`);
     if (!spec.element && (spec.fullPage ?? true)) {
-      // Grow the viewport to the page, so fixed parts (the dock) sit where they would at the end of the page instead of
+      // Grow the viewport to the page, so fixed parts (toasts) sit where they would at the end of the page instead of
       // over the middle of a full-page capture.
       const height = await page.evaluate(() => document.documentElement.scrollHeight);
       if (height > (page.viewportSize()?.height ?? 0)) {

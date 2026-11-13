@@ -1,0 +1,12 @@
+/* /__silicon-motion (silicon-motion-lab.tsx): each style over a row of three cards at Home's column. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; justify-items: start; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.style { display: grid; gap: var(--space-inset); }
+.name { margin: 0; font: var(--h3); letter-spacing: var(--h3-tracking); }
+.note { max-width: 70ch; margin: var(--space-tight) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.stage { padding: var(--space-block) var(--gutter); border-radius: var(--radius-container); background: var(--background); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.grid { display: grid; width: 100%; max-width: var(--page-narrow); grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-group); margin: 0 auto; padding: 0; list-style: none; }
+.grid > li { display: grid; min-width: 0; }
+@media (max-width: 639px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

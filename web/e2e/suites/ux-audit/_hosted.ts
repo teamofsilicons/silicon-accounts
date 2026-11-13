@@ -187,7 +187,7 @@ export async function walkDetails(ctx: Ctx, page: Page, findings: Findings, plan
         lastIndex = -1;
         continue;
       }
-      await page.getByRole("button", { name: "Share and continue", exact: true }).click();
+      await page.getByRole("button", { name: "Share and Continue", exact: true }).click();
       await page.waitForURL(appUrl(env, plan.app), { timeout: 45_000 });
       break;
     }

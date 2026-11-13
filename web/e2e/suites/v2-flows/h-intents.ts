@@ -25,11 +25,11 @@ async function methodsPage(page: Page): Promise<{ title: string; subtitle: strin
     const subtitle = block?.querySelector("h1 + p")?.textContent?.trim() ?? "";
     const label = block?.querySelector('p[aria-hidden="true"]')?.textContent?.trim() ?? "";
     const hero = document.querySelector(".sa-brand-title")?.textContent?.trim() ?? "";
-    const other = [...document.querySelectorAll("main button")].find(element => !element.closest("[data-step-leaving]") && /^Other ways to sign (in|up)$/.test((element.textContent ?? "").trim()));
+    const other = [...document.querySelectorAll("main button")].find(element => !element.closest("[data-step-leaving]") && /^Other ways to sign (in|up)$/i.test((element.textContent ?? "").trim()));
     return { subtitle, splitLabel: label, hero, tab: document.title, otherWays: other?.textContent?.trim() ?? null };
   });
-  const named = async (name: string) => (await page.getByRole("group", { name, exact: true }).count()) > 0;
-  const group = (await named("Sign up with")) ? "Sign up with" : (await named("Sign in with")) ? "Sign in with" : null;
+  // The email and phone methods' one field (2026-11-12; it was a "Sign in with" / "Sign up with" switch).
+  const group = (await page.getByRole("textbox", { name: "Email or phone", exact: true }).count()) > 0 ? "Email or phone" : null;
   return { ...read, title, group };
 }
 
@@ -53,13 +53,13 @@ export const journey: Journey = {
     let flow = await waitForFlow(page, f => f.step === "choose_method", "briefcase's methods page");
     let seen = await methodsPage(page);
     results.check("briefcase's sign-in link carries no intent and the flow says intent signin", !signinHref.searchParams.has("intent") && flow.intent === "signin", `${signinHref.search.slice(0, 80)} → ${flow.intent}`);
-    results.check("the sign-in page: \"Sign in to Briefcase\", briefcase's subtitle, \"Sign in with\"", seen.title === "Sign in to Briefcase" && seen.subtitle === "Your files, for every Carbon and Silicon." && seen.group === "Sign in with", JSON.stringify(seen));
+    results.check("the sign-in page: \"Sign in to Briefcase\", briefcase's subtitle, \"Sign in with\"", seen.title === "Sign in to Briefcase" && seen.subtitle === "Your files, for every Carbon and Silicon." && seen.group === "Email or phone", JSON.stringify(seen));
     results.check("…and the browser tab says \"Sign in to Briefcase · Silicon Accounts\" (flow-page.tsx sets it from the app's title)", seen.tab === "Sign in to Briefcase · Silicon Accounts", `tab: "${seen.tab}"`);
     const signupHref = await startAtApp(env, page, "briefcase", { intent: "signup" });
     flow = await waitForFlow(page, f => f.step === "choose_method", "briefcase's sign-up page");
     seen = await methodsPage(page);
     results.check("briefcase's \"Create an account\" link asks intent=signup and the flow says so", signupHref.searchParams.get("intent") === "signup" && flow.intent === "signup", `${signupHref.searchParams.get("intent")} → ${flow.intent}`);
-    results.check("the sign-up page: briefcase's own sign-up title \"Create your Briefcase account\", \"Sign up with\"", seen.title === "Create your Briefcase account" && seen.group === "Sign up with", JSON.stringify(seen));
+    results.check("the sign-up page: briefcase's own sign-up title \"Create your Briefcase account\", \"Sign up with\"", seen.title === "Create your Briefcase account" && seen.group === "Email or phone", JSON.stringify(seen));
     results.check("…and the browser tab says \"Create your Briefcase account · Silicon Accounts\" (not the sign-in tab)", seen.tab === "Create your Briefcase account · Silicon Accounts", `tab: "${seen.tab}"`);
     await page.reload();
     await waitForFlow(page, f => f.step === "choose_method", "briefcase's sign-up page, reloaded");
@@ -91,18 +91,18 @@ export const journey: Journey = {
     await startAtApp(env, page, "ledgerly", { intent: "signup" });
     await waitForFlow(page, f => f.step === "choose_method" && f.intent === "signup", "ledgerly's sign-up page");
     const ledgerlyUp = await methodsPage(page);
-    results.check("ledgerly's sign-up page: \"Create your Ledgerly account\" with its own sign-up subtitle \"Bookkeeping for freelancers, set up in two steps.\"", ledgerlyUp.title === "Create your Ledgerly account" && ledgerlyUp.subtitle === "Bookkeeping for freelancers, set up in two steps." && ledgerlyUp.group === "Sign up with", JSON.stringify(ledgerlyUp));
+    results.check("ledgerly's sign-up page: \"Create your Ledgerly account\" with its own sign-up subtitle \"Bookkeeping for freelancers, set up in two steps.\"", ledgerlyUp.title === "Create your Ledgerly account" && ledgerlyUp.subtitle === "Bookkeeping for freelancers, set up in two steps." && ledgerlyUp.group === "Email or phone", JSON.stringify(ledgerlyUp));
     await startAtApp(env, page, "ledgerly");
     await waitForFlow(page, f => f.step === "choose_method" && f.intent === "signin", "ledgerly's sign-in page");
     const ledgerlyIn = await methodsPage(page);
-    results.check("…and its sign-in page: \"Sign in to Ledgerly\" with the sign-in subtitle, \"Sign in with\"", ledgerlyIn.title === "Sign in to Ledgerly" && ledgerlyIn.subtitle === "We need your phone and date of birth to keep your books safe." && ledgerlyIn.group === "Sign in with", JSON.stringify(ledgerlyIn));
+    results.check("…and its sign-in page: \"Sign in to Ledgerly\" with the sign-in subtitle, \"Sign in with\"", ledgerlyIn.title === "Sign in to Ledgerly" && ledgerlyIn.subtitle === "We need your phone and date of birth to keep your books safe." && ledgerlyIn.group === "Email or phone", JSON.stringify(ledgerlyIn));
 
     // A direct method button with the sign-up intent: the email field alone, "Other ways to sign up".
     await startAtApp(env, page, "briefcase", { extra: { method: "email", intent: "signup" } });
     flow = await waitForFlow(page, f => f.step === "choose_method", "briefcase's email sign-up page");
     seen = await methodsPage(page);
     const fields = await live(page, "main input").evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).name || input.getAttribute("aria-label") || (input as HTMLInputElement).type));
-    results.check("method=email&intent=signup: the sign-up title over the email field alone, with \"Other ways to sign up\"", flow.method_hint === "email" && flow.intent === "signup" && seen.title === "Create your Briefcase account" && seen.otherWays === "Other ways to sign up" && (await page.getByRole("button", { name: "Continue with Google", exact: true }).count()) === 0, `${JSON.stringify(seen)} inputs ${JSON.stringify(fields)}`);
+    results.check("method=email&intent=signup: the sign-up title over the email field alone, with \"Other ways to sign up\"", flow.method_hint === "email" && flow.intent === "signup" && seen.title === "Create your Briefcase account" && seen.otherWays?.toLowerCase() === "other ways to sign up" && (await page.getByRole("button", { name: "Continue with Google", exact: true }).count()) === 0, `${JSON.stringify(seen)} inputs ${JSON.stringify(fields)}`);
 
     // The account site's own sign-in has a sign-up version too.
     await page.goto(`${env.site}/sign-in?intent=signup`);
@@ -113,9 +113,9 @@ export const journey: Journey = {
     const email = freshEmail("intent");
     await startAtApp(env, page, "briefcase");
     await signInWithCode(env, page, { email });
-    const signup = await page.getByRole("button", { name: "Create account" }).waitFor({ timeout: 25_000 }).then(() => true, () => false);
+    const signup = await page.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 25_000 }).then(() => true, () => false);
     results.check("a new address through the Sign in button gets the sign-up step (Create account)", signup);
-    await page.getByRole("button", { name: "Create account" }).click();
+    await page.getByRole("button", { name: /^Create account$/i }).click();
     await waitForDetailsPage(page);
     await button(page, "Share and continue").click();
     const first = await backAtApp(env, page, "briefcase");

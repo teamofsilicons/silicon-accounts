@@ -1,0 +1,72 @@
+/* The first-visit stories (Anil, 2026-11-01): one tall card, the container squircle, a faint light edge and a light
+   raised shadow, in the beat's own colours (data-tone: the forest of the first-Silicon banner with its grain, or one
+   of the Silicon colour pairs deepened at the top left; local forest colours, a tolerated difference). Segmented bars
+   across the top; the beat's picture, its headline in Geist Serif and its line, in white, rising in as the beat
+   starts; Back and Next at the lower right. */
+.stories { display: grid; container: stories / inline-size; }
+
+.card {
+  --sq-r: var(--radius-container);
+  --tone-1: #0f2a1d; --tone-2: #2f5d3a; --tone-3: #c9b27c;
+  position: relative; isolation: isolate; display: grid; min-height: 480px; grid-template-rows: auto 1fr auto; gap: var(--space-section);
+  padding: var(--space-section) var(--space-block); overflow: hidden; outline: none; cursor: pointer; user-select: none; -webkit-user-select: none;
+  border: 1px solid color-mix(in oklab, var(--neutral-0) 22%, transparent);
+  background-image: linear-gradient(135deg, var(--tone-1), var(--tone-2) 55%, var(--tone-3)); background-origin: border-box;
+  box-shadow: var(--shadow-raised); color: var(--neutral-0);
+}
+.card:focus-visible { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent), var(--shadow-raised); }
+.card::after {
+  position: absolute; z-index: -1; inset: 0; content: ""; pointer-events: none; opacity: .5; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+.card[data-tone="1"] { --tone-1: color-mix(in oklab, var(--silicon-mark-1-from), var(--neutral-11) 45%); --tone-2: var(--silicon-mark-1-from); --tone-3: var(--silicon-mark-1-to); }
+.card[data-tone="2"] { --tone-1: color-mix(in oklab, var(--silicon-mark-2-from), var(--neutral-11) 45%); --tone-2: var(--silicon-mark-2-from); --tone-3: var(--silicon-mark-2-to); }
+.card[data-tone="3"] { --tone-1: color-mix(in oklab, var(--silicon-mark-3-from), var(--neutral-11) 45%); --tone-2: var(--silicon-mark-3-from); --tone-3: var(--silicon-mark-3-to); }
+.card[data-tone="4"] { --tone-1: color-mix(in oklab, var(--silicon-mark-4-from), var(--neutral-11) 45%); --tone-2: var(--silicon-mark-4-from); --tone-3: var(--silicon-mark-4-to); }
+
+/* The bars: one per beat; the current one fills over --beat (paused while held), the ones before are full. */
+.bars { display: flex; gap: var(--space-tight); }
+.bar { height: 3px; flex: 1; overflow: hidden; border-radius: var(--radius-full); background: color-mix(in oklab, var(--neutral-0) 30%, transparent);  corner-shape: round;}
+.fill { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--neutral-0); transform: scaleX(0); transform-origin: left; }
+.fill[data-state="done"] { transform: scaleX(1); }
+.fill[data-state="now"] { animation: story-fill var(--beat) linear forwards; }
+@keyframes story-fill { to { transform: scaleX(1); } }
+
+/* A beat: its picture, its headline and its line, settled at the bottom of the card, rising in as it starts. */
+.beat { display: grid; align-content: end; justify-items: start; gap: var(--space-group); animation: beat-in var(--duration-considered) var(--ease-standard) both; }
+@keyframes beat-in { from { opacity: 0; translate: 0 var(--space-related); } }
+.headline { max-width: 16ch; margin: 0; color: var(--neutral-0); font: var(--display); letter-spacing: var(--display-tracking); font-family: var(--font-geist-serif), var(--font-display); text-wrap: balance; }
+.line { max-width: 40ch; margin: 0; color: color-mix(in oklab, var(--neutral-0) 85%, transparent); font: var(--body); letter-spacing: var(--body-tracking); text-wrap: pretty; }
+.mono { font-family: var(--font-mono); font-size: .9em; letter-spacing: 0; }
+
+/* A beat's product shot: in the top-right, below the bars and lined up with their right end; it rises in with the
+   beat. On a card under 540 px there is no room beside the words, so it sits in the flow between the bars and the words. */
+.shot { position: absolute; z-index: 0; top: calc(var(--space-section) + var(--space-block)); right: var(--space-block); width: 360px; pointer-events: none; animation: shot-in var(--duration-considered) var(--ease-standard) both; }
+@keyframes shot-in { from { opacity: 0; translate: 0 var(--space-related); } }
+
+/* The last beat's three ways: rows on a light glass, the action at the end. */
+.ways { display: grid; width: 100%; gap: var(--space-related); margin: var(--space-related) 0 0; padding: 0; list-style: none; }
+.way { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-group) var(--space-inset); border-radius: var(--radius-control); background: color-mix(in oklab, var(--neutral-0) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--neutral-0) 20%, transparent); cursor: auto; }
+.wayWords { display: grid; min-width: 0; flex: 1; gap: var(--space-hair); }
+.wayTitle { color: var(--neutral-0); font: var(--label); letter-spacing: var(--label-tracking); }
+.wayLine { color: color-mix(in oklab, var(--neutral-0) 80%, transparent); font: var(--small); letter-spacing: var(--small-tracking); }
+
+/* Back and Next at the lower right, round. */
+.controls { display: flex; justify-content: flex-end; gap: var(--space-tight); }
+.control.control { width: 28px; min-width: 28px; height: 28px; padding: 0; border-radius: var(--radius-full); corner-shape: round; }
+
+@media (prefers-reduced-motion: reduce) {
+  .beat, .shot { animation: none; }
+  .fill[data-state="now"] { animation: none; transform: scaleX(1); }
+}
+@container stories (max-width: 539px) {
+  .card:has(.shot) { grid-template-rows: auto auto 1fr auto; gap: var(--space-block); }
+  .shot { position: static; width: 100%; max-width: 360px; }
+}
+@media (max-width: 639px) {
+  .card { min-height: 480px; padding: var(--space-inset) var(--space-section); }
+  .headline { font: var(--h1); letter-spacing: var(--h1-tracking); font-family: var(--font-geist-serif), var(--font-display); }
+  .way { flex-wrap: wrap; }
+
+}

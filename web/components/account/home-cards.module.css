@@ -1,0 +1,59 @@
+/* Home's introduction is a banner, not a section (Anil, 2026-10-31): one soft grey tile (the canvas grey, no edge, the
+   container squircle, a hairline edge in --border-subtle like the tiles', 20px inside) holding its heading (an h3) and dismiss button, 24px above the You, Silicons and
+   Apps cards side by side, 16px between them. 48px under what comes before (the column's 24px and 24px more), like every section.
+   One column under 640px. */
+.banner { --sq-r: var(--radius-container); --sq-fill: var(--canvas); --sq-stroke: var(--border-subtle); display: grid; gap: var(--space-section); margin-top: var(--space-section); padding: var(--space-comfort); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+/* 16px between the cards (the banner's own gap is the 24px under its heading). */
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
+/* Home's section headings (h2), one style everywhere: 22px medium, display tracking (Anil, 2026-10-31). */
+.title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
+
+/* Dismiss: lucide's X in a round button (28px circle) sitting on the banner's 20px padding, its edge in line with the
+   cards' right edge; a soft grey circle at rest, darker on hover. */
+.close.close { width: 28px; min-width: 28px; height: 28px; min-height: 28px; flex: none; padding: 0; border-radius: var(--radius-full); corner-shape: round; }
+.items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-inset); margin: 0; padding: 0; list-style: none; }
+.id { font-family: var(--font-mono); letter-spacing: 0; }
+
+/* The cards (You, Silicons, Apps): each a small card clipped to the container squircle, 140px tall, on its own 135° gradient
+   (dark top left to light bottom right). Its picture stands on the bottom edge at the right; its words sit at the top
+   left on the dark end: the item's name as the card's title (22px, medium, display tracking) over a smaller, softer
+   line (12px, medium, so it holds up on the gradient). Light words on a dark gradient (data-on-dark), ink on a light one. A faint light edge (white at 22%, over
+   the gradient itself: it starts under the border, so the border never shows the gradient's far end repeated) and a
+   light raised shadow lift each card off the tile. */
+.card { --sq-r: var(--radius-container); position: relative; display: grid; min-width: 0; min-height: 140px; overflow: hidden; isolation: isolate; border: 1px solid color-mix(in oklab, var(--neutral-0) 22%, transparent); background-origin: border-box; box-shadow: var(--shadow-raised); transition: background var(--duration-considered) var(--ease-standard); }
+.cardWords { display: grid; min-width: 0; width: 60%; justify-self: start; align-content: start; gap: var(--space-tight); padding: var(--space-group); }
+.cardLabel { color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); }
+.cardLine { color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
+.card[data-on-dark] .cardLabel { color: var(--neutral-0); }
+.card[data-on-dark] .cardLine { color: color-mix(in oklab, var(--neutral-0) 72%, transparent); }
+
+.card[data-clickable] { cursor: pointer; }
+
+/* Tilted a little, each its own way, like cards laid on a table (Anil, 2026-10-30). */
+.you { rotate: -1deg; }
+.silicons { rotate: 0.75deg; }
+.apps { rotate: -0.5deg; }
+
+/* You: the gradient is the Carbon's pixel avatar's own palette (hair, skin, shirt; --you-1 to 4, set by home-cards.tsx;
+   the Silicon colours until it is read), and the avatar's figure, alone and crisp, stands at the right. */
+.you {
+  --you-1: var(--silicon-mark-1-from); --you-2: var(--silicon-mark-3-from); --you-3: var(--silicon-mark-1-to); --you-4: var(--silicon-mark-2-to);
+  background-image: linear-gradient(135deg, var(--you-1), var(--you-2) 40%, var(--you-3) 72%, var(--you-4));
+}
+.youPicture { position: absolute; z-index: -1; right: var(--space-group); bottom: 0; height: 68%; aspect-ratio: 1; image-rendering: pixelated; }
+
+/* Silicons: the Silicon colours (violet into teal), deepened at the top left so the words read light; the Silicon spark,
+   large and white, stands at the right. */
+.silicons { background-image: linear-gradient(135deg, color-mix(in oklab, var(--silicon-mark-1-from), var(--neutral-11) 45%), var(--silicon-mark-1-from) 45%, var(--silicon-mark-1-to)); }
+.siliconsSpark { position: absolute; z-index: -1; right: var(--space-group); bottom: var(--space-group); width: 64px; height: 64px; color: var(--neutral-0); }
+
+/* Apps: the site's blue accent (deepened at the top left) into the Silicon sky blue; the apps grid, solid and white,
+   stands at the right. */
+.apps { background-image: linear-gradient(135deg, color-mix(in oklab, var(--accent), var(--neutral-11) 45%), var(--accent) 45%, var(--silicon-mark-3-to)); }
+.appsGrid { position: absolute; z-index: -1; right: var(--space-group); bottom: var(--space-group); width: 56px; height: 56px; color: var(--neutral-0); }
+
+@media (max-width: 639px) {
+  .items { grid-template-columns: minmax(0, 1fr); gap: var(--space-inset); }
+}
+/* The picture cards on Home (Anil, 2026-11-11): the same space above as every Home section. */
+.place { margin-top: var(--space-section); }

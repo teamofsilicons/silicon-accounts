@@ -2,7 +2,7 @@
  * IANA time zones for pickers (Arc Combobox options): every zone the browser knows, labelled with its current UTC
  * offset and searchable by city, region and offset ("kolkata", "+05:30", "india").
  */
-import type { ComboboxOption } from "@/components/silicon-ui/combobox/combobox";
+import type { ComboboxOption } from "@teamofsilicons/silicon-ui/combobox";
 
 /** "+05:30" for a zone at a moment (now by default). */
 export function utcOffset(timeZone: string, at: Date = new Date()): string {
@@ -118,4 +118,52 @@ export function timezoneOptions(at: Date = new Date(), include: string[] = []): 
       keywords: [zone, zone.replace(/_/g, " "), offset, `utc${offset}`, `gmt${offset}`, ...Object.entries(MODERN).filter(([, name]) => name === zone).map(([legacy]) => legacy)],
     };
   });
+}
+
+export interface TimezoneBand {
+  /** Minutes east of UTC right now. */
+  offset: number;
+  /** "+05:30". */
+  label: string;
+  /** Every zone at this offset. */
+  zones: string[];
+  /** The zone a band stands for: the best known one. */
+  primary: string;
+}
+
+/** The zones people know best, first match wins, so each offset is named after one of them. */
+export const WELL_KNOWN = [
+  "UTC", "Pacific/Pago_Pago", "Pacific/Honolulu", "Pacific/Marquesas", "America/Anchorage", "America/Los_Angeles", "America/Denver",
+  "America/Chicago", "America/Mexico_City", "America/New_York", "America/Halifax", "America/St_Johns", "America/Sao_Paulo", "Atlantic/South_Georgia",
+  "Atlantic/Azores", "Europe/Paris", "Africa/Lagos", "Europe/Athens", "Europe/Moscow", "Asia/Tehran", "Asia/Dubai", "Asia/Kabul", "Asia/Karachi",
+  "Asia/Kolkata", "Asia/Kathmandu", "Asia/Dhaka", "Asia/Yangon", "Asia/Bangkok", "Asia/Singapore", "Australia/Eucla", "Asia/Tokyo",
+  "Australia/Darwin", "Australia/Brisbane", "Australia/Adelaide", "Australia/Sydney", "Australia/Lord_Howe", "Pacific/Noumea",
+  "Pacific/Fiji", "Pacific/Auckland", "Pacific/Chatham", "Pacific/Tongatapu", "Pacific/Kiritimati",
+];
+
+/** Every zone grouped by its current offset, west to east, so each one is in exactly one band. */
+export function timezoneBands(at: Date = new Date()): TimezoneBand[] {
+  const byOffset = new Map<number, string[]>();
+  for (const zone of allTimezones()) {
+    const offset = offsetMinutes(zone, at);
+    byOffset.set(offset, [...(byOffset.get(offset) ?? []), zone]);
+  }
+  return [...byOffset.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([offset, zones]) => ({
+      offset,
+      label: utcOffset(zones[0] ?? "UTC", at),
+      zones,
+      primary: WELL_KNOWN.find(zone => zones.includes(zone)) ?? zones[0] ?? "UTC",
+    }));
+}
+
+/** This browser's time zone, if it's one we list. */
+export function browserTimezone(): string | null {
+  try {
+    const zone = modernTimezone(new Intl.DateTimeFormat().resolvedOptions().timeZone);
+    return allTimezones().includes(zone) ? zone : null;
+  } catch {
+    return null;
+  }
 }

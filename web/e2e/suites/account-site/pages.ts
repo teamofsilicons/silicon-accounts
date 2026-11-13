@@ -21,33 +21,23 @@ interface View {
 }
 
 const VIEWS: View[] = [
-  { name: "identity", path: "/", title: "Silicon Accounts", ready: page => page.getByRole("region", { name: /^Identity card of / }).first() },
-  { name: "sign-in methods", path: "/sign-in-methods", title: "Sign-in methods · Silicon Accounts", ready: page => page.getByRole("list", { name: "Your phone numbers", exact: true }) },
-  { name: "apps with access", path: "/apps", title: "Apps · Silicon Accounts", ready: page => page.getByRole("list", { name: "Apps with access" }) },
-  {
-    name: "apps whose access was removed",
-    path: "/apps",
-    title: "Apps · Silicon Accounts",
-    ready: page => page.getByRole("list", { name: "Apps whose access you removed" }),
-    open: async page => page.getByRole("button", { name: /^Access removed \(\d+\)$/ }).click({ timeout: 30_000 }),
-  },
-  { name: "active proofs", path: "/proofs", title: "User verification · Silicon Accounts", ready: page => page.getByRole("list", { name: "Active verifications" }) },
-  {
-    name: "ended proofs",
-    path: "/proofs",
-    title: "User verification · Silicon Accounts",
-    ready: page => page.getByRole("list", { name: "Ended verifications" }),
-    open: async page => page.getByRole("button", { name: /^Ended \(\d+\)$/ }).click({ timeout: 30_000 }),
-  },
+  { name: "personal info", path: "/personal", title: "Personal info · Silicon Accounts", ready: page => page.getByRole("region", { name: "Profile" }).first() },
+  { name: "security", path: "/sign-in-methods", title: "Security · Silicon Accounts", ready: page => page.getByRole("region", { name: "Your sign-in", exact: true }) },
+  { name: "apps with access", path: "/apps", title: "Apps · Silicon Accounts", ready: page => page.getByRole("region", { name: "Your apps" }) },
+  { name: "apps whose access was removed", path: "/apps", title: "Apps · Silicon Accounts", ready: page => page.getByRole("region", { name: "Access removed" }) },
+  { name: "an app's page", path: "/apps/briefcase", title: "App · Silicon Accounts", ready: page => page.getByRole("heading", { name: "What it can see about you" }) },
+  { name: "active proofs", path: "/proofs", title: "Permissions between apps · Silicon Accounts", ready: page => page.getByRole("region", { name: "Active", exact: true }) },
+  { name: "ended proofs", path: "/proofs", title: "Permissions between apps · Silicon Accounts", ready: page => page.getByRole("region", { name: "Ended", exact: true }) },
   { name: "activity", path: "/activity", title: "Activity · Silicon Accounts", ready: page => page.getByRole("region", { name: "Account activity" }) },
   {
     name: "activity filtered to an empty kind",
     path: "/activity",
     title: "Activity · Silicon Accounts",
     ready: page => page.getByText("Nothing here yet").first(),
-    open: async page => page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Custodian", exact: true }).click({ timeout: 30_000 }),
+    open: async page => page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Silicons", exact: true }).click({ timeout: 30_000 }),
   },
-  { name: "settings", path: "/settings", title: "Settings · Silicon Accounts", ready: page => page.getByRole("list", { name: "Signed-in sessions" }) },
+  { name: "privacy", path: "/privacy", title: "Data & privacy · Silicon Accounts", ready: page => page.getByRole("heading", { name: "What apps see" }) },
+  { name: "privacy-delete", path: "/privacy/delete", title: "Delete your account · Silicon Accounts", ready: page => page.getByRole("heading", { name: "Before you delete" }) },
 ];
 
 async function show(page: Page, site: string, view: View): Promise<boolean> {

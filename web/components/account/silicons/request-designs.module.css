@@ -1,0 +1,77 @@
+/* Three designs for a custodian request (request-designs.tsx). --p1..3 are the Silicon avatar's palette, set inline,
+   so each request wears its Silicon's colours. */
+
+/* Shared parts */
+.art { --sq-r: var(--radius-container); display: grid; flex: none; place-items: center; background: linear-gradient(135deg, color-mix(in oklab, var(--p1) 26%, var(--surface)), color-mix(in oklab, var(--p2) 20%, var(--surface)) 55%, color-mix(in oklab, var(--p3) 26%, var(--surface))); }
+.art img { width: 70%; height: 70%; image-rendering: pixelated; }
+.check { --sq-r: var(--radius-container); --sq-fill: color-mix(in oklab, var(--warning) 10%, var(--surface)); display: flex; align-items: flex-start; gap: var(--space-group); margin: 0; padding: var(--space-group) var(--space-inset); background: var(--sq-fill); color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.check svg { flex: none; margin-top: var(--space-hair); color: var(--warning); }
+.check strong { color: var(--foreground); font-weight: var(--weight-medium); }
+.list { display: grid; align-content: start; gap: var(--space-related); margin: 0; padding: 0; list-style: none; }
+.list li { display: flex; align-items: flex-start; gap: var(--space-related); color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.listIcon { display: grid; flex: none; height: calc(1em * var(--leading-body)); place-items: center; color: var(--text-secondary); }
+.list[data-tone="accept"] .listIcon { color: var(--success); }
+.lapse { display: flex; align-items: center; gap: var(--space-related); margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.lapse svg { flex: none; }
+.smallTitle { margin: 0; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); padding-top: var(--space-related); }
+
+/* A  Choice */
+.choice { display: grid; gap: var(--space-block); }
+.hero { --sq-r: var(--radius-container); display: grid; justify-items: center; gap: var(--space-group); padding: var(--space-page) var(--space-block) var(--space-block); background: radial-gradient(120% 90% at 50% 0%, color-mix(in oklab, var(--p2) 26%, var(--surface)), transparent 70%), linear-gradient(135deg, color-mix(in oklab, var(--p1) 16%, var(--surface)), color-mix(in oklab, var(--p3) 16%, var(--surface))); text-align: center; }
+.heroFigures { display: flex; align-items: center; gap: var(--space-inset); margin-bottom: var(--space-related); }
+.heroArt { width: calc(var(--space-page) * 2.5); height: calc(var(--space-page) * 2.5); box-shadow: var(--shadow-raised); }
+.heroArt.heroArt { background: var(--surface); }
+.heroPerson { display: grid; padding: var(--space-hair); border-radius: var(--radius-full); background: var(--surface); box-shadow: var(--shadow-raised); }
+.heroArrow { color: var(--text-secondary); }
+.heroQuestion { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); text-wrap: balance; }
+.heroMeta { display: flex; flex-wrap: wrap; align-items: center; justify-content: inherit; gap: var(--space-related); margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-group); }
+.option { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; grid-template-rows: auto 1fr auto; gap: var(--space-inset); padding: var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.option[data-yes] { --sq-stroke: color-mix(in oklab, var(--success) 40%, var(--border)); --sq-fill: color-mix(in oklab, var(--success) 4%, var(--surface)); }
+.optionTitle { display: flex; align-items: center; gap: var(--space-related); margin: 0; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); }
+.option[data-yes] .optionTitle svg { color: var(--success); }
+.optionButton.optionButton { width: 100%; }
+
+/* B  Pass */
+.pass { display: grid; grid-template-columns: minmax(0, 17rem) minmax(0, 1fr); align-items: start; gap: var(--space-page); }
+.ticket { --sq-r: var(--radius-container); --sq-stroke: color-mix(in oklab, var(--p2) 30%, var(--border)); display: grid; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--surface); box-shadow: var(--shadow-raised); }
+.ticketArt { --sq-r: 0; width: 100%; aspect-ratio: 1; }
+.ticketWords { display: grid; gap: var(--space-hair); padding: var(--space-inset) var(--space-inset) var(--space-group); }
+.ticketName { color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
+.ticketId { color: var(--text-muted); font: var(--small); font-family: var(--font-mono); letter-spacing: 0; }
+/* The stub: a dashed tear line, then the request's facts. */
+.ticketFacts { display: grid; gap: var(--space-related); margin: 0; padding: var(--space-group) var(--space-inset) var(--space-inset); border-top: 1px dashed var(--sq-stroke); }
+.ticketFacts div { display: flex; justify-content: space-between; gap: var(--space-group); }
+.ticketFacts dt { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.ticketFacts dd { overflow: hidden; margin: 0; color: var(--foreground); font: var(--small); letter-spacing: var(--small-tracking); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.passMain { display: grid; gap: var(--space-inset); padding-top: var(--space-related); }
+.eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); margin: 0; color: var(--text-secondary); font: var(--label); letter-spacing: var(--label-tracking); }
+.passQuestion { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); text-wrap: balance; }
+.passButtons { display: flex; flex-wrap: wrap; gap: var(--space-related); padding-top: var(--space-related); }
+
+/* C  Sheet */
+.sheet { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 18rem); align-items: start; gap: var(--space-block); }
+.sheetMain { display: grid; gap: var(--space-inset); }
+.sheetHead { display: flex; align-items: center; gap: var(--space-inset); }
+.sheetArt { width: calc(var(--space-page) * 1.75); height: calc(var(--space-page) * 1.75); }
+.summary { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.row { display: grid; grid-template-columns: minmax(0, 9rem) minmax(0, 1fr); gap: var(--space-group); padding: var(--space-group) var(--space-inset); }
+.row + .row { border-top: 1px solid var(--border-subtle); }
+.rowLabel { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.rowValue { color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.rowStrong { color: var(--foreground); font-weight: var(--weight-medium); }
+.rowMono { color: var(--text-muted); font-family: var(--font-mono); letter-spacing: 0; }
+.panel { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); position: sticky; top: var(--space-block); display: grid; gap: var(--space-group); padding: var(--space-inset); border: 1px solid var(--sq-stroke); background: var(--sq-fill); box-shadow: var(--shadow-raised); }
+.timer { display: grid; gap: var(--space-tight); }
+.timerWords { display: flex; justify-content: space-between; gap: var(--space-group); color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); font-variant-numeric: tabular-nums; }
+.timerWords span { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.panelLead { margin: var(--space-tight) 0 0; color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
+
+@media (max-width: 719px) {
+  .cards, .pass, .sheet { grid-template-columns: minmax(0, 1fr); }
+  .ticket { max-width: 20rem; }
+  .ticketArt { aspect-ratio: 2 / 1; }
+  .panel { position: static; }
+  .row { grid-template-columns: minmax(0, 1fr); gap: var(--space-hair); }
+}

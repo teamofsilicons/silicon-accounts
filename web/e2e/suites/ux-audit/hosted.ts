@@ -250,7 +250,7 @@ export const journeys: Journey[] = [
       // First sign-in: the email it requires, the timezone left unticked.
       await page.goto(authorize);
       await page.getByRole("button", { name: /^Continue as/ }).click({ timeout: 30_000 });
-      await page.getByRole("button", { name: "Share and continue", exact: true }).click({ timeout: 30_000 });
+      await page.getByRole("button", { name: /^Share and continue$/i }).click({ timeout: 30_000 });
       await page.waitForURL(url => url.href.startsWith(`${env.apps}/briefcase/callback`), { timeout: 30_000 });
       // The app now also requires a date of birth.
       const patched = await (async () => {

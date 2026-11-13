@@ -1,5 +1,5 @@
 /**
- * Deleting a Carbon's account on Settings. Blocked while the Carbon is custodian of a Silicon (every Silicon always
+ * Deleting a Carbon's account on Data & privacy (/privacy; /settings redirects). Blocked while the Carbon is custodian of a Silicon (every Silicon always
  * has exactly one): deleting one Silicon or starting a transfer doesn't unblock it, only the last Silicon leaving does.
  * When it goes: every app with access is told (signed), its sessions, tokens and proofs end at once, its emails are
  * free, its c:id stays reserved 10 days (free after, time travel), a Silicon still waiting for it is released, and
@@ -7,7 +7,7 @@
  */
 import type { Journey } from "../../context";
 import { api, codeFor, developerApi, json, lastSeq, newContext, postJson, shot, signInOnDeveloper, signInOnSite, sleep, sql, tag } from "../../lib";
-import { DEVELOPER_SESSION_ENDED, appAuth, appRefresh, appUserinfo, call, codeOf, deliveredAfter, getMe, hold, inbox, messageOf, newCarbon, probePage, queuedEvents, requestSent, signInAgain, signIntoApp, timelineRows, until, waitEvent } from "./_helpers";
+import { DEVELOPER_SESSION_ENDED, appAuth, appRefresh, appUserinfo, call, codeOf, deliveredAfter, getMe, inbox, messageOf, newCarbon, probePage, queuedEvents, requestSent, signInAgain, signIntoApp, timelineRows, until, waitEvent } from "./_helpers";
 
 interface Created {
   silicon?: { uuid: string; id: string };
@@ -15,7 +15,7 @@ interface Created {
 
 const blocked: Journey = {
   name: "account-site-delete-blocked",
-  title: "deleting the account is blocked while custodian of a Silicon: Settings explains and lists them, the hold does nothing, the API answers 409 with the Silicons; deleting one or starting a transfer doesn't unblock it; once the other Carbon accepts, it does",
+  title: "deleting the account is blocked while custodian of a Silicon: Data & privacy sends you to Silicons and offers no Delete, the API answers 409 with the Silicons; deleting one or starting a transfer doesn't unblock it; once the other Carbon accepts, it does",
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
@@ -28,27 +28,30 @@ const blocked: Journey = {
     const sb = b.body.silicon;
     results.check("setup: the Carbon created two Silicons (custodian of both)", a.status === 201 && b.status === 201 && (await getMe(keeper.probe)).custodian_of === 2, `${a.status} ${b.status}`);
 
-    await keeper.page.goto(`${env.site}/`);
-    const glance = keeper.page.getByRole("complementary", { name: "At a glance" });
-    const glanceText = await until(async () => (await glance.innerText().catch(() => "")).replace(/\s+/g, " "), value => /(\d+) ?Silicons in your care/.test(value), 15_000);
-    results.check("the identity page counts 2 Silicons in your care", /(^|\D)2 ?Silicons in your care/.test(glanceText), glanceText.slice(0, 200));
     const cookie = (await keeper.context.cookies(env.site)).map(entry => `${entry.name}=${entry.value}`).join("; ");
     const csrf = await api(ctx, "/v1/me", { method: "DELETE", json: { confirm: keeper.id }, headers: { cookie, origin: "http://evil.example" } });
     results.check("a deletion with the session cookie from a foreign Origin is refused (403 origin_not_allowed)", csrf.status === 403 && codeOf(csrf.body) === "origin_not_allowed" && (await getMe(keeper.probe)).status === "active", `${csrf.status} ${codeOf(csrf.body)}`);
-    const section = keeper.page.getByRole("region", { name: "Delete your account" });
-    const holdButton = keeper.page.getByRole("button", { name: "Hold to delete your account" });
+    // Data & privacy (/settings redirects there): the Delete account row.
+    const section = keeper.page.getByRole("region", { name: "Delete account" });
     await keeper.page.goto(`${env.site}/settings`);
-    await section.getByText(/You look after/).waitFor({ timeout: 30_000 });
+    await keeper.page.waitForURL(`${env.site}/privacy`, { timeout: 30_000 });
+    results.check("/settings goes to Data & privacy", keeper.page.url() === `${env.site}/privacy`, keeper.page.url());
+    await section.getByRole("link", { name: /Delete account/ }).waitFor({ timeout: 30_000 });
     await sleep(800);
     await shot(env, keeper.page, "acct-delete-01-blocked", true);
     const text = (await section.innerText()).replace(/\s+/g, " ");
-    results.check("Settings says why it can't be deleted yet", text.includes("You look after 2 Silicons. Every Silicon always has exactly one custodian, so hand each one to another Carbon, or delete it, before you delete your account."), text.slice(0, 260));
-    results.check("…lists both Silicons with their ids", text.includes(`Keep A ${t}`) && text.includes(sa?.id ?? "?") && text.includes(`Keep B ${t}`) && text.includes(sb?.id ?? "?"), text.slice(0, 400));
-    results.check("…the hold button is off, with the reason beside it", (await holdButton.isDisabled()) && text.includes("Unavailable while you are custodian of a Silicon."));
-    results.check("…and points to the Silicons page", (await section.getByRole("link", { name: "Hand over or delete your Silicons" }).getAttribute("href")) === "/silicons");
-    await hold(keeper.page, holdButton, 2600).catch(() => undefined);
-    await sleep(500);
-    results.check("holding the disabled button does nothing", (await getMe(keeper.probe)).status === "active" && keeper.page.url() === `${env.site}/settings`);
+    results.check("Data & privacy's Delete account is about the account, not the Silicons", !text.includes("Silicon") && text.includes("Remove your account and everything in it"), text.slice(0, 260));
+    results.check("…and its row opens Delete your account", (await section.getByRole("link", { name: /Delete account/ }).getAttribute("href")) === "/privacy/delete");
+    // Delete your account: each Silicon as a check, and Delete Account off until they're done.
+    const box = keeper.page.getByRole("region", { name: "Delete your account" });
+    const deleteAccount = box.getByRole("button", { name: "Delete Account" });
+    await keeper.page.goto(`${env.site}/privacy/delete`);
+    await box.getByText(/left before you can delete/).waitFor({ timeout: 30_000 });
+    const checks = (await box.innerText()).replace(/\s+/g, " ");
+    results.check("Delete your account lists both Silicons as checks", checks.includes(`Keep A ${t} needs a new home`) && checks.includes(`Keep B ${t} needs a new home`), checks.slice(0, 300));
+    results.check("…says 2 left, and Delete Account is off", checks.includes("2 left before you can delete") && (await deleteAccount.isDisabled()));
+    results.check("…and has a Hand Over and a Delete for each", (await box.getByRole("button", { name: `Hand Over Keep A ${t}` }).count()) === 1 && (await box.getByRole("button", { name: `Delete Keep B ${t}` }).count()) === 1);
+
 
     const refuse = async () => call<{ error?: { details?: { silicons?: Array<{ id: string }> } } }>(keeper.probe, "/v1/me", { method: "DELETE", json: { confirm: keeper.id } });
     let refused = await refuse();
@@ -68,8 +71,9 @@ const blocked: Journey = {
     refused = await refuse();
     results.check("a pending transfer doesn't unblock it (the Silicon still has this custodian)", transfer.status === 201 && refused.status === 409, `${transfer.status} ${refused.status}`);
     await keeper.page.reload();
-    await section.getByText(/You look after 1 Silicon\./).waitFor({ timeout: 30_000 }).catch(() => undefined);
-    results.check("Settings now says 1 Silicon, still blocked", (await section.innerText()).includes("You look after 1 Silicon.") && (await holdButton.isDisabled()));
+    await box.getByText(/1 left before you can delete/).waitFor({ timeout: 30_000 }).catch(() => undefined);
+    const one = (await box.innerText()).replace(/\s+/g, " ");
+    results.check("Delete your account now says 1 left: the handover waits for the heir, still blocked", one.includes("1 left before you can delete") && one.includes(`Keep B ${t} is going to`) && (await deleteAccount.isDisabled()), one.slice(0, 300));
 
     // The other Carbon accepts: the Silicon is theirs, and this account can be deleted.
     const requests = (await call<{ items: Array<{ id: string; silicon: { uuid: string } }> }>(heir.probe, "/v1/me/custodian-requests")).body.items;
@@ -83,17 +87,16 @@ const blocked: Journey = {
     results.check("the keeper's activity: both Silicons created, the second transferred to the heir", keeperCustody.filter(title => title.startsWith("Created the Silicon ")).length === 2 && keeperCustody.includes(`Created the Silicon ${sb?.id}`) && keeperCustody.includes(`Transferred ${sb?.id} to ${heir.id}`), keeperCustody.join(" | "));
     results.check("the heir's activity: it became the custodian, transferred from the keeper", heirCustody.includes(`Became the custodian of ${sb?.id} (transferred from ${keeper.id})`), heirCustody.join(" | "));
     await keeper.page.goto(`${env.site}/activity`);
-    await keeper.page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Custodian", exact: true }).click({ timeout: 30_000 });
+    await keeper.page.getByRole("group", { name: "Show" }).getByRole("button", { name: "Silicons", exact: true }).click({ timeout: 30_000 });
     const custodianRows = await until(() => timelineRows(keeper.page), rows => rows.length >= keeperCustody.length, 10_000);
     await shot(env, keeper.page, "acct-delete-01b-custodian-activity");
-    results.check("…and /activity's Custodian filter shows exactly those entries, newest first (the request, then the transfer)", custodianRows.length === keeperCustody.length && keeperCustody.every((title, index) => (custodianRows[index] ?? "").startsWith(title)) && keeperCustody.includes(`Transfer of ${sb?.id} to ${heir.id} requested`), custodianRows.join(" | "));
-    await keeper.page.goto(`${env.site}/settings`);
-    await keeper.page.reload();
-    await section.getByText(/Your account ends for good/).waitFor({ timeout: 30_000 }).catch(() => undefined);
+    results.check("…and /activity's Silicons filter shows exactly those entries, newest first (the request, then the transfer)", custodianRows.length === keeperCustody.length && keeperCustody.every((title, index) => (custodianRows[index] ?? "").startsWith(title)) && keeperCustody.includes(`Transfer of ${sb?.id} to ${heir.id} requested`), custodianRows.join(" | "));
+    await keeper.page.goto(`${env.site}/privacy/delete`);
+    await box.getByText("All done").waitFor({ timeout: 30_000 }).catch(() => undefined);
     await sleep(600);
     await shot(env, keeper.page, "acct-delete-02-unblocked", true);
-    const open = (await section.innerText()).replace(/\s+/g, " ");
-    results.check("Settings now explains what deleting does, and the hold button is on", open.includes(`${keeper.id} stays reserved for 10 days before anyone can take it`) && !(await holdButton.isDisabled()), open.slice(0, 300));
+    const open = (await box.innerText()).replace(/\s+/g, " ");
+    results.check("Delete your account now says All done, and Delete Account is on", open.includes("All done") && open.includes("No Silicons in your care") && !(await deleteAccount.isDisabled()), open.slice(0, 300));
     const heirRefused = await call(heir.probe, "/v1/me", { method: "DELETE", json: { confirm: heir.id } });
     results.check("the new custodian is the one blocked now", heirRefused.status === 409 && codeOf(heirRefused.body) === "custodian_of_silicons", `${heirRefused.status}`);
     const stillWrong = await call(keeper.probe, "/v1/me", { method: "DELETE", json: { confirm: `${keeper.id}x` } });
@@ -105,7 +108,7 @@ const blocked: Journey = {
 
 const deletion: Journey = {
   name: "account-site-delete",
-  title: "deleting the account on Settings (hold 2 s): apps with access get account.deleted (signed), sessions/CLI/app tokens/proofs end at once, an app whose access was removed hears nothing, the c:id is reserved 10 days then free, a waiting Silicon is released, the email signs up a new account with a new uuid",
+  title: "deleting the account on Data & privacy (a dialog, the CarbonID typed): apps with access get account.deleted (signed), sessions/CLI/app tokens/proofs end at once, an app whose access was removed hears nothing, the c:id is reserved 10 days then free, a waiting Silicon is released, the email signs up a new account with a new uuid",
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
@@ -146,16 +149,27 @@ const deletion: Journey = {
     results.check("setup: the proof verifies before the deletion", (await verifyProof()).valid === true);
     const seq = { briefcase: (await inbox(env, "briefcase")).last_seq, commit: (await inbox(env, "commit")).last_seq };
 
-    // Settings: what deleting does, then hold for 2 seconds.
-    await leaver.page.goto(`${env.site}/settings`);
+    // Delete your account: what you lose on the page, then Delete Account asks for the CarbonID typed.
+    await leaver.page.goto(`${env.site}/privacy/delete`);
     const section = leaver.page.getByRole("region", { name: "Delete your account" });
-    await section.getByText(/Your account ends for good/).waitFor({ timeout: 30_000 });
-    const text = (await section.innerText()).replace(/\s+/g, " ");
-    results.check("Settings says what deleting does: apps told, sessions and user verifications end, emails freed, the id reserved 10 days", text.includes("Every app you signed into is told and loses access, your sessions and user verifications end, your emails and phone numbers are freed") && text.includes(`${leaver.id} stays reserved for 10 days before anyone can take it. This cannot be undone.`), text.slice(0, 320));
-    const button = leaver.page.getByRole("button", { name: "Hold to delete your account" });
-    await hold(leaver.page, button, 600);
-    await sleep(600);
-    results.check("letting go too early deletes nothing", (await getMe(leaver.probe)).status === "active");
+    await section.getByText("All done").waitFor({ timeout: 30_000 });
+    const shown = (await section.innerText()).replace(/\s+/g, " ");
+    results.check("the page says what goes: the app signs you out and is told, devices signed out, the CarbonID held 10 days", shown.includes("What you’ll lose access to") && shown.includes("Signs you out and is told you’ve left") && shown.includes("All signed out, this one too") && shown.includes(`Your CarbonID ${leaver.id}`) && shown.includes("Held for 10 days, then anyone can take it"), shown.slice(0, 400));
+    await section.getByRole("button", { name: "Delete Account" }).click();
+    const dialog = leaver.page.getByRole("dialog", { name: "Delete your account?" });
+    const text = (await dialog.innerText({ timeout: 10_000 })).replace(/\s+/g, " ");
+    results.check("the dialog says it can't be undone", text.includes("This can’t be undone.") && text.includes("You lose access to everything on this page."), text.slice(0, 320));
+    const button = dialog.getByRole("button", { name: "Delete Account" });
+    const field = dialog.getByLabel(`Type ${leaver.id} to confirm`);
+    results.check("…Delete Account stays off until the CarbonID is typed", await button.isDisabled());
+    await field.fill(`${leaver.id}x`);
+    results.check("…and off for anything else", await button.isDisabled());
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await sleep(400);
+    results.check("Cancel deletes nothing", (await getMe(leaver.probe)).status === "active");
+    await section.getByRole("button", { name: "Delete Account" }).click();
+    await field.fill(leaver.id);
+    await shot(env, leaver.page, "acct-delete-02b-confirm", true);
     const failing: string[] = [];
     const signouts: string[] = [];
     leaver.page.on("response", response => {
@@ -165,12 +179,16 @@ const deletion: Journey = {
       if (request.url().startsWith(`${env.site}/v1/session/signout`)) signouts.push(request.method());
     });
     const deleteSent = requestSent(leaver.page, "DELETE", "/v1/me");
-    await hold(leaver.page, button, 2600);
-    await leaver.page.waitForURL(`${env.site}/`, { timeout: 20_000 });
-    const landing = await leaver.page.getByRole("link", { name: /sign in/i }).first().waitFor({ timeout: 20_000 }).then(() => true, () => false);
+    await button.click();
+    // The prototype's "gone" page (/goodbye), naming the CarbonID it was handed in session storage.
+    await leaver.page.waitForURL(`${env.site}/goodbye`, { timeout: 20_000 });
+    const gone = leaver.page.getByRole("heading", { name: "Your account is deleted" });
+    const landing = await gone.waitFor({ timeout: 20_000 }).then(() => true, () => false);
     const sentAt = await deleteSent;
-    results.metric("delete DELETE sent → signed-out landing page shown", Date.now() - sentAt);
-    results.check("after the hold the browser lands signed out", landing);
+    results.metric("delete DELETE sent → Your account is deleted shown", Date.now() - sentAt);
+    const goneText = (await leaver.page.locator("main").innerText().catch(() => "")).replace(/\s+/g, " ");
+    results.check("…it says every app was told, names the CarbonID held for 10 days, and offers Start Again", goneText.includes("Every app was told and lost access.") && goneText.includes(`${leaver.id} is reserved for 10 days`) && (await leaver.page.getByRole("link", { name: "Start Again" }).getAttribute("href")) === "/", goneText.slice(0, 240));
+    results.check("after Delete Account the browser lands on Your account is deleted", landing);
     results.check("deleting makes no failing request, and no sign-out of a session the deletion already ended", failing.length === 0 && signouts.length === 0, `failing: ${failing.join(", ") || "none"}; sign-out requests: ${signouts.length}`);
     await shot(env, leaver.page, "acct-delete-03-gone");
 

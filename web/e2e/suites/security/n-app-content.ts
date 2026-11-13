@@ -106,7 +106,7 @@ export const journey: Journey = {
       const flowPage = walk.pages[0];
       seen.push({ page: "the app's flow page", pwned: null, injected: 0, violations: [], shows: !!flowPage && flowPage.title.includes("<marquee") && flowPage.continueLabel === "<b>go</b>" });
       await look(page, "review page", null);
-      await page.getByRole("button", { name: "Share and continue", exact: true }).click();
+      await page.getByRole("button", { name: "Share and Continue", exact: true }).click();
       await page.waitForURL(appUrl(env, APP), { timeout: 30_000 }).catch(() => undefined);
       await look(page, "back at the app", null);
       // The embed on the app's own page.

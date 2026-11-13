@@ -9,10 +9,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
-import { Button } from "@/components/silicon-ui/button/button";
-import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
-import { SlotText } from "@/components/silicon-ui/slot-text/slot-text";
-import { motionTokens } from "@/components/silicon-ui/lib/motion-tokens";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { CopyButton } from "@teamofsilicons/silicon-ui/copy-button";
+import { SlotText } from "@teamofsilicons/silicon-ui/slot-text";
+import { motionTokens } from "@teamofsilicons/silicon-ui/motion-tokens";
 import { bringIntoView } from "./focus";
 import { revealValue, type SecretSlot } from "./reveals";
 import styles from "./parts.module.css";
@@ -61,7 +61,7 @@ function SecretValue({ secret: slot, value }: { secret: SecretSlot; value: strin
         </span>
         <span className={styles.secretActions}>
           <button data-sq="surface" type="button" className={styles.iconButton} onClick={() => setHidden(value => !value)} aria-label={hidden ? `Show the ${secret.label}` : `Hide the ${secret.label}`} aria-pressed={hidden}>
-            {hidden ? <Eye size={16} strokeWidth={1.75} aria-hidden="true" /> : <EyeOff size={16} strokeWidth={1.75} aria-hidden="true" />}
+            {hidden ? <Eye size={16} strokeWidth={2} aria-hidden="true" /> : <EyeOff size={16} strokeWidth={2} aria-hidden="true" />}
           </button>
           <CopyButton value={secret.value} label={`Copy the ${secret.label}`} iconOnly variant="plain" />
         </span>
@@ -103,7 +103,7 @@ export function SecretReveal({ revealId, title, description, secrets, onDone, do
       transition={{ ...motionTokens.spring.smooth, opacity: { duration: motionTokens.duration.standard } }}
     >
       <div className={styles.revealHead}>
-        <span className={styles.revealIcon} aria-hidden="true"><KeyRound size={20} strokeWidth={1.75} /></span>
+        <span className={styles.revealIcon} aria-hidden="true"><KeyRound size={20} strokeWidth={2} /></span>
         <div className={styles.revealText}>
           <h2 ref={heading} id={titleId} className={styles.revealTitle} tabIndex={-1}>{title}</h2>
           <p className={styles.revealDescription}>{description}</p>

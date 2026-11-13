@@ -3,8 +3,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "motion/react";
-import { motionTokens } from "../../lib/motion-tokens";
-import { Button } from "../../button/button";
+import { motionTokens } from "@teamofsilicons/silicon-ui/motion-tokens";
+import { Button } from "@teamofsilicons/silicon-ui/button";
 import { FRAMES, KINDS, VIEW, shapePath } from "./empty-states-art";
 import type { Frame, Phase, SceneId } from "./empty-states-art";
 import styles from "./empty-states.module.css";
@@ -28,23 +28,23 @@ const SCENES: { id: SceneId; tab: string }[] = [
 
 const COPY: Record<SceneId, { idle: Copy; done: Copy; loading: string; wait: number }> = {
   search: {
-    idle: { title: "No results for “Q3 roadmap”", line: "Two filters are on: owner is Emma Collins and status is archived.", action: "Clear filters" },
-    done: { title: "12 results for “Q3 roadmap”", line: "Filters cleared. Showing matches from every owner and status.", action: "Restore filters" },
+    idle: { title: "No results for “Q3 roadmap”", line: "Two filters are on: owner is Emma Collins and status is archived.", action: "Clear Filters" },
+    done: { title: "12 results for “Q3 roadmap”", line: "Filters cleared. Showing matches from every owner and status.", action: "Restore Filters" },
     loading: "", wait: 0,
   },
   offline: {
-    idle: { title: "You are offline", line: "Edits are saved on this device and sync when the connection returns.", action: "Try again" },
-    done: { title: "Back online", line: "Three edits synced to the Northwind workspace just now.", action: "Go offline" },
+    idle: { title: "You are offline", line: "Edits are saved on this device and sync when the connection returns.", action: "Try Again" },
+    done: { title: "Back online", line: "Three edits synced to the Northwind workspace just now.", action: "Go Offline" },
     loading: "Reaching sync.northwind.example…", wait: 1400,
   },
   inbox: {
-    idle: { title: "All caught up", line: "You have read every message in Inbox. New mail lands here first.", action: "Check for mail" },
-    done: { title: "Still all caught up", line: "Checked just now. Nothing new since 8:30 this morning.", action: "Check again" },
+    idle: { title: "All caught up", line: "You have read every message in Inbox. New mail lands here first.", action: "Check for Mail" },
+    done: { title: "Still all caught up", line: "Checked just now. Nothing new since 8:30 this morning.", action: "Check Again" },
     loading: "Checking for new mail…", wait: 1100,
   },
   map: {
-    idle: { title: "Page not found", line: "The link to /projects/atlas-2023 is broken, or the page has moved.", action: "Find the page" },
-    done: { title: "Found it in Archive", line: "Atlas 2023 roadmap moved to /archive/atlas-2023 in March.", action: "Show broken link" },
+    idle: { title: "Page not found", line: "The link to /projects/atlas-2023 is broken, or the page has moved.", action: "Find the Page" },
+    done: { title: "Found it in Archive", line: "Atlas 2023 roadmap moved to /archive/atlas-2023 in March.", action: "Show Broken Link" },
     loading: "Searching the workspace for Atlas…", wait: 1200,
   },
 };

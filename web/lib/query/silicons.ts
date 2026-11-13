@@ -40,7 +40,7 @@ export function useSilicon(uuid: string | null) {
 }
 
 /**
- * Creates a Silicon with me as custodian: `run(body)`. The answer's `stk` / `webhook_secret` are shown once, so the
+ * Creates a Silicon with me as custodian: `run(body)`. The answer's `stk` is shown once, so the
  * action is a secret mutation (never cached; a chosen STK in the input is not kept either). Same input, same key.
  */
 export function useCreateSilicon() {
@@ -97,37 +97,6 @@ export function useRotateStk() {
       refreshSilicons(client);
     },
     meta: { errorTitle: "Could not rotate the STK" },
-  });
-}
-
-/**
- * Sets a Silicon's webhook: `run({uuid, url})`; its new signing secret comes back once (a secret mutation). The PUT
- * takes no Idempotency-Key: a retry after a lost answer sets the same URL again with a fresh secret, and the unseen one
- * simply stops working.
- */
-export function useSetSiliconWebhook() {
-  const client = useQueryClient();
-  return useSecretMutation(({ uuid, url }: { uuid: string; url: string }) => api.me.silicons.setWebhook(uuid, url), {
-    onSuccess: (answer, { uuid }) => {
-      const change = (silicon: ManagedSilicon) => ({ ...silicon, webhook_url: answer.webhook_url });
-      client.setQueryData<ManagedSilicon>(queryKeys.me.silicon(uuid), silicon => (silicon ? change(silicon) : silicon));
-      client.setQueryData<Page<ManagedSilicon>>(queryKeys.me.silicons, page => (page ? { ...page, items: page.items.map(item => (item.uuid === uuid ? change(item) : item)) } : page));
-      void client.invalidateQueries({ queryKey: queryKeys.me.silicon(uuid) });
-      void client.invalidateQueries({ queryKey: queryKeys.me.silicons });
-    },
-    meta: { errorTitle: "Could not set the webhook" },
-  });
-}
-
-export function useRemoveSiliconWebhook() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (uuid: string) => api.me.silicons.removeWebhook(uuid),
-    onSuccess: (_result, uuid) => {
-      void client.invalidateQueries({ queryKey: queryKeys.me.silicon(uuid) });
-      void client.invalidateQueries({ queryKey: queryKeys.me.silicons });
-    },
-    meta: { errorTitle: "Could not remove the webhook" },
   });
 }
 

@@ -11,7 +11,7 @@
  *
  * They guard what the e2e walk and the UX audit found on these pages:
  *
- *   settings-delete   deleting the account on Settings lands on the signed-out landing page without calling
+ *   privacy-delete    deleting the account on Delete your account (/privacy/delete) lands on Your account is deleted (/goodbye) without calling
  *                     POST /v1/session/signout (the deletion already ended every session, so it could only answer 401,
  *                     which browsers log as a failed request) or any other /v1 call that fails
  *   silicon-tiles     every word a Silicon tile's button shows is part of its accessible name (WCAG 2.5.3, axe
@@ -201,31 +201,22 @@ const pageWords = (page: Page) => page.evaluate(`(() => {
   return parts.join("\\n");
 })()`) as Promise<string>;
 
-/** Presses and holds a button for `ms` with the mouse. */
-async function hold(page: Page, button: Locator, ms: number): Promise<void> {
-  await button.scrollIntoViewIfNeeded();
-  const box = await button.boundingBox();
-  if (!box) throw new Error("the hold button has no box");
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await sleep(ms);
-  await page.mouse.up();
-}
-
 /* ------------------------------------------------------------------------------------------------------------------ */
 /* Checks                                                                                                              */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
 const checks: Check[] = [
   {
-    name: "settings-delete: deleting the account lands on the signed-out landing page with no sign-out call and no failing request",
+    name: "privacy-delete: deleting the account lands on Your account is deleted (/goodbye) with no sign-out call and no failing request",
     run: async env => {
       const leaver = await newCarbon(env, "leaver");
       const { page } = leaver;
       try {
-        await visit(page, `${env.base}/settings`, "Settings");
+        await visit(page, `${env.base}/privacy/delete`, "Delete your account");
         const section = page.getByRole("region", { name: "Delete your account" });
-        await section.getByText(/Your account ends for good/).waitFor({ timeout: 20_000 });
+        await section.getByRole("button", { name: "Delete Account" }).click({ timeout: 20_000 });
+        const dialog = page.getByRole("dialog", { name: "Delete your account?" });
+        await dialog.getByLabel(/^Type .* to confirm$/).fill(leaver.id);
         const signouts: string[] = [];
         const failing: string[] = [];
         page.on("request", request => {
@@ -235,12 +226,12 @@ const checks: Check[] = [
           if (response.url().startsWith(`${env.base}/v1/`) && response.status() >= 400) failing.push(`${response.request().method()} ${new URL(response.url()).pathname} ${response.status()}`);
         });
         const deleted = page.waitForResponse(response => new URL(response.url()).pathname === "/v1/me" && response.request().method() === "DELETE", { timeout: 20_000 });
-        await hold(page, page.getByRole("button", { name: "Hold to delete your account" }), 2_600);
+        await dialog.getByRole("button", { name: "Delete Account" }).click();
         const answer = await deleted;
         expect(answer.status() === 204, `DELETE /v1/me answered ${answer.status()}, not 204`);
-        await page.waitForURL(`${env.base}/`, { timeout: 20_000 });
-        const landing = await page.getByRole("link", { name: /sign in/i }).first().waitFor({ timeout: 20_000 }).then(() => true, () => false);
-        expect(landing, "after the deletion the browser did not land on the signed-out landing page");
+        await page.waitForURL(`${env.base}/goodbye`, { timeout: 20_000 });
+        const landing = await page.getByRole("heading", { name: "Your account is deleted" }).waitFor({ timeout: 20_000 }).then(() => true, () => false);
+        expect(landing, "after the deletion the browser did not land on Your account is deleted");
         // Anything the old page or the landing page still asks for would show up by now.
         await sleep(1_500);
         expect(signouts.length === 0, `the site signed out a session the deletion had already ended: ${signouts.join(", ")}`);
@@ -373,7 +364,7 @@ const checks: Check[] = [
         const hits = words.split("\n").filter(line => people.test(line));
         if (hits.length) found.push(`${where}: ${hits.map(line => JSON.stringify(line.trim().slice(0, 120))).join(", ")}`);
       };
-      for (const [url, title] of [["/", "Your identity"], ["/sign-in-methods", "Sign-in methods"], ["/apps", "Apps you have signed into"], ["/proofs", "Proofs about you"], ["/silicons", "Silicons in your care"], ["/activity", "Activity"], ["/settings", "Settings"]] as const) {
+      for (const [url, title] of [["/personal", "Personal Info"], ["/sign-in-methods", "Security"], ["/apps", "Apps you have signed into"], ["/proofs", "Proofs about you"], ["/silicons", "Silicons in your care"], ["/activity", "Activity"], ["/privacy", "Data & privacy"]] as const) {
         await visit(page, `${env.base}${url}`, title);
         await look(url);
       }
@@ -386,12 +377,12 @@ const checks: Check[] = [
       expect(createText.includes("What Carbons, Silicons and apps type to find it."), `the Create a Silicon id field says: ${createText.slice(0, 400)}`);
       await look("/silicons, Create a Silicon");
       await page.keyboard.press("Escape");
-      await visit(page, `${env.base}/`, "Your identity");
-      await page.getByRole("button", { name: "Change id" }).first().click();
-      const change = page.getByRole("dialog", { name: "Change your id" });
+      await visit(page, `${env.base}/personal`, "Personal Info");
+      await page.getByRole("button", { name: /CarbonID/ }).first().click();
+      const change = page.getByRole("dialog", { name: "CarbonID" });
       await change.waitFor({ timeout: 10_000 });
       await settle(page, 300);
-      await look("/, Change your id");
+      await look("/personal, Change your CarbonID");
       await page.keyboard.press("Escape");
       expect(found.length === 0, `"people" words: ${found.join("; ")}`);
     },

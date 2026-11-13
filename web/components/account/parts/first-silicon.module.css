@@ -1,0 +1,24 @@
+/* "Create your first Silicon" (Anil, 2026-10-31), shown wherever there are no Silicons yet (Home, /silicons): a tall
+   banner of its own, apart from the brand's blues and violets: a deep forest
+   green into moss and warm sand (local colours, a tolerated difference, redesign/prototype-differences.md), with a fine
+   grain over it (SVG noise, overlay). On it, in light ink: the heading in Geist Serif (36px, on two balanced lines),
+   the line (medium), then the button. Clipped to the container squircle. */
+.first {
+  --sq-r: var(--radius-container);
+  --first-1: #0f2a1d; --first-2: #2f5d3a; --first-3: #c9b27c;
+  position: relative; isolation: isolate; display: grid; min-height: 208px; align-content: end; justify-items: start; gap: var(--space-group);
+  padding: var(--space-block); overflow: hidden;
+  background: linear-gradient(135deg, var(--first-1), var(--first-2) 55%, var(--first-3));
+  color: var(--neutral-0);
+}
+.first::after {
+  position: absolute; z-index: -1; inset: 0; content: ""; pointer-events: none; opacity: .6; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+.firstTitle { max-width: 12ch; margin: 0; color: var(--neutral-0); font: var(--display); letter-spacing: var(--display-tracking); font-family: var(--font-geist-serif), var(--font-display); text-wrap: balance; }
+.firstLine { max-width: 34ch; text-wrap: balance; margin: 0; color: color-mix(in oklab, var(--neutral-0) 82%, transparent); font: var(--small); letter-spacing: var(--small-tracking); }
+.firstAction { margin-top: var(--space-tight); }
+@media (max-width: 639px) {
+  .first { min-height: 184px; padding: var(--space-section); }
+}

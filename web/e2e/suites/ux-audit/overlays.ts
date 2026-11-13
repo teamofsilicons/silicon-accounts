@@ -5,14 +5,14 @@
  * a modal keeps Tab inside, every Tab stop in it shows focus (pixels, as _audit.ts focusPixels), and Escape closes it
  * and puts focus back on what opened it.
  *
- *   identity    "Change your id" (dialog)
- *   silicons    "Create a Silicon" (drawer); a Silicon's own drawer ("Manage si:…")
+ *   identity    "CarbonID" (dialog, from Personal info's CarbonID row)
+ *   silicons    a Silicon's page: Change its key (dialog), Hand it over (dialog)
  *   palette     "Search and jump" (⌘K), from the shell's search button
  *   sign-up     the date of birth picker and the timezone list (popovers of the hosted sign-up)
  *   developer   the developer site (briefcase's seeded owner): its command palette (⌘K), the apps home's "New app"
  *               dialog, a user's drawer on the Users tab, and the sign-in setup's History drawer
  *
- * Also the state a Carbon reaches through the "Create a Silicon" drawer: the generated STK, shown once on the page.
+ * Also the state a Carbon reaches through Create a Silicon (/silicons/new): the generated STK, shown once on its page.
  */
 import type { Journey } from "../../context";
 import { sleep } from "../../lib";
@@ -40,13 +40,14 @@ export const journeys: Journey[] = [
       const created = await pageFetch<{ silicon?: { id?: string } }>(page, "/v1/me/silicons", { method: "POST", body: { id: `si:uxa-overlay-${Date.now().toString(36)}`, display_name: silicon } });
       results.check("overlays: a Silicon to open", created.status === 200 || created.status === 201, `${created.status} ${JSON.stringify(created.body).slice(0, 120)}`);
 
-      await openAccountPage(ctx, page, "/", /./);
+      await openAccountPage(ctx, page, "/personal", /./);
       await auditOverlay(ctx, page, findings, {
         name: "overlay-identity-change-id",
-        trigger: p => p.getByRole("button", { name: "Change id", exact: true }).first(),
-        panel: p => p.getByRole("dialog", { name: "Change your id" }),
+        trigger: p => p.getByRole("link", { name: /^CarbonID/ }).first(),
+        panel: p => p.getByRole("dialog", { name: "CarbonID" }),
         kind: "modal",
       });
+      await openAccountPage(ctx, page, "/", /./);
       await auditOverlay(ctx, page, findings, {
         name: "overlay-palette",
         // The top bar's "Search and jump ⌘K" at 1440; the compact bar's search button on a phone.
@@ -55,32 +56,39 @@ export const journeys: Journey[] = [
         kind: "modal",
       });
 
-      await openAccountPage(ctx, page, "/silicons", /Silicon/);
-      await auditOverlay(ctx, page, findings, {
-        name: "overlay-create-silicon",
-        trigger: p => p.getByRole("button", { name: "Create a Silicon" }).first(),
-        panel: p => p.getByRole("dialog", { name: "Create a Silicon" }),
-        kind: "modal",
-      });
-      // Created from the drawer: the generated STK is shown exactly once, on the page (UNDERSTANDING.md "Silicon account").
+      // Created on /silicons/new (three steps): the generated STK is shown exactly once, on its page (UNDERSTANDING.md
+      // "Silicon account").
       {
         await applyVariant(page, VARIANTS[0]!);
-        await page.getByRole("button", { name: "Create a Silicon" }).first().click();
-        const drawer = page.getByRole("dialog", { name: "Create a Silicon" });
-        await drawer.waitFor({ timeout: 15_000 });
-        await drawer.getByRole("textbox", { name: "Display name" }).fill(`Reveal Scout ${Date.now().toString(36).slice(-4)}`);
+        await page.goto(`${env.site}/silicons/new`);
+        await page.getByRole("textbox", { name: "Name" }).fill(`Reveal Scout ${Date.now().toString(36).slice(-4)}`, { timeout: 30_000 });
+        await page.locator("main").getByText(/is available\./).first().waitFor({ timeout: 20_000 });
+        await page.getByRole("button", { name: "Continue", exact: true }).click();
+        await page.getByRole("button", { name: "Continue", exact: true }).click({ timeout: 10_000 });
+        // Create Silicon ignores a press right after its step opens (ARRIVAL_PAUSE: a double-click never creates one).
         await sleep(900);
-        await drawer.getByRole("button", { name: "Create Silicon", exact: true }).click();
-        await drawer.waitFor({ state: "hidden", timeout: 20_000 }).catch(() => undefined);
+        await page.getByRole("button", { name: "Create Silicon", exact: true }).click({ timeout: 10_000 });
         const stk = page.locator("main").getByText(/stk-[0-9a-f]{12}/).first();
         const shown = await stk.waitFor({ timeout: 20_000 }).then(() => true, () => false);
         results.check("silicons-stk-reveal: the generated STK is shown on the page once the Silicon exists", shown, (await page.locator("main").first().innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 300));
         for (const variant of [VARIANTS[0]!, VARIANTS[3]!]) await auditPage(ctx, page, findings, { name: "silicons-stk-reveal", variant, keepScroll: true });
       }
+      // A Silicon's page: its dialogs (Change its key on Access, Hand it over on Settings).
+      await openAccountPage(ctx, page, "/silicons", /Silicon/);
+      await page.getByRole("link", { name: new RegExp(silicon) }).first().click({ timeout: 15_000 });
+      await page.getByRole("region", { name: "Secret key", exact: true }).waitFor({ timeout: 20_000 });
       await auditOverlay(ctx, page, findings, {
-        name: "overlay-silicon-drawer",
-        trigger: p => p.getByRole("button", { name: /^Manage si:uxa-overlay-/ }).first(),
-        panel: p => p.getByRole("dialog", { name: silicon }),
+        name: "overlay-silicon-key",
+        trigger: p => p.getByRole("region", { name: "Secret key", exact: true }).getByRole("button", { name: "Change", exact: true }),
+        panel: p => p.getByRole("dialog", { name: /key\?$/ }),
+        kind: "modal",
+      });
+      await page.getByRole("tab", { name: "Settings" }).click();
+      await page.getByRole("region", { name: "About", exact: true }).waitFor({ timeout: 10_000 });
+      await auditOverlay(ctx, page, findings, {
+        name: "overlay-silicon-handover",
+        trigger: p => p.getByRole("button", { name: "Hand Over" }),
+        panel: p => p.getByRole("dialog", { name: /^Hand .* over$/ }),
         kind: "modal",
       });
       await carbon.context.close();
@@ -95,22 +103,9 @@ export const journeys: Journey[] = [
         const code = await sendEmailCode(env, signup, freshEmail("uxa.overlays.signup"));
         await signup.getByRole("textbox", { name: /digit 1 of 6/ }).first().click();
         await signup.keyboard.type(code, { delay: 25 });
-        await signup.getByRole("button", { name: "Create account" }).waitFor({ timeout: 30_000 });
+        await signup.getByRole("button", { name: /^Create account$/i }).waitFor({ timeout: 30_000 });
         await stepReady(signup);
-        await auditOverlay(ctx, signup, findings, {
-          name: "overlay-signup-date-of-birth",
-          trigger: p => p.getByRole("button", { name: /Date of birth/ }).first(),
-          panel: p => p.getByRole("dialog", { name: /Date of birth: choose a day/ }),
-          kind: "popover",
-          gridArrows: true,
-        });
-        await auditOverlay(ctx, signup, findings, {
-          name: "overlay-signup-timezone",
-          trigger: p => p.getByRole("combobox", { name: "Timezone" }),
-          key: "ArrowDown",
-          panel: p => p.getByRole("listbox").first(),
-          kind: "listbox",
-        });
+        // Sign-up asks only for the name and CarbonID since 2026-11-12: no date of birth or timezone overlays left on it.
         await context.close();
       }
 
@@ -124,7 +119,7 @@ export const journeys: Journey[] = [
         const code = await sendEmailCode(env, user, freshEmail("uxa.overlays.user"));
         await user.getByRole("textbox", { name: /digit 1 of 6/ }).first().click();
         await user.keyboard.type(code, { delay: 25 });
-        await user.getByRole("button", { name: "Create account" }).click({ timeout: 30_000 });
+        await user.getByRole("button", { name: /^Create account$/i }).click({ timeout: 30_000 });
         await user.getByRole("button", { name: "Share and continue" }).click({ timeout: 30_000 });
         await user.waitForURL(url => url.href.startsWith(`${env.apps}/briefcase/`), { timeout: 30_000 });
         await context.close();

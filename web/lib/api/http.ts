@@ -5,6 +5,7 @@
  *
  * Framework-free: the TanStack Query hooks (lib/query) and any plain code call these functions.
  */
+import { devAnswer, devFailure } from "../dev-states";
 import { ApiError, errorFromResponse, networkError } from "./errors";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -115,13 +116,20 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (options.auth) headers.Authorization = "basic" in options.auth ? basic(options.auth.basic.appId, options.auth.basic.secret) : `Bearer ${options.auth.bearer}`;
   const url = `${config.baseUrl}${path}${queryString(options.query)}`;
 
+  // Development only: the dev states (lib/dev-states.ts) may answer this read themselves, delay it, fail it, or change
+  // the API's answer. Production builds never ask.
+  const dev = process.env.NODE_ENV === "development" ? devAnswer(method, path) : null;
+  if (dev?.delay) await new Promise(resolve => setTimeout(resolve, dev.delay));
+  if (dev?.replace !== undefined) return dev.replace as T;
+
   let response: Response;
   try {
-    response = await fetch(url, { method, headers, body, credentials: "include", signal: options.signal, cache: "no-store" });
+    response = dev?.fail ? devFailure() : await fetch(url, { method, headers, body, credentials: "include", signal: options.signal, cache: "no-store" });
   } catch (error) {
     throw networkError(error, method, path);
   }
-  const parsed = await readBody(response).catch(() => null);
+  let parsed = await readBody(response).catch(() => null);
+  if (dev?.patch && response.ok) parsed = dev.patch(parsed);
   if (!response.ok) {
     const error = errorFromResponse(response, parsed, method, path);
     if (error.status === 401 && !options.quiet401) config.onUnauthenticated?.(error);

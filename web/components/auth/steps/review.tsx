@@ -7,7 +7,7 @@
  */
 import { useState } from "react";
 import { Check, Lock } from "lucide-react";
-import { Button } from "@/components/silicon-ui/button/button";
+import { Button } from "@teamofsilicons/silicon-ui/button";
 import type { ApiError } from "@/lib/api/errors";
 import type { ActionResult, FlowController } from "../flow/controller";
 import type { HostedFlow } from "../flow/model";
@@ -61,12 +61,12 @@ export function Review({ flow, ctl, notice }: ReviewProps) {
             </span>
             {field.field === "profile" || field.mode === "required" ? (
               <span className={styles.shareLock} title="Always shared">
-                <Lock size={14} strokeWidth={1.75} aria-hidden="true" />
+                <Lock size={14} strokeWidth={2} aria-hidden="true" />
                 <span>{field.field === "profile" ? "Always" : "Required"}</span>
               </span>
             ) : (
               <span className={styles.shareLock}>
-                <Check size={14} strokeWidth={1.75} aria-hidden="true" />
+                <Check size={14} strokeWidth={2} aria-hidden="true" />
                 <span>You chose</span>
               </span>
             )}
@@ -91,7 +91,7 @@ export function Review({ flow, ctl, notice }: ReviewProps) {
       <FlowAlert error={problem} app={app} onSwitch={() => ctl.switchAccount()} />
       <div className={styles.actions}>
         <Button className={styles.wide} loading={pending === "approve"} disabled={!!pending && pending !== "approve"} onClick={() => void act("approve", () => ctl.review(true))}>
-          Share and continue
+          Share and Continue
         </Button>
         <Button variant="secondary" className={styles.wide} loading={pending === "back"} disabled={!!pending && pending !== "back"} onClick={() => void act("back", () => ctl.detailsBack())}>
           Back

@@ -351,7 +351,7 @@ export interface Meta {
   docs_url?: string | null;
   /**
    * The developer site (ACCOUNTS_DEVELOPER_URL; https://developers.teamofsilicons.com, http://localhost:8600 in
-   * development), where apps' sign-in is set up. The dock's Developer item and /developer[/*] lead there. Optional for
+   * development), where apps' sign-in is set up. The sidebar's Developers link and /developer[/*] lead there. Optional for
    * servers before it existed (the site then uses the production address).
    */
   developer_url?: string | null;
@@ -833,13 +833,6 @@ export interface WebhookTestQueued {
   type: "ping";
 }
 
-/** `POST /v1/me/webhook/test` (202), a Silicon's own webhook. */
-export interface SiliconWebhookTestQueued extends WebhookTestQueued {
-  url: string;
-  /** Older pings that were still waiting and were dropped for this one. */
-  superseded_pings: number;
-}
-
 /** The body Silicon Accounts POSTs to a webhook (headers carry X-Accounts-Signature: v1=<hex>). */
 export interface WebhookEvent {
   event_id: string;
@@ -1260,12 +1253,6 @@ export interface StkRotated {
   rotated_at: Timestamp;
   /** Sessions and token families that were signed out. */
   revoked_sessions: number;
-}
-
-export interface SiliconWebhook {
-  webhook_url: string;
-  /** `whsec_…`, shown once each time the URL is set. */
-  webhook_secret: string;
 }
 
 /** A custodian request as Carbons see it (incoming requests, and a new transfer). */

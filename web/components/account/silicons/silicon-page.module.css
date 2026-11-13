@@ -1,0 +1,24 @@
+/* /silicons/[uuid], one Silicon's page (silicon-page.tsx, Anil 2026-11-12), on the account pages' rows
+   (parts/rows.module.css). Only what those rows don't draw is here: the intro under the page bar, the tabs' spacing,
+   the secrets shown once, and the dialogs' forms and actions. */
+.alertAction { display: block; margin-top: var(--space-group); }
+.skeleton { margin-top: var(--space-section); }
+
+/* Its mark beside its si:id, its status and since when it is in your care. */
+.intro { display: flex; min-width: 0; align-items: center; gap: var(--space-group); margin-top: var(--space-section); }
+.introText { display: grid; min-width: 0; gap: 0; }
+.introTitle { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-related); color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); }
+.introLine { min-width: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+
+.reveals { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
+.tabs { margin-top: var(--space-block); }
+/* Each tab's sections in the page column's 16px grid, so they sit 32px apart as on every account page. */
+.panel { display: grid; gap: var(--space-inset); }
+
+/* In a dialog: its fields, then Cancel and the action at the end. */
+.form { display: grid; min-width: 0; gap: var(--space-inset); }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); padding-top: var(--space-related); }
+.start { justify-self: start; }
+/* The Photo dialog's other ways, as link buttons in a row under the upload. */
+.photoLinks { display: flex; flex-wrap: wrap; gap: var(--space-related) var(--space-group); }
+.error { margin: 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); }

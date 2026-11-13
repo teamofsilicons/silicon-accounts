@@ -1,0 +1,21 @@
+/* /__links (links-lab.tsx): three columns, each a dialog-like surface with the phone field and the code step's actions. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; justify-items: start; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: var(--space-block); }
+.column { display: grid; align-content: start; gap: var(--space-group); min-width: 0; }
+.columnHead { display: grid; gap: var(--space-hair); }
+.columnName { margin: 0; font: var(--label); letter-spacing: var(--label-tracking); }
+.note { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+
+.dialog { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; gap: var(--space-inset); padding: var(--space-section); border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.dialogTitle { margin: 0; font: var(--h2); letter-spacing: var(--h2-tracking); }
+.field { display: grid; gap: var(--space-related); }
+.start { justify-self: start; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-related) var(--space-inset); padding-top: var(--space-inset); border-top: 1px solid var(--border-subtle); }
+.end { display: flex; gap: var(--space-related); }
+
+/* The variant's own knob: no underline at rest, so it shows on hover and focus only. */
+.hoverOnly { --button-link-underline: transparent; }

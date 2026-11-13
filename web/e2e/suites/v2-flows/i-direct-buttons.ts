@@ -18,15 +18,17 @@ async function offered(page: Page): Promise<{ google: boolean; apple: boolean; c
   await live(page, "main h1").first().waitFor({ timeout: 30_000 });
   await page.waitForTimeout(400);
   const visible = async (locator: ReturnType<Page["getByRole"]>) => locator.first().isVisible().catch(() => false);
-  const email = page.getByRole("textbox", { name: "Email", exact: true });
+  // Both offered: one "Email or phone" field (2026-11-12); `choice` is whether that field is there, `email` its value.
+  const either = page.getByRole("textbox", { name: "Email or phone", exact: true });
+  const email = (await either.first().isVisible().catch(() => false)) ? either : page.getByRole("textbox", { name: "Email", exact: true });
   const phone = page.getByRole("textbox", { name: "Phone number", exact: true });
   return {
     google: await visible(page.getByRole("button", { name: "Continue with Google", exact: true })),
     apple: await visible(page.getByRole("button", { name: "Continue with Apple", exact: true })),
-    choice: await visible(page.getByRole("button", { name: "Phone", exact: true })),
+    choice: await visible(either),
     email: (await visible(email)) ? await email.first().inputValue() : null,
     phone: (await visible(phone)) ? await phone.first().inputValue() : null,
-    otherWays: await visible(page.getByRole("button", { name: /^Other ways to sign (in|up)$/ })),
+    otherWays: await visible(page.getByRole("button", { name: /^Other ways to sign (in|up)$/i })),
   };
 }
 
@@ -49,7 +51,7 @@ export const journey: Journey = {
     let flow = await waitForFlow(page, f => f.step === "choose_method", "the email page");
     let seen = await offered(page);
     results.check("Continue with email asks method=email, and the flow keeps it as method_hint", emailHref.searchParams.get("method") === "email" && flow.method_hint === "email", `${emailHref.searchParams.get("method")} → ${flow.method_hint}`);
-    results.check("…the page opens on the email field alone, empty: no Google or Apple buttons, no Email | Phone choice", seen.email === "" && seen.phone === null && !seen.google && !seen.apple && !seen.choice, JSON.stringify(seen));
+    results.check("…the page opens on the email field alone, empty: no Google or Apple buttons, no Email or phone field", seen.email === "" && seen.phone === null && !seen.google && !seen.apple && !seen.choice, JSON.stringify(seen));
     results.check("…with \"Other ways to sign in\"", seen.otherWays, JSON.stringify(seen));
     results.check("…under briefcase's usual title", (await hostedTitle(page)) === "Sign in to Briefcase", await hostedTitle(page));
     await settle(page);
@@ -57,7 +59,7 @@ export const journey: Journey = {
     await page.getByRole("button", { name: "Other ways to sign in" }).click();
     await page.waitForTimeout(500);
     seen = await offered(page);
-    results.check("Other ways to sign in shows every method: Google, Apple and the Email | Phone choice", seen.google && seen.apple && seen.choice && !seen.otherWays, JSON.stringify(seen));
+    results.check("Other ways to sign in shows every method: Google, Apple and the Email or phone field", seen.google && seen.apple && seen.choice && !seen.otherWays, JSON.stringify(seen));
 
     // Continue with phone number.
     const phoneHref = await startAtApp(env, page, "briefcase", { method: "phone" });
@@ -71,7 +73,7 @@ export const journey: Journey = {
     const email = freshEmail("direct");
     await startAtApp(env, page, "briefcase", { method: "email" });
     await codeSignIn(env, page, { email });
-    await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+    await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
     await waitForDetailsPage(page);
     await button(page, "Share and continue").click();
     const outcome = await backAtApp(env, page, "briefcase");

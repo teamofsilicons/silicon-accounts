@@ -213,7 +213,7 @@ const google: Journey = {
     await startAtApp(env, otherPage, "quill-docs", { method: "google" });
     await live(otherPage, '[data-opening="google"]').first().waitFor({ timeout: 30_000 });
     await otherPage.getByRole("button", { name: "Other ways to sign in" }).click({ timeout: 5_000 }).catch(() => undefined);
-    const field = otherPage.getByRole("textbox", { name: "Email" });
+    const field = otherPage.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     const methods = await field.waitFor({ timeout: 10_000 }).then(() => true, () => false);
     await sleep(1_500);
     results.check("\"Other ways to sign in\" on the Opening page shows quill-docs' methods (the email field) and stays there", methods && otherPage.url().startsWith(env.site) && (await field.isVisible()), otherPage.url());

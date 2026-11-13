@@ -22,14 +22,14 @@ const email: Journey = {
 
     const started = Date.now();
     await startAtApp(env, page, "briefcase");
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     results.check("the hosted link lands on /authorize/flow/{id}", /\/authorize\/flow\/[A-Za-z0-9_-]+$/.test(new URL(page.url()).pathname), page.url());
     const heading = await hostedTitle(page);
     results.check("the methods page is the sign-in version: \"Sign in to Briefcase\"", heading === "Sign in to Briefcase", heading);
     let after = await lastSeq(env);
     await field.fill(`  Ada.Lovelace.${t.toUpperCase()}@Example.TEST `);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const sentAt = Date.now();
     const code = await codeFor(env, address, after);
     results.metric("email code: Continue → code in the mock inbox", Date.now() - sentAt);
@@ -40,15 +40,15 @@ const email: Journey = {
     results.check("the code step says \"Check your email\" with the masked address, never the whole one", (await hostedTitle(page)) === "Check your email" && shown.includes("a***@example.test") && !shown.includes(address), shown.slice(0, 200));
     await page.keyboard.type(code, { delay: 25 });
 
-    const idField = page.getByRole("textbox", { name: "Your id" });
+    const idField = page.getByRole("textbox", { name: "Your CarbonID" });
     await idField.waitFor({ timeout: 20_000 });
     await sleep(500);
     await shot(env, page, "auth-flows-email-01-signup");
     const id = await idField.inputValue();
-    const name = await page.getByRole("textbox", { name: "Display name" }).inputValue();
+    const name = await page.getByRole("textbox", { name: "Your name" }).inputValue();
     results.check("sign-up: the id comes from the email's local part", id === `ada-lovelace-${t}`, id);
     results.check("sign-up: the display name comes from the email's local part, title-cased", name === `Ada Lovelace ${titleCase(t)}`, name);
-    await page.getByRole("button", { name: "Create account" }).click();
+    await page.getByRole("button", { name: /^Create account$/i }).click();
 
     const walk = await completeDetails(env, page, "briefcase", { shotName: "auth-flows-email-02" });
     const rows = walk.pages[0]?.rows ?? [];
@@ -76,7 +76,7 @@ const email: Journey = {
     lap("hosted page → Use another account");
     after = await lastSeq(env);
     await field.fill(address.toUpperCase());
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const again = await codeFor(env, address, after);
     lap("code sent and received");
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
@@ -193,28 +193,28 @@ const phone: Journey = {
     const number = `+1415555${digits}`;
 
     await startAtApp(env, page, "dm");
-    const field = page.getByRole("textbox", { name: "Phone number" });
+    // One "Email or phone" field (2026-11-12): a number with its "+" goes as typed.
+    const field = page.getByRole("textbox", { name: "Email or phone" });
     await field.waitFor({ timeout: 30_000 });
-    results.check("dm's page opens on the phone field (phone comes first in its order)", await field.isVisible());
+    results.check("dm's page has the one Email or phone field", await field.isVisible());
     const after = await lastSeq(env);
-    await field.click();
-    await page.keyboard.type(number, { delay: 25 });
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await field.fill(number);
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code = await codeFor(env, number, after);
     results.check("the SMS reached the E.164 number", /^\d{6}$/.test(code), number);
     await page.getByRole("group", { name: /Code from the text message/ }).first().waitFor({ timeout: 15_000 });
     const masked = (await page.locator("main").innerText()).replace(/\s+/g, " ");
     results.check("the code step says \"Check your phone\" and shows the masked number", (await hostedTitle(page)) === "Check your phone" && masked.includes(digits) && !masked.includes(number.slice(2, 8)), masked.slice(0, 200));
     await page.keyboard.type(code, { delay: 25 });
-    const idField = page.getByRole("textbox", { name: "Your id" });
+    const idField = page.getByRole("textbox", { name: "Your CarbonID" });
     await idField.waitFor({ timeout: 20_000 });
     await sleep(400);
-    const name = await page.getByRole("textbox", { name: "Display name" }).inputValue();
+    const name = await page.getByRole("textbox", { name: "Your name" }).inputValue();
     const id = await idField.inputValue();
     results.check("sign-up by phone: display name \"Carbon <last 4 digits>\"", name === `Carbon ${digits}`, name);
     results.check("sign-up by phone: id from the display name (carbon-<digits>, numbered if taken)", id === `carbon-${digits}` || id.startsWith(`carbon-${digits}-`), id);
     await shot(env, page, "auth-flows-phone-01-signup");
-    await page.getByRole("button", { name: "Create account" }).click();
+    await page.getByRole("button", { name: /^Create account$/i }).click();
     const walk = await completeDetails(env, page, "dm");
     const rows = walk.pages[0]?.rows ?? [];
     results.check("dm's page shows the required phone present and masked (the sign-up proved it), the email optional and missing", rows.some(r => r.field === "phone" && r.mode === "required" && !r.missing && r.text.includes(`+14*****${digits}`) && !r.text.includes(number)) && rows.some(r => r.field === "email" && r.missing), JSON.stringify(rows));

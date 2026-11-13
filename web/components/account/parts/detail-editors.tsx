@@ -11,13 +11,13 @@
  * that list or calendar; the next Escape closes the popover (components/silicon-ui/lib/escape.ts).
  */
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Avatar } from "@/components/silicon-ui/avatar/avatar";
-import { Button } from "@/components/silicon-ui/button/button";
-import { Combobox } from "@/components/silicon-ui/combobox/combobox";
-import { DatePicker } from "@/components/silicon-ui/date-picker/date-picker";
-import { Input } from "@/components/silicon-ui/input/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/silicon-ui/popover/popover";
-import { Select } from "@/components/silicon-ui/select/select";
+import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Combobox } from "@teamofsilicons/silicon-ui/combobox";
+import { DatePicker } from "@teamofsilicons/silicon-ui/date-picker";
+import { Input } from "@teamofsilicons/silicon-ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@teamofsilicons/silicon-ui/popover";
+import { Select } from "@teamofsilicons/silicon-ui/select";
 import { timezoneOptions } from "@/lib/timezones";
 import { describeError } from "./common";
 import partStyles from "./parts.module.css";
@@ -120,8 +120,8 @@ export function TimezoneForm({ value, onSave, onDone, autoFocus }: TimezoneFormP
       <Combobox label="Timezone" options={options} value={draft} onValueChange={next => { setDraft(next); setError(null); }} placeholder="Search a city or an offset" />
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.actions}>
-        <Button variant="ghost" size="sm" onClick={onDone} disabled={pending}>Cancel</Button>
-        <Button size="sm" onClick={() => void save()} loading={pending} disabled={!draft || draft === value}>Save timezone</Button>
+        <Button variant="ghost" onClick={onDone} disabled={pending}>Cancel</Button>
+        <Button onClick={() => void save()} loading={pending} disabled={!draft || draft === value}>Save Timezone</Button>
       </div>
     </div>
   );
@@ -175,7 +175,8 @@ function withYear(date: Date, year: number): Date {
 /** The API accepts dates after 1900-01-01 and before today. */
 const MIN_DOB = new Date(1900, 0, 2);
 
-function DobForm({ value, onSave, onDone }: { value: string; onSave: (dob: string) => Promise<unknown>; onDone: () => void }) {
+/** The date of birth's year list and calendar with Save and Cancel (in a popover, or in Personal info's dialog). */
+export function DobForm({ value, onSave, onDone }: { value: string; onSave: (dob: string) => Promise<unknown>; onDone: () => void }) {
   const [bounds] = useState(() => {
     const today = new Date();
     return { max: new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1), year: today.getFullYear() };
@@ -219,7 +220,7 @@ function DobForm({ value, onSave, onDone }: { value: string; onSave: (dob: strin
       {error ? <p className={styles.error} role="alert">{error}</p> : draft && !changed ? <span className={styles.hint}>Pick a different date to save it.</span> : null}
       <div className={styles.actions}>
         <Button variant="ghost" size="sm" onClick={onDone} disabled={pending}>Cancel</Button>
-        <Button size="sm" onClick={() => void save()} loading={pending} disabled={!changed}>Save date</Button>
+        <Button size="sm" onClick={() => void save()} loading={pending} disabled={!changed}>Save Date</Button>
       </div>
     </div>
   );
@@ -349,7 +350,7 @@ export function PhotoUrlForm({ value, name, onSave, onDone, autoFocus }: PhotoUr
       ) : null}
       <div className={styles.actions}>
         <Button type="button" variant="ghost" size="sm" onClick={onDone} disabled={pending}>Cancel</Button>
-        <Button type="submit" size="sm" loading={pending} disabled={!url || url === value}>Save photo</Button>
+        <Button type="submit" size="sm" loading={pending} disabled={!url || url === value}>Save Photo</Button>
       </div>
     </form>
   );

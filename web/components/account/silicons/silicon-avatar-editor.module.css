@@ -1,0 +1,13 @@
+/* Making a Silicon's avatar (silicon-avatar-editor.tsx): the avatar large on a light wash, then its controls as rows
+   (a label at the start, the control at the end), then the dialog's actions. */
+.maker { display: grid; gap: var(--space-inset); }
+.stage { --sq-r: var(--radius-container); --sq-fill: var(--surface-muted); display: grid; place-items: center; padding: var(--space-block) 0; background: var(--sq-fill); }
+.avatar { width: calc(var(--space-page) * 5); }
+.controls { display: grid; gap: var(--space-related); }
+.row { display: flex; min-height: var(--control-height-sm); align-items: center; justify-content: space-between; gap: var(--space-group); }
+.rowLabel { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.stepper { display: inline-flex; align-items: center; gap: var(--space-related); }
+.value { min-width: 6rem; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-align: center; }
+.shuffle.shuffle { justify-self: start; }
+.error { margin: 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); padding-top: var(--space-related); }

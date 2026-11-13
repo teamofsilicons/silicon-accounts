@@ -1,398 +1,406 @@
 "use client";
 
 /**
- * The identity home ("/" signed in): your identity as an object. The card carries your photo (drop a new one on it),
- * your display name (edit it in place), your id (change it; the old one stays reserved for you for 10 days), your
- * uuid, the time where you are, and a stamp for every app you have signed into. Turn it over for your emails, phone
- * numbers and date of birth. Beside it: requests waiting for you, counts that open each section, and your latest
- * activity.
+ * Personal info (/personal), built to the lead designer's prototype (redesign/prototype-v7.html: personal, .scard,
+ * .srow) on Silicon UI (Anil, 2026-11-09): the page bar (parts/page-bar.tsx), then a Silicon UI Card per group with its
+ * rows. Silicon UI has no settings row yet (redesign/requests/silicon-ui-settings-list.md), so the rows are drawn here
+ * with tokens and the type roles until it ships. Each whole row opens its editor in a dialog: a row is a
+ * link to `?edit=<field>`, and the dialog follows the address (closing it drops the parameter, and focus goes back to
+ * the row), so an editor can be linked to, as from the palette's "Change your id".
+ *
+ * - Profile: photo, name, public id (the old one stays reserved for 10 days), date of birth, timezone.
+ * - Contact (a Carbon's): every email, then every phone number, the primary one marked when there are several; the
+ *   dialog makes one primary, removes one or adds one with a code. A Carbon without a phone gets "Add a phone".
+ *
+ * A Silicon sees Profile only: it has no emails or phone numbers.
+ *
+ * A work account (one an org owns, `me.org`) can't change its CarbonID: its org manages it, so the row only says so
+ * and the palette has no "Change your CarbonID" (from main's work accounts, 2026-11-03). "Your Accounts" leads to
+ * /linked-accounts, the personal and work accounts this one can switch between.
  */
-import { useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, AtSign, Inbox } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { AnimatedCounter } from "@/components/silicon-ui/animated-counter/animated-counter";
-import { Badge } from "@/components/silicon-ui/badge/badge";
-import { Button } from "@/components/silicon-ui/button/button";
-import { Dialog, DialogContent } from "@/components/silicon-ui/dialog/dialog";
-import { InlineEdit } from "@/components/silicon-ui/inline-edit/inline-edit";
-import { TextMorph } from "@/components/silicon-ui/text-morph/text-morph";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AtSign, ChevronRight, UsersRound } from "lucide-react";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
+import { Badge } from "@teamofsilicons/silicon-ui/badge";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Calendar } from "@teamofsilicons/silicon-ui/calendar";
+import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
+import { Input } from "@teamofsilicons/silicon-ui/input";
+import { Select } from "@teamofsilicons/silicon-ui/select";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { IdentityCard, IdentityField, LiveClock, StampRow, useIdentityCard, type StampProps } from "@/components/foundation/identity/identity-card";
-import { Page, PageHeader } from "@/components/foundation/layout/layout";
-import { useTheme } from "@/components/foundation/theme/use-theme";
-import { api } from "@/lib/api/endpoints";
-import type { Me, MyApp } from "@/lib/api/types";
+import { Page } from "@/components/foundation/layout/layout";
+import type { CarbonMe, Me } from "@/lib/api/types";
+import { useCarbonPicture } from "@/lib/carbon-avatar";
 import { useRegisterCommands } from "@/lib/commands";
-import { formatDate, formatPhone, formatRelative, kindNoun, plural } from "@/lib/format";
 import { paths } from "@/lib/navigation";
+import { formatDate, formatPhone } from "@/lib/format";
 import { useRemovePhoto, useUpdateProfile, useUploadPhoto } from "@/lib/query/account";
 import { useMe } from "@/lib/query/session";
-import { timezoneLabel, utcOffset } from "@/lib/timezones";
-import { appLogo, asCarbon, asSilicon, describeError, readableTimes, reasonError, stkRotatedAt, useNow } from "../parts/common";
-import { DobEditor, TimezoneEditor } from "../parts/detail-editors";
+import { asCarbon, describeError } from "../parts/common";
+import { TimezoneForm } from "../parts/detail-editors";
 import { IdChangeForm } from "../parts/id-change-form";
+import { PageBar } from "../parts/page-bar";
 import { PhotoControl } from "../parts/photo-control";
-import { useChangeOwnId, useEveryApp, useEveryCustodianRequest } from "../parts/queries";
-import partStyles from "../parts/parts.module.css";
+import { useChangeOwnId } from "../parts/queries";
+import { ContactList } from "../sign-in-methods/sign-in-methods";
+import { AvatarEditor } from "./avatar-editor";
+import { LinkRow, Section, Tile } from "../parts/rows";
 import styles from "./identity.module.css";
 
 const RESERVED_DAYS = 10;
-/** Ids longer than this get the card's whole row, so they show in full instead of fading out at the column's edge. */
-const LONG_ID = 12;
+
+const EDITORS = ["photo", "name", "id", "dob", "timezone", "emails", "phones"] as const;
+type Editor = (typeof EDITORS)[number];
+const editorOf = (value: string | null): Editor | null => (EDITORS as readonly string[]).includes(value ?? "") ? value as Editor : null;
+const editHref = (editor: Editor) => `${paths.personal}?edit=${editor}`;
 
 function validateName(next: string): string | null {
-  if (!next) return "Enter a display name.";
-  if (next.length > 100) return `A display name can be at most 100 characters (this one has ${next.length}).`;
+  if (!next) return "Enter a name.";
+  if (next.length > 100) return `A name can be at most 100 characters (this one has ${next.length}).`;
   if (/[\u0000-\u001f\u007f]/.test(next)) return "Remove tabs, line breaks and other control characters.";
   return null;
 }
 
 export function Identity() {
   const me = useMe();
-  const apps = useEveryApp();
-  const { theme } = useTheme();
-  const [changingId, setChangingId] = useState(false);
+  const router = useRouter();
+  const editing = editorOf(useSearchParams().get("edit"));
   const [reserved, setReserved] = useState<{ id: string; until: number } | null>(null);
-  const idInput = useRef<HTMLInputElement>(null);
-  const changeId = useChangeOwnId();
 
-  useRegisterCommands(() => me.data?.org ? [] : [
-    { id: "identity.change-id", label: "Change your id", description: "Pick a new id; the old one stays reserved for you for 10 days", group: "Identity", icon: <AtSign size={16} strokeWidth={1.75} />, keywords: ["id", "handle", "username", "rename"], run: () => setChangingId(true) },
-  ], [me.data?.org]);
-
-  // Apps with a logo of their own come first; the rest follow as their letter, in the order the service gave.
-  const stamps: StampProps[] = (apps.data?.items ?? [])
-    .filter(item => item.status === "active")
-    .map(item => ({ name: item.app.name, logoUrl: appLogo(item.app, theme), seed: item.app.app_id, href: `${paths.apps}#app-${item.app.app_id}` }))
-    .sort((a, b) => Number(!a.logoUrl) - Number(!b.logoUrl));
+  const org = me.data?.org ?? null;
+  useRegisterCommands(() => org ? [] : [
+    { id: "identity.change-id", label: "Change your CarbonID", description: "Pick a new CarbonID; the old one stays reserved for you for 10 days", group: "Identity", icon: <AtSign size={16} strokeWidth={2} />, keywords: ["id", "handle", "username", "rename"], run: () => router.push(editHref("id"), { scroll: false }) },
+  ], [router, org]);
 
   const account = me.data;
+  const carbon = asCarbon(account);
+  const picture = useCarbonPicture(account);
+  const close = () => router.replace(paths.personal, { scroll: false });
+
   return (
-    <Page>
-      <PageHeader title="Your identity" description={me.data?.org ? `Your work account in ${me.data.org.name}. Your org manages its handle and app access.` : "One account for every app you use. Apps keep your uuid; your id is yours to change."} actions={<Link href="/linked-accounts">Your accounts →</Link>} />
-      {me.error && !account ? (
-        <Alert tone="danger" title="Your account did not load">
-          {describeError(me.error)}
-          <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try again</Button></span>
-        </Alert>
-      ) : !account ? (
-        <LayoutSkeleton />
-      ) : (
-        <div className={styles.layout}>
-          <IdentityCard
-            label={`Identity card of ${account.id ?? account.display_name}`}
-            front={(
-              <Front
-                me={account}
-                stamps={stamps}
-                appsLoading={apps.isPending}
-                appsFailed={!apps.data && !!apps.error}
-                onRetryApps={() => void apps.refetch()}
-                reserved={reserved}
-                onChangeId={() => setChangingId(true)}
-              />
-            )}
-            back={<Back me={account} />}
-          />
-          <Glance me={account} apps={apps.data?.items} appsFailed={!apps.data && !!apps.error} />
-          <Dialog open={changingId} onOpenChange={setChangingId}>
-            <DialogContent
-              title="Change your id"
-              description={account.id ? `Your id is ${account.id} now.` : "Pick the id Carbons and Silicons will type to find you."}
-              onOpenAutoFocus={event => {
-                event.preventDefault();
-                requestAnimationFrame(() => idInput.current?.focus());
-              }}
-            >
-              <IdChangeForm
-                prefix={account.kind === "carbon" ? "c:" : "si:"}
-                currentId={account.id}
-                uuid={account.uuid}
-                subject="self"
-                inputRef={idInput}
-                submit={id => changeId.mutateAsync(id)}
-                onChanged={(_, previous) => {
-                  setChangingId(false);
-                  if (previous) setReserved({ id: previous, until: Date.now() + RESERVED_DAYS * 86_400_000 });
-                }}
-                onCancel={() => setChangingId(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
+    <div>
+      <PageBar title="Personal Info" />
+      <Page>
+        {me.error && !account ? (
+          <Alert tone="danger" title="Your account did not load">
+            {describeError(me.error)}
+            <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try Again</Button></span>
+          </Alert>
+        ) : !account ? (
+          <PageSkeleton />
+        ) : (
+          <>
+            <Box title="Profile">
+              <Row label="Photo" edit="photo"><Avatar name={account.display_name} src={picture?.src ?? account.pfp_url} size="md" /></Row>
+              <Row label="Name" edit="name">{account.display_name}</Row>
+              <Row
+                label="CarbonID"
+                edit={org ? undefined : "id"}
+                detail={org ? <>Managed by {org.name}</> : reserved ? <><span className="mono">{reserved.id}</span> stays reserved for you until {formatDate(reserved.until)}.</> : undefined}
+              >
+                <span className="mono">{account.id ?? account.uuid}</span>
+              </Row>
+              <Row label="Date of birth" edit="dob">{account.dob ? formatDate(`${account.dob}T12:00:00Z`) : <span className={styles.muted}>Not added</span>}</Row>
+              <Row label="Timezone" edit="timezone">{account.timezone}</Row>
+            </Box>
+            {carbon ? <ContactBox carbon={carbon} /> : null}
+            <div className={styles.accounts}>
+              <LinkRow href={paths.linkedAccounts} lead={<Tile><UsersRound size={16} strokeWidth={2} /></Tile>} title="Your Accounts" detail="Your personal and work accounts, and switching between them" />
+            </div>
+            <Editors me={account} editing={org && editing === "id" ? null : editing} onClose={close} onReserved={setReserved} />
+          </>
+        )}
+      </Page>
+    </div>
+  );
+}
+
+function ContactBox({ carbon }: { carbon: CarbonMe }) {
+  const emails = [...carbon.emails].sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+  const phones = [...carbon.phones].sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+  const primary = <Badge size="sm" tone="neutral">Primary</Badge>;
+  return (
+    <Box title="Contact">
+      {emails.map((item, index) => (
+        <Row key={item.email} label={index === 0 ? "Email" : ""} edit="emails" end={item.is_primary && emails.length > 1 ? primary : null}>{item.email}</Row>
+      ))}
+      {phones.length ? phones.map((item, index) => (
+        <Row key={item.phone} label={index === 0 ? "Phone" : ""} edit="phones" end={item.is_primary && phones.length > 1 ? primary : null}>{formatPhone(item.phone)}</Row>
+      )) : (
+        <Row label="Phone" edit="phones"><span className={styles.muted}>Add a phone</span></Row>
       )}
-    </Page>
+    </Box>
+  );
+}
+
+/** The prototype's .scard as the account pages' section (parts/rows.tsx, 2026-11-12): an h2 over a boxed list of rows. */
+function Box({ title, children }: { title: string; children: ReactNode }) {
+  return <Section id={`personal-${title.toLowerCase()}`} title={title}>{children}</Section>;
+}
+
+/** The prototype's .srow: the whole row opens its editor (a link to ?edit=…), label, value, chevron. */
+function Row({ label, edit, detail, end, children }: { label: string; edit?: Editor; detail?: ReactNode; end?: ReactNode; children: ReactNode }) {
+  // Without an editor (a work account's CarbonID), the row only shows its value: no link, no chevron.
+  if (!edit) return (
+    <li className={styles.item}>
+      <div className={`${styles.row} ${styles.fixed}`}>
+        <span className={styles.label}>{label}</span>
+        <span className={styles.value}>
+          {children}
+          {detail ? <span className={styles.detail}>{detail}</span> : null}
+        </span>
+        {end}
+      </div>
+    </li>
+  );
+  return (
+    <li className={styles.item}>
+      <Link href={editHref(edit)} replace scroll={false} className={styles.row} data-edit={edit}>
+        <span className={styles.label}>{label}</span>
+        <span className={styles.value}>
+          {children}
+          {detail ? <span className={styles.detail}>{detail}</span> : null}
+        </span>
+        {end}
+        <ChevronRight className={styles.chevron} size={16} strokeWidth={2} aria-hidden="true" />
+      </Link>
+    </li>
   );
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* The card                                                                                                            */
+/* The editors, one dialog each, with the prototype's words                                                            */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-interface FrontProps {
+interface EditorsProps {
   me: Me;
-  stamps: StampProps[];
-  appsLoading: boolean;
-  appsFailed: boolean;
-  onRetryApps: () => void;
-  reserved: { id: string; until: number } | null;
-  onChangeId: () => void;
+  editing: Editor | null;
+  onClose: () => void;
+  onReserved: (reserved: { id: string; until: number }) => void;
 }
 
-function Front({ me, stamps, appsLoading, appsFailed, onRetryApps, reserved, onChangeId }: FrontProps) {
-  const card = useIdentityCard();
+function Editors({ me, editing, onClose, onReserved }: EditorsProps) {
   const update = useUpdateProfile();
   const upload = useUploadPhoto();
   const removePhoto = useRemovePhoto();
-  const id = me.id ?? "";
-  const saveName = async (next: string) => {
+  const changeId = useChangeOwnId();
+  const idInput = useRef<HTMLInputElement>(null);
+  const carbon = asCarbon(me);
+  const dialog = (editor: Editor) => ({ open: editing === editor, onOpenChange: (next: boolean) => { if (!next) onClose(); } });
+  /** Closing hands focus back to the row that opened the editor (the rows open it by address, not as a trigger). */
+  const backToRow = (editor: Editor) => (event: Event) => {
+    const row = document.querySelector<HTMLElement>(`[data-edit="${editor}"]`);
+    if (!row) return;
+    event.preventDefault();
+    row.focus({ preventScroll: true });
+  };
+
+  return (
+    <>
+      <Dialog {...dialog("photo")}>
+        <DialogContent title="Photo" description={carbon ? "Apps show this next to your name. Make your avatar, or use a photo." : "Apps show this next to your name. Upload a PNG, JPEG, WebP or GIF."} onCloseAutoFocus={backToRow("photo")}>
+          {carbon ? (editing === "photo" ? <AvatarEditor me={carbon} onDone={onClose} /> : null) : (
+            <>
+              <div className={styles.photo}>
+                <PhotoControl
+                  name={me.display_name}
+                  src={me.pfp_url}
+                  size={96}
+                  upload={file => upload.mutateAsync(file)}
+                  remove={() => removePhoto.mutateAsync()}
+                  audience="Every app this Silicon signs into sees it."
+                />
+              </div>
+              <div className={styles.actions}><Button variant="secondary" onClick={onClose}>Done</Button></div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog {...dialog("name")}>
+        <DialogContent title="Name" onCloseAutoFocus={backToRow("name")} description={me.display_name ? <>Apps show <strong>{me.display_name}</strong> next to your files and messages.</> : "Apps show it next to your files and messages."}>
+          {editing === "name" ? <NameForm value={me.display_name} onSave={display_name => update.mutateAsync({ display_name })} onDone={onClose} /> : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog {...dialog("id")}>
+        <DialogContent
+          title="CarbonID"
+          onCloseAutoFocus={backToRow("id")}
+          description={me.id ? <>Your CarbonID is <strong>{me.id}</strong>. It’s how people and Silicons find you.</> : "Pick the CarbonID Carbons and Silicons will type to find you."}
+          onOpenAutoFocus={event => {
+            event.preventDefault();
+            requestAnimationFrame(() => idInput.current?.focus());
+          }}
+        >
+          <IdChangeForm
+            prefix={me.kind === "carbon" ? "c:" : "si:"}
+            currentId={me.id}
+            uuid={me.uuid}
+            subject="self"
+            inputRef={idInput}
+            submit={id => changeId.mutateAsync(id)}
+            onChanged={(_, previous) => {
+              onClose();
+              if (previous) onReserved({ id: previous, until: Date.now() + RESERVED_DAYS * 86_400_000 });
+            }}
+            onCancel={onClose}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog {...dialog("dob")}>
+        <DialogContent title="Date of birth" className={styles.calendarDialog} onCloseAutoFocus={backToRow("dob")} description="Only apps you allow can see it. Some apps need it to check your age.">
+          {editing === "dob" ? <DobCalendarForm value={me.dob} onSave={dob => update.mutateAsync({ dob })} onDone={onClose} /> : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog {...dialog("timezone")}>
+        <DialogContent title="Timezone" onCloseAutoFocus={backToRow("timezone")} description="Apps show times to you in this timezone.">
+          {editing === "timezone" ? <TimezoneForm value={me.timezone} onSave={timezone => update.mutateAsync({ timezone })} onDone={onClose} autoFocus /> : null}
+        </DialogContent>
+      </Dialog>
+
+      {carbon ? (
+        <>
+          <Dialog {...dialog("emails")}>
+            <DialogContent title="Email addresses" onCloseAutoFocus={backToRow("emails")} description="Once verified, an email can sign you in with a code.">
+              <ContactList channel="email" carbon={carbon} />
+              <div className={styles.actions}><Button variant="secondary" onClick={onClose}>Close</Button></div>
+            </DialogContent>
+          </Dialog>
+          <Dialog {...dialog("phones")}>
+            {/* With no number the dialog is the add form: copy B, as on Security, and its Cancel and the close button are the
+                ways out (Anil, 2026-11-10). With numbers it lists them, and Close ends it. */}
+            <DialogContent
+              title={carbon.phones.length ? "Phone numbers" : "Add a phone number"}
+              onCloseAutoFocus={backToRow("phones")}
+              description={carbon.phones.length
+                ? "Once verified, a number can sign you in with a code texted to it."
+                : "Once it\u2019s verified, you can sign in with a code texted to it."}
+            >
+              <ContactList channel="phone" carbon={carbon} />
+              {carbon.phones.length ? <div className={styles.actions}><Button variant="secondary" onClick={onClose}>Close</Button></div> : null}
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function NameForm({ value, onSave, onDone }: { value: string; onSave: (name: string) => Promise<unknown>; onDone: () => void }) {
+  const [draft, setDraft] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const next = draft.trim();
+    const problem = validateName(next);
+    if (problem) return setError(problem);
+    if (next === value) return onDone();
+    setPending(true);
     try {
-      await update.mutateAsync({ display_name: next });
-    } catch (error) {
-      throw reasonError(error);
+      await onSave(next);
+      onDone();
+    } catch (raw) {
+      setError(describeError(raw));
+    } finally {
+      setPending(false);
     }
   };
   return (
-    <div className={styles.face}>
-      {/* In the same place as the back's Back button, so the card turns over under the pointer and back again. */}
-      <Button variant="secondary" size="sm" className={styles.turn} onClick={card.toggle}>
-        Details
-        <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
-      </Button>
-      <div className={styles.who}>
-        <PhotoControl
-          name={me.display_name}
-          src={me.pfp_url}
-          upload={file => upload.mutateAsync(file)}
-          remove={() => removePhoto.mutateAsync()}
-          audience={me.kind === "carbon" ? "Every app that can see your profile sees it." : "Every app this Silicon signs into sees it."}
-        />
-        <div className={styles.names}>
-          <InlineEdit as="h2" variant="title" className={styles.name} label="Display name" value={me.display_name} onSave={saveName} validate={validateName} />
-          <div className={styles.badges}>
-            <Badge size="sm" tone={me.status === "active" ? "success" : "warning"}>{kindNoun(me.kind)}</Badge>
-            <span className={styles.since}>since {formatDate(me.created_at)}</span>
-          </div>
-        </div>
+    <form className={styles.form} onSubmit={event => void submit(event)} noValidate>
+      <Input label="Your name" value={draft} maxLength={100} autoComplete="off" autoFocus onChange={event => { setDraft(event.target.value); setError(null); }} description="Up to 100 characters." error={error ?? undefined} />
+      <div className={styles.actions}>
+        <Button type="button" variant="ghost" onClick={onDone} disabled={pending}>Cancel</Button>
+        <Button type="submit" loading={pending} disabled={!draft.trim()}>Save</Button>
       </div>
-      <div className={styles.fields}>
-        <div className={styles.field} data-wide={id.length > LONG_ID || undefined}>
-          <IdentityField label="Id" value={id} copyLabel="Copy id">
-            {/* A very long id fades out at the edge instead of running under the next field; the title has it all. */}
-            <span className={styles.idValue} title={id || undefined}><TextMorph className={styles.idMorph}>{id || "No id yet"}</TextMorph></span>
-          </IdentityField>
-          {me.org ? <span className={styles.fieldNote}>Handle managed by {me.org.name}.</span> : <button data-sq="surface" type="button" className={partStyles.textAction} onClick={onChangeId}>Change id</button>}
-          {reserved ? <span className={styles.fieldNote}><span className="mono">{reserved.id}</span> is reserved for you until {formatDate(reserved.until)}.</span> : null}
-        </div>
-        <div className={styles.field}>
-          <IdentityField label="uuid" value={me.uuid} mono copyLabel="Copy uuid" />
-          <span className={styles.fieldNote}>Never changes. Apps know you by it.</span>
-        </div>
-        <div className={styles.field}>
-          <IdentityField label="Local time" value={me.timezone}>
-            {/* The zone under the time wraps on narrow cards, but never inside its offset. */}
-            <span className={styles.clock}>
-              <LiveClock timeZone={me.timezone} showZone={false} />
-              <span className={styles.zone}>{timezoneLabel(me.timezone)} · <span className={styles.offset}>UTC{utcOffset(me.timezone)}</span></span>
-            </span>
-          </IdentityField>
-          <TimezoneEditor value={me.timezone} onSave={timezone => update.mutateAsync({ timezone })} />
-        </div>
-      </div>
-      <div className={styles.foot}>
-        {appsFailed ? (
-          <span className={styles.stampsError} role="alert">
-            <span>Your apps did not load, so their stamps are missing.</span>
-            <button data-sq="surface" type="button" className={partStyles.textAction} onClick={onRetryApps}>Try again</button>
-          </span>
-        ) : appsLoading ? (
-          <span className={styles.stampsSkeleton} aria-hidden="true">
-            {[0, 1, 2, 3].map(index => <SkeletonBlock key={index} width="40px" height="40px" radius="12px" index={index} />)}
-          </span>
-        ) : stamps.length ? (
-          <StampRow apps={stamps} label="Apps you have signed into" />
-        ) : (
-          <span className={styles.noStamps}>Apps you sign into get a stamp here.</span>
-        )}
-      </div>
-    </div>
+    </form>
   );
 }
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  );
-}
+/** "YYYY-MM-DD" for a local date. */
+const dayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const fromDayKey = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : undefined;
+};
+/** The API takes dates after 1900-01-01. */
+const MIN_DOB = new Date(1900, 0, 2);
 
-function Back({ me }: { me: Me }) {
-  const card = useIdentityCard();
-  const update = useUpdateProfile();
-  const carbon = asCarbon(me);
-  const silicon = asSilicon(me);
-  return (
-    <div className={styles.face}>
-      <div className={styles.backHead}>
-        <h2 className={styles.backTitle}>Details</h2>
-      </div>
-      <Button variant="secondary" size="sm" className={styles.turn} onClick={card.toggle}>
-        <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
-        Back
-      </Button>
-      <dl className={styles.details}>
-        {carbon ? (
-          <>
-            <Row label="Emails">
-              {carbon.emails.length ? carbon.emails.map(email => (
-                <span key={email.email} className={styles.contact}>
-                  <span className={styles.contactText}>{email.email}</span>
-                  {email.is_primary ? <Badge size="sm" tone="info">Primary</Badge> : null}
-                </span>
-              )) : <span className={styles.muted}>No email yet</span>}
-            </Row>
-            <Row label="Phone numbers">
-              {carbon.phones.length ? carbon.phones.map(phone => (
-                <span key={phone.phone} className={styles.contact}>
-                  <span className={styles.contactText}>{formatPhone(phone.phone)}</span>
-                  {phone.is_primary ? <Badge size="sm" tone="info">Primary</Badge> : null}
-                </span>
-              )) : <span className={styles.muted}>No phone number yet</span>}
-            </Row>
-          </>
-        ) : null}
-        <Row label="Date of birth">
-          <span className={styles.valueLine}>
-            <span>{formatDate(me.dob)}</span>
-            {carbon ? <DobEditor value={me.dob} onSave={dob => update.mutateAsync({ dob })} /> : null}
-          </span>
-          {silicon ? <span className={styles.muted}>A Silicon&apos;s date of birth is the day its account was created, so it never changes.</span> : null}
-        </Row>
-        <Row label="Timezone">
-          <span>{timezoneLabel(me.timezone)} · <span className={styles.offset}>UTC{utcOffset(me.timezone)}</span></span>
-        </Row>
-        {silicon ? (
-          <>
-            <Row label="Custodian"><span className="mono">{silicon.org_custodian?.name ?? silicon.custodian?.id ?? "Waiting for a custodian to accept"}</span></Row>
-            <Row label="Notifications"><span className={styles.contactText}>Silicon Ting</span></Row>
-            <Row label="STK rotated">{stkRotatedAt(silicon) ? formatDate(stkRotatedAt(silicon)) : "Never"}</Row>
-          </>
-        ) : null}
-      </dl>
-      {carbon ? (
-        <Link href={paths.signInMethods} className={styles.backLink}>
-          Add or remove emails and phone numbers
-          <ArrowRight size={16} strokeWidth={1.75} aria-hidden="true" />
-        </Link>
-      ) : null}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------------------------------------------------------ */
-/* Beside the card                                                                                                     */
-/* ------------------------------------------------------------------------------------------------------------------ */
-
-/** A quiet column beside the card: requests waiting for you, counts that open each section, and recent activity. */
-function Glance({ me, apps, appsFailed }: { me: Me; apps: MyApp[] | undefined; appsFailed: boolean }) {
-  const now = useNow(30_000);
-  const carbon = asCarbon(me);
-  const requests = useEveryCustodianRequest();
-  const recent = useQuery({
-    queryKey: ["me", "history", "recent"],
-    queryFn: () => api.me.history({ limit: 4 }).then(page => page.items),
+/**
+ * The date of birth editor: a year list, then Silicon UI's Calendar laid out in the dialog, Cancel and Save. The
+ * prototype draws one date field; Silicon UI's DatePicker is that field, but inside a dialog its calendar is clipped
+ * (a Silicon UI bug, being fixed: prototype-differences.md). Once it ships, this becomes a DatePicker.
+ */
+function DobCalendarForm({ value, onSave, onDone }: { value: string; onSave: (dob: string) => Promise<unknown>; onDone: () => void }) {
+  const [max] = useState(() => {
+    const yesterday = new Date();
+    yesterday.setHours(0, 0, 0, 0);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday;
   });
-  const waiting = requests.data?.items.length ?? 0;
-  const requestsFailed = !requests.data && !!requests.error;
-  const rows: Array<{ label: string; value: number | undefined; failed?: boolean; href: string }> = [
-    { label: "Apps you are signed into", value: apps?.filter(item => item.status === "active").length, failed: appsFailed, href: paths.apps },
-    ...(carbon
-      ? [
-        { label: "Silicons in your care", value: carbon.custodian_of, href: paths.silicons },
-        { label: "Emails and phone numbers", value: carbon.emails.length + carbon.phones.length, href: paths.signInMethods },
-      ]
-      : []),
-  ];
+  const [draft, setDraft] = useState<Date | undefined>(() => fromDayKey(value));
+  const [month, setMonth] = useState<Date>(() => draft ?? max);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const years = useMemo(() => Array.from({ length: max.getFullYear() - 1899 }, (_, index) => {
+    const year = String(max.getFullYear() - index);
+    return { value: year, label: year };
+  }), [max]);
+  const changed = !!draft && dayKey(draft) !== value;
+
+  const pickYear = (raw: string) => {
+    const year = Number(raw);
+    if (!Number.isFinite(year)) return;
+    const base = draft ?? month;
+    const last = new Date(year, base.getMonth() + 1, 0).getDate();
+    let next = new Date(year, base.getMonth(), Math.min(base.getDate(), last));
+    if (next > max) next = max;
+    if (next < MIN_DOB) next = MIN_DOB;
+    if (draft) setDraft(next);
+    setMonth(next);
+    setError(null);
+  };
+  const save = async () => {
+    if (!draft) return setError("Pick a date.");
+    if (!changed) return onDone();
+    setPending(true);
+    try {
+      await onSave(dayKey(draft));
+      onDone();
+    } catch (raw) {
+      setError(describeError(raw));
+    } finally {
+      setPending(false);
+    }
+  };
   return (
-    <aside className={styles.glance} aria-label="At a glance">
-      {carbon && (waiting > 0 || requestsFailed) ? (
-        <Link href={paths.silicons} data-sq="surface" className={styles.waiting}>
-          <Inbox size={20} strokeWidth={1.75} aria-hidden="true" />
-          <span className={styles.waitingText}>
-            {requestsFailed ? (
-              <>
-                <span className={styles.waitingTitle}>Custodian requests did not load</span>
-                <span className={styles.waitingMeta}>A Silicon may be waiting for you. Open the Silicons page to see your requests.</span>
-              </>
-            ) : (
-              <>
-                <span className={styles.waitingTitle}>{plural(waiting, "custodian request")} waiting for you</span>
-                <span className={styles.waitingMeta}>Accept or decline them on the Silicons page.</span>
-              </>
-            )}
-          </span>
-          <ArrowRight className={styles.glanceArrow} size={16} strokeWidth={1.75} aria-hidden="true" />
-        </Link>
-      ) : null}
-      <div className={styles.counts}>
-        {rows.map((row, index) => (
-          <Link key={row.label} href={row.href} className={styles.glanceRow}>
-            <span className={styles.glanceValue}>
-              {row.value !== undefined ? <AnimatedCounter value={row.value} />
-                : row.failed ? <><span aria-hidden="true">?</span><span className="sr-only">Did not load.</span></>
-                  : <SkeletonBlock width="2ch" height="28px" radius="6px" index={index} />}
-            </span>
-            <span className={styles.glanceLabel}>
-              {row.label}
-              {row.failed && row.value === undefined ? <span className={styles.glanceFailed}>Did not load. Open the page to try again.</span> : null}
-            </span>
-            <ArrowRight className={styles.glanceArrow} size={16} strokeWidth={1.75} aria-hidden="true" />
-          </Link>
-        ))}
+    <div className={styles.form}>
+      <Select label="Year" options={years} value={String(month.getFullYear())} onValueChange={pickYear} />
+      <Calendar value={draft} onChange={date => { setDraft(date); setError(null); }} month={month} onMonthChange={setMonth} minDate={MIN_DOB} maxDate={max} />
+      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      <div className={styles.actions}>
+        <Button type="button" variant="ghost" onClick={onDone} disabled={pending}>Cancel</Button>
+        <Button type="button" loading={pending} disabled={!changed} onClick={() => void save()}>Save</Button>
       </div>
-      <section className={styles.recent} aria-labelledby="identity-recent">
-        <div className={styles.recentHead}>
-          <h2 id="identity-recent" className={styles.recentTitle}>Recent activity</h2>
-          <Link href={paths.activity} className={styles.recentAll}>All activity</Link>
-        </div>
-        {recent.error && !recent.data ? (
-          <p className={styles.muted}>Recent activity did not load. Open Activity to try again.</p>
-        ) : !recent.data ? (
-          <div className={styles.recentList}>
-            {[0, 1, 2].map(index => <SkeletonBlock key={index} width="100%" height="40px" radius="10px" index={index} />)}
-          </div>
-        ) : recent.data.length === 0 ? (
-          <p className={styles.muted}>Nothing yet. Sign-ins and changes to your account show up here.</p>
-        ) : (
-          <ol className={styles.recentList} role="list">
-            {recent.data.slice(0, 4).map(item => (
-              <li key={item.id} className={styles.recentItem}>
-                <span className={styles.recentText}>{readableTimes(item.title)}</span>
-                <time className={styles.recentTime} dateTime={item.at}>{formatRelative(item.at, now)}</time>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-    </aside>
+    </div>
   );
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
-/* Skeleton                                                                                                            */
+/* Loading                                                                                                             */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
-function LayoutSkeleton() {
+function PageSkeleton() {
   return (
-    <div className={styles.layout} aria-busy="true" aria-label="Loading your identity">
-      <SkeletonBlock width="min(100%, 640px)" height="392px" radius="var(--radius-surface)" />
-      <div className={styles.glance}>
-        {[0, 1, 2].map(index => <SkeletonBlock key={index} width="100%" height="56px" radius="12px" index={index + 1} />)}
-      </div>
+    <div className={styles.skeleton} aria-busy="true" aria-label="Loading your personal info">
+      <SkeletonBlock width="100%" height="300px" radius="var(--radius-container)" />
+      <SkeletonBlock width="100%" height="120px" radius="var(--radius-container)" index={1} />
     </div>
   );
 }

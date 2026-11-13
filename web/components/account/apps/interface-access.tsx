@@ -1,31 +1,73 @@
 "use client";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Button } from "@/components/silicon-ui/button/button";
-import { ConfirmMorph } from "@/components/silicon-ui/confirm-morph/confirm-morph";
+
+/**
+ * Connected Apps' Interfaces: each Interface that signs you in to apps, with how many sessions it holds and for which
+ * apps, and Remove, asked first in a dialog as an app's Remove is (app-page.tsx). Removing signs the Interface out of
+ * those apps; your own sign-ins to them stay. Shown only when an Interface has access.
+ */
+import { useState } from "react";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
 import { useInterfaceSessions, useRemoveInterfaceAccess } from "@/lib/query/interface-sessions";
+import { AppMark } from "../parts/app-mark";
 import { describeError } from "../parts/common";
-import styles from "./interface-access.module.css";
+import { Row, Section } from "../parts/rows";
+import styles from "./apps.module.css";
+
+interface InterfaceEntry { id: string; name: string; logo_url: string | null; sessions: number; apps: string[] }
 
 export function InterfaceAccess() {
   const sessions = useInterfaceSessions();
-  const remove = useRemoveInterfaceAccess();
-  const grouped = new Map<string, { name: string; count: number; apps: Set<string> }>();
+  const byInterface = new Map<string, InterfaceEntry>();
   for (const session of sessions.data?.sessions ?? []) {
-    const entry = grouped.get(session.interface_id) ?? { name: session.name, count: 0, apps: new Set<string>() };
-    entry.count++;
-    for (const app of session.apps) entry.apps.add(app);
-    grouped.set(session.interface_id, entry);
+    const entry = byInterface.get(session.interface_id) ?? { id: session.interface_id, name: session.name, logo_url: session.logo_url, sessions: 0, apps: [] };
+    entry.sessions++;
+    for (const app of session.apps) if (!entry.apps.includes(app)) entry.apps.push(app);
+    byInterface.set(session.interface_id, entry);
   }
-  if (sessions.error && !sessions.data) return <Alert tone="danger" title="Your Interfaces did not load">{describeError(sessions.error)} <Button size="sm" variant="secondary" onClick={() => void sessions.refetch()}>Try again</Button></Alert>;
-  if (!sessions.data || grouped.size === 0) return null;
-  return <section className={styles.section} aria-labelledby="interfaces-heading">
-    <div><h2 id="interfaces-heading">Interfaces with access</h2><p>Removing an Interface signs it out of your apps. Your other app sign-ins stay active.</p></div>
-    <ul className={styles.list}>
-      {Array.from(grouped, ([id, entry]) => <li className={styles.row} key={id} data-sq="surface">
-        <div><strong>{entry.name}</strong><p>{entry.count} {entry.count === 1 ? "session" : "sessions"}{entry.apps.size ? ` · ${Array.from(entry.apps).join(", ")}` : ""}</p></div>
-        <ConfirmMorph label="Remove access" prompt={`Remove ${entry.name}'s access?`} confirmLabel="Remove" pendingLabel="Removing" doneLabel="Access removed" onConfirm={() => remove.mutateAsync(id)} />
-      </li>)}
-    </ul>
-    {remove.error ? <p role="alert">{describeError(remove.error)}</p> : null}
-  </section>;
+  if (sessions.error && !sessions.data) {
+    return (
+      <Alert tone="danger" title="Your Interfaces did not load">
+        {describeError(sessions.error)}
+        <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void sessions.refetch()}>Try Again</Button></span>
+      </Alert>
+    );
+  }
+  if (!byInterface.size) return null;
+  return (
+    <Section id="apps-interfaces" title="Interfaces" description="They sign you in to apps for you. Removing one signs it out of those apps; your own sign-ins stay.">
+      {Array.from(byInterface.values(), entry => <InterfaceRow key={entry.id} entry={entry} />)}
+    </Section>
+  );
+}
+
+function InterfaceRow({ entry }: { entry: InterfaceEntry }) {
+  const remove = useRemoveInterfaceAccess();
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const confirm = async () => {
+    setError(null);
+    try {
+      await remove.mutateAsync(entry.id);
+      setAsking(false);
+    } catch (raw) {
+      setError(describeError(raw));
+    }
+  };
+  const detail = `${entry.sessions} ${entry.sessions === 1 ? "session" : "sessions"}${entry.apps.length ? ` · ${entry.apps.join(", ")}` : ""}`;
+  return (
+    <Row lead={<AppMark app={{ app_id: entry.id, name: entry.name, logo_url: entry.logo_url }} size={32} className={styles.mark} decorative />} title={entry.name} detail={detail}>
+      <Button variant="secondary" size="sm" onClick={() => setAsking(true)}>Remove</Button>
+      <Dialog open={asking} onOpenChange={open => { if (!open && !remove.isPending) setAsking(false); }}>
+        <DialogContent title={`Remove ${entry.name}’s access?`} description={<><strong>{entry.name}</strong> is signed out of the apps it opened for you. Your own sign-ins to them stay.</>}>
+          {error ? <p className={styles.error} role="alert">{error}</p> : null}
+          <div className={styles.actions}>
+            <Button variant="ghost" onClick={() => setAsking(false)} disabled={remove.isPending}>Cancel</Button>
+            <Button variant="danger" loading={remove.isPending} onClick={() => void confirm()}>Remove Access</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Row>
+  );
 }

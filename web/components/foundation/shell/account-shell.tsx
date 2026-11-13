@@ -1,35 +1,50 @@
 "use client";
 
 /**
- * The account site's frame for signed-in pages: the top row (brand, the other sites, search), the page, the floating dock, the ⌘K
- * palette, number-key section shortcuts and page transitions. It also guards the account routes: visitors without a
+ * The account site's frame for signed-in pages, as in the lead designer's prototype (redesign/prototype-map.md): a
+ * top bar with the brand (home), search (the ⌘K palette) and the account menu, and the section list (sidebar.tsx)
+ * beside the page from 900px, in a bottom sheet opened from the top bar below that. Also the ⌘K palette, number-key
+ * shortcuts and page transitions. It also guards the account routes: visitors without a
  * session are sent to sign in and come back to the page they asked for. At "/" a signed-out visitor sees the landing
  * page, rendered bare (without the shell).
  *
- * Every navigation the shell starts (dock, phone sheet, brand, palette, number keys, Settings, signing out) asks the
+ * Every navigation the shell starts (brand, palette, number keys, Settings, signing out) asks the
  * page's navigation guards first (lib/navigation-guard.ts), and so does a plain click on any other link while a guard
  * protects its destination: a page with unsaved work registers one guard and every way out asks.
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ViewTransition, useCallback, useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
-import { ArrowUpRight, LogOut, Search, Settings as SettingsIcon, SwatchBook } from "lucide-react";
-import { Alert } from "@/components/silicon-ui/alert/alert";
-import { Button } from "@/components/silicon-ui/button/button";
+import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { Database, LogOut, Menu, Search, SwatchBook } from "lucide-react";
+import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
+import { Button } from "@teamofsilicons/silicon-ui/button";
+import { UserMenu, type UserMenuUser } from "@teamofsilicons/silicon-ui/user-menu";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { SkipLink } from "@/components/foundation/layout/layout";
+import { Page, SkipLink } from "@/components/foundation/layout/layout";
+import { useCarbonPicture } from "@/lib/carbon-avatar";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
-import { ELSEWHERE, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
+import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
 import { beginSignIn, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
-import { BrandMark } from "./brand-mark";
+import { PrototypeMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
-import { Dock, type DockAccount } from "./dock";
 import { LeaveQuestionHost } from "./leave-question";
+import { Sidebar } from "./sidebar";
+import { SIDEBAR_STEPS, SidebarResize, useSidebarStep } from "./sidebar-resize";
 import styles from "./shell.module.css";
 
 const subscribeNothing = () => () => undefined;
+
+/** Under 900px the section list moves from beside the page into a bottom sheet. */
+const NARROW = "(max-width: 899px)";
+const subscribeNarrow = (change: () => void) => {
+  const media = window.matchMedia(NARROW);
+  media.addEventListener("change", change);
+  return () => media.removeEventListener("change", change);
+};
+const readNarrow = () => window.matchMedia(NARROW).matches;
 
 function detectApple(): boolean {
   const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
@@ -45,16 +60,36 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return !["button", "checkbox", "radio", "submit", "reset", "range", "color", "file"].includes((target as HTMLInputElement).type);
 }
 
-/** The loading stand-in for a page: header and two regions in their final positions. */
-export function PageSkeleton() {
+/** A page's title while it loads: a sidebar section or a page reached from one, by its exact path; else unknown. */
+function loadingTitle(pathname: string): { title?: string; nested: boolean } {
+  const exact = [...SECTIONS, ...MORE_DESTINATIONS].find(item => item.href === pathname);
+  if (exact) return { title: exact.label, nested: !SECTIONS.some(section => section.href === pathname) };
+  return { nested: true };
+}
+
+/**
+ * The loading stand-in for an account page, drawn like the page it becomes (Anil, 2026-11-12): the page bar pinned at the
+ * top with the title when the path names it (a crumb's line above it on nested pages), then sections on the page column,
+ * each a heading over a boxed list, so nothing jumps when the page arrives.
+ */
+export function PageSkeleton({ pathname = "" }: { pathname?: string }) {
+  const { title, nested } = loadingTitle(pathname);
   return (
-    <div className={styles.loading} aria-busy="true" aria-label="Loading">
-      <div className={styles.loadingHeader}>
-        <SkeletonBlock width="min(320px, 70%)" height="44px" radius="12px" />
-        <SkeletonBlock width="min(480px, 90%)" height="18px" radius="8px" index={1} />
+    <div aria-busy="true" aria-label={title ? `Loading ${title}` : "Loading"}>
+      <div className={styles.loadingBar}>
+        {nested ? <div className={styles.loadingCrumb}><SkeletonBlock width="6rem" height="1rem" radius="var(--radius-control)" /></div> : null}
+        <div className={styles.loadingTitleRow}>
+          {title ? <h1 className={styles.loadingTitle}>{title}</h1> : <SkeletonBlock width="min(14rem, 60%)" height="1.75rem" radius="var(--radius-control)" />}
+        </div>
       </div>
-      <SkeletonBlock width="100%" height="220px" radius="var(--radius-surface)" index={2} />
-      <SkeletonBlock width="100%" height="140px" radius="var(--radius-surface)" index={3} />
+      <Page>
+        {[2, 3, 2].map((rows, index) => (
+          <div key={index} className={styles.loadingSection}>
+            <SkeletonBlock width="8rem" height="1.25rem" radius="var(--radius-control)" index={index} />
+            <SkeletonBlock width="100%" height={`calc(${rows} * 3rem)`} radius="var(--radius-container)" index={index} />
+          </div>
+        ))}
+      </Page>
     </div>
   );
 }
@@ -72,6 +107,9 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const isHome = pathname === "/";
   const active = sectionFor(pathname);
   const developerUrl = useDeveloperUrl();
+  const narrow = useSyncExternalStore(subscribeNarrow, readNarrow, () => false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sidebarStep, setSidebarStep] = useSidebarStep();
 
   // Account routes need a session; "/" shows the landing page instead. (Sign-ins come back to /sign-in, which restores
   // the page: this home page never reads a code, state or error from its address.)
@@ -79,7 +117,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
     if (status === "signed_out" && !isHome) beginSignIn(window.location.pathname + window.location.search);
   }, [status, isHome]);
 
-  /** Navigates inside a page transition whose direction follows the dock (no guard asked: the caller did). */
+  /** Navigates inside a page transition whose direction follows the sidebar (no guard asked: the caller did). */
   const push = useCallback((href: string) => {
     router.push(href, { transitionTypes: [navigationType(window.location.pathname, href)] });
   }, [router]);
@@ -98,6 +136,11 @@ export function AccountShell({ children }: { children: ReactNode }) {
     }
     push(href);
   }, [pathname, push]);
+
+  // From 900px the page box is the scroller, not the window (shell.module.css), so a new page starts at its top.
+  useEffect(() => {
+    document.getElementById("main")?.scrollTo({ top: 0 });
+  }, [pathname]);
 
   // Links in the pages ask too while a guard protects where they go.
   useGuardedLinks(push);
@@ -134,12 +177,25 @@ export function AccountShell({ children }: { children: ReactNode }) {
         description: section.description,
         group: "Go to",
         shortcut: section.shortcut,
-        icon: <Icon size={16} strokeWidth={1.75} />,
+        icon: <Icon size={16} strokeWidth={2} />,
         keywords: [section.key, "go", "open"],
         run: () => void go(section.href),
       };
     }),
-    { id: "go.settings", label: "Settings", description: "Where you are signed in, and your account", group: "Go to", icon: <SettingsIcon size={16} strokeWidth={1.75} />, keywords: ["preferences", "delete", "sessions"], run: () => void go(paths.settings) },
+    ...MORE_DESTINATIONS.map(destination => {
+      const Icon = destination.icon;
+      return {
+        id: `go.${destination.key}`,
+        label: destination.label,
+        description: destination.description,
+        group: "Go to",
+        icon: <Icon size={16} strokeWidth={2} />,
+        keywords: [destination.key, "go", "open"],
+        run: () => void go(destination.href),
+      };
+    }),
+    // The old Settings page is Data & privacy now (a section above); these words still find it.
+    { id: "go.delete-account", label: "Delete account", description: "On Data & privacy", group: "Go to", icon: <Database size={16} strokeWidth={2} />, keywords: ["settings", "preferences", "delete", "close account"], run: () => void go(paths.privacy) },
     ...ELSEWHERE.map(site => {
       const Icon = site.icon;
       return {
@@ -147,18 +203,20 @@ export function AccountShell({ children }: { children: ReactNode }) {
         label: site.label,
         description: site.description,
         group: "Other sites",
-        icon: <Icon size={16} strokeWidth={1.75} />,
+        icon: <Icon size={16} strokeWidth={2} />,
         keywords: site.key === "developer" ? ["developer", "build", "apps", "sign-in setup", "client"] : ["docs", "documentation", "help", "guide", "api"],
         run: () => void go(site.href(developerUrl)),
       };
     }),
     ...(process.env.NODE_ENV !== "production"
-      ? [{ id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={1.75} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) }]
+      ? [
+          { id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={2} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) },
+        ]
       : []),
-    { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
+    { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={2} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
   ], [go, doSignOut, developerUrl]);
 
-  // ⌘K toggles the palette; 1 to 6 jump to sections (never while typing or with a layer open).
+  // ⌘K toggles the palette; 1 to 7 jump to sections (never while typing or with a layer open).
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
@@ -180,64 +238,82 @@ export function AccountShell({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [go, paletteOpen, status]);
 
-  const account = useMemo<DockAccount | null>(() => {
+  // A Carbon's picture is their photo or their pixel avatar (lib/carbon-avatar.ts).
+  const picture = useCarbonPicture(me.data ?? session?.account);
+  const account = useMemo<UserMenuUser | null>(() => {
     const summary = session?.account;
     if (!summary) return null;
     const full = me.data;
     return {
       name: full?.display_name ?? summary.display_name,
       email: full?.id ?? summary.id ?? summary.uuid,
-      avatarSrc: full?.pfp_url ?? summary.pfp_url,
-      kind: summary.kind,
+      avatarSrc: picture?.src ?? full?.pfp_url ?? summary.pfp_url,
     };
-  }, [session, me.data]);
+  }, [session, me.data, picture?.src]);
 
+  const brand = (
+    <Link href={paths.home} aria-label="Team of Silicons Accounts" data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
+      event.preventDefault();
+      void go(paths.home, event.currentTarget);
+    }}>
+      <PrototypeMark />
+      <span className={styles.brandText}>Team of Silicons <b className={styles.brandProduct}>Accounts</b></span>
+    </Link>
+  );
+  const search = (
+    // Keyed by the layout: Silicon UI's Button measures its label once and keeps that width inline, so after a resize
+    // from wide to narrow it stayed 400px and covered the brand. A new Button measures again.
+    <Button key={narrow ? "narrow" : "wide"} variant="soft" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
+      <Search size={16} strokeWidth={2.1} aria-hidden="true" />
+      <span className={styles.searchLabel}>Search</span>
+      <kbd data-sq="surface" className={styles.keys}>{isApple ? "⌘K" : "Ctrl K"}</kbd>
+    </Button>
+  );
+  const accountMenu = account ? (
+    <UserMenu
+      className={styles.account}
+      user={account}
+      showTheme={false}
+      onSignOut={menuSignOut}
+      align="end"
+    />
+  ) : null;
+
+  // The panel shell (redesign/decisions.md, 2026-10-30): the top bar (brand, search centred, the account menu), then
+  // the sections and the page in 8px of padding (the sections' width in steps, sidebar-resize.tsx). The page is a white box with an 8px corner and a 1px hairline. Under
+  // 900px the sections move into a bottom sheet from the top bar and the page is full bleed.
   const chrome = (content: ReactNode) => (
     <div className={styles.shell}>
       <SkipLink href="#main" />
       <header className={styles.top}>
-        <Link href={paths.home} data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
-          if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
-          event.preventDefault();
-          void go(paths.home, event.currentTarget);
-        }}>
-          <BrandMark />
-          <span className={styles.brandText}>Silicon Accounts</span>
-        </Link>
+        {brand}
+        {search}
         <span className={styles.topEnd}>
-          {/* The other sites, quiet and out of the dock: full navigations after the page's guards. */}
-          <nav className={styles.elsewhere} aria-label="Other sites">
-            {ELSEWHERE.map(site => {
-              const href = site.href(developerUrl);
-              return (
-                <a key={site.key} href={href} data-sq="surface" className={styles.elsewhereLink} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
-                  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                  event.preventDefault();
-                  void go(href, event.currentTarget);
-                }}>
-                  {site.label}
-                  <ArrowUpRight size={14} strokeWidth={1.75} aria-hidden="true" />
-                </a>
-              );
-            })}
-          </nav>
-          <button data-sq="surface" type="button" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}>
-            <Search size={16} strokeWidth={1.75} aria-hidden="true" />
-            <span>Search and jump</span>
-            <kbd data-sq="surface">{isApple ? "⌘ K" : "Ctrl K"}</kbd>
-          </button>
+          {accountMenu}
+          {narrow ? (
+            <BottomSheet
+              title="Your account"
+              open={sheetOpen}
+              onOpenChange={setSheetOpen}
+              trigger={<Button variant="ghost" size="sm" aria-label="Account sections"><Menu size={18} strokeWidth={2} aria-hidden="true" /></Button>}
+            >
+              <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} />
+            </BottomSheet>
+          ) : null}
         </span>
       </header>
-      <main id="main" className={styles.main} tabIndex={-1}>{content}</main>
-      <Dock
-        activeKey={active?.key}
-        onNavigate={go}
-        account={account}
-        onSignOut={menuSignOut}
-        onOpenSettings={() => void go(paths.settings)}
-        onOpenPalette={openCommandPalette}
-        isApple={isApple}
-      />
+      <div className={styles.body} style={{ "--sidebar-width": `${SIDEBAR_STEPS[sidebarStep]}px` } as CSSProperties}>
+        {narrow ? null : (
+          <>
+            <aside id="account-sidebar" className={styles.aside}>
+              <Sidebar activeKey={active?.key} developerUrl={developerUrl} />
+            </aside>
+            <SidebarResize step={sidebarStep} onStep={setSidebarStep} controls="account-sidebar" />
+          </>
+        )}
+        <main id="main" data-sq-native="" className={styles.main} tabIndex={-1}>{content}</main>
+      </div>
       <CommandMenu />
       <LeaveQuestionHost />
     </div>
@@ -257,12 +333,12 @@ export function AccountShell({ children }: { children: ReactNode }) {
         <Alert tone="danger" title="Silicon Accounts is not answering">
           {error?.message ?? "The session could not be loaded."} {error?.hint ?? "Check your connection, then try again."}
           <span style={{ display: "block", marginTop: "var(--space-3)" }}>
-            <Button variant="secondary" size="sm" onClick={refetch}>Try again</Button>
+            <Button variant="secondary" size="sm" onClick={refetch}>Try Again</Button>
           </span>
         </Alert>
       </div>
     );
   }
   // Loading, or signed out on an account page (on the way to sign in).
-  return isHome ? <div className={styles.bare} aria-busy="true" /> : chrome(<PageSkeleton />);
+  return isHome ? <div className={styles.bare} aria-busy="true" /> : chrome(<PageSkeleton pathname={pathname} />);
 }

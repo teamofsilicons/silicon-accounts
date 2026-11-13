@@ -1,0 +1,14 @@
+/* /__request (request-lab.tsx): a switch for the sample, then the request at the page's narrow column, as the real
+   page would show it under its page bar; the current page's card below for comparison. */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; justify-items: start; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.stage { padding: var(--space-block) var(--gutter) var(--space-page); border-radius: var(--radius-container); background: var(--background); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.column { width: 100%; max-width: var(--page-narrow); margin-inline: auto; }
+.answered { margin: var(--space-group) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.design { display: grid; gap: var(--space-inset); }
+.name { margin: 0; font: var(--h3); letter-spacing: var(--h3-tracking); }
+.note { max-width: 70ch; margin: var(--space-tight) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+/* The two-column designs at the page's width (Silicons pages use it). */
+.wide { width: 100%; max-width: var(--page-max); margin-inline: auto; }

@@ -5,7 +5,7 @@
  */
 import type { Journey } from "../../context";
 import { api, postJson, shot, sleep, sql } from "../../lib";
-import { appAuth, call, codeOf, confirmMorph, newCarbon, requestSent, signIntoApp, until } from "./_helpers";
+import { appAuth, call, codeOf, newCarbon, requestSent, signIntoApp, until } from "./_helpers";
 
 interface Issued {
   status?: number;
@@ -63,22 +63,27 @@ const proofs: Journey = {
     results.check("/v1/me/proofs lists exactly the three User verification proofs (no App verification)", listed.length === 3 && [ids.read, ids.write, ids.message].every(id => listed.some(item => item.proof_id === id)), listed.map(item => `${item.issuing_app.app_id}→${item.receiving_app.app_id}`).join(", "));
     const started = Date.now();
     await page.goto(`${env.site}/proofs`);
-    const active = page.getByRole("list", { name: "Active verifications" });
+    // Permissions between apps (2026-11-12): an "Active" list and, once any has ended, an "Ended" list; each row is
+    // "Briefcase in Commit" with what it may do, and Stop on a live one.
+    const active = page.getByRole("region", { name: "Active", exact: true });
+    const ended = page.getByRole("region", { name: "Ended", exact: true });
+    const rowsOf = (list: typeof active, title: string) => list.getByRole("listitem").filter({ hasText: title });
     await active.waitFor({ timeout: 30_000 });
     results.metric("/proofs list visible after navigation", Date.now() - started);
     await sleep(1200);
     await shot(env, page, "acct-proofs-01-active", true);
-    results.check("the switch counts 3 active, 0 ended", (await page.getByRole("button", { name: "Active (3)" }).getAttribute("aria-pressed")) === "true" && (await page.getByRole("button", { name: "Ended (0)" }).count()) === 1);
-    const toCommit = page.getByRole("article", { name: "Briefcase acts at Commit for you" });
-    const toDm = page.getByRole("article", { name: "Briefcase acts at DM for you" });
-    results.check("each proof is drawn issuing → receiving app", (await toCommit.count()) === 2 && (await toDm.count()) === 1, `${await toCommit.count()} to Commit, ${await toDm.count()} to DM`);
+    results.check("3 active, no Ended list yet", (await active.getByRole("listitem").count()) === 3 && (await ended.count()) === 0);
+    const toCommit = rowsOf(active, "Briefcase in Commit");
+    const toDm = rowsOf(active, "Briefcase in DM");
+    results.check("each permission is a row \"Briefcase in Commit\" (issuing in receiving app)", (await toCommit.count()) === 2 && (await toDm.count()) === 1, `${await toCommit.count()} to Commit, ${await toDm.count()} to DM`);
     const readCard = toCommit.filter({ hasText: "files.read" });
     const readText = (await readCard.innerText()).replace(/\s+/g, " ");
-    results.check("the read proof's card: its scope, Active, and its 10-minute token counting down", readText.includes("files.read") && /Active/.test(readText) && /Current token checks out for (9|10) minutes more/.test(readText), readText.slice(0, 260));
+    results.check("the read permission's row: what it may do and when it ends, and Stop", readText.includes("May do files.read") && / ends /.test(readText) && (await readCard.getByRole("button", { name: "Stop Briefcase acting in Commit" }).count()) === 1, readText.slice(0, 260));
 
-    // Revoke the read proof on the page: Commit's next verify fails, the write proof stays valid.
+    // Stop the read permission on the page: Commit's next verify fails, the write proof stays valid.
     const revokeSent = requestSent(page, "DELETE", `/v1/me/proofs/${ids.read}`);
-    await confirmMorph(readCard, "Revoke", "Revoke");
+    await readCard.getByRole("button", { name: "Stop Briefcase acting in Commit" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Stop", exact: true }).click({ timeout: 10_000 });
     const afterRevoke = await until(async () => verify("commit", tokens.read), value => value.valid === false, 10_000);
     results.metric("revoke DELETE sent → Commit's verify answers not valid", Date.now() - (await revokeSent));
     results.check("Commit's verify of the revoked proof: exactly {valid:false, expires_at:null}", afterRevoke.valid === false && afterRevoke.expires_at === null && Object.keys(afterRevoke).length === 2, JSON.stringify(afterRevoke));
@@ -92,26 +97,21 @@ const proofs: Journey = {
     const liveRefresh = await refreshProof(write.body?.proof_refresh_token ?? "");
     const fresh = liveRefresh.body.proof_token ? await verify("commit", liveRefresh.body.proof_token) : {};
     results.check("Briefcase can no longer refresh the revoked proof; the write proof refreshes, and its new token verifies", deadRefresh.status >= 400 && deadRefresh.status < 500 && !!codeOf(deadRefresh.body) && liveRefresh.status === 200 && fresh.valid === true, `revoked: ${deadRefresh.status} ${codeOf(deadRefresh.body)}; write: ${liveRefresh.status} → valid ${String(fresh.valid)}`);
-    await until(async () => page.getByRole("button", { name: "Ended (1)" }).count(), n => n === 1, 8_000);
-    await page.getByRole("button", { name: "Ended (1)" }).click();
-    const ended = page.getByRole("list", { name: "Ended verifications" });
     await ended.waitFor({ timeout: 10_000 });
     await sleep(800);
     const endedText = (await ended.innerText()).replace(/\s+/g, " ");
-    results.check("Ended: the read proof, \"You revoked it\", Revoked, no Revoke button", endedText.includes("files.read") && endedText.includes("You revoked it") && /Revoked/.test(endedText) && (await ended.getByRole("button", { name: "Revoke", exact: true }).count()) === 0, endedText.slice(0, 240));
+    results.check("Ended: Briefcase in Commit, \"You stopped it\" and the date, no Stop button", endedText.includes("Briefcase in Commit") && endedText.includes("You stopped it") && (await ended.getByRole("button").count()) === 0 && (await active.getByRole("listitem").count()) === 2, endedText.slice(0, 240));
     await shot(env, page, "acct-proofs-02-ended", true);
 
     // The write proof runs out (time travel): it moves to Ended as Expired and stops verifying.
     await sql(env, `update proof_families set expires_at = now() - interval '1 second' where id = '${ids.write}'`);
     results.check("an expired proof no longer verifies", (await verify("commit", tokens.write)).valid === false);
     await page.reload();
-    await page.getByRole("button", { name: /^Ended \(\d+\)$/ }).waitFor({ timeout: 30_000 });
-    results.check("after expiry: 1 active (DM), 2 ended", (await page.getByRole("button", { name: "Active (1)" }).count()) === 1 && (await page.getByRole("button", { name: "Ended (2)" }).count()) === 1);
-    await page.getByRole("button", { name: "Ended (2)" }).click();
-    const expiredCard = page.getByRole("list", { name: "Ended verifications" }).getByRole("article").filter({ hasText: "files.write" });
-    await expiredCard.waitFor({ timeout: 10_000 });
-    const expiredText = (await expiredCard.innerText()).replace(/\s+/g, " ");
-    results.check("the expired proof says Expired", /Expired/.test(expiredText), expiredText.slice(0, 200));
+    await ended.waitFor({ timeout: 30_000 });
+    await sleep(600);
+    results.check("after expiry: 1 active (DM), 2 ended", (await active.getByRole("listitem").count()) === 1 && (await ended.getByRole("listitem").count()) === 2);
+    const endedAgain = (await ended.innerText()).replace(/\s+/g, " ");
+    results.check("the expired permission says Expired", /Expired · /.test(endedAgain), endedAgain.slice(0, 200));
     results.check("/v1/me/proofs says expired", (await mine()).find(item => item.proof_id === ids.write)?.status === "expired");
 
     // The DM proof ends with Briefcase's access.
@@ -122,14 +122,12 @@ const proofs: Journey = {
     const third = (await mine()).find(item => item.proof_id === ids.message);
     results.check("…and the proof says why (access_removed)", third?.status === "revoked" && third.revoke_reason === "access_removed", JSON.stringify(third && { status: third.status, reason: third.revoke_reason }));
     await page.reload();
-    await page.getByRole("button", { name: "Ended (3)" }).click({ timeout: 30_000 });
-    const dmCard = page.getByRole("list", { name: "Ended verifications" }).getByRole("article", { name: "Briefcase acts at DM for you" });
+    await ended.waitFor({ timeout: 30_000 });
+    const dmCard = rowsOf(ended, "Briefcase in DM");
     await dmCard.waitFor({ timeout: 10_000 });
     const dmText = (await dmCard.innerText()).replace(/\s+/g, " ");
-    results.check("the page says it ended when Briefcase's access was removed", dmText.includes("Ended when Briefcase's access was removed"), dmText.slice(0, 200));
-    await page.getByRole("button", { name: "Active (0)" }).click();
-    await sleep(500);
-    results.check("no active proof left: the empty state says so", (await page.locator("main").innerText()).includes("No app is acting for you"));
+    results.check("the page says it ended when Briefcase's access was removed", dmText.includes("Ended when Briefcase\u2019s access was removed"), dmText.slice(0, 200));
+    results.check("no active permission left: the empty state says so", (await page.locator("main").innerText()).includes("No app is acting for you") && (await active.count()) === 0);
 
     // The API: a proof that is not this account's (or does not exist) can't be revoked.
     const missing = await call(probe, "/v1/me/proofs/01890000-0000-7000-8000-000000000000", { method: "DELETE" });

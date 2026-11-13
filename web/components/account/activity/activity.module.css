@@ -1,20 +1,19 @@
-/* Activity: a filter, then the timeline grouped by day. */
-.alertAction { display: block; margin-top: var(--space-3); }
-.toolbar { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+/* /activity (activity.tsx, Anil 2026-11-12): the line under the page bar, the filters, then a section per day on the
+   account pages' rows (parts/rows.module.css), the time at each row's end. */
+.lead { margin: var(--space-section) 0 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.toolbar { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-group); margin-top: var(--space-inset); }
 .toolbar > * { max-width: 100%; }
-.feed { min-width: 0; }
-/* A row without details that took focus after older activity loaded: it shows the timeline's hover fill. */
-.feed :global(li[data-focus-landing]:focus-visible) > :last-child > :first-child { background: var(--surface-muted); }
-.more { display: flex; justify-content: center; }
-.empty { padding: var(--space-6) 0; }
-.error { margin: 0; color: var(--danger); font-size: var(--text-sm); text-align: center; }
-.skeleton { display: grid; gap: var(--space-5); }
-.skeletonRow { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: var(--space-3); }
+.alertAction { display: block; margin-top: var(--space-group); }
+.skeleton { margin-top: var(--space-section); }
+.empty { padding: var(--space-block) 0; }
 
-/* What an opened row shows: the event's details as label and value pairs. */
-.detail { display: grid; gap: var(--space-2); margin: 0; }
-.detail > div { display: grid; grid-template-columns: minmax(6rem, 8rem) minmax(0, 1fr); gap: var(--space-3); font-size: var(--text-sm); }
-.detail dt { color: var(--text-secondary); }
-.detail dd { min-width: 0; margin: 0; color: var(--foreground); overflow-wrap: anywhere; }
+/* An app's mark with a hairline, as on Connected apps. */
+.mark { --sq-stroke: var(--border-subtle); border: 1px solid var(--sq-stroke); }
+.time { color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-@media (max-width: 480px) { .detail > div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+.none { margin: var(--space-section) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.more { display: flex; justify-content: center; margin-top: var(--space-section); }
+.error { margin: var(--space-related) 0 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); text-align: center; }
+
+/* The days in the page column's 16px grid, so they sit 32px apart as sections do on every account page. */
+.feed { display: grid; gap: var(--space-inset); }

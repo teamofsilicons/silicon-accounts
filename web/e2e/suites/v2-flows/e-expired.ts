@@ -21,7 +21,7 @@ export const journey: Journey = {
 
     const started = await startAtApp(env, page, "ledgerly");
     await signInWithCode(env, page, { email });
-    await page.getByRole("button", { name: "Create account" }).click({ timeout: 25_000 });
+    await page.getByRole("button", { name: /^Create account$/i }).click({ timeout: 25_000 });
     await waitForDetailsPage(page, { id: "contact" });
     await addOnPage(env, page, "phone", phone);
     await button(page, "Continue").click();

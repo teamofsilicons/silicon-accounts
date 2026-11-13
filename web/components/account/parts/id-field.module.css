@@ -1,0 +1,21 @@
+/* The id field (id-field.tsx, Anil 2026-11-11 audit): Silicon UI's Input with "c:" or "si:" in its prefix slot, the
+   status as its hint or error, and free ids as small buttons. The id is code, so it and its prefix are mono at the
+   typed text's size. */
+.field { display: grid; min-width: 0; gap: var(--space-group); }
+.mono { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; }
+.success { color: var(--success); }
+.danger { color: var(--danger); }
+.spin { color: var(--text-muted); animation: spin 900ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.suggestions { display: grid; gap: var(--space-related); }
+.suggestionsLabel { color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
+.suggestionList { display: flex; flex-wrap: wrap; gap: var(--space-related); }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+/* The id change form (id-change-form.tsx): the field, a note, then the actions. */
+.form { display: grid; min-width: 0; gap: var(--space-inset); }
+/* The note is small (14/400) in --text-secondary and "Note:" is label (14/500), a step heavier so it scans as a label
+   (Anil, 2026-11-11). */
+.note { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.noteLabel { color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.formActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-related); padding-top: var(--space-related); }

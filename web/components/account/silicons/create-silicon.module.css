@@ -1,22 +1,14 @@
-/* The create-a-Silicon form in its drawer: fields, then the actions held at the bottom of the drawer while it scrolls. */
-/* The panel clips rather than hides its overflow, so focus and scrollIntoView can only ever scroll the body. */
-.panel.panel { overflow: clip; }
-.form { --drawer-pad: var(--space-6); display: grid; min-width: 0; gap: var(--space-6); }
-.field { display: grid; min-width: 0; gap: var(--space-2); }
-.error { margin: 0; color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); }
-.stk { display: grid; min-width: 0; gap: var(--space-3); }
-.mono.mono { font-family: var(--font-mono); font-variant-ligatures: none; letter-spacing: 0; }
-.footer {
-  position: sticky;
-  bottom: calc(-1 * var(--drawer-pad));
-  z-index: 2;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  margin: 0 calc(-1 * var(--drawer-pad)) calc(-1 * var(--drawer-pad));
-  padding: var(--space-4) var(--drawer-pad) var(--drawer-pad);
-  border-top: 1px solid var(--border);
-  background: var(--surface-raised);
-}
-@media (max-width: 40rem) { .form { --drawer-pad: var(--space-5); } }
+/* Create a Silicon (/silicons/new): a wizard in one column: Silicon UI's Stepper, the current step's fields, then the
+   actions on the right, the primary last. */
+/* Centred in the page. Its fields follow the site's field sizes (tokens.css: typed text 16, hints 12); the step-up of
+   every Silicon UI size here (labels and buttons at 16) was removed for them on 2026-11-10. */
+.form { display: grid; width: 100%; min-width: 0; max-width: 480px; gap: var(--space-block); margin-inline: auto; }
+.group { display: grid; min-width: 0; gap: var(--space-comfort); }
+.group:focus { outline: none; }
+/* An available id reads as success. Silicon UI's Input has no success state, so its hint and border tokens are set here. */
+.available { --text-muted: var(--success); --border-strong: var(--success); min-width: 0; }
+.suggestions { display: flex; flex-wrap: wrap; gap: var(--space-tight); margin-top: calc(var(--space-tight) * -1); }
+.footer { display: flex; flex-flow: row-reverse wrap; align-items: center; gap: var(--space-related); }
+/* Markers only. Silicon UI's compact Stepper still captions the current step and has no option to drop it, so it's hidden
+   here; screen readers keep every step's name. */
+.steps.steps.steps > span[aria-hidden="true"] { display: none; }

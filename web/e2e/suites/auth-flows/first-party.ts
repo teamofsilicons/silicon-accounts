@@ -47,11 +47,11 @@ const firstParty: Journey = {
       if (frame === page.mainFrame()) visited.push(new URL(frame.url()).pathname);
     });
     await page.goto(`${env.site}/sign-in?return_to=${encodeURIComponent("/apps")}`);
-    const field = page.getByRole("textbox", { name: "Email" });
+    const field = page.getByRole("textbox", { name: /^(Email or phone|Email)$/ });
     await field.waitFor({ timeout: 30_000 });
     const mark = await lastSeq(env);
     await field.fill(email);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code = await codeFor(env, email, mark);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code, { delay: 25 });
@@ -87,7 +87,7 @@ const firstParty: Journey = {
     results.check("prompt=login shows the methods (no Continue as) although signed in", (await page.getByRole("button", { name: /^Continue as/ }).count()) === 0);
     const again = await lastSeq(env);
     await field.fill(email);
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();
     const code2 = await codeFor(env, email, again);
     await page.getByRole("group", { name: /Code from the email/ }).waitFor({ timeout: 15_000 });
     await page.keyboard.type(code2, { delay: 25 });
@@ -109,7 +109,7 @@ const firstParty: Journey = {
     const p2 = await other.newPage();
     results.watch(p2, "first-party-forged");
     await p2.goto(`${env.site}/sign-in?error=access_denied&error_description=EVIL+TEXT+${t}&state=unknown-${t}`);
-    await p2.getByRole("textbox", { name: "Email" }).waitFor({ timeout: 30_000 });
+    await p2.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     results.check("signed out, a forged ?error&state starts a normal sign-in and never shows the address's text", !(await p2.locator("body").innerText()).includes(`EVIL TEXT ${t}`), p2.url());
     await other.close();
   },
