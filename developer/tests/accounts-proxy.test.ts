@@ -21,4 +21,5 @@ test("Accounts reads no request body before the session, and refuses one larger 
   assert.equal(signedOut.bodyUsed,false);
   const oversized=await POST(request("apps/briefcase/imports",true,{"content-length":String(52_494_336+1)}));
   assert.equal(oversized.status,413);assert.equal(calls,0);
+  assert.equal((await oversized.json()).error.code,"payload_too_large");
 });

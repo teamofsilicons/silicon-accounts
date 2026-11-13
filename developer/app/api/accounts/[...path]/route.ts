@@ -100,7 +100,8 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   if (method !== "GET" && method !== "HEAD") {
     // The API's largest body limit (imports: 50 MB plus its 64 KiB read allowance).
     const maximum = 52_494_336;
-    const tooLarge = () => json(413, errorBody("body_too_large", "The request exceeds 50 MB.", "Choose a smaller request or import file."));
+    // The API's own import 413 words, so callers see one refusal whichever side answers first.
+    const tooLarge = () => json(413, errorBody("payload_too_large", "The import body is larger than 50 MB.", "Split the file into smaller parts (at most 50 MB and 100,000 rows each)."));
     if (Number(request.headers.get("content-length") || 0) > maximum) return tooLarge();
     const reader = request.body?.getReader();
     const chunks: Uint8Array[] = [];
