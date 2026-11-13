@@ -814,19 +814,22 @@ pub async fn select_account(
             "This account is no longer active.",
         ));
     }
-    if let Err(e) =
-        accounts_core::repo::organizations::check(&mut tx, &account.uuid, &fa.app.app_id).await
-    {
-        tx.rollback().await?;
-        accounts_core::repo::organizations::record_refusal(
-            &state.db,
-            &account.uuid,
-            &fa.app.app_id,
-        )
-        .await?;
-        return Err(e);
-    }
-    let signed = browser::sign_in(&mut tx, &state, &headers, &meta, &account.uuid, false).await?;
+    // Choosing an account proves nothing new, so the session keeps its last proof (auth_time).
+    let signed = if account.uuid == current.account.uuid {
+        browser::SignedIn {
+            session_id: current.session_id,
+            cookie: None,
+        }
+    } else {
+        let signed =
+            browser::sign_in(&mut tx, &state, &headers, &meta, &account.uuid, false).await?;
+        sqlx::query("update browser_sessions set authenticated_at=(select authenticated_at from browser_sessions where id=$2) where id=$1")
+            .bind(signed.session_id)
+            .bind(current.session_id)
+            .execute(&mut *tx)
+            .await?;
+        signed
+    };
     flow.extras.browser_session_id = Some(signed.session_id);
     flow.extras.account_selected = true;
     next::advance(&mut tx, &state, &meta, &mut flow, &fa, &account).await?;

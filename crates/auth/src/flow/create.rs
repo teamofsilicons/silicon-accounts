@@ -418,6 +418,7 @@ pub async fn create_flow(
         },
     )
     .await?;
+    let current = browser::current(&mut tx, &state, &headers).await?;
     if let Some(raw) = body.link_id.as_deref() {
         if app_id != accounts_core::FIRST_PARTY_APP_ID || !prompt.login {
             return Err(ApiError::forbidden(
@@ -430,8 +431,7 @@ pub async fn create_flow(
         let source:Option<String>=sqlx::query_scalar("select source_uuid from account_link_requests where id=$1 and expires_at>now() and completed_at is null").bind(link).fetch_optional(&mut *tx).await?;
         let source = source
             .ok_or_else(|| ApiError::gone("link_expired", "This linking request expired."))?;
-        let browser = browser::current(&mut tx, &state, &headers).await?;
-        if browser.as_ref().map(|b| b.account.uuid.as_str()) != Some(source.as_str()) {
+        if current.as_ref().map(|b| b.account.uuid.as_str()) != Some(source.as_str()) {
             return Err(ApiError::forbidden(
                 "link_initiator_required",
                 "Begin linking from the account that requested it.",
@@ -471,7 +471,6 @@ pub async fn create_flow(
     flow.extras.intent = intent;
     flow.extras.browser_timezone = clean(&body.timezone).and_then(|t| normalize_timezone(t).ok());
 
-    let current = browser::current(&mut tx, &state, &headers).await?;
     let usable_browser = current
         .as_ref()
         .filter(|b| b.is_active_carbon() && fa.config.remember_browser && !prompt.login);

@@ -590,3 +590,22 @@ async fn intents_choose_the_sign_in_or_sign_up_pages() {
     assert_eq!(r.json["flow"]["signed_in_as"]["uuid"], carbon.uuid.as_str());
     assert_eq!(r.json["flow"]["intent"], "signup");
 }
+
+#[tokio::test]
+async fn unreadable_flow_state_fails_instead_of_resetting() {
+    let ctx = TestContext::new().await;
+    let (app, _) = ctx.app("briefcase").await;
+    let mut b = Browser::new(&ctx);
+    let id = id_of(&new_flow(&ctx, &mut b, &app.app_id, json!({})).await);
+    // A variant written by a newer release.
+    sqlx::query(
+        "update signin_flows set provider_state = '{\"pending\": {\"kind\": \"from_a_newer_release\"}}' where id = $1",
+    )
+    .bind(&id)
+    .execute(&ctx.state.db)
+    .await
+    .expect("state");
+    let r = b.get(&ctx, &format!("/v1/flows/{id}")).await;
+    assert_eq!(r.status, 500, "{}", r.json);
+    assert_eq!(r.error_code(), Some("internal"));
+}

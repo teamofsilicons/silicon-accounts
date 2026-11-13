@@ -587,9 +587,9 @@ fn current_step<'p>(plan: &'p Plan, flow: &Flow) -> Option<&'p PlanStep> {
 }
 
 /// Repairs a flow at `details` whose page no longer exists (the app changed its flow while the
-/// Carbon was signing in, or the flow was stored by the previous version at `requirements` or
-/// `consent`): moves it to its next page, or completes it. Only for the browser signed in as the
-/// flow's account (as every details action is). Returns true when the flow changed.
+/// Carbon was signing in): moves it to its next page, or completes it. Only for the browser
+/// signed in as the flow's account (as every details action is). Returns true when the flow
+/// changed.
 pub async fn repair(
     conn: &mut PgConnection,
     state: &AppState,

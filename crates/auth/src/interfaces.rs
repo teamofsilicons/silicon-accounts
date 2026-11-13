@@ -590,7 +590,7 @@ async fn revoke_session(conn: &mut PgConnection, session_id: Uuid, why: &str) ->
         .bind(session_id).bind(why).execute(&mut *conn).await?;
     sqlx::query("update token_families set revoked_at=coalesce(revoked_at,now()),revoke_reason=coalesce(revoke_reason,$2) where id in (select family_id from interface_app_token_families where session_id=$1)")
         .bind(session_id).bind(why).execute(&mut *conn).await?;
-    sqlx::query("update interface_token_operations set sealed_response=$2 where session_id=$1")
+    sqlx::query("update interface_token_operations set sealed_response=$2 where session_id=$1 and sealed_response<>$2")
         .bind(session_id)
         .bind(json!({"$unavailable":true}))
         .execute(&mut *conn)
@@ -894,7 +894,7 @@ async fn token(
             .await?;
         let session = read_session(&mut tx, id).await?;
         let app_tokens = issue_apps(&mut tx, &state, &c, &session, &account, true, None).await?;
-        (session, app_tokens)
+        (session, app_tokens, account)
     } else {
         let refresh = input
             .refresh_token
@@ -970,20 +970,19 @@ async fn token(
             .bind(state.keys.pepper.hash(refresh))
             .execute(&mut *tx)
             .await?;
-        (session, app_tokens)
+        (session, app_tokens, account)
     };
-    let (session, app_tokens) = session;
+    let (session, app_tokens, account) = session;
     let refresh = crypto::random_token("sifr_");
     sqlx::query("insert into interface_refresh_tokens(token_hash,session_id) values($1,$2)")
         .bind(state.keys.pepper.hash(&refresh))
         .bind(session.id)
         .execute(&mut *tx)
         .await?;
-    let account = active_subject(&mut tx, &session.account_uuid).await?;
     let account_view = interface_account_view(&mut tx, &account, &session.interface_scopes).await?;
     let body = json!({"interface_id":input.interface_id,"session_id":session.id,"expires_at":accounts_core::timefmt::format_rfc3339_ms(session.expires_at),"account":account_view,"refresh_token":refresh,"apps":app_tokens});
     let sealed = idempotency::seal(&state.keys.keyring, &scope, key.as_str(), &body)?;
-    sqlx::query("update interface_token_operations set sealed_response=$2 where session_id=$1")
+    sqlx::query("update interface_token_operations set sealed_response=$2 where session_id=$1 and sealed_response<>$2")
         .bind(session.id)
         .bind(json!({"$unavailable":true}))
         .execute(&mut *tx)
@@ -1333,10 +1332,6 @@ async fn verified_start(
     headers: HeaderMap,
     Json(input): Json<VerifiedStart>,
 ) -> ApiResult<Response> {
-    let _permit = VERIFIED_ACTIONS
-        .acquire()
-        .await
-        .map_err(|_| ApiError::internal("Verified sign-in is unavailable."))?;
     let mut conn = state.db.acquire().await?;
     let c = client(&mut conn, &input.interface_id).await?;
     verified_secret(&c, &state, &headers, &input.interface_origin)?;
@@ -1362,6 +1357,10 @@ async fn verified_start(
         ));
     }
     drop(conn);
+    let _permit = VERIFIED_ACTIONS
+        .acquire()
+        .await
+        .map_err(|_| ApiError::internal("Verified sign-in is unavailable."))?;
     let mut initial_headers = HeaderMap::new();
     initial_headers.insert(
         header::ORIGIN,
@@ -1561,16 +1560,22 @@ async fn verified_action(
     headers: HeaderMap,
     Json(input): Json<VerifiedAction>,
 ) -> ApiResult<Response> {
-    let _permit = VERIFIED_ACTIONS
-        .acquire()
-        .await
-        .map_err(|_| ApiError::internal("Verified sign-in is unavailable."))?;
     if !input.capability.starts_with("sivf_") {
         return Err(ApiError::unauthenticated(
             "invalid_capability",
             "The verified sign-in capability is invalid.",
         ));
     }
+    // Only an authenticated backend waits for one of the few permits.
+    {
+        let mut conn = state.db.acquire().await?;
+        let c = client(&mut conn, &input.interface_id).await?;
+        verified_secret(&c, &state, &headers, &input.interface_origin)?;
+    }
+    let _permit = VERIFIED_ACTIONS
+        .acquire()
+        .await
+        .map_err(|_| ApiError::internal("Verified sign-in is unavailable."))?;
     let mut tx = state.db.begin().await?;
     let c = client(&mut tx, &input.interface_id).await?;
     verified_secret(&c, &state, &headers, &input.interface_origin)?;
@@ -1884,5 +1889,36 @@ async fn verified_action(
         accounts_core::repo::sessions::revoke(&mut tx, &session.account_uuid, session.id).await?;
         tx.commit().await?;
         Ok(response(result))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VERIFIED_ACTIONS;
+    use accounts_core::test_support::{Req, TestContext};
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn unauthenticated_verified_calls_do_not_wait_for_a_permit() {
+        let ctx = TestContext::new().await;
+        let _busy = VERIFIED_ACTIONS.acquire_many(2).await.expect("permits");
+        for (path, body) in [
+            (
+                "/v1/verified-interface-auth/start",
+                json!({"interface_id":"nobody","interface_origin":"https://nobody.example","redirect_uri":"https://nobody.example/callback","state":"s","code_challenge":"c","code_challenge_method":"S256"}),
+            ),
+            (
+                "/v1/verified-interface-auth/action",
+                json!({"interface_id":"nobody","interface_origin":"https://nobody.example","capability":"sivf_x","action":"get","payload":{}}),
+            ),
+        ] {
+            let r = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                ctx.call(crate::router(), Req::post(path).json(body)),
+            )
+            .await
+            .expect("answered without waiting for a permit");
+            assert_eq!(r.error_code(), Some("interface_not_found"), "{}", r.json);
+        }
     }
 }

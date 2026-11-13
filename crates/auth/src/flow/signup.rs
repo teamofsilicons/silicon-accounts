@@ -34,7 +34,7 @@ use accounts_core::repo::accounts::{self, NewCarbon, NewContact, ProfileUpdate};
 use accounts_core::repo::audit::{self, AuditEntry};
 use accounts_core::repo::contacts::{self, ContactKind};
 use accounts_core::repo::{identities, photos};
-use accounts_core::timefmt::{date, format_rfc3339_ms, parse_date, rfc3339_ms};
+use accounts_core::timefmt::{date, format_rfc3339_ms, parse_date, rfc3339_ms, today_utc};
 use accounts_core::{ApiError, ApiResult, AppState, FieldErrors, events};
 use axum::body::Body;
 use axum::extract::State;
@@ -510,7 +510,7 @@ fn validate_details(
     };
     let dob = match &body.dob {
         None => Some(prefill.dob),
-        Some(raw) => match parse_date(raw).and_then(|d| validate_dob(d, view::today())) {
+        Some(raw) => match parse_date(raw).and_then(|d| validate_dob(d, today_utc())) {
             Ok(d) => Some(d),
             Err(m) => {
                 fields.add("dob", m);
