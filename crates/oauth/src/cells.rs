@@ -456,13 +456,12 @@ async fn exchange(
             "The authorization code must return to this cell's current registered callback.",
         ));
     }
-    apps::require_active(&mut admission, &app).await?;
+    let target = apps::require_active(&mut admission, &app).await?;
     let scope = format!("cells:{cell}:{app}:token");
     // Seal token responses and replay uncertain network responses without consuming
     // a single-use code/SLT twice or accidentally reusing a rotating refresh token.
-    let mut response = idempotency::run(&state,Some(key.as_str()),&scope,&input,true,||async {
-        let mut tx=state.db.begin().await?;
-        let target=apps::require_active(&mut tx,&app).await?;
+    // Reuses `admission` (the grant takes its own connection) so a burst can't drain the pool.
+    let mut response = idempotency::run(&state,Some(key.as_str()),&scope,&input,true,async ||{
         let params=TokenParams{grant_type:Some(input.grant_type.clone()),code:input.code.clone(),redirect_uri:input.redirect_uri.clone(),code_verifier:input.code_verifier.clone(),slt:input.slt.clone(),refresh_token:input.refresh_token.clone(),..Default::default()};
         let tokens=match input.grant_type.as_str(){
             "authorization_code"=>{
@@ -473,15 +472,14 @@ async fn exchange(
             "slt"|super::token::SLT_GRANT_TYPE=>grants::slt::exchange(&state,&ClientAuth{app:target,public:false},&params,&meta,None).await.map_err(oauth)?,
             "refresh_token"=>{
                 let token=input.refresh_token.as_deref().ok_or_else(||ApiError::invalid_request("refresh_token is required."))?;
-                let family=super::credentials::refresh_token_info(&mut tx,&state.keys.pepper,token).await?.map(|v|v.family_id);
-                bound(&mut tx,cell,&app,family).await?;
+                let family=super::credentials::refresh_token_info(&mut admission,&state.keys.pepper,token).await?.map(|v|v.family_id);
+                bound(&mut admission,cell,&app,family).await?;
                 grants::refresh::exchange(&state,&ClientAuth{app:target,public:false},&params,&meta,None).await.map_err(oauth)?
             },
             _=>return Err(ApiError::invalid_request("Cells delegation supports authorization_code with S256 PKCE, slt, and refresh_token.")),
         };
         let family=state.keys.jwt.verify_access(&tokens.access_token,Some(&app)).map_err(|_|ApiError::internal("Issued token could not be verified."))?.family_id().ok_or_else(||ApiError::internal("Issued token has no family."))?;
-        sqlx::query("insert into cells_token_families(family_id,cell_uuid,app_id) values($1,$2,$3) on conflict(family_id) do nothing").bind(family).bind(cell).bind(&app).execute(&mut *tx).await?;
-        tx.commit().await?;
+        sqlx::query("insert into cells_token_families(family_id,cell_uuid,app_id) values($1,$2,$3) on conflict(family_id) do nothing").bind(family).bind(cell).bind(&app).execute(&state.db).await?;
         Ok((StatusCode::OK,serde_json::to_value(tokens).map_err(|_|ApiError::internal("Could not encode token response."))?))
     }).await?;
     admission.commit().await?;
@@ -577,16 +575,21 @@ async fn revoke(
             .filter(|c| c.aud == app)
             .and_then(|c| c.family_id())
     };
-    if let Ok(family) = bound(&mut tx, cell, &app, family).await
-        && let Some(family) = tokens::revoke_family(&mut tx, family, "cell_sign_out").await?
-    {
-        accounts_core::events::membership_signed_out(
-            &mut tx,
-            &app,
-            &family.account_uuid,
-            "cell_sign_out",
-        )
-        .await?;
+    match bound(&mut tx, cell, &app, family).await {
+        Ok(family) => {
+            if let Some(family) = tokens::revoke_family(&mut tx, family, "cell_sign_out").await? {
+                accounts_core::events::membership_signed_out(
+                    &mut tx,
+                    &app,
+                    &family.account_uuid,
+                    "cell_sign_out",
+                )
+                .await?;
+            }
+        }
+        // A failed lookup aborted the transaction: never report a sign-out that did not happen.
+        Err(e) if e.is_server_error() => return Err(e),
+        Err(_) => {}
     }
     tx.commit().await?;
     Ok(super::respond::no_store(

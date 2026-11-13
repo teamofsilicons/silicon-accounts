@@ -3,7 +3,8 @@
 //! after expiring so late presentations still get a precise "already used"/"expired" answer and
 //! a reused authorization code can still revoke the tokens issued from it. Token families and
 //! refresh tokens are sign-in history and are never swept here. Expired or revoked encrypted
-//! refresh recovery replies are retired while their request bindings remain.
+//! refresh recovery replies are retired while their request bindings remain, and code and SLT
+//! exchange receipts are deleted like the grants they replay.
 
 use std::time::Duration;
 
@@ -11,7 +12,8 @@ use accounts_core::{ApiResult, AppState};
 use sqlx::PgPool;
 use tokio::time::MissedTickBehavior;
 
-/// Days an expired authorization code, short-lived token or device authorization is kept.
+/// Days an expired authorization code, short-lived token, device authorization or exchange receipt
+/// is kept.
 pub const GRANT_RETENTION_DAYS: i32 = 7;
 
 /// How often the sweep runs.
@@ -22,6 +24,7 @@ const SWEEP_EVERY: Duration = Duration::from_mins(15);
 pub struct PurgedGrants {
     pub authorization_codes: u64,
     pub refresh_recoveries: u64,
+    pub exchange_recoveries: u64,
     pub short_lived_tokens: u64,
     pub device_authorizations: u64,
 }
@@ -34,11 +37,13 @@ impl PurgedGrants {
             + self.short_lived_tokens
             + self.device_authorizations
             + self.refresh_recoveries
+            + self.exchange_recoveries
     }
 }
 
-/// Deletes authorization codes, short-lived tokens and device authorizations that expired more
-/// than [`GRANT_RETENTION_DAYS`] days ago, and retires expired/revoked refresh recovery replies.
+/// Deletes authorization codes, short-lived tokens, device authorizations and code/SLT exchange
+/// receipts that expired more than [`GRANT_RETENTION_DAYS`] days ago, and retires expired/revoked
+/// refresh recovery replies.
 ///
 /// # Errors
 ///
@@ -67,8 +72,16 @@ pub async fn purge_expired_grants(pool: &PgPool) -> ApiResult<PurgedGrants> {
     .execute(&mut *conn)
     .await?
     .rows_affected();
+    let exchange_recoveries = sqlx::query(
+        "delete from grant_exchange_recoveries where expires_at < now() - make_interval(days => $1)",
+    )
+    .bind(GRANT_RETENTION_DAYS)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
     Ok(PurgedGrants {
         refresh_recoveries,
+        exchange_recoveries,
         authorization_codes,
         short_lived_tokens,
         device_authorizations,
@@ -86,6 +99,7 @@ pub(crate) async fn run(state: AppState) {
             Ok(purged) if purged.total() > 0 => tracing::info!(
                 authorization_codes = purged.authorization_codes,
                 refresh_recoveries = purged.refresh_recoveries,
+                exchange_recoveries = purged.exchange_recoveries,
                 short_lived_tokens = purged.short_lived_tokens,
                 device_authorizations = purged.device_authorizations,
                 "purged expired grants"

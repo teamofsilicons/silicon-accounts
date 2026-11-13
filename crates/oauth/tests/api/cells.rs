@@ -4,7 +4,7 @@ use accounts_core::{
     crypto::{prefix, random_token},
     models::Scope,
     repo::{apps, tokens},
-    test_support::{Req, TestContext},
+    test_support::{Req, TestContext, call},
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -230,15 +230,19 @@ async fn cells_delegation_requires_authors_and_keeps_sessions_bound_to_one_cell(
     .expect("Cells delegation fixture or response")
     .0;
     let exchange_body = json!({"grant_type":"slt","slt":slt});
-    let issued = ctx
-        .call(
-            router(),
-            Req::post(&format!("{path}/token"))
-                .basic("silicon-cells", &service_secret)
-                .header("idempotency-key", "slt-exchange")
-                .json(exchange_body.clone()),
-        )
-        .await;
+    // Two pooled connections suffice: the exchange never waits for a third while holding two.
+    let mut tight = ctx.state.clone();
+    tight.db = accounts_core::db::connect_url(&ctx.db.url, 2)
+        .await
+        .expect("two-connection pool");
+    let issued = call(
+        router().with_state(tight),
+        Req::post(&format!("{path}/token"))
+            .basic("silicon-cells", &service_secret)
+            .header("idempotency-key", "slt-exchange")
+            .json(exchange_body.clone()),
+    )
+    .await;
     assert_eq!(issued.status, 200, "{}", issued.json);
     assert_eq!(issued.json["account"]["uuid"], silicon.uuid);
     let replay = ctx
@@ -613,4 +617,32 @@ async fn cells_custom_callbacks_are_fenced_and_never_replace_the_permanent_callb
     );
     let denied = ctx.call(router(), Req::put(&path).basic("silicon-cells", &secret).header("idempotency-key", "replace-base").json(json!({"actor_token":author.access_token,"callback_uri":"https://other.example/auth/callback"}))).await;
     assert_eq!(denied.status, 409);
+}
+
+#[tokio::test]
+async fn cells_revoke_never_reports_a_sign_out_that_failed() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (app, _) = ctx.app("notes").await;
+    let service_secret = random_token(prefix::APP_SECRET);
+    sqlx::query("insert into apps(app_id,name,secret_hash,status,source) values('silicon-cells','Silicon Cells',$1,'active','fake')").bind(ctx.state.keys.pepper.hash(&service_secret)).execute(&ctx.db.pool).await.expect("Cells service app");
+    let session = ctx
+        .tokens_for(&carbon, &app.app_id, &[Scope::Profile])
+        .await;
+    // The binding lookup fails, which aborts the transaction the revocation would commit in.
+    ctx.exec("alter table cells_token_families rename to cells_token_families_gone")
+        .await;
+    let r = ctx
+        .call(
+            router(),
+            Req::post(&format!(
+                "/v1/internal/cells/links/{}/{}/revoke",
+                Uuid::new_v4(),
+                app.app_id
+            ))
+            .basic("silicon-cells", &service_secret)
+            .json(json!({"token":session.access_token})),
+        )
+        .await;
+    assert_eq!(r.status, 500, "{}", r.json);
 }
