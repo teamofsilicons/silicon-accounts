@@ -11,6 +11,7 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
 
 ## Design
 
+- **Tabs have a 2px frame (2026-11-13).** Anil chose `/__tabs` version A: 2px around the tabs instead of 4px, the keyboard ring inside the tab, corners concentric; tab widths, height and the 4px between them unchanged. Why: the 4px frame made the strip heavy beside the page's controls. In Silicon UI's Tabs through the local patch, filed as teamofsilicons/silicon-ui#32.
 - **The account command menu uses Silicon UI Dialog with a hidden accessible title and top placement (2026-11-12).** The palette draws the visible surface, while Dialog owns the modal layer and focus return. Why: Silicon UI #31 supplies the missing headerless mode, so the account menu no longer needs a direct Radix layer.
 
 - **Security on Home's rules, in the prototype's order (Anil, 2026-11-10).** The pinned page bar (as Connected apps);
@@ -40,6 +41,8 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   /__silicon-cards; Anil asked for the background to blend or wash with the Silicon's colours on 2026-11-13); The Silicons page uses the same cards (2026-11-13), with a badge beside the name only for Handing over or Waiting for
   a custodian (Active shows none). Home has no New Silicon card (2026-11-13); it shows the first three. Two a row on a
   phone. Save Avatar uploads a transparent animated GIF with the editable settings in its comment; its first frame is the still picture. An older opaque PNG is recognised by its mosaic cells and its gradient background is removed in the browser, so it keeps the same card artwork without changing the stored photo. The card samples the saved creature's actual colours for its wash; a new GIF uses its first frame. Ordinary photos still fill the art (2026-11-13).
+- **Silicon avatars keep the Alive motion (Anil, 2026-11-13).** Shimmer, glances, blinks and a twinkling halo; never up
+  and down. The other styles (colour wave, sparkle, watcher, glow, on hover) stay in /__silicon-motion.
 - **The sidebar's sections in title case (Anil, 2026-11-12):** Home, Silicons, Connected Apps, Security, Personal Info,
   Data & Privacy (lib/navigation.ts SECTIONS, so the phone sheet, the ⌘K menu and the phone bar's title follow). The
   pages' own titles stay as they are.

@@ -3,7 +3,7 @@
    shadow; rows 8px high and 12px at the sides, straight dividers between them (rows aren't rounded); a 28px mark; the
    title in body over one line in --text-soft; title-case buttons, outlined, with a quiet soft Keep. */
 
-.section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
+.section { display: grid; gap: var(--space-related); margin-top: var(--space-section); }
 .head { display: flex; align-items: center; gap: var(--space-related); }
 .title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
 

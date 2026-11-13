@@ -106,7 +106,15 @@ export interface SiliconAvatarCell { r: number; c: number; color: string; kind: 
  * `phase` drifts the mosaic's grain (a slow shimmer), `look` sends the eyes to one side, `blinking` closes them, and
  * `twinkle` picks which halo pixels around it are lit. The still picture is every one of them at rest.
  */
-export interface SiliconAvatarFrame { phase?: number; look?: "left" | "right"; blinking?: boolean; twinkle?: number }
+export interface SiliconAvatarFrame {
+  phase?: number; look?: "left" | "right"; blinking?: boolean; twinkle?: number;
+  /** Colour wave: how far the palette has flowed along its own slant (0 to 2, wrapping), so colours travel through it. */
+  shift?: number;
+  /** Sparkle: which few body pixels glint white this moment (a new number picks new ones). */
+  sparkle?: number;
+  /** Glow: how much of the halo is lit, 0.3 (a few pixels) to 2 (a full ring). */
+  glow?: number;
+}
 
 /** Every pixel of the avatar on the 16 by 16 grid. */
 export function siliconAvatarCells(choice: SiliconAvatarChoice, frame: SiliconAvatarFrame = {}): SiliconAvatarCell[] {
@@ -126,7 +134,9 @@ export function siliconAvatarCells(choice: SiliconAvatarChoice, frame: SiliconAv
   for (const [r, c] of filled) { const p = project(r, c); low = Math.min(low, p); high = Math.max(high, p); }
   const sd = choice.seed;
   const colourAt = (r: number, c: number): Rgb => {
-    const t = (project(r, c) - low) / (high - low || 1) + (hash(r, c, sd + 1) - 0.5) * BLEND * 2;
+    let t = (project(r, c) - low) / (high - low || 1) + (hash(r, c, sd + 1) - 0.5) * BLEND * 2;
+    // The wave: the palette slides along its slant and back (a triangle, so the colours never jump).
+    if (frame.shift) { const u = (((t + frame.shift) % 2) + 2) % 2; t = 1 - Math.abs(u - 1); }
     let [h, s, l] = sampleStops(palette.stops, t);
     if (palette.accent && hash(r, c, sd + 11) < SPRINKLE) [h, s, l] = palette.accent[Math.floor(hash(r, c, sd + 13) * palette.accent.length)];
     h += (hash(r, c, sd + 7) - 0.5) * 8;
@@ -141,12 +151,13 @@ export function siliconAvatarCells(choice: SiliconAvatarChoice, frame: SiliconAv
     if (ch === "E") continue;
     const edge = empty(r - 1, c) || empty(r + 1, c) || empty(r, c - 1) || empty(r, c + 1);
     const white = ch === "o" ? 0.5 + 0.35 * hash(r, c, sd + 19) : edge ? EDGE * (0.1 + 0.6 * hash(r, c, sd + 17)) : 0;
-    put(r, c, mix(colourAt(r, c), WHITE, white), "body");
+    const glint = frame.sparkle !== undefined && hash(r, c, sd + 31 + frame.sparkle * 1.7) < 0.05 ? 0.85 : 0;
+    put(r, c, mix(colourAt(r, c), WHITE, Math.max(white, glint)), "body");
   }
   for (let r = -1; r <= height; r++) for (let c = -1; c <= width; c++) {
     if (!empty(r, c)) continue;
     const touches = ([[1, 0], [-1, 0], [0, 1], [0, -1]] as const).some(([p, q]) => !empty(r + p, c + q) && at(r + p, c + q) !== "E");
-    if (touches && hash(r, c, sd + 23 + (frame.twinkle ?? 0) * 0.37) < HALO * 0.55) put(r, c, mix(colourAt(r, c), WHITE, 0.72 + 0.2 * hash(r, c, sd + 29)), "halo");
+    if (touches && hash(r, c, sd + 23 + (frame.twinkle ?? 0) * 0.37) < HALO * 0.55 * (frame.glow ?? 1)) put(r, c, mix(colourAt(r, c), WHITE, 0.72 + 0.2 * hash(r, c, sd + 29)), "halo");
   }
   const look = { right: [[0, 1], [0, 1]], left: [[1, 0], [1, 0]], inward: [[0, 1], [1, 0]] }[choice.eyes] ?? [[0, 1], [0, 1]];
   let eye = 0;

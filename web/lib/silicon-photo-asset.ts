@@ -6,6 +6,7 @@
  */
 import { isSiliconAvatarGif, siliconAvatarChoiceFromGif } from "./silicon-avatar-gif";
 import type { SiliconAvatarChoice } from "./silicon-avatar";
+import { matchSiliconAvatar } from "./silicon-avatar-match";
 
 export type SiliconPhotoAsset = { kind: "avatar"; src: string; poster: string; colours?: [string, string, string]; choice?: SiliconAvatarChoice } | { kind: "photo"; src: string };
 
@@ -94,6 +95,21 @@ async function firstFrame(blob: Blob): Promise<{ poster: string; colours?: [stri
   } finally { bitmap.close(); }
 }
 
+/** The avatar look an exact maker PNG was drawn from, or null for anything else. */
+async function lookOfPng(blob: Blob): Promise<SiliconAvatarChoice | null> {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width; canvas.height = bitmap.height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return null;
+    context.drawImage(bitmap, 0, 0);
+    return matchSiliconAvatar(context.getImageData(0, 0, bitmap.width, bitmap.height).data, bitmap.width, bitmap.height);
+  } catch {
+    return null;
+  } finally { bitmap.close(); }
+}
+
 const cache = new Map<string, Promise<SiliconPhotoAsset>>();
 
 /** Keeps real photos intact; returns a transparent image (and a still frame for GIFs) for maker uploads. */
@@ -121,6 +137,9 @@ export function siliconPhotoAsset(src: string): Promise<SiliconPhotoAsset> {
         if (isSiliconAvatarGif(bytes)) return { kind: "avatar", src: url, ...await firstFrame(blob), choice: siliconAvatarChoiceFromGif(bytes) ?? undefined };
       }
       if (blob.type === "image/png") {
+        // A maker PNG is exact: find its look again, so the card can draw it live (silicon-avatar-match.ts).
+        const choice = await lookOfPng(blob);
+        if (choice) return { kind: "avatar", src: url, poster: url, choice };
         const recovered = await recoverLegacyAvatar(blob);
         if (recovered) return { kind: "avatar", src: recovered.src, poster: recovered.src, colours: recovered.colours };
       }

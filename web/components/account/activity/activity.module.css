@@ -14,3 +14,6 @@
 .none { margin: var(--space-section) 0 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
 .more { display: flex; justify-content: center; margin-top: var(--space-section); }
 .error { margin: var(--space-related) 0 0; color: var(--danger); font: var(--small); letter-spacing: var(--small-tracking); text-align: center; }
+
+/* The days in the page column's 16px grid, so they sit 32px apart as sections do on every account page. */
+.feed { display: grid; gap: var(--space-inset); }

@@ -16,7 +16,7 @@
  */
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Clock, ImageUp, KeyRound, Trash2, UserRound, Webhook } from "lucide-react";
+import { CaseSensitive, Clock, ImageUp, KeyRound, Trash2, UserRound, Webhook } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
@@ -125,11 +125,11 @@ export function SiliconPage({ uuid }: { uuid: string }) {
           <TabsTrigger value="access">Access</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
-        <TabsContent value="access">
+        <TabsContent value="access" className={styles.panel}>
           <SecretKey silicon={silicon} now={now} />
           <WebhookSection silicon={silicon} />
         </TabsContent>
-        <TabsContent value="settings">
+        <TabsContent value="settings" className={styles.panel}>
           <About silicon={silicon} me={carbon} now={now} />
           <DeleteSection silicon={silicon} onDeleted={gone => { dismissRevealsOf(gone); router.push(paths.silicons); }} />
         </TabsContent>
@@ -311,7 +311,7 @@ function About({ silicon, me, now }: { silicon: ManagedSilicon; me: CarbonMe; no
 
   return (
     <Section id="silicon-about" title="About">
-      <Row lead={<SiliconMark seed={silicon.uuid} photo={silicon.pfp_url} size={28} />} title="Name" detail={silicon.display_name}>
+      <Row lead={<Tile><CaseSensitive size={16} strokeWidth={2} /></Tile>} title="Name" detail={silicon.display_name}>
         <Button variant="secondary" size="sm" onClick={() => { setName(silicon.display_name); setEditing("name"); }}>Edit</Button>
       </Row>
       <Row lead={<Tile><UserRound size={16} strokeWidth={2} /></Tile>} title="Id" detail={<span className="mono">{silicon.id ?? "No id yet"}</span>}>

@@ -12,6 +12,8 @@
 
 .reveals { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
 .tabs { margin-top: var(--space-block); }
+/* Each tab's sections in the page column's 16px grid, so they sit 32px apart as on every account page. */
+.panel { display: grid; gap: var(--space-inset); }
 
 /* In a dialog: its fields, then Cancel and the action at the end. */
 .form { display: grid; min-width: 0; gap: var(--space-inset); }

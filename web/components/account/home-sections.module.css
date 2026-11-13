@@ -1,7 +1,7 @@
 /* Home's Your Silicons, in Home's section pattern: a heading row (the section heading, a quiet "See all" at the end),
-   16px above its content; 32px under what comes before, like every section. The cards are parts/silicon-card.tsx,
+   8px above its content; 32px under what comes before, like every section. The cards are parts/silicon-card.tsx,
    three a row (two on a phone). */
-.section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
+.section { display: grid; gap: var(--space-related); margin-top: var(--space-section); }
 .head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-group); }
 /* Home's section headings (h2), one style everywhere: 22px medium, display tracking (Anil, 2026-10-31). */
 .title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }

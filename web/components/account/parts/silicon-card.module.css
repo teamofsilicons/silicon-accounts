@@ -54,3 +54,12 @@
 .card[data-blend="tint"] .art { background: radial-gradient(closest-side at 50% 60%, color-mix(in oklab, var(--avatar-2) 20%, transparent), transparent); }
 
 @media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+
+/* Browsers without color-mix() (Safari before 16.2, Firefox before 113): the wash and tint above fail when applied
+   (they use custom properties, so the browser can't drop them while parsing), leaving no background. Draw a quiet
+   grey instead, so the avatar still sits on something. */
+@supports not (color: color-mix(in oklab, red, blue)) {
+  .card .art { background: var(--surface-muted); }
+  .card[data-blend="tint"] { --sq-fill: var(--surface); --sq-stroke: var(--border); }
+  .card .art::before { content: none; }
+}

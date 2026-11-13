@@ -145,7 +145,7 @@ export function Activity() {
             <EmptyState icon={<History width={24} height={24} strokeWidth={1.5} />} title="Nothing here yet" description={EMPTY[filter]} />
           </div>
         ) : (
-          <div ref={feed} role="region" aria-label="Account activity">
+          <div ref={feed} role="region" aria-label="Account activity" className={styles.feed}>
             {days.map(day => (
               <Section key={day.key} id={`activity-${day.key}`} title={dayLabel(day.key, now, timeZone)}>
                 {day.items.map(item => {

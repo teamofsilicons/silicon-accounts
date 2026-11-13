@@ -1,8 +1,10 @@
-/* The account pages' sections and rows (rows.tsx), on Home's rules (Anil, 2026-11-10): sections 32px apart (the column's
-   16 and 16 more) with an h2 16px above a boxed list; one white list with a clear border and no resting shadow; rows 8px
+/* The account pages' sections and rows (rows.tsx), on Home's rules (Anil, 2026-11-10; spacing 2026-11-13): an h2 8px
+   above its boxed list, so the heading belongs to its box; 32px between sections (the page column's 16 and this 16
+   more), so each reads as its own group. A page that holds sections outside the column (the Silicon page's tabs) gives
+   them the same 16px column (silicon-page.module.css .panel); one white list with a clear border and no resting shadow; rows 8px
    high and 12px at the sides, straight dividers between them; the title in body over one line in --text-soft. */
 
-.section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
+.section { display: grid; gap: var(--space-related); margin-top: var(--space-section); }
 .head { display: flex; align-items: center; gap: var(--space-related); }
 .title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
 .headBlock { display: grid; gap: var(--space-tight); }

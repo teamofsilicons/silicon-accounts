@@ -9,9 +9,9 @@
  * Until 2026-11-12 the mark was the prototype's: the Silicon's gradient (one of four pairs) with a white spark. It stays
  * as SiliconSparkMark, for the labs' record.
  */
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { Sparkle } from "lucide-react";
-import { siliconAvatarDataUrl, siliconPalette } from "@/lib/silicon-avatar";
+import { siliconAvatarDataUrl, siliconChoiceFromSeed, siliconPalette } from "@/lib/silicon-avatar";
 import { useSiliconPicture } from "@/lib/silicon-picture";
 import styles from "./parts.module.css";
 
@@ -26,15 +26,17 @@ export function pairOf(seed: string): number {
 
 export function SiliconMark({ seed, photo, size = 32, pending, className }: { seed: string; photo?: string | null; size?: number; pending?: boolean; className?: string }) {
   const picture = useSiliconPicture({ uuid: seed, pfp_url: photo });
-  if (picture.kind === "photo") {
+  // A photo that can't be loaded (a dead link, a blocked host) falls back to the Silicon's own avatar.
+  const [failed, setFailed] = useState<string | null>(null);
+  if (picture.kind === "photo" && failed !== picture.src) {
     return (
       <span className={[styles.siliconMark, styles.siliconPhoto, className].filter(Boolean).join(" ")} style={{ "--mark-size": `${size}px` } as CSSProperties} data-pending={pending ? "" : undefined} aria-hidden="true">
         {/* eslint-disable-next-line @next/next/no-img-element -- the Silicon's own photo, any https address. */}
-        <img src={picture.src} alt="" decoding="async" referrerPolicy="no-referrer" />
+        <img src={picture.src} alt="" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(picture.src)} />
       </span>
     );
   }
-  const choice = picture.choice;
+  const choice = picture.kind === "avatar" ? picture.choice : siliconChoiceFromSeed(seed);
   const colours = siliconPalette(choice);
   const style = { "--mark-size": `${size}px`, "--mark-from": colours[0], "--mark-to": colours[colours.length - 1] } as CSSProperties;
   return (

@@ -3,7 +3,7 @@
 .alertAction { display: block; margin-top: var(--space-group); }
 .reveals { display: grid; min-width: 0; gap: var(--space-inset); }
 
-.section { display: grid; gap: var(--space-inset); margin-top: var(--space-section); }
+.section { display: grid; gap: var(--space-related); margin-top: var(--space-section); }
 .sectionTitle { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
 
 /* Silicon cards (parts/silicon-card.tsx), three a row as on Home; two on a phone. */

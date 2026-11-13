@@ -16,7 +16,7 @@ import type { CSSProperties } from "react";
 import { siliconChoiceFromSeed, siliconPalette, type SiliconAvatarChoice } from "@/lib/silicon-avatar";
 import { siliconPhotoAsset, type SiliconPhotoAsset } from "@/lib/silicon-photo-asset";
 import { useSiliconPicture } from "@/lib/silicon-picture";
-import { SiliconAvatar } from "./silicon-avatar";
+import { SiliconAvatar, type SiliconMotion } from "./silicon-avatar";
 import { SiliconCardPhoto } from "./silicon-card-photo";
 import styles from "./silicon-card.module.css";
 
@@ -41,7 +41,10 @@ function scatter(choice: SiliconAvatarChoice, colours: string[]): string {
  * the name for a state worth noticing (Handing over, Waiting for a custodian; Active, the normal case, shows none). `detail`: one more line under the
  * si:id ("Key made 4 days ago").
  */
-export function SiliconCard({ uuid, name, id, href, blend = "wash", choice: given, photo, animate = true, status, detail }: { uuid: string; name: string; id?: string | null; href: string; blend?: SiliconCardBlend; choice?: SiliconAvatarChoice; photo?: string | null; animate?: boolean; status?: { tone: BadgeTone; text: string }; detail?: ReactNode }) {
+export function SiliconCard({ uuid, name, id, href, blend = "wash", choice: given, photo, animate = true, motion = "alive", status, detail }: { uuid: string; name: string; id?: string | null; href: string; blend?: SiliconCardBlend; choice?: SiliconAvatarChoice; photo?: string | null; animate?: boolean; motion?: SiliconMotion | "hover"; status?: { tone: BadgeTone; text: string }; detail?: ReactNode }) {
+  // "hover": still until the card is pointed at or focused, then alive (/__silicon-motion).
+  const [hovered, setHovered] = useState(false);
+  const moving = animate && (motion !== "hover" || hovered);
   // The Silicon's picture (lib/silicon-picture.ts): the look its Carbon made, its default avatar, or its own photo.
   const picture = useSiliconPicture({ uuid, pfp_url: photo });
   const photoSrc = picture.kind === "photo" && !given ? picture.src : null;
@@ -63,12 +66,15 @@ export function SiliconCard({ uuid, name, id, href, blend = "wash", choice: give
     ...(blend === "pixels" ? { "--avatar-scatter": scatter(choice, colours) } : {}),
   } as CSSProperties;
   return (
-    <Link href={href} data-sq="clip" className={styles.card} data-blend={blend} style={style}>
+    <Link href={href} data-sq="clip" className={styles.card} data-blend={blend} style={style} onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)} onFocus={() => setHovered(true)} onBlur={() => setHovered(false)}>
       <span className={styles.art} aria-hidden="true">
-        {picture.kind === "photo" && !given ? (
-          <SiliconCardPhoto src={picture.src} asset={photoAsset} />
+        {picture.kind === "photo" && !given && photoAsset?.kind === "avatar" && photoAsset.choice ? (
+          // An avatar saved as a GIF carries its look: draw it live and moving, as in the browser that made it.
+          <SiliconAvatar seed={uuid} choice={photoAsset.choice} animate={moving} motion={motion === "hover" ? "alive" : motion} className={styles.avatar} />
+        ) : picture.kind === "photo" && !given ? (
+          <SiliconCardPhoto src={picture.src} asset={photoAsset} fallback={<SiliconAvatar seed={uuid} choice={choice} animate={moving} motion={motion === "hover" ? "alive" : motion} className={styles.avatar} />} />
         ) : (
-          <SiliconAvatar seed={uuid} choice={choice} animate={animate} className={styles.avatar} />
+          <SiliconAvatar seed={uuid} choice={choice} animate={moving} motion={motion === "hover" ? "alive" : motion} className={styles.avatar} />
         )}
       </span>
       <span className={styles.words}>
