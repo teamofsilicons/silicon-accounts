@@ -453,8 +453,8 @@ pub async fn ping_subscription(
     .await
 }
 
-/// Records an event for a Silicon (it reads it on the event stream) and queues a delivery to its
-/// own webhook when it has one (returned).
+/// Records an event for a Silicon and enqueues it for Ting in the same transaction. Always
+/// returns `None`: Silicon events have no webhook delivery.
 pub async fn emit_to_silicon(
     conn: &mut PgConnection,
     silicon_uuid: &str,
@@ -513,7 +513,7 @@ pub async fn account_id_changed(
     Ok(out)
 }
 
-/// `silicon.id_changed` to the Silicon's own webhook: `{uuid, old_id, new_id}`.
+/// `silicon.id_changed` to the Silicon through Ting: `{uuid, old_id, new_id}`.
 pub async fn silicon_id_changed(
     conn: &mut PgConnection,
     silicon: &Account,
@@ -530,7 +530,7 @@ pub async fn silicon_id_changed(
 }
 
 /// Every id-change notification: `account.id_changed` to the account's member apps, plus
-/// `silicon.id_changed` to a Silicon's own webhook, or for a Carbon,
+/// `silicon.id_changed` to a Silicon through Ting, or for a Carbon,
 /// [`custodian_id_changed`] for the Silicons it is custodian of.
 pub async fn notify_id_changed(
     conn: &mut PgConnection,
@@ -551,7 +551,7 @@ pub async fn notify_id_changed(
 /// A Carbon's c:id changed. Apps see a Silicon's custodian as `{uuid, id}` (token responses,
 /// lookups, `account.updated`), so each live Silicon this Carbon is custodian of gets its
 /// version bumped and `account.updated` with `changed: ["custodian"]` to its member apps (and
-/// `silicon.updated` to its own webhook), carrying the custodian's new c:id. Call it after the
+/// `silicon.updated` to it through Ting), carrying the custodian's new c:id. Call it after the
 /// id change, in the same transaction.
 pub async fn custodian_id_changed(
     conn: &mut PgConnection,
@@ -641,7 +641,7 @@ pub async fn account_updated(
     Ok(out)
 }
 
-/// `silicon.updated` to the Silicon's own webhook: `{uuid, id, changed, silicon: Me}`.
+/// `silicon.updated` to the Silicon through Ting: `{uuid, id, changed, silicon: Me}`.
 pub async fn silicon_updated(
     conn: &mut PgConnection,
     silicon: &Account,
@@ -826,11 +826,11 @@ pub async fn notify_custodian_changed(
     Ok(out)
 }
 
-/// `silicon.custodian.declined` to a self-created Silicon's own webhook: `{uuid, id, request_id,
+/// `silicon.custodian.declined` to a self-created Silicon through Ting: `{uuid, id, request_id,
 /// custodian, decided_at, reason, released: true}`. `custodian` labels the Carbon it asked (its
 /// c:id, or the masked email it was named by); `reason` is a [`declined_reason`]. Emit it before
 /// the Silicon is released (`repo::accounts::release_silicon`), while it still has its id; the
-/// release keeps the webhook so the worker can deliver this.
+/// Ting row is written in the same transaction, so delivery survives the release.
 pub async fn silicon_custodian_declined(
     conn: &mut PgConnection,
     silicon: &Account,
@@ -854,7 +854,7 @@ pub async fn silicon_custodian_declined(
     .await
 }
 
-/// `silicon.custodian.expired` to a self-created Silicon's own webhook: `{uuid, id, request_id,
+/// `silicon.custodian.expired` to a self-created Silicon through Ting: `{uuid, id, request_id,
 /// custodian, expired_at, released: true}` (nobody accepted within 14 days). Emit it before the
 /// release, like [`silicon_custodian_declined`].
 pub async fn silicon_custodian_expired(
@@ -895,23 +895,6 @@ pub async fn ping_app(conn: &mut PgConnection, app_id: &str) -> ApiResult<Option
     }
 }
 
-/// `ping` to a Silicon's own webhook. `None` (and nothing recorded) when it has no webhook URL.
-pub async fn ping_silicon(
-    conn: &mut PgConnection,
-    silicon_uuid: &str,
-) -> ApiResult<Option<EmittedEvent>> {
-    let url: Option<String> =
-        sqlx::query_scalar("select webhook_url from accounts where uuid = $1 and kind = 'silicon'")
-            .bind(silicon_uuid)
-            .fetch_optional(&mut *conn)
-            .await?
-            .flatten();
-    if url.is_none() {
-        return Ok(None);
-    }
-    emit_to_silicon(conn, silicon_uuid, types::PING, json!({})).await
-}
-
 async fn custodian_ref(
     conn: &mut PgConnection,
     account: &Account,
@@ -927,51 +910,6 @@ async fn custodian_ref(
             }))
         }
         _ => Ok(None),
-    }
-}
-
-/// The current webhook URL of a target (deliveries and replays go to the current URL).
-pub async fn current_url(
-    conn: &mut PgConnection,
-    target_kind: WebhookTargetKind,
-    target_id: &str,
-) -> ApiResult<Option<String>> {
-    Ok(match target_kind {
-        WebhookTargetKind::App => crate::repo::apps::webhook_target(conn, target_id)
-            .await?
-            .map(|(u, _)| u),
-        WebhookTargetKind::Silicon => {
-            sqlx::query_scalar("select webhook_url from accounts where uuid = $1")
-                .bind(target_id)
-                .fetch_optional(&mut *conn)
-                .await?
-                .flatten()
-        }
-    })
-}
-
-/// The current signing secret of a target (decrypted), used to sign deliveries.
-pub async fn current_secret(
-    conn: &mut PgConnection,
-    keyring: &Keyring,
-    target_kind: WebhookTargetKind,
-    target_id: &str,
-) -> ApiResult<Option<String>> {
-    let enc: Option<Vec<u8>> = match target_kind {
-        WebhookTargetKind::App => crate::repo::apps::webhook_target(conn, target_id)
-            .await?
-            .and_then(|(_, s)| s),
-        WebhookTargetKind::Silicon => {
-            sqlx::query_scalar("select webhook_secret_enc from accounts where uuid = $1")
-                .bind(target_id)
-                .fetch_optional(&mut *conn)
-                .await?
-                .flatten()
-        }
-    };
-    match enc {
-        Some(bytes) => Ok(Some(keyring.decrypt_string(&bytes)?)),
-        None => Ok(None),
     }
 }
 

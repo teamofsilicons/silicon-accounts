@@ -117,14 +117,14 @@ async fn change_my_id(
 | `pfp` | photo URLs | `default_pfp_url(iris, kind, uuid)`, `is_default_pfp`, `photo_url_prefix`, `photo_url`, `photo_ref` → `PhotoRef::{External, Exact, Inexact}` |
 | `image` | photo bytes | `inspect(bytes, declared)` → `ImageInfo` (PNG/JPEG/GIF/WebP by their bytes, dimensions from the headers), `ImageKind`, `ImageError`, `MAX_DIMENSION`, `MAX_PIXELS` |
 | `photo_upload` | reading a photo upload | `read(&headers, body, route)` → `UploadedPhoto { bytes, info }` (`fingerprint()` for idempotency, `view(id)` for responses), `MAX_PHOTO_BYTES`, `count_account_upload` (20/hour per uploader), `count_signup_upload` (20/hour per sign-up), `too_large` |
-| `repo::accounts` | accounts and ids | `create_carbon`, `create_silicon`, `get`, `require`, `lock`, `by_handle`, `by_email`/`by_phone` (any row: uniqueness only), `by_uuid_or_id`, `id_availability`, `id_availability_for` (for a Silicon its custodian manages), `is_id_free`, `suggest_ids`, `suggest_id`, `change_id` (+ `ID_CHANGES_PER_DAY`), `update_profile`, `bump_version`, `set_status`, `set_custodian`, `finish_claim`, `set_stk`, `begin_stk_attempt` → `StkAttempt`, `stk_attempt_failed`, `clear_stk_failures` (+ `MAX_STK_FAILURES`, `STK_LOCK_SECONDS`), `set_silicon_webhook`, `delete_account` → `DeletedAccount`, `release_silicon`, `count/list_silicons_in_custody`, `active_reservation`, `reservations_of`, `invalid_id_error` |
-| `repo::contacts` | emails/phones | `lookup` → `Holder` (who an address signs in to), `after_proof`, `prove`, `drop_unverified`, `list_emails`, `list_phones`, `primary_email`, `primary_phone`, `owner`, `check_can_add`, `add_verified(_email/_phone)`, `mark_verified`, `set_primary(_email/_phone)`, `remove(_email/_phone)`, `verified_emails` |
+| `repo::accounts` | accounts and ids | `create_carbon`, `create_silicon`, `get`, `require`, `lock`, `by_handle`, `by_email` (any row: uniqueness only), `by_uuid_or_id`, `id_availability`, `id_availability_for` (for a Silicon its custodian manages), `is_id_free`, `suggest_ids`, `suggest_id`, `change_id` (+ `ID_CHANGES_PER_DAY`), `update_profile`, `bump_version`, `set_status`, `set_custodian`, `finish_claim`, `set_stk`, `begin_stk_attempt` → `StkAttempt`, `stk_attempt_failed`, `clear_stk_failures` (+ `MAX_STK_FAILURES`, `STK_LOCK_SECONDS`), `set_silicon_webhook`, `delete_account` → `DeletedAccount`, `release_silicon`, `count/list_silicons_in_custody`, `active_reservation`, `invalid_id_error` |
+| `repo::contacts` | emails/phones | `lookup` → `Holder` (who an address signs in to), `after_proof`, `prove`, `drop_unverified`, `list_emails`, `list_phones`, `primary_email`, `primary_phone`, `owner`, `check_can_add`, `add_verified(_email/_phone)`, `mark_verified`, `set_primary(_email)`, `remove(_email/_phone)`, `verified_emails` |
 | `repo::photos` | uploaded photos | `insert_for_account`, `check_usable` (an account's own or its custodian's upload), `prune`; sign-up uploads: `insert_for_signup`, `signup_photo`, `check_usable_for_signup`, `attach_signup_photo`, `discard_signup_photos`, `sweep_signup_photos` |
-| `repo::identities` | Google/Apple links | `find`, `link`, `touch`, `list_for_account`, `remove` |
-| `repo::apps` | apps | `get`, `require_active`, `owned_by`, `signin_row` → `AppSigninRow`, `effective_config`, `webhook_target`, `AppCredentialCache`, `AppAuthError`, `unknown_app`, `app_disabled` |
+| `repo::identities` | Google/Apple links | `find`, `link`, `list_for_account`, `remove` |
+| `repo::apps` | apps | `get`, `require_active`, `signin_row` → `AppSigninRow`, `effective_config`, `webhook_target`, `AppCredentialCache`, `AppAuthError`, `unknown_app`, `app_disabled` |
 | `repo::memberships` | `{app_id}:{uuid}` | `get`, `upsert_signin` (+`GrantMode`), `upsert_imported`, `list_for_account`, `remove_access`, `webhook_targets` (one row per member app and active subscription) |
 | `repo::subscriptions` | app event subscriptions | `Subscription`, `list`, `get`, `by_delivery`, `lock`, `insert_stream`, `set_webhook_updates` (the webhook's updates live in `app_signin_configs.webhook_events`; a trigger keeps its row in step), `set_stream_updates`, `set_status`, `delete_stream`, `validate_updates`, `wants` |
-| `repo::tokens` | grants | `issue_tokens`, `issue_tokens_for` (a sign-in with its own end, for token exchanges), `issue_tokens_until` (a sign-in that ends by a given moment, for an SLT minted by a token-exchange sign-in), `refresh`, `verify_access_token`, `create_family`, `find_family`, `family_for_refresh_token`, `revoke_family`, `revoke_families` (+`RevokeFilter`), `list_families`, `count_active_families`, `create_code`/`consume_code`, `create_slt`/`create_slt_within` (+`SltBound`)/`consume_slt`, `create_device`/`create_app_device`/`device_by_user_code`/`decide_device`/`poll_device`/`poll_app_device`, `GrantError` |
+| `repo::tokens` | grants | `issue_tokens`, `issue_tokens_for` (a sign-in with its own end, for token exchanges), `issue_tokens_until` (a sign-in that ends by a given moment, for an SLT minted by a token-exchange sign-in), `refresh`, `verify_access_token`, `find_family`, `family_for_refresh_token`, `revoke_family`, `revoke_families` (+`RevokeFilter`), `create_code`/`consume_code`, `create_slt`/`create_slt_within` (+`SltBound`)/`consume_slt`, `create_device`/`create_app_device`/`device_by_user_code`/`decide_device`/`poll_device`/`poll_app_device`, `GrantError` |
 | `repo::sessions` | browser sessions | `create`, `lookup`, `get`, `touch`, `mark_authenticated`, `authenticated_at`, `revoke`, `revoke_all`, `list_active` |
 | `repo::otp` | 6-digit codes | `send`, `verify` (+`Expect`, `Attempt`), `get`, `purge` |
 | `repo::rate_limit` | fixed windows | `enforce`, `enforce_pool`, `hit`, `peek` (no count), `take` (weighted), `bucket`, `limits::*`, `purge` |
@@ -134,7 +134,7 @@ async fn change_my_id(
 | `federation` | workload identity federation: trusted outside OIDC tokens (CI jobs) sign a Silicon in | `validate` (`NewFederation` → `ValidFederation`), `check_url` (https, public addresses; loopback only with `federation_allow_loopback`), `FederationClient` (SSRF-guarded fetch, JWKS cache: `discover`, `age_cache`, `clear`), `peek`, `verify` → `VerifiedToken` (`mismatch(trust)`), `sign_in` (the token exchange), `session_seconds`, `live_federations`, `is_federated_session`, `federated_session_refused`, `Federation`, `GITHUB_ACTIONS_ISSUER`, `GITLAB_ISSUER` |
 | `identity_tokens` | a Silicon's OIDC ID tokens for clouds (RS256) | `IdentitySigner` (`generate`, `from_pkcs8_der`, `sign`, `verify`, `jwk`, `kid`), `IdentityKeyCell`, `load_or_create` (made once, sealed with the keyring, stored in `signing_keys`), `IdentityClaims`, `validate_audience`, `is_identity_token`, `not_an_access_token`, `TOKEN_USE_IDENTITY` |
 | `silicon_keys` | Silicon key credentials | `parse_public_key`, `PublicKey::fingerprint`, `read_assertion`, `Assertion::signed_by`, `sign_in` (assertion to first-party tokens), `SiliconKey`, `audiences` |
-| `events` | webhooks and the event stream | `APP_UPDATE_CHOICES`, `DEFAULT_UPDATES`, `APP_EVENT_TYPES`, `SILICON_EVENT_TYPES`, `event_types_for_updates`, `ping_subscription`, `notify_id_changed`, `notify_profile_updated`, `account_deleted`, `membership_signed_out`, `signed_out_for_families`, `membership_access_removed`, `notify_custodian_changed`, `silicon_custodian_declined`, `silicon_custodian_expired`, `emit_to_app`, `emit_to_silicon`, `ping_app`, `ping_silicon`, `current_url`, `current_secret`, `new_webhook_secret`, `retry_delay_seconds`, `signout_reason::*`, `declined_reason::*`, header constants |
+| `events` | webhooks and the event stream | `APP_UPDATE_CHOICES`, `DEFAULT_UPDATES`, `APP_EVENT_TYPES`, `SILICON_EVENT_TYPES`, `event_types_for_updates`, `ping_subscription`, `notify_id_changed`, `notify_profile_updated`, `account_deleted`, `membership_signed_out`, `signed_out_for_families`, `membership_access_removed`, `notify_custodian_changed`, `silicon_custodian_declined`, `silicon_custodian_expired`, `emit_to_app`, `emit_to_silicon`, `ping_app`, `new_webhook_secret`, `retry_delay_seconds`, `signout_reason::*`, `declined_reason::*`, header constants |
 | `delivery` | email/SMS | `enqueue`, `enqueue_otp`, `spawn_deliver`, `deliver_now`, `claim_due`, `deliver_claimed` (claim-checked), `CLAIM_SECONDS`, `Sender`, `PostmarkSender`, `TwilioSender`, `LocalSender`, `templates::*`, `extract_code` |
 | `logging` | process logs | `init_logging` (JSON lines in production) |
 | `http` | extractors and helpers | `AccountAuth`, `CarbonAuth`, `SiliconAuth`, `AppAuth`, `AppOrOwner`, `authenticate_client`, `ClientMeta`, `IdempotencyKey`, `Json`, `Query`, `Path`, `parse_form_or_json`, `check_origin`, `cookies::*`, `pagination::*`, `request_id::middleware` |
@@ -340,7 +340,7 @@ surfaces, not a fill. The dark `danger` was `#F97066` (4.46:1 on the old `#35343
   with `repo::photos::check_usable`. Then `events::notify_profile_updated(&mut tx, &account, &changed)`.
 - `bump_version` after app-visible changes stored elsewhere (new primary email/phone), then
   `events::account_updated(&mut tx, &account, &[AccountField::Email])`.
-- `by_email` / `by_phone` match **any** row, verified or not: uniqueness checks only. Who an
+- `by_email` matches **any** row, verified or not: uniqueness checks only. Who an
   address signs in to is `repo::contacts::lookup`.
 - `finish_claim(&mut conn, uuid, &[(ContactKind::Email, "a@x.test", VerifiedVia::Code)])` →
   `ClaimFinished { account, changed }`: finishes an `unclaimed` (imported) Carbon for the Carbon who
@@ -559,13 +559,12 @@ Call inside the transaction of the change. Each returns the `EmittedEvent`s it s
 | transfer accepted | `events::notify_custodian_changed(&mut tx, &silicon, &from, &to)` |
 | initial request declined / expired | `events::silicon_custodian_declined(&mut tx, &silicon, request_id, label, decided_at, declined_reason::DECLINED)` / `silicon_custodian_expired(...)` (before `release_silicon`) |
 | Silicon lifecycle | `events::emit_to_silicon(&mut tx, uuid, types::SILICON_CREATED / SILICON_CUSTODIAN_ACCEPTED / SILICON_STK_ROTATED, json!({...}))` |
-| test buttons | `events::ping_app`, `events::ping_silicon` |
+| test buttons | `events::ping_app` |
 
 The worker: deliveries are rows in `webhook_deliveries` (`pending`); body = `webhook_events.payload`
-serialized; headers `events::HEADER_*`, `User-Agent: events::USER_AGENT`; sign with
-`crypto::webhook_signature(&events::current_secret(..)?, ts, body)`; post to
-`events::current_url(..)` (replays go to the current URL; a deleted or released Silicon keeps its
-webhook so its last events still arrive); connect only to addresses `normalize::resolve_checked`
+serialized; headers `events::HEADER_*`, `User-Agent: events::USER_AGENT`; the worker's
+`webhooks::load_target` reads the target's current URL and secret (replays go to the current URL);
+sign with `crypto::webhook_signature(secret, ts, body)`; connect only to addresses `normalize::resolve_checked`
 returned (the SSRF guard); 2xx within 10 s = delivered; retry with
 `events::retry_delay_seconds(attempts)` until `GIVE_UP_AFTER_HOURS` (72, counted from the event,
 or from `requeued_at` after a replay) → `failed`. New secrets:
@@ -589,8 +588,8 @@ Postmark posts to `{ACCOUNTS_POSTMARK_API_URL}/email`; Twilio to
 
 - `AccountAuth` — cookie `sa_session` (`__Host-sa_session` when secure) or `Bearer` access token with
   `aud = silicon-accounts` and an active family. A developer platform token (`aud = developer`) is accepted
-  only on `GET /v1/me`, `GET /v1/session` and `GET /v1/me/owned-apps` (`DEVELOPER_READ_ROUTES`,
-  judged by the matched route) and by `AppOrOwner`; anywhere else it is 401
+  only where `http::auth::developer_audience_allowed` allows it (judged by the matched route) and
+  by `AppOrOwner`; anywhere else it is 401
   `token_wrong_audience` naming the route. Cookie-authenticated POST/PUT/PATCH/DELETE must carry an
   allowed `Origin` (403 `origin_not_allowed`). `auth.uuid()`, `auth.kind()`, `auth.account`,
   `auth.session_id()`, `auth.family_id()`, `auth.is_cookie()`. `Option<AccountAuth>` for optional

@@ -166,13 +166,6 @@ async fn silicon_tings_and_custodian_changes() {
         .await;
     let mut conn = ctx.conn().await;
 
-    // No Silicon webhook yet: nothing for the Silicon itself.
-    assert!(
-        events::ping_silicon(&mut conn, &s.uuid)
-            .await
-            .expect("ping")
-            .is_none()
-    );
     let (_secret, enc) = events::new_webhook_secret(&ctx.state.keys.keyring).expect("secret");
     let s = accounts_core::repo::accounts::set_silicon_webhook(
         &mut conn,
@@ -229,17 +222,7 @@ async fn silicon_tings_and_custodian_changes() {
     );
     assert_eq!(payload["data"]["uuid"], s.uuid);
 
-    // The Silicon's secret decrypts for signing; the app gets the custodian in account.updated.
-    let secret = events::current_secret(
-        &mut conn,
-        &ctx.state.keys.keyring,
-        accounts_core::models::WebhookTargetKind::Silicon,
-        &s.uuid,
-    )
-    .await
-    .expect("secret")
-    .expect("set");
-    assert!(secret.starts_with("whsec_"));
+    // The app gets the custodian in account.updated.
     let emitted = events::notify_profile_updated(&mut conn, &s, &[AccountField::Timezone])
         .await
         .expect("emit");

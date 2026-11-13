@@ -290,11 +290,6 @@ pub fn normalize_timezone(input: &str) -> Result<String, String> {
     }
 }
 
-/// True when `s` is a valid IANA timezone.
-pub fn is_valid_timezone(s: &str) -> bool {
-    normalize_timezone(s).is_ok()
-}
-
 /// Validates a display name: trimmed, 1..=100 characters, no control characters.
 pub fn validate_display_name(input: &str) -> Result<String, String> {
     let s = input.trim();

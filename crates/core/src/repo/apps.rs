@@ -57,18 +57,6 @@ pub fn app_disabled(app: &App) -> ApiError {
     .hint("Ask the app's owner to re-enable it in Silicon Apps.")
 }
 
-/// Apps owned by a Carbon, newest first.
-pub async fn owned_by(conn: &mut PgConnection, owner_uuid: &str) -> ApiResult<Vec<App>> {
-    Ok(sqlx::query_as::<_, App>(concat!(
-        "select ",
-        crate::app_columns!(),
-        " from apps where owner_uuid = $1 order by created_at desc, app_id"
-    ))
-    .bind(owner_uuid)
-    .fetch_all(&mut *conn)
-    .await?)
-}
-
 /// A row of `app_signin_configs` (secrets stay encrypted).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct AppSigninRow {
@@ -81,16 +69,6 @@ pub struct AppSigninRow {
     pub webhook_secret_enc: Option<Vec<u8>>,
     pub updated_at: OffsetDateTime,
     pub updated_by: String,
-}
-
-impl AppSigninRow {
-    /// Which BYO secrets are stored.
-    pub fn secrets_present(&self) -> crate::models::ConfigSecretsPresent {
-        crate::models::ConfigSecretsPresent {
-            google_client_secret: self.google_client_secret_enc.is_some(),
-            apple_private_key: self.apple_private_key_enc.is_some(),
-        }
-    }
 }
 
 /// Loads an app's stored sign-in row.

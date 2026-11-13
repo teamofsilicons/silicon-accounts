@@ -128,15 +128,6 @@ pub fn too_large(bytes: Option<u64>) -> ApiError {
     .detail("max_bytes", MAX_PHOTO_BYTES as u64)
 }
 
-fn clip(s: &str, max: usize) -> String {
-    if s.chars().count() <= max {
-        s.to_string()
-    } else {
-        let head: String = s.chars().take(max).collect();
-        format!("{head}…")
-    }
-}
-
 /// The declared image type from Content-Type (415 when missing or not an accepted image type).
 fn declared_kind(headers: &HeaderMap, route: &str) -> ApiResult<ImageKind> {
     let raw = headers
@@ -158,7 +149,7 @@ fn declared_kind(headers: &HeaderMap, route: &str) -> ApiResult<ImageKind> {
         )));
     }
     ImageKind::from_content_type(raw).ok_or_else(|| {
-        let shown = clip(raw, 80);
+        let shown = crate::pfp::clip(raw, 80);
         let hint = if raw.to_ascii_lowercase().starts_with("multipart/") {
             "Send the image's raw bytes as the request body (not a multipart form) with Content-Type image/png, image/jpeg, image/webp or image/gif."
         } else {

@@ -243,11 +243,6 @@ impl IdentityKeyCell {
             .get_or_try_init(|| async { load_or_create(db, keyring).await })
             .await
     }
-
-    /// The key when it was already loaded (never touches the database).
-    pub fn loaded(&self) -> Option<&IdentitySigner> {
-        self.0.get()
-    }
 }
 
 async fn load_current(db: &PgPool, keyring: &Keyring) -> ApiResult<Option<IdentitySigner>> {

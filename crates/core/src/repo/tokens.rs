@@ -66,12 +66,6 @@ pub struct TokenFamily {
 }
 
 impl TokenFamily {
-    /// Not revoked and not past its absolute expiry (judged with this node's clock; the
-    /// repository functions use the database clock).
-    pub fn is_active(&self) -> bool {
-        self.revoked_at.is_none() && self.expires_at > OffsetDateTime::now_utc()
-    }
-
     pub fn scope_list(&self) -> Vec<Scope> {
         scopes_from_strings(&self.scopes)
     }
@@ -168,7 +162,7 @@ impl From<JwtError> for GrantError {
     }
 }
 
-/// Input for [`create_family`].
+/// Input for creating a token family (see [`issue_tokens`]).
 #[derive(Debug, Clone)]
 pub struct NewFamily<'a> {
     pub app_id: &'a str,
@@ -182,11 +176,6 @@ pub struct NewFamily<'a> {
     pub user_agent: Option<&'a str>,
     /// When the account authenticated (see [`TokenFamily::auth_time`]); `None` = now.
     pub auth_time: Option<OffsetDateTime>,
-}
-
-/// Creates a token family (expires 900 days from now).
-pub async fn create_family(conn: &mut PgConnection, new: &NewFamily<'_>) -> ApiResult<TokenFamily> {
-    create_family_for(conn, new, None, None).await
 }
 
 /// Creates a token family that expires `lifetime_seconds` from now (database clock), or 900
@@ -684,41 +673,6 @@ pub async fn revoke_families(
     .await?)
 }
 
-/// Families of an account (optionally one app), newest first.
-pub async fn list_families(
-    conn: &mut PgConnection,
-    account_uuid: &str,
-    app_id: Option<&str>,
-    active_only: bool,
-) -> ApiResult<Vec<TokenFamily>> {
-    Ok(sqlx::query_as::<_, TokenFamily>(concat!(
-        "select ",
-        family_columns!(),
-        " from token_families where account_uuid = $1 and ($2::text is null or app_id = $2) \
-          and (not $3 or (revoked_at is null and expires_at > now())) order by created_at desc"
-    ))
-    .bind(account_uuid)
-    .bind(app_id)
-    .bind(active_only)
-    .fetch_all(&mut *conn)
-    .await?)
-}
-
-/// Number of active families of an account at an app (the "active sessions" count).
-pub async fn count_active_families(
-    conn: &mut PgConnection,
-    account_uuid: &str,
-    app_id: &str,
-) -> ApiResult<i64> {
-    Ok(sqlx::query_scalar(
-        "select count(*) from token_families where account_uuid = $1 and app_id = $2 and revoked_at is null and expires_at > now()",
-    )
-    .bind(account_uuid)
-    .bind(app_id)
-    .fetch_one(&mut *conn)
-    .await?)
-}
-
 /// A verified access token: its claims, its (active) family and the account.
 #[derive(Debug, Clone)]
 pub struct VerifiedAccess {
@@ -1129,57 +1083,10 @@ pub async fn consume_slt(
     slt: &str,
     app_id: &str,
 ) -> Result<ShortLivedToken, GrantError> {
-    let slt = slt.trim();
-    if !slt.starts_with(prefix::SLT) {
-        let what = crate::crypto::describe_token(slt)
-            .unwrap_or("not a Silicon Accounts short-lived token");
-        return Err(GrantError::Invalid(format!(
-            "slt must be a short-lived token (it starts with slt_), but this is {what}."
-        )));
-    }
     let mut tx = pool.begin().await?;
-    let row: Option<(ShortLivedToken, bool)> = sqlx::query_as::<_, SltRow>(
-        "select token_hash, account_uuid, app_id, scopes, created_at, expires_at, consumed_at, \
-                family_expires_cap, federation_id, expires_at <= now() as expired from short_lived_tokens \
-         where token_hash = $1 for update",
-    )
-    .bind(pepper.hash(slt))
-    .fetch_optional(&mut *tx)
-    .await?
-    .map(|r| (r.token, r.expired));
-    let Some((t, expired)) = row else {
-        return Err(GrantError::Invalid(
-            "The short-lived token is not known: it is mistyped or was never issued.".into(),
-        ));
-    };
-    if t.consumed_at.is_some() {
-        return Err(GrantError::Invalid(
-            "The short-lived token was already used; each one works once. Get a new one.".into(),
-        ));
-    }
-    let failure = if expired {
-        Some(format!(
-            "The short-lived token expired at {} (they last {SLT_TTL_SECONDS} seconds); get a new one with `silicon-accounts login --app {}`.",
-            crate::timefmt::format_rfc3339_ms(t.expires_at),
-            t.app_id
-        ))
-    } else if t.app_id != app_id {
-        Some(format!(
-            "The short-lived token was issued for the app '{}', not for '{app_id}'; get one for '{app_id}' with `silicon-accounts login --app {app_id}`.",
-            t.app_id
-        ))
-    } else {
-        None
-    };
-    sqlx::query("update short_lived_tokens set consumed_at = now() where token_hash = $1")
-        .bind(&t.token_hash)
-        .execute(&mut *tx)
-        .await?;
+    let consumed = consume_slt_in_transaction(&mut tx, pepper, slt, app_id).await;
     tx.commit().await?;
-    match failure {
-        Some(m) => Err(GrantError::Invalid(m)),
-        None => Ok(t),
-    }
+    consumed
 }
 
 /// Consume under the caller's transaction. Commit client refusals, but commit successful

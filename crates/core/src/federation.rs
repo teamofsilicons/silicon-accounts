@@ -49,7 +49,7 @@ use uuid::Uuid;
 
 use crate::error::{ApiError, ApiResult};
 use crate::http::{AccountAuth, AuthVia, ClientMeta};
-use crate::models::{Account, AccountKind, AccountStatus, Scope, TokenOrigin};
+use crate::models::{AccountKind, AccountStatus, Scope, TokenOrigin};
 use crate::normalize::is_public_ip;
 use crate::repo::audit::{self, SigninRecord};
 use crate::repo::{accounts, rate_limit, tokens};
@@ -418,23 +418,19 @@ fn allowed_ip(ip: IpAddr, allow_loopback: bool) -> bool {
     is_public_ip(ip) || (allow_loopback && ip.is_loopback())
 }
 
-/// A host whose addresses aren't all allowed.
+/// A host whose addresses aren't all allowed; one message for both, so it can't map internal DNS.
 #[derive(Debug)]
 struct RefusedHost {
     host: String,
-    ip: Option<IpAddr>,
 }
 
 impl std::fmt::Display for RefusedHost {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.ip {
-            Some(ip) => write!(
-                f,
-                "the issuer host '{}' resolves to {ip}, which is not a public address",
-                self.host
-            ),
-            None => write!(f, "the issuer host '{}' doesn't resolve", self.host),
-        }
+        write!(
+            f,
+            "the issuer host '{}' has no public address (it doesn't resolve, or it resolves to a private or reserved address)",
+            self.host
+        )
     }
 }
 
@@ -460,16 +456,10 @@ impl reqwest::dns::Resolve for GuardedResolver {
                 .await
                 .map(Iterator::collect)
                 .unwrap_or_default();
-            if addrs.is_empty() {
-                return Err(Box::new(RefusedHost { host, ip: None })
-                    as Box<dyn std::error::Error + Send + Sync>);
-            }
-            if let Some(bad) = addrs.iter().find(|a| !allowed_ip(a.ip(), allow_loopback)) {
-                return Err(Box::new(RefusedHost {
-                    host,
-                    ip: Some(bad.ip()),
-                })
-                    as Box<dyn std::error::Error + Send + Sync>);
+            if addrs.is_empty() || addrs.iter().any(|a| !allowed_ip(a.ip(), allow_loopback)) {
+                return Err(
+                    Box::new(RefusedHost { host }) as Box<dyn std::error::Error + Send + Sync>
+                );
             }
             Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
         })
@@ -1236,11 +1226,6 @@ pub fn federated_session_refused(what: &str) -> ApiError {
     .hint("Add it from a session signed in with the STK or a key, or as the custodian.")
 }
 
-/// Whether `account` is the Silicon `silicon` or its custodian.
-pub fn is_silicon_or_custodian(silicon: &Account, account_uuid: &str) -> bool {
-    silicon.uuid == account_uuid || silicon.custodian_uuid.as_deref() == Some(account_uuid)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1377,5 +1362,25 @@ mod tests {
             );
         }
         assert!(peek("a.b").is_err());
+    }
+
+    #[tokio::test]
+    async fn a_refused_issuer_host_never_names_its_address() {
+        use reqwest::dns::Resolve as _;
+        let name = "localhost".parse().expect("name");
+        let err = match (GuardedResolver {
+            allow_loopback: false,
+        })
+        .resolve(name)
+        .await
+        {
+            Ok(_) => panic!("loopback refused"),
+            Err(e) => e.to_string(),
+        };
+        assert!(err.contains("has no public address"), "{err}");
+        assert!(
+            !err.contains("127.0.0.1") && !err.contains("::1"),
+            "the address stays private: {err}"
+        );
     }
 }
