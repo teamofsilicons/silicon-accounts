@@ -150,6 +150,14 @@ struct Start {
     signin_proof: Option<String>,
 }
 
+/// Accounts, Developer and Silicon Apps tokens manage accounts and apps; an Interface never gets one.
+fn delegation_forbidden() -> ApiError {
+    ApiError::forbidden(
+        "first_party_delegation_forbidden",
+        "Accounts, Developer and Silicon Apps privileges cannot be delegated.",
+    )
+}
+
 /// Builds precisely what the Carbon is asked to authorize, including target app
 /// details. A missing required email/phone or a work policy denial fails closed.
 async fn descriptors(
@@ -161,6 +169,11 @@ async fn descriptors(
 ) -> ApiResult<Vec<Value>> {
     let mut result = Vec::with_capacity(ids.len());
     for id in ids {
+        // Checked here, where every grant passes (start, consent, code exchange, refresh), and not
+        // only when the registry lists the apps: a stored row must not be able to slip one through.
+        if accounts_core::is_privileged_app_id(id) {
+            return Err(delegation_forbidden());
+        }
         let app = apps::require_active(conn, id).await?;
         organizations::check(conn, &account.uuid, id).await?;
         let config = apps::effective_config(conn, &state.settings, id).await?;
@@ -930,11 +943,8 @@ async fn token(
                     "Only a trusted interface may add an app without another sign-in.",
                 ));
             }
-            if app_id == "silicon-accounts" || app_id == "developer" {
-                return Err(ApiError::forbidden(
-                    "first_party_delegation_forbidden",
-                    "Accounts and Developer privileges cannot be delegated.",
-                ));
+            if accounts_core::is_privileged_app_id(app_id) {
+                return Err(delegation_forbidden());
             }
             if !session.approved_apps.iter().any(|id| id == app_id) {
                 session.approved_apps.push(app_id.to_string());

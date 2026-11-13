@@ -242,10 +242,10 @@ fn validate(input: &Sync) -> ApiResult<()> {
         || input
             .app_ids
             .iter()
-            .any(|s| s == "silicon-accounts" || s == "developer")
+            .any(|s| accounts_core::is_privileged_app_id(s))
     {
         return Err(ApiError::invalid_request(
-            "App IDs must be unique and cannot delegate Accounts or Developer identity privileges.",
+            "App IDs must be unique and cannot delegate Accounts, Developer or Silicon Apps privileges.",
         ));
     }
     if input.redirect_uris.len() > 100 || input.allowed_origins.len() > 100 {

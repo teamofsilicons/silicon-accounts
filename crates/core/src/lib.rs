@@ -87,6 +87,13 @@ pub fn is_first_party_app_id(app_id: &str) -> bool {
     app_id == FIRST_PARTY_APP_ID || app_id == DEVELOPER_APP_ID
 }
 
+/// True for the apps whose tokens manage accounts or apps: the first-party apps (and the former
+/// `accounts` id) and Silicon Apps, whose `aud = silicon-apps` tokens act as the owner on
+/// `/v1/apps/*` (see `http::auth`). An Interface may never be granted one of these.
+pub fn is_privileged_app_id(app_id: &str) -> bool {
+    is_first_party_app_id(app_id) || app_id == SILICON_APPS_APP_ID || app_id == "accounts"
+}
+
 /// Product name used in copy, emails and the `Powered by` line.
 pub const PRODUCT_NAME: &str = "Silicon Accounts";
 

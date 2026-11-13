@@ -1276,6 +1276,44 @@ async fn trusted_interface_can_add_unlisted_app_without_extra_consent() {
 }
 
 #[tokio::test]
+async fn trusted_interface_cannot_add_an_app_management_app() {
+    let ctx = TestContext::new().await;
+    let (_, cookie, _) = fixture(&ctx, "trusted", true).await;
+    sqlx::query("update interface_auth_clients set app_ids='{}' where interface_id='potato'")
+        .execute(&ctx.state.db)
+        .await
+        .unwrap();
+    let flow = begin(&ctx, &cookie).await;
+    let approved = decide(&ctx, &cookie, flow["flow_id"].as_str().unwrap(), true).await;
+    let issued = ctx
+        .call(router(), exchange(&code(&approved), "trusted-privileged"))
+        .await;
+    assert_eq!(issued.status, 200, "{}", issued.json);
+    let token = issued.json["refresh_token"].as_str().unwrap();
+    // Silicon Apps tokens act as the owner on /v1/apps/*: as dangerous as Developer's.
+    for app in ["silicon-apps", "developer", "silicon-accounts", "accounts"] {
+        let added = ctx
+            .call(
+                router(),
+                Req::post("/v1/interface-auth/token")
+                    .header("idempotency-key", &format!("trusted-add-{app}"))
+                    .json(json!({"interface_id":"potato","grant_type":"refresh_token","refresh_token":token,"app_id":app})),
+            )
+            .await;
+        assert_eq!(added.status, 403, "{app}: {}", added.json);
+        assert_eq!(added.json["error"]["code"], "first_party_delegation_forbidden", "{app}");
+    }
+    // A stored row naming Silicon Apps (written around the registry's check) is refused too.
+    sqlx::query("update interface_auth_clients set app_ids='{silicon-apps}' where interface_id='potato'")
+        .execute(&ctx.state.db)
+        .await
+        .unwrap();
+    let started = ctx.call(router(),Req::post("/v1/interface-auth/flows").session(&ctx.state.settings,&cookie).json(json!({"interface_id":"potato","redirect_uri":"https://potato.example/callback","state":"privileged","code_challenge":pkce::s256_challenge(VERIFIER),"code_challenge_method":"S256"}))).await;
+    assert_eq!(started.status, 403, "{}", started.json);
+    assert_eq!(started.json["error"]["code"], "first_party_delegation_forbidden");
+}
+
+#[tokio::test]
 async fn declining_interface_details_cannot_be_bypassed_by_verified_backend() {
     let ctx = TestContext::new().await;
     let (account, _, _) = fixture(&ctx, "verified", true).await;
