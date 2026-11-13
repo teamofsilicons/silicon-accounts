@@ -108,7 +108,7 @@ export function Identity() {
             </Box>
             {carbon ? <ContactBox carbon={carbon} /> : null}
             <div className={styles.accounts}>
-              <LinkRow href="/linked-accounts" lead={<Tile><UsersRound size={16} strokeWidth={2} /></Tile>} title="Your Accounts" detail="Your personal and work accounts, and switching between them" />
+              <LinkRow href={paths.linkedAccounts} lead={<Tile><UsersRound size={16} strokeWidth={2} /></Tile>} title="Your Accounts" detail="Your personal and work accounts, and switching between them" />
             </div>
             <Editors me={account} editing={org && editing === "id" ? null : editing} onClose={close} onReserved={setReserved} />
           </>

@@ -1,5 +1,5 @@
 import { LinkedAccountsPage } from "@/components/account/linked-accounts";
-export const metadata = { title: "Your accounts" };
+export const metadata = { title: "Your Accounts" };
 export default async function Page({
   searchParams,
 }: {

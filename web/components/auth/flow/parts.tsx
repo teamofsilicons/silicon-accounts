@@ -217,13 +217,14 @@ export function useStepErrors(carried: ErrorLike | null | undefined) {
  * The account this flow signs in as: photo, name and c:id, with an optional action (switch account). The name and id
  * are never cut short (the action moves under them when they need the room).
  */
-export function AccountRow({ account, action, size = "md" }: { account: AccountSummary; action?: ReactNode; size?: "sm" | "md" }) {
+export function AccountRow({ account, action, size = "md", detail, blocked }: { account: AccountSummary; action?: ReactNode; size?: "sm" | "md"; detail?: ReactNode; blocked?: boolean }) {
   return (
-    <div data-sq="surface" className={styles.accountRow} data-account={account.uuid} data-size={size}>
+    <div data-sq="surface" className={styles.accountRow} data-account={account.uuid} data-size={size} data-blocked={blocked ? "" : undefined}>
       <Avatar name={account.display_name} src={account.pfp_url || undefined} size={size === "sm" ? "md" : "lg"} />
       <span className={styles.accountText}>
         <span className={styles.accountName}>{account.display_name}</span>
         <span className={styles.accountId}>{account.id ?? account.uuid}</span>
+        {detail ? <span className={styles.accountDetail}>{detail}</span> : null}
       </span>
       {action ? <span className={styles.rowAction}>{action}</span> : null}
     </div>

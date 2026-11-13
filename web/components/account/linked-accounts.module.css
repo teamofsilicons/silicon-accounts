@@ -1,11 +1,13 @@
-.accounts { display: grid; gap: var(--space-block); }
-.row { background: var(--sq-fill); border: 1px solid var(--sq-stroke); --sq-r: 16px; --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; align-items: center; gap: var(--space-inset); padding: var(--space-comfort); margin-block: var(--space-related); }
-.row > svg { color: var(--text-muted); flex: none; }
-.identity { display: grid; gap: var(--space-hair); flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.identity span, .identity small { color: var(--text-muted); }
-.create { display: grid; gap: var(--space-inset); max-width: 440px; }
-.actions { display: flex; gap: var(--space-group); flex-wrap: wrap; align-items: center; }
-.actions p { flex-basis: 100%; }
-.request { align-items: stretch; flex-direction: column; }
-.request .actions { align-self: flex-start; }
-@media (max-width: 420px) { .row { flex-wrap: wrap; } .row > button { width: 100%; } }
+/* Your Accounts (linked-accounts.tsx), on the account pages' rules: the lead line as on Activity and Connected Apps,
+   the sections and rows from parts/rows. */
+.lead { margin: var(--space-section) 0 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.alert { margin-top: var(--space-section); }
+.skeleton { margin-top: var(--space-section); }
+/* An org's logo leads its work accounts, at the rows' 28px, with the marks' faint edge. */
+.logo { --sq-r: var(--radius-control); --sq-stroke: var(--border-subtle); flex: none; border: 1px solid var(--sq-stroke); object-fit: cover; }
+/* Create your personal account: the form inside the section's box, at the rows' inset. */
+.formRow { padding: var(--space-group); }
+.form { display: grid; max-width: 28rem; gap: var(--space-group); }
+.formActions { display: flex; }
+/* Manage your organizations: a link row after the sections, a section's distance below them. */
+.orgs { margin-top: var(--space-section); }

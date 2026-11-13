@@ -180,6 +180,15 @@
 .destinationIcon { display: grid; place-items: center; color: var(--text-secondary); }
 .provenNote { color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); }
 .destinationText { min-width: 0; color: var(--foreground); font: var(--small); letter-spacing: var(--small-tracking); overflow-wrap: anywhere; }
+/* A line under the id (an account's org, or why its org doesn't allow this app), and a row that can't be chosen. */
+.accountDetail { color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); overflow-wrap: anywhere; }
+.accountRow[data-blocked] { --sq-fill: var(--surface-muted); }
+.accountRow[data-blocked] .accountDetail { color: var(--danger); }
+/* The work invitation's sentences (work-invitation.tsx), in the body role under the heading. */
+.invitationText { margin: 0; color: var(--text-secondary); font: var(--body); letter-spacing: var(--body-tracking); overflow-wrap: anywhere; }
+/* The account picker's groups (steps/select-account.tsx): Personal, then Work, each a small label over its rows. */
+.accountGroup { display: grid; min-width: 0; gap: var(--space-2); }
+.groupLabel { margin: 0; color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
 .rowAction { display: flex; flex: none; align-items: center; margin-left: auto; }
 
 /* ------------------------------------------------------------------------------------------------ code entry */

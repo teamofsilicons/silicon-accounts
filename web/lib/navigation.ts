@@ -47,6 +47,7 @@ export const paths = {
   device: "/device",
   signInMethods: "/sign-in-methods",
   personal: "/personal",
+  linkedAccounts: "/linked-accounts",
   apps: "/apps",
   silicons: "/silicons",
   proofs: "/proofs",
