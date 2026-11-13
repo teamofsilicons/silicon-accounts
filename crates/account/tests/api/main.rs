@@ -11,5 +11,6 @@ mod id_change;
 mod identities;
 mod lookup;
 mod me;
+mod organizations;
 mod photos;
 mod sessions;

@@ -41,10 +41,6 @@ mod sessions;
 mod util;
 mod work_invitations;
 
-/// Photo inspection lives in core (every photo upload shares it); re-exported for callers of
-/// this crate's former `image` module.
-pub use accounts_core::image;
-
 pub use contacts::{CONTACT_ADDS_PER_ACCOUNT, CONTACT_ADDS_PER_IP};
 pub use lookup::LOOKUPS_PER_MINUTE;
 pub use photos::{MAX_PHOTO_BYTES, PHOTO_UPLOADS_PER_HOUR};

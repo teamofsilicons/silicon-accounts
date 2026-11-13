@@ -35,7 +35,10 @@ pub async fn enable(
     let token = headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
+        .and_then(|v| v.trim().split_once(' '))
+        .filter(|(scheme, _)| scheme.eq_ignore_ascii_case("bearer"))
+        .map(|(_, token)| token.trim())
+        .filter(|token| !token.is_empty())
         .ok_or_else(|| {
             ApiError::unauthenticated("invalid_token", "A Silicon access token is required.")
         })?;
@@ -114,29 +117,24 @@ pub async fn bind_request(
 ) -> Result<Json<Value>, ApiError> {
     ting::validate_session(&body.session_id)?;
     let token = super::self_create::request_token(&headers)?;
-    let id = super::common::parse_request_id(&raw).ok_or_else(|| {
+    let not_found = || {
         ApiError::not_found(
             "custodian_request_not_found",
             "No request matches this token.",
         )
-    })?;
+    };
+    let id = super::common::parse_request_id(&raw).ok_or_else(not_found)?;
     let mut tx = state.db.begin().await?;
-    let request = super::requests::lock(&mut tx, id).await?.ok_or_else(|| {
-        ApiError::not_found(
-            "custodian_request_not_found",
-            "No request matches this token.",
-        )
-    })?;
-    if request.kind != "initial"
+    let request = super::requests::lock(&mut tx, id)
+        .await?
+        .ok_or_else(not_found)?;
+    if !request.is_initial()
         || !request
             .request_token_hash
             .as_deref()
             .is_some_and(|hash| state.keys.pepper.verify(&token, hash))
     {
-        return Err(ApiError::not_found(
-            "custodian_request_not_found",
-            "No request matches this token.",
-        ));
+        return Err(not_found());
     }
     // Polling remains authoritative even if the decision happened during reconnect.
     // Retrying the same binding is idempotent; a new socket gets a fresh generation.

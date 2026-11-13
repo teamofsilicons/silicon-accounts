@@ -1,5 +1,5 @@
-//! Helpers shared by the handlers: id pre-checks, finding "my" Silicon, webhook storage, the
-//! peek-only rate-limit check, and the row locks that keep custody consistent with account
+//! Helpers shared by the handlers: id pre-checks, finding "my" Silicon, the peek-only
+//! rate-limit check, and the row locks that keep custody consistent with account
 //! deletion and STK rotation.
 //!
 //! # Locks on account rows

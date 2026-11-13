@@ -556,3 +556,30 @@ async fn the_photo_check_runs_under_the_account_lock() {
     assert_error(&r, 422, "validation_failed");
     assert_eq!(reload(&ctx, &carbon.uuid).await.pfp_url, current);
 }
+
+#[tokio::test]
+async fn a_new_personal_account_gets_the_trimmed_display_name() {
+    let ctx = TestContext::new().await;
+    let work = ctx.carbon().await;
+    ctx.exec(
+        "insert into organization_projections(org_id,name) values('testorg','Test organization')",
+    )
+    .await;
+    sqlx::query("update accounts set org_id='testorg',handle='c:member.testorg' where uuid=$1")
+        .bind(&work.uuid)
+        .execute(&ctx.state.db)
+        .await
+        .expect("work account");
+    let t = token(&ctx, &work).await;
+    let r = call(
+        &ctx,
+        Req::post("/v1/me/personal-account").bearer(&t).json(json!({
+            "id": format!("c:home-{}", accounts_core::test_support::rand_suffix()),
+            "display_name": "  Padded  ",
+        })),
+    )
+    .await;
+    assert_status(&r, 201);
+    let personal = reload(&ctx, r.json["uuid"].as_str().expect("uuid")).await;
+    assert_eq!(personal.display_name, "Padded");
+}

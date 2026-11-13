@@ -43,7 +43,7 @@ const PHOTO_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 
 /// `POST /v1/me/photo` — the body is the raw image (Content-Type image/png, image/jpeg,
 /// image/webp or image/gif; at most 2 MB). The bytes must really be that format; dimensions
-/// are capped (see [`image`]). Sets the account's `pfp_url` to
+/// are capped (see [`accounts_core::image`]). Sets the account's `pfp_url` to
 /// `{PUBLIC_URL}/v1/photos/{photo_id}` and notifies apps (`account.updated`, field pfp_url).
 /// 201 `{"pfp_url","photo":{…},"me":Me}`. Accepts `Idempotency-Key`.
 pub(crate) async fn upload(

@@ -131,7 +131,7 @@ async fn invite_action(
                 validate_notification_type(string(&notification,"type")?)?;
                 let stable_key=string(&notification,"key")?.to_owned();
                 notification["for"]=json!(target);notification["key"]=json!(format!("{stable_key}:invite:{id}"));
-                let base=std::env::var("ACCOUNTS_TING_URL").unwrap_or_else(|_|"https://ting.teamofsilicons.com".into());
+                let base=&state.settings.ting_url;
                 let response=state.http.post(format!("{}/v1/tings",base.trim_end_matches('/'))).bearer_auth(string(&body,"proof_token")?).json(&notification).send().await.map_err(|_|ApiError::unavailable("ting_unavailable","Ting could not be reached; retry the same notification."))?;
                 if !response.status().is_success(){return Err(ApiError::unavailable("ting_delivery_failed","Ting refused this invitation notification. Retry after the recipient's subscription is available."))}
                 delivered=1;
@@ -396,7 +396,7 @@ async fn mail(
         let mut destinations=vec![];
         if org=="system" {
             let email=body.get("to_email").and_then(Value::as_str).unwrap_or("");
-            if body.get("kind").and_then(Value::as_str)!=Some("bug_report") || !["saketdev12@gmail.com","shubhastro2@gmail.com","bugs@teamofsilicons.com"].contains(&email) || body.get("to_uuid").is_some(){return Err(ApiError::forbidden("report_recipient_forbidden","System mail is restricted to configured bug-report recipients."))}
+            if body.get("kind").and_then(Value::as_str)!=Some("bug_report") || !state.settings.report_recipients.iter().any(|r| r==email) || body.get("to_uuid").is_some(){return Err(ApiError::forbidden("report_recipient_forbidden","System mail is restricted to configured bug-report recipients."))}
         }
         if let Some(email)=body.get("to_email").and_then(Value::as_str){destinations.push(accounts_core::normalize::normalize_email(email)?);}
         if let Some(uuid)=body.get("to_uuid").and_then(Value::as_str){

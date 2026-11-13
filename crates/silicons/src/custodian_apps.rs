@@ -13,8 +13,7 @@
 //! custodian removes them.
 
 use accounts_core::events;
-use accounts_core::http::pagination::encode_cursor;
-use accounts_core::http::{CarbonAuth, ClientMeta, Json, PageParams, Path, Query};
+use accounts_core::http::{CarbonAuth, ClientMeta, Json, PageParams, Path, Query, paginate};
 use accounts_core::ids::validate_app_id;
 use accounts_core::models::{Account, MembershipStatus};
 use accounts_core::repo::memberships;
@@ -131,16 +130,10 @@ pub(crate) async fn list_apps(
     .bind(limit + 1)
     .fetch_all(&mut *conn)
     .await?;
-    let more = rows.len() as i64 > limit;
-    let rows: Vec<AppRow> = rows.into_iter().take(limit as usize).collect();
-    let next_cursor = if more {
-        rows.last()
-            .map(|r| encode_cursor(&(micros(r.sort_at), r.app_id.clone())))
-    } else {
-        None
-    };
+    let page = paginate(rows, limit, |r| (micros(r.sort_at), r.app_id.clone()));
     let ts = |t: Option<OffsetDateTime>| t.map(format_rfc3339_ms);
-    let items: Vec<Value> = rows
+    let items: Vec<Value> = page
+        .items
         .iter()
         .map(|r| {
             json!({
@@ -159,7 +152,9 @@ pub(crate) async fn list_apps(
             })
         })
         .collect();
-    Ok(Json(json!({"items": items, "next_cursor": next_cursor})))
+    Ok(Json(
+        json!({"items": items, "next_cursor": page.next_cursor}),
+    ))
 }
 
 /// `DELETE /v1/me/silicons/{uuid}/apps/{app_id}` → 204. Repeating it changes nothing.
@@ -225,12 +220,6 @@ pub(crate) async fn remove_app(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Debug, Default, Deserialize)]
-pub(crate) struct SigninsQuery {
-    limit: Option<i64>,
-    cursor: Option<String>,
-}
-
 #[derive(sqlx::FromRow)]
 struct SigninRow {
     id: i64,
@@ -248,14 +237,10 @@ pub(crate) async fn list_signins(
     State(state): State<AppState>,
     me: CarbonAuth,
     Path(key): Path<String>,
-    Query(q): Query<SigninsQuery>,
+    Query(params): Query<PageParams>,
 ) -> ApiResult<Json<Value>> {
     let mut conn = state.db.acquire().await?;
     let silicon = my_silicon(&mut conn, me.uuid(), &key).await?;
-    let params = PageParams {
-        limit: q.limit,
-        cursor: q.cursor.clone(),
-    };
     let limit = params.limit();
     let before: i64 = params.cursor::<i64>()?.unwrap_or(i64::MAX);
     let rows: Vec<SigninRow> = sqlx::query_as(
@@ -268,14 +253,9 @@ pub(crate) async fn list_signins(
     .bind(limit + 1)
     .fetch_all(&mut *conn)
     .await?;
-    let more = rows.len() as i64 > limit;
-    let rows: Vec<SigninRow> = rows.into_iter().take(limit as usize).collect();
-    let next_cursor = if more {
-        rows.last().map(|r| encode_cursor(&r.id))
-    } else {
-        None
-    };
-    let items: Vec<Value> = rows
+    let page = paginate(rows, limit, |r| r.id);
+    let items: Vec<Value> = page
+        .items
         .iter()
         .map(|r| {
             json!({
@@ -288,7 +268,9 @@ pub(crate) async fn list_signins(
             })
         })
         .collect();
-    Ok(Json(json!({"items": items, "next_cursor": next_cursor})))
+    Ok(Json(
+        json!({"items": items, "next_cursor": page.next_cursor}),
+    ))
 }
 
 /// The Silicon's allow-list (`None` = every app).

@@ -148,7 +148,7 @@ pub async fn login(
                 &SigninRecord {
                     account_uuid: None,
                     app_id: Some(accounts_core::FIRST_PARTY_APP_ID),
-                    method: "silicon_key",
+                    method: audit::method::SILICON_KEY,
                     outcome: audit::outcome::FAILED,
                     ip: meta.ip.as_deref(),
                     user_agent: meta.user_agent.as_deref(),

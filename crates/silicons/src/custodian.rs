@@ -9,7 +9,6 @@
 //! | `PATCH /v1/me/silicons/{uuid}` | display name, timezone, photo (`null` = default) |
 //! | `POST /v1/me/silicons/{uuid}/photo` (IDEMPOTENT) | upload its profile photo (raw image, ≤ 2 MB; owned by the Silicon) |
 //! | `POST /v1/me/silicons/{uuid}/id` | change its si:id (old id reserved 10 days) |
-//! | `PUT`/`DELETE /v1/me/silicons/{uuid}/webhook` | its webhook (new secret each time) |
 //! | `POST /v1/me/silicons/{uuid}/stk` | rotate its STK: old STK dead, every session revoked |
 //! | `POST`/`DELETE /v1/me/silicons/{uuid}/transfer` | ask another Carbon to take it over / cancel |
 //! | `DELETE /v1/me/silicons/{uuid}` `{"confirm"}` | delete it (as account deletion: also its uploaded photos) |
@@ -139,14 +138,14 @@ async fn create_silicon(
         input::pfp_url(settings, body.pfp_url.as_deref()),
     );
     let chosen_stk = check(&mut fields, "stk", input::chosen_stk(body.stk.as_deref()));
-    let webhook_url = check(
+    check(
         &mut fields,
         "webhook_url",
-        input::webhook_url(settings, body.webhook_url.as_deref()),
+        input::webhook_url(body.webhook_url.as_deref()),
     );
     fields.into_result()?;
-    let (Some(display_name), Some(timezone), Some(pfp_url), Some(chosen_stk), Some(webhook_url)) =
-        (display_name, timezone, pfp_url, chosen_stk, webhook_url)
+    let (Some(display_name), Some(timezone), Some(pfp_url), Some(chosen_stk)) =
+        (display_name, timezone, pfp_url, chosen_stk)
     else {
         return Err(ApiError::internal("validated create fields are missing"));
     };
@@ -155,10 +154,6 @@ async fn create_silicon(
     ensure_id_free(&mut conn, &id).await?;
     drop(conn);
     let new_stk = stk::prepare(state, chosen_stk).await?;
-    let webhook = match &webhook_url {
-        Some(_) => Some(events::new_webhook_secret(&state.keys.keyring)?),
-        None => None,
-    };
 
     let mut tx = state.db.begin().await?;
     // The custodian must still exist when the Silicon is stored: this serializes with the
@@ -179,8 +174,8 @@ async fn create_silicon(
             status: AccountStatus::Active,
             custodian_uuid: Some(custodian.uuid.clone()),
             stk_hash: new_stk.hash.clone(),
-            webhook_url: webhook_url.clone(),
-            webhook_secret_enc: webhook.as_ref().map(|(_, enc)| enc.clone()),
+            webhook_url: None,
+            webhook_secret_enc: None,
             actor: custodian.uuid.clone(),
         },
     )
@@ -202,7 +197,7 @@ async fn create_silicon(
             "silicon.created",
             ("silicon", &silicon.uuid),
             None,
-            json!({"id": silicon.handle, "custodian": custodian.handle, "webhook": webhook_url.is_some(),
+            json!({"id": silicon.handle, "custodian": custodian.handle, "webhook": false,
                    "stk": if new_stk.generated { "generated" } else { "chosen" }}),
         )
         .await?;
@@ -216,7 +211,7 @@ async fn create_silicon(
         json!({
             "silicon": item,
             "stk": new_stk.reveal(),
-            "webhook_secret": webhook.map(|(secret, _)| secret),
+            "webhook_secret": Value::Null,
         }),
     ))
 }
@@ -362,7 +357,7 @@ pub async fn update(
 /// GIF, at most 2 MB and 8192 px per side); it counts toward the custodian's 20 uploads per
 /// hour. The photo belongs to the Silicon (it stays its photo after a transfer, and the
 /// Silicon's older uploads nobody shows are deleted). Apps that see the Silicon's photo get
-/// `account.updated`, the Silicon's own webhook `silicon.updated`.
+/// `account.updated`, the Silicon `silicon.updated` (through Ting).
 /// → 201 `{"pfp_url","photo":{id,content_type,bytes,width,height},"silicon":SiliconItem}`.
 /// Accepts `Idempotency-Key`.
 pub async fn upload_photo(
