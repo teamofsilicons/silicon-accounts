@@ -63,8 +63,8 @@ use crate::util::{caller_scope, from_micros, micros};
 
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
-        // The handler reads the body itself (after taking an import slot), up to 50 MB plus a
-        // little headroom so it can answer with its own precise 413.
+        // The handler reads the body itself (after taking an import slot), up to 50 MB; the
+        // server's read allowance carries the headroom so this answers with its own precise 413.
         .route(
             "/v1/apps/{app_id}/imports",
             post(create_import).get(list_imports),
@@ -130,10 +130,6 @@ fn import_not_found(job_id: &str, app_id: &str) -> ApiError {
     )
     .hint("List the app's imports with GET /v1/apps/{app_id}/imports; job ids come from the 202 response of POST …/imports.")
 }
-
-/// Most bytes read from an import body: 50 MB plus room for the JSON envelope, so a body just
-/// over the limit gets the precise 413 below instead of a read error.
-const READ_LIMIT: usize = MAX_BYTES + 64 * 1024;
 
 async fn create_import(
     State(state): State<AppState>,
@@ -221,7 +217,7 @@ async fn went_through(pool: &PgPool, scope: &str, key: &str) -> ApiResult<bool> 
     .await?)
 }
 
-/// Reads the body (holding an import slot), at most [`READ_LIMIT`] bytes, and only while it
+/// Reads the body (holding an import slot), at most [`MAX_BYTES`] bytes, and only while it
 /// keeps the minimum pace ([`limits::UPLOAD_PACE`]): a stalled upload is dropped with 408
 /// `import_upload_too_slow` instead of keeping its slot for the request's whole budget.
 async fn read_body(body: Body) -> ApiResult<Bytes> {
@@ -230,8 +226,8 @@ async fn read_body(body: Body) -> ApiResult<Bytes> {
 
 async fn read_paced_body(mut body: Body, pace: limits::Pace) -> ApiResult<Bytes> {
     let started = Instant::now();
-    let expected = usize::try_from(body.size_hint().lower()).unwrap_or(READ_LIMIT);
-    let mut buf: Vec<u8> = Vec::with_capacity(expected.min(READ_LIMIT));
+    let expected = usize::try_from(body.size_hint().lower()).unwrap_or(MAX_BYTES);
+    let mut buf: Vec<u8> = Vec::with_capacity(expected.min(MAX_BYTES));
     loop {
         let deadline = pace.deadline(started, buf.len());
         let frame = match tokio::time::timeout_at(deadline, body.frame()).await {
@@ -248,14 +244,11 @@ async fn read_paced_body(mut body: Body, pace: limits::Pace) -> ApiResult<Bytes>
             Ok(Some(Ok(frame))) => frame,
         };
         if let Ok(data) = frame.into_data() {
-            if buf.len() + data.len() > READ_LIMIT {
+            if buf.len() + data.len() > MAX_BYTES {
                 return Err(input::payload_too_large());
             }
             buf.extend_from_slice(&data);
         }
-    }
-    if buf.len() > MAX_BYTES {
-        return Err(input::payload_too_large());
     }
     Ok(Bytes::from(buf))
 }
@@ -334,21 +327,11 @@ async fn create_job(
     Ok(job)
 }
 
-#[derive(Debug, Default, Deserialize)]
-struct ListQuery {
-    limit: Option<i64>,
-    cursor: Option<String>,
-}
-
 async fn list_imports(
     State(state): State<AppState>,
     auth: AppOrOwner,
-    Query(q): Query<ListQuery>,
+    Query(params): Query<accounts_core::http::PageParams>,
 ) -> ApiResult<Response> {
-    let params = accounts_core::http::PageParams {
-        limit: q.limit,
-        cursor: q.cursor,
-    };
     let limit = params.limit();
     let (after_ts, after_id) = match params.cursor::<(i64, Uuid)>()? {
         Some((us, id)) => (Some(from_micros(us)?), Some(id)),

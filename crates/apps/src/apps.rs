@@ -125,7 +125,7 @@ async fn owned_apps(
 
 async fn app_details(State(state): State<AppState>, auth: AppOrOwner) -> ApiResult<Response> {
     let mut conn = state.db.acquire().await?;
-    let body = details_body(&mut conn, &state, &auth.app).await?;
+    let body = details_body(&mut conn, &auth.app).await?;
     Ok(Json(body).into_response())
 }
 
@@ -197,12 +197,7 @@ pub(crate) async fn masked_config(
 }
 
 /// The `GET /v1/apps/{app_id}` body (also returned by `PATCH …/signin-config`).
-pub(crate) async fn details_body(
-    conn: &mut PgConnection,
-    state: &AppState,
-    app: &App,
-) -> ApiResult<Value> {
-    let _ = state;
+pub(crate) async fn details_body(conn: &mut PgConnection, app: &App) -> ApiResult<Value> {
     // Re-read the app: the extractor's copy may come from the 60 s credential cache.
     let app = apps_repo::get(conn, &app.app_id)
         .await?

@@ -89,8 +89,24 @@ async fn active_account(
         accounts::by_handle(conn, id).await?
     } else {
         accounts::get(conn, id).await?
-    }
-    .ok_or_else(|| ApiError::not_found("account_not_found", "The account was not found."))?;
+    };
+    require_active(account)
+}
+
+/// The acting account by uuid only: `actor_uuid` is stored, locked on and audited as given, so
+/// a mutable handle must not stand in for it.
+async fn active_actor(
+    conn: &mut sqlx::PgConnection,
+    uuid: &str,
+) -> ApiResult<accounts_core::models::Account> {
+    require_active(accounts::get(conn, uuid).await?)
+}
+
+fn require_active(
+    account: Option<accounts_core::models::Account>,
+) -> ApiResult<accounts_core::models::Account> {
+    let account = account
+        .ok_or_else(|| ApiError::not_found("account_not_found", "The account was not found."))?;
     if account.status != AccountStatus::Active {
         return Err(ApiError::forbidden(
             "account_not_active",
@@ -355,7 +371,7 @@ async fn sync(
     validate(&input)?;
     let mut tx = state.db.begin().await?;
     if !input.cell_broker_cleanup {
-        active_account(&mut tx, &input.actor_uuid).await?;
+        active_actor(&mut tx, &input.actor_uuid).await?;
     }
     sqlx::query("select pg_advisory_xact_lock(hashtextextended($1,0))")
         .bind(format!("interface-sync:{}", input.interface_id))
@@ -661,7 +677,7 @@ async fn list_requests(
 ) -> ApiResult<Response> {
     authorize_interface_service(&state, &headers)?;
     let mut conn = state.db.acquire().await?;
-    active_account(&mut conn, &query.actor_uuid).await?;
+    active_actor(&mut conn, &query.actor_uuid).await?;
     let exists: bool = sqlx::query_scalar(
         "select exists(select 1 from interface_auth_clients where interface_id=$1)",
     )
@@ -707,7 +723,7 @@ async fn request_tier(
         ));
     }
     let mut tx = state.db.begin().await?;
-    let actor = active_account(&mut tx, &input.actor_uuid).await?;
+    let actor = active_actor(&mut tx, &input.actor_uuid).await?;
     // Lock by actor+tier, since pending requests are shared across interfaces.
     sqlx::query("select pg_advisory_xact_lock(hashtextextended($1,0))")
         .bind(format!(

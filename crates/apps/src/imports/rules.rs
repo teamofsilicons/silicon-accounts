@@ -703,7 +703,7 @@ pub fn prepare(stored: &Value, options: &ImportOptions, today: Date) -> Prepared
     // pfp_url
     if let Some(raw) = text(&mut p, "pfp_url") {
         match normalize::validate_https_url(&raw) {
-            Ok(_) => p.pfp_url = Some(raw),
+            Ok(u) => p.pfp_url = Some(u.to_string()),
             Err(why) => p.messages.push(RowMessage::warning(
                 codes::INVALID_PFP_URL,
                 format!(
@@ -861,6 +861,12 @@ mod tests {
         assert_eq!(p.timezone, None);
         assert_eq!(p.pfp_url, None);
         assert_eq!(p.emails, vec!["ok@x.test"]);
+    }
+
+    #[test]
+    fn pfp_url_is_kept_in_the_form_that_was_validated() {
+        let p = prep(json!({"email": "a@x.test", "pfp_url": " https://CDN.Example.com:443/a.png"}));
+        assert_eq!(p.pfp_url.as_deref(), Some("https://cdn.example.com/a.png"));
     }
 
     #[test]

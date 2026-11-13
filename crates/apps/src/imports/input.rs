@@ -33,6 +33,8 @@ use serde::de::{self, DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 
+use super::rules::quote as shown;
+
 /// Most rows one import may carry.
 pub const MAX_ROWS: usize = 100_000;
 /// Largest import body.
@@ -154,16 +156,6 @@ pub fn storable(s: &str) -> String {
     }
 }
 
-/// A name shown in a message: at most 80 characters.
-fn shown(s: &str) -> String {
-    let cut: String = s.chars().take(80).collect();
-    if cut.len() < s.len() {
-        format!("'{cut}…'")
-    } else {
-        format!("'{cut}'")
-    }
-}
-
 fn parse_bool(v: &str) -> Option<bool> {
     match v.trim().to_ascii_lowercase().as_str() {
         "true" | "1" | "yes" | "on" => Some(true),
@@ -203,9 +195,14 @@ fn query_options(query: Option<&str>) -> Result<PartialOptions, ApiError> {
                 ))
             })
         };
+        let twice = || {
+            bad(format!(
+                "The query parameter '{k}' is given twice with different values; give it once."
+            ))
+        };
         match k.as_ref() {
             "default_country" => {
-                out.default_country = Some(if v.trim().is_empty() {
+                let country = if v.trim().is_empty() {
                     None
                 } else {
                     Some(validate_country(&v).map_err(|m| {
@@ -213,11 +210,14 @@ fn query_options(query: Option<&str>) -> Result<PartialOptions, ApiError> {
                             "The query parameter 'default_country' is invalid: {m}."
                         ))
                     })?)
-                })
+                };
+                set_once(&mut out.default_country, country, twice)?
             }
-            "ignore_unknown_columns" => out.ignore_unknown_columns = Some(flag(&v)?),
-            "dry_run" => out.dry_run = Some(flag(&v)?),
-            "update_existing" => out.update_existing = Some(flag(&v)?),
+            "ignore_unknown_columns" => {
+                set_once(&mut out.ignore_unknown_columns, flag(&v)?, twice)?
+            }
+            "dry_run" => set_once(&mut out.dry_run, flag(&v)?, twice)?,
+            "update_existing" => set_once(&mut out.update_existing, flag(&v)?, twice)?,
             other => {
                 return Err(bad(format!(
                     "The query parameter {} is not an import option; the options are {OPTION_NAMES}.",
@@ -227,6 +227,19 @@ fn query_options(query: Option<&str>) -> Result<PartialOptions, ApiError> {
         }
     }
     Ok(out)
+}
+
+/// Sets a query option; a repeat with another value is refused, like a query/body conflict.
+fn set_once<T: PartialEq>(
+    slot: &mut Option<T>,
+    value: T,
+    twice: impl FnOnce() -> ApiError,
+) -> Result<(), ApiError> {
+    if slot.as_ref().is_some_and(|old| *old != value) {
+        return Err(twice());
+    }
+    *slot = Some(value);
+    Ok(())
 }
 
 fn body_options(v: Option<&Value>, errors: &mut FieldErrors) -> PartialOptions {
@@ -1158,7 +1171,19 @@ impl<'de> Visitor<'de> for CellSeed<'_, '_> {
                 budget: &mut *self.budget,
             })?;
             self.item()?;
-            object.insert(storable(&key), value);
+            let key = storable(&key);
+            // A JSON object keeps its last duplicate key, so a repeated option would win silently.
+            if matches!(self.at, CellAt::Options)
+                && object.get(&key).is_some_and(|old| *old != value)
+            {
+                let mut f = FieldErrors::new();
+                f.add(
+                    format!("options.{key}"),
+                    "is given twice with different values; give it once",
+                );
+                return Err(self.st.stop(ApiError::validation(f)));
+            }
+            object.insert(key, value);
         }
         Ok(Value::Object(object))
     }
@@ -1514,6 +1539,31 @@ mod tests {
         let e = parse_request(Some("application/json"), None, br#"{"options": {}}"#)
             .expect_err("rows missing");
         assert!(e.details["fields"]["rows"].is_string());
+    }
+
+    #[test]
+    fn an_option_repeated_with_another_value_is_refused() {
+        let e = parse_request(
+            Some("text/csv"),
+            Some("dry_run=true&dry_run=false"),
+            b"email\na@x.test\n",
+        )
+        .expect_err("query repeat");
+        assert_eq!(e.code, "invalid_query");
+        let p = parse_request(
+            Some("text/csv"),
+            Some("dry_run=true&dry_run=1"),
+            b"email\na@x.test\n",
+        )
+        .expect("same value twice");
+        assert!(p.options.dry_run);
+        let e = parse_request(
+            Some("application/json"),
+            None,
+            br#"{"rows":[{"email":"a@x.test"}],"options":{"dry_run":true,"dry_run":false}}"#,
+        )
+        .expect_err("body repeat");
+        assert!(e.details["fields"]["options.dry_run"].is_string(), "{e:?}");
     }
 
     #[test]

@@ -610,7 +610,7 @@ async fn rows_per_app_per_day_are_limited() {
     assert_eq!(used, 2);
 }
 
-/// Bodies over 50 MB get a precise 413, whether or not they fit the read buffer's headroom.
+/// Bodies over 50 MB get a precise 413, whether or not they fit the server's read headroom.
 #[tokio::test]
 async fn bodies_over_fifty_megabytes_are_refused() {
     let ctx = TestContext::new().await;

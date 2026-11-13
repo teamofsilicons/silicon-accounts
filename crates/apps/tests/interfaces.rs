@@ -331,6 +331,15 @@ async fn tier_request_is_durable_and_does_not_grant_eligibility() {
     assert_eq!(first.status, 200, "{}", first.json);
     assert_eq!(first.json["created"], true);
     assert_eq!(call(&ctx, submit()).await.json, first.json);
+    let by_handle = call(
+        &ctx,
+        Req::post("/v1/internal/interfaces/potato/requests")
+            .bearer(TOKEN)
+            .header("idempotency-key", "ask-2")
+            .json(json!({"actor_uuid":actor.handle,"kind":"verified","reason":"A reason"})),
+    )
+    .await;
+    assert_eq!(by_handle.status, 404, "{}", by_handle.json);
     let count: i64 =
         sqlx::query_scalar("select count(*) from interface_tier_request_notifications")
             .fetch_one(&ctx.state.db)
