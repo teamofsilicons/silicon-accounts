@@ -22,7 +22,9 @@ export default defineConfig([
   // sidebar's Developers and Docs chips (2026-10-30). segmented-control: the xs size, in the development-only dev states
   // panel (components/foundation/dev, 2026-10-31).
   // dropdown-menu: its parts, for Add a Silicon's menu on /silicons to carry the Silicon UI scope (an experiment, 2026-11-07).
-  ...siliconUi({ allowExperimental: ["nav-list", "button", "button-link", "segmented-control", "dropdown-menu"] }),
+  // dialog: hideHeader and top placement for the ⌘K menu and docs search; input: prefix and suffix in the id field;
+  // button's link variant for the phone field's switches (all experimental since Silicon UI 0.5.0, 2026-11-13).
+  ...siliconUi({ allowExperimental: ["nav-list", "button", "button-link", "segmented-control", "dropdown-menu", "dialog", "input"] }),
   {
     // The landing frames are not the account shell. How it works steps are text rows from the frame, not Silicon UI buttons.
     files: ["components/landing/**"],

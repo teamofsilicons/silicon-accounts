@@ -30,7 +30,6 @@ Change key on the page), Personal info, Data & privacy with the delete page, sig
 - Home's account cards (Anil, 2026-11-12: "we'll get back on this"): Home shows no apps section and no account cards for
   now. Four designs for cards to Connected Apps, Security and Personal Info, each with one live fact, wait in
   /__account (parts/account-cards.tsx: picture, band, cover, gradient); pick one and put it back on Home.
-- Publish Silicon UI and update this site's package dependency when Anil resumes the release. Deferred at his request (2026-11-08). `silicon-ui-unreleased-through-31.patch` is the current cumulative upstream patch; the earlier Select and #28/#29 patches remain for reference. The site uses the tested pnpm patch for 0.4.0 in the meantime.
 - Add a Silicon's chevron: Silicon UI's DropdownMenuTrigger draws it at stroke 1.8 (about 1.13 px at 15 px) with no prop, while our icons are at 2. Anil wants 2 everywhere; choose between our own Button trigger via `asChild` (loses the flip on open) or a Silicon UI request for a chevron stroke option (2026-11-07).
 - Make a Silicon's optional webhook URL easy to find now it's out of the create wizard; it lives in the Silicon page's settings (decisions.md, 2026-11-07).
 - Move `components/foundation/layout` (Page, PageHeader, Section) to silicon-ui's page layout if #24 ships.
