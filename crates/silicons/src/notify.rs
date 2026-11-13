@@ -1,7 +1,7 @@
 //! What this crate tells the outside world: emails to the Carbons asked to be custodians (sent
-//! through core's delivery queue) and events on a Silicon's own webhook.
+//! through core's delivery queue) and Silicon events, which core queues to Ting (`ting::enqueue`).
 //!
-//! Silicon webhook events emitted here (data shapes):
+//! Silicon events emitted here (data shapes):
 //! - `silicon.created` `{uuid, id, status, silicon: Me, request: RequestInfo|null}`
 //! - `silicon.custodian.accepted` `{uuid, id, request_id, custodian: AccountSummary, silicon: Me}`
 //! - `silicon.custodian.declined` `{uuid, id, request_id, custodian, decided_at, reason, released: true}`
@@ -337,7 +337,7 @@ pub fn transfer_invite_email(
     }
 }
 
-/// `silicon.created` to the new Silicon's webhook (no-op without one).
+/// `silicon.created` for the new Silicon (its event stream and Ting).
 pub async fn silicon_created(
     conn: &mut PgConnection,
     silicon: &Account,

@@ -12,7 +12,7 @@
 //! get none (403 `audience_not_allowed`), so nothing changes for a Silicon until its custodian
 //! opts in. Tokens live 60 to 3600 seconds (default 300). Every issued token is in the
 //! Silicon's and the custodian's history (never the token itself), and every change of the list
-//! reaches the Silicon's webhook and event stream (`silicon.identity_audiences.changed`).
+//! reaches the Silicon's event stream and Ting (`silicon.identity_audiences.changed`).
 
 use accounts_core::events;
 use accounts_core::http::{AccountAuth, ClientMeta, Json, Path};
@@ -105,6 +105,9 @@ pub(crate) async fn set_audiences(
     }
     let mut tx = state.db.begin().await?;
     let silicon = silicon_for(&mut tx, &me, &key).await?;
+    let Some(silicon) = accounts::lock(&mut tx, &silicon.uuid).await? else {
+        return Err(silicon_not_found(&key));
+    };
     if silicon.custodian_uuid.as_deref() != Some(me.uuid()) {
         return Err(ApiError::forbidden(
             "custodian_only",
@@ -115,9 +118,6 @@ pub(crate) async fn set_audiences(
         )
         .hint("Ask your custodian: `silicon-accounts silicon audiences allow <si:id> <audience>`."));
     }
-    let Some(silicon) = accounts::lock(&mut tx, &silicon.uuid).await? else {
-        return Err(silicon_not_found(&key));
-    };
     let before = audiences_of(&mut tx, &silicon.uuid).await?;
     sqlx::query("update accounts set identity_audiences = $2, updated_at = now() where uuid = $1")
         .bind(&silicon.uuid)

@@ -63,9 +63,9 @@ pub fn chosen_stk(input: Option<&str>) -> Result<Option<String>, String> {
 }
 
 /// Reject retired callback configuration with migration guidance.
-pub fn webhook_url(_settings: &Settings, input: Option<&str>) -> Result<Option<String>, String> {
+pub fn webhook_url(input: Option<&str>) -> Result<(), String> {
     match input {
-        None => Ok(None),
+        None => Ok(()),
         Some(_) => Err("Silicon account webhooks were replaced by Ting. Use notifications enable, or ting_session_id for a pending self-creation.".into()),
     }
 }

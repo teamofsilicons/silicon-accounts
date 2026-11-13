@@ -825,3 +825,36 @@ async fn silicon_photos_must_be_the_custodians_or_its_own_uploads() {
     .await;
     assert_eq!(r.status, 201, "external https photos are fine: {}", r.json);
 }
+
+#[tokio::test]
+async fn key_and_trust_lists_show_live_ones_before_revoked_ones() {
+    let ctx = TestContext::new().await;
+    let saket = ctx.carbon().await;
+    let t = token(&ctx, &saket).await;
+    let (silicon, _) = ctx.silicon(&saket.uuid).await;
+    // One old live key and trust, then 200 newer revoked ones that would fill the page.
+    ctx.exec(&format!(
+        "insert into silicon_keys (id, silicon_uuid, name, public_key, fingerprint, created_by, created_at, revoked_at) \
+         select gen_random_uuid(), '{0}', 'k' || i, decode(lpad(to_hex(i), 64, '0'), 'hex'), 'SHA256:k' || i, '{0}', \
+                now() - make_interval(secs => 300 - i), case when i > 0 then now() end \
+           from generate_series(0, 200) i; \
+         insert into silicon_federations (id, silicon_uuid, name, issuer, audience, conditions, created_by, created_at, revoked_at) \
+         select gen_random_uuid(), '{0}', 'f' || i, 'https://issuer.example', 'aud', '{{\"sub\":\"x\"}}', '{0}', \
+                now() - make_interval(secs => 300 - i), case when i > 0 then now() end \
+           from generate_series(0, 200) i",
+        silicon.uuid
+    ))
+    .await;
+    for (list, live) in [("keys", "k0"), ("federations", "f0")] {
+        let r = call(
+            &ctx,
+            Req::get(&format!("/v1/silicons/{}/{list}", silicon.uuid)).bearer(&t),
+        )
+        .await;
+        assert_eq!(r.status, 200, "{}", r.json);
+        let items = r.json["items"].as_array().expect("items");
+        assert_eq!(items.len(), 200);
+        assert_eq!(items[0]["name"], live, "{list}");
+        assert_eq!(items[0]["revoked_at"], Value::Null);
+    }
+}

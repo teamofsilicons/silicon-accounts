@@ -5,14 +5,14 @@
 //! | endpoint | who | what |
 //! |---|---|---|
 //! | `POST /v1/silicons/{id}/federations` | the Silicon, or its custodian | `{"issuer", "audience"?, "conditions", "name"?}` → 201 the trust |
-//! | `GET /v1/silicons/{id}/federations` | the same | `{"items": [trust…], "next_cursor": null}`, newest first, removed ones too |
+//! | `GET /v1/silicons/{id}/federations` | the same | `{"items": [trust…], "next_cursor": null}`, live first, each group newest first, removed ones too |
 //! | `DELETE /v1/silicons/{id}/federations/{federation_id}` | the same | 204: the trust stops working and the sign-ins it started end, with the app sign-ins made from their short-lived tokens (those apps get `membership.signed_out`, reason `session_revoked`) |
 //!
 //! `{id}` is the Silicon's si:id or uuid; anyone else gets 404 `silicon_not_found`. Adding a
 //! trust reads the issuer's discovery document first, so a trust always names a reachable
 //! https OIDC issuer (422 `issuer_unreachable` otherwise). A sign-in that itself came from an
 //! outside token can't add a trust (403 `federated_session`). Every change is in the Silicon's
-//! history and reaches its webhook and event stream (`silicon.federation.added`,
+//! history and reaches its event stream and Ting (`silicon.federation.added`,
 //! `silicon.federation.removed`).
 
 use accounts_core::events;
@@ -31,7 +31,7 @@ use uuid::Uuid;
 
 use crate::common::silicon_not_found;
 use crate::history::Actor;
-use crate::keys::silicon_for;
+use crate::keys::{is_mine, silicon_for};
 
 /// `POST /v1/silicons/{id}/federations`.
 pub(crate) async fn add(
@@ -65,7 +65,10 @@ pub(crate) async fn add(
         })?;
     let mut tx = state.db.begin().await?;
     let silicon = silicon_for(&mut tx, &me, &key).await?;
-    let Some(silicon) = accounts::lock(&mut tx, &silicon.uuid).await? else {
+    let Some(silicon) = accounts::lock(&mut tx, &silicon.uuid)
+        .await?
+        .filter(|s| is_mine(s, &me))
+    else {
         return Err(silicon_not_found(&key));
     };
     if silicon.status != AccountStatus::Active {
@@ -153,7 +156,7 @@ pub(crate) async fn list(
     let silicon = silicon_for(&mut conn, &me, &key).await?;
     let rows: Vec<Federation> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "select {FEDERATION_COLUMNS} from silicon_federations where silicon_uuid = $1 \
-         order by created_at desc, id desc limit 200"
+         order by (revoked_at is not null), created_at desc, id desc limit 200"
     )))
     .bind(&silicon.uuid)
     .fetch_all(&mut *conn)

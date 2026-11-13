@@ -8,8 +8,8 @@
 //! | transfer | custodian = acceptor, history `transfer`, `silicon.custodian.changed` + apps `silicon.custodian_changed` | nothing changes | nothing changes |
 //!
 //! "Released" = the Silicon never became active, so it is deleted with its id freed immediately
-//! (no 10-day reservation) by core's `accounts::release_silicon`, which keeps its webhook so the
-//! `silicon.custodian.declined` / `.expired` event emitted just before can still be delivered.
+//! (no 10-day reservation) by core's `accounts::release_silicon`, right after the
+//! `silicon.custodian.declined` / `.expired` event is emitted.
 //! A self-created Silicon whose named Carbon deletes their account before answering is released
 //! by that deletion itself (core's `accounts::delete_account`); [`release_orphan`] is the safety
 //! net for requests that were cancelled without it (accounts deleted before that existed).

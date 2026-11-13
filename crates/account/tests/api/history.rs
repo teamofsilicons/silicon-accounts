@@ -1027,3 +1027,49 @@ async fn entries_from_sign_in_flows_read_as_sentences() {
         }
     }
 }
+
+#[tokio::test]
+async fn switching_to_a_linked_account_is_a_signin_in_its_history_and_org_log() {
+    let ctx = TestContext::new().await;
+    let personal = ctx.carbon().await;
+    let work = ctx.carbon().await;
+    ctx.exec(
+        "insert into organization_projections(org_id,name) values('testorg','Test organization')",
+    )
+    .await;
+    sqlx::query("update accounts set org_id='testorg',handle='c:member.testorg' where uuid=$1")
+        .bind(&work.uuid)
+        .execute(&ctx.state.db)
+        .await
+        .expect("work account");
+    accounts_core::repo::organizations::link(&mut *ctx.conn().await, &personal.uuid, &work.uuid)
+        .await
+        .expect("link");
+    let cookie = ctx.browser_session(&personal).await;
+    let r = call(
+        &ctx,
+        Req::post("/v1/me/linked-accounts/switch")
+            .session(&ctx.state.settings, &cookie)
+            .json(json!({"account_uuid": work.uuid})),
+    )
+    .await;
+    assert_status(&r, 200);
+    let signins: Vec<(String, Option<String>)> =
+        sqlx::query_as("select method, app_id from signin_history where account_uuid = $1")
+            .bind(&work.uuid)
+            .fetch_all(&ctx.state.db)
+            .await
+            .expect("signins");
+    assert_eq!(
+        signins,
+        vec![("session".to_string(), Some("silicon-accounts".to_string()))]
+    );
+    let logged: i64 = sqlx::query_scalar(
+        "select count(*) from organization_work_events where account_uuid = $1 and kind = 'account.signin'",
+    )
+    .bind(&work.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("org log");
+    assert_eq!(logged, 1);
+}

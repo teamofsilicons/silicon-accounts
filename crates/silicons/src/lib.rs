@@ -167,8 +167,8 @@ pub fn router() -> Router<AppState> {
         .layer(axum::middleware::map_response(no_store))
 }
 
-/// Every response here is account-specific and many carry secrets (STKs, tokens, SLTs, webhook
-/// secrets), so nothing may be cached (RFC 6749 §5.1 for the token responses).
+/// Every response here is account-specific and many carry secrets (STKs, tokens, SLTs), so
+/// nothing may be cached (RFC 6749 §5.1 for the token responses).
 async fn no_store(mut response: Response) -> Response {
     let headers = response.headers_mut();
     headers
