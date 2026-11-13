@@ -302,7 +302,7 @@ characters), 409 `key_exists` (`details.key_id`), 409 `too_many_keys` (10 live k
 
 ### `GET /v1/silicons/{id}/keys`
 
-**200** `{"items": [key…], "next_cursor": null}`, newest first, revoked keys included.
+**200** `{"items": [key…], "next_cursor": null}`, live keys first, then revoked ones, each newest first.
 
 ### `DELETE /v1/silicons/{id}/keys/{key_id}`
 
@@ -375,7 +375,7 @@ issuer, or names a `jwks_uri` that isn't public https), 409 `federation_exists`
 
 ### `GET /v1/silicons/{id}/federations`
 
-**200** `{"items": [trust…], "next_cursor": null}`, newest first, removed trusts included.
+**200** `{"items": [trust…], "next_cursor": null}`, live trusts first, then removed ones, each newest first.
 `last_used_at` is the last sign-in through the trust.
 
 ### `DELETE /v1/silicons/{id}/federations/{federation_id}`

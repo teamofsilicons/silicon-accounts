@@ -898,7 +898,7 @@ impl<'a> AccountSession<'a> {
         .json()
     }
 
-    /// `GET /v1/silicons/{id}/keys`: the Silicon's keys, newest first, revoked ones too.
+    /// `GET /v1/silicons/{id}/keys`: the Silicon's keys, live ones first, then revoked ones, each newest first.
     pub async fn silicon_keys(&self, silicon: &str) -> Result<Vec<SiliconKeyInfo>> {
         let page: Page<SiliconKeyInfo> = self
             .get(&["v1", "silicons", silicon.trim(), "keys"])
@@ -942,7 +942,7 @@ impl<'a> AccountSession<'a> {
         .json()
     }
 
-    /// `GET /v1/silicons/{id}/federations`: the Silicon's trusts, newest first, removed ones
+    /// `GET /v1/silicons/{id}/federations`: the Silicon's trusts, live ones first, each group newest first, removed ones
     /// too.
     pub async fn federations(&self, silicon: &str) -> Result<Vec<crate::types::Federation>> {
         let page: Page<crate::types::Federation> = self

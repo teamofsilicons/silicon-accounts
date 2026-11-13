@@ -13536,7 +13536,7 @@
         ],
         "operationId": "listSiliconKeys",
         "summary": "A Silicon's keys",
-        "description": "For the Silicon itself or its custodian. `{id}` is the si:id or uuid. Newest first, revoked keys too.",
+        "description": "For the Silicon itself or its custodian. `{id}` is the si:id or uuid. Live keys first, then revoked ones, each newest first.",
         "security": [
           {
             "bearerAuth": []
@@ -13931,7 +13931,7 @@
         ],
         "operationId": "listSiliconFederations",
         "summary": "A Silicon's trust relationships",
-        "description": "For the Silicon itself or its custodian. Which outside OIDC tokens (CI jobs on GitHub Actions, GitLab or any https issuer) sign the Silicon in. Newest first, removed ones too.",
+        "description": "For the Silicon itself or its custodian. Which outside OIDC tokens (CI jobs on GitHub Actions, GitLab or any https issuer) sign the Silicon in. Live trusts first, then removed ones, each newest first.",
         "security": [
           {
             "bearerAuth": []
