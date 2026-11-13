@@ -74,7 +74,7 @@
     },
     {
       "name": "Internal",
-      "description": "Endpoints for Silicon Apps and local development only. Apps and accounts can't use them."
+      "description": "Service-to-service bridges (Silicon Apps, Silicon Cells, Silicon Organizations and the Interface registry, each with its own credential) and local development. Apps and accounts can't use them."
     }
   ],
   "paths": {
@@ -30690,6 +30690,7 @@
               "signup",
               "details",
               "review",
+              "select_account",
               "complete",
               "failed"
             ]
