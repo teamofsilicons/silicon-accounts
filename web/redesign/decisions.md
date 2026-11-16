@@ -548,3 +548,17 @@ Create Account; "Not You?" kept. After deleting an account: /goodbye, "Your acco
 - The top bar's Search label and ⌘K take muted too (they were lighter than muted, 2026-10-30), so all three of the
   bar's quiet words ("Accounts", "Search", ⌘K) pass.
 - The account site stays light only (lib/theme.ts); the audit now expects light for a dark-preferring visitor.
+
+## Tabs (2026-11-14)
+
+- A control that switches what the page shows is Silicon UI Tabs (thin frame, 0.5.0): a Silicon's page (Access,
+  Settings) and Activity's filters. A control that picks a value (the avatar editor's Eyes and Facing) stays a
+  SegmentedControl (Anil: "use the new updated tab design everywhere in the accounts").
+
+## The full-height shell (2026-11-17)
+
+- From 900px there is no top bar: the sidebar carries the wordmark and Search at its head and the account menu at its
+  foot (full width, with the name), and it and the page box run the window's full height, as the Apps store does.
+  Under 900px the top bar shows the mark, the name and the menu button; Search and the account menu are in the sheet.
+  Replaces the 2026-10-30 top bar (brand, search centred, account menu). Anil: "im using a full height content, and
+  search and account in sidebar design for apps, can we try that in accounts as well?"

@@ -138,7 +138,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 
 `app/(app)/layout.tsx` mounts the client providers for everything under it (one query cache across the account pages
 and the hosted pages); the root layout and the public landing load none. `app/(app)/(shell)/layout.tsx` wraps the
-account pages in the account shell (sidebar, ⌘K palette, sign-in gate). While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
+account pages in the account shell (sidebar, ⌘K palette, sign-in gate). The shell is full height (2026-11-17): from 900px there is no top bar, and the sidebar holds the brand and Search at its head and the account menu at its foot; under 900px a top bar shows the brand and a Menu button that opens the sidebar in a bottom sheet. While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
 development only: production answers 404 unless the server runs with `ACCOUNTS_KITCHEN=1`.
 
 ## Conventions

@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * The account site's frame for signed-in pages, as in the lead designer's prototype (redesign/prototype-map.md): a
- * top bar with the brand (home), search (the ⌘K palette) and the account menu, and the section list (sidebar.tsx)
- * beside the page from 900px, in a bottom sheet opened from the top bar below that. Also the ⌘K palette, number-key
+ * The account site's frame for signed-in pages: from 900px the sidebar (sidebar.tsx) beside the page, the window's full
+ * height, with the brand (home) and search (the ⌘K palette) at its head and the account menu at its foot; below that a
+ * top bar with the brand and a menu button that opens the same sidebar in a bottom sheet (Anil, 2026-11-17). Also the ⌘K palette, number-key
  * shortcuts and page transitions. It also guards the account routes: visitors without a
  * session are sent to sign in and come back to the page they asked for. At "/" a signed-out visitor sees the landing
  * page, rendered bare (without the shell).
@@ -262,52 +262,63 @@ export function AccountShell({ children }: { children: ReactNode }) {
     </Link>
   );
   const search = (
-    // Keyed by the layout: Silicon UI's Button measures its label once and keeps that width inline, so after a resize
-    // from wide to narrow it stayed 400px and covered the brand. A new Button measures again.
-    <Button key={narrow ? "narrow" : "wide"} variant="soft" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
+    // Keyed by the layout: Silicon UI's Button measures its label once and keeps that width inline, so a new Button
+    // measures again when the sidebar moves between the page's side and the phone sheet.
+    <Button
+      key={narrow ? "narrow" : "wide"}
+      variant="soft"
+      size="sm"
+      className={styles.search}
+      onClick={() => {
+        setSheetOpen(false);
+        openCommandPalette();
+      }}
+      aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}
+    >
       <Search size={16} strokeWidth={2.1} aria-hidden="true" />
       <span className={styles.searchLabel}>Search</span>
       <kbd data-sq="surface" className={styles.keys}>{isApple ? "⌘K" : "Ctrl K"}</kbd>
     </Button>
   );
+  // The account menu at the sidebar's foot, with the name beside the photo (as the Apps store's profile row).
   const accountMenu = account ? (
     <UserMenu
       className={styles.account}
       user={account}
       showTheme={false}
+      showName
       onSignOut={menuSignOut}
-      align="end"
+      align="start"
     />
   ) : null;
 
-  // The panel shell (redesign/decisions.md, 2026-10-30): the top bar (brand, search centred, the account menu), then
-  // the sections and the page in 8px of padding (the sections' width in steps, sidebar-resize.tsx). The page is a white box with an 8px corner and a 1px hairline. Under
-  // 900px the sections move into a bottom sheet from the top bar and the page is full bleed.
+  // The full-height shell (Anil, 2026-11-17, from the Apps store): from 900px no top bar; the sidebar carries the
+  // wordmark and search at its head and the account menu at its foot, and it and the page box run the window's full
+  // height in 8px of padding. Under 900px a top bar with the wordmark and the menu button; the sidebar (search, the
+  // sections, the account menu, the other sites) opens in a bottom sheet, and the page is full bleed. (The top-bar
+  // shell of 2026-10-30 is in git before this change.)
   const chrome = (content: ReactNode) => (
     <div className={styles.shell}>
       <SkipLink href="#main" />
+      {/* Drawn on every width, hidden from 900px by CSS, so a phone has it before the page knows its width. */}
       <header className={styles.top}>
         {brand}
-        {search}
-        <span className={styles.topEnd}>
-          {accountMenu}
-          {narrow ? (
-            <BottomSheet
-              title="Your account"
-              open={sheetOpen}
-              onOpenChange={setSheetOpen}
-              trigger={<Button variant="ghost" size="sm" aria-label="Account sections"><Menu size={18} strokeWidth={2} aria-hidden="true" /></Button>}
-            >
-              <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} />
-            </BottomSheet>
-          ) : null}
-        </span>
+        {narrow ? (
+          <BottomSheet
+            title="Your account"
+            open={sheetOpen}
+            onOpenChange={setSheetOpen}
+            trigger={<Button variant="ghost" size="sm" aria-label="Menu"><Menu size={18} strokeWidth={2} aria-hidden="true" /></Button>}
+          >
+            <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} head={search} account={accountMenu} />
+          </BottomSheet>
+        ) : null}
       </header>
       <div className={styles.body} style={{ "--sidebar-width": `${SIDEBAR_STEPS[sidebarStep]}px` } as CSSProperties}>
         {narrow ? null : (
           <>
             <aside id="account-sidebar" className={styles.aside}>
-              <Sidebar activeKey={active?.key} developerUrl={developerUrl} />
+              <Sidebar activeKey={active?.key} developerUrl={developerUrl} head={<><div className={styles.brandRow}>{brand}</div>{search}</>} account={accountMenu} />
             </aside>
             <SidebarResize step={sidebarStep} onStep={setSidebarStep} controls="account-sidebar" />
           </>

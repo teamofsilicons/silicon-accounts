@@ -15,8 +15,8 @@ import { AtSign, Cpu, History, LayoutGrid, LockKeyhole, LogIn, ShieldCheck } fro
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
-import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@teamofsilicons/silicon-ui/tabs";
 import { Page } from "@/components/foundation/layout/layout";
 import type { HistoryItem, HistoryKind } from "@/lib/api/types";
 import { browserTimezone } from "@/lib/format";
@@ -128,51 +128,57 @@ export function Activity() {
       <PageBar title="Activity" />
       <Page>
         <p className={styles.lead}>What you, your Silicons and your apps did, newest first. Times are in {timezoneLabel(timeZone)}.</p>
-        <div className={styles.toolbar}>
-          <SegmentedControl label="Show" value={filter} onValueChange={value => setFilter(value as Filter)} options={FILTERS.map(({ value, label }) => ({ value, label }))} />
-        </div>
-        {history.error && !history.data ? (
-          <Alert tone="danger" title="Your activity did not load">
-            {describeError(history.error)}
-            <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void history.refetch()}>Try Again</Button></span>
-          </Alert>
-        ) : !history.data || !zoneKnown ? (
-          <div className={styles.skeleton} aria-busy="true" aria-label="Loading your activity"><Skeleton label="Loading" lines={6} avatar /></div>
-        ) : !items.length && !history.hasNextPage ? (
-          <div className={styles.empty}>
-            {/* Names what the filter shows, so the empty state's heading sits one level under the page's: h1, h2, h3. */}
-            <h2 className="sr-only">{filter === "all" ? "All activity" : group.label}</h2>
-            <EmptyState icon={<History width={24} height={24} strokeWidth={1.5} />} title="Nothing here yet" description={EMPTY[filter]} />
-          </div>
-        ) : (
-          <div ref={feed} role="region" aria-label="Account activity" className={styles.feed}>
-            {days.map(day => (
-              <Section key={day.key} id={`activity-${day.key}`} title={dayLabel(day.key, now, timeZone)}>
-                {day.items.map(item => {
-                  // Times inside the service's sentences read in the account's timezone, like the times around them.
-                  const detail = [item.detail ? readableTimes(item.detail, { timeZone }) : null, siliconOf(item, context), item.app && !item.title.includes(item.app.name) ? item.app.name : null].filter(Boolean).join(" · ");
-                  return (
-                    <Row
-                      key={item.id}
-                      lead={item.app && item.app.app_id !== FIRST_PARTY ? <AppMark app={withAppIcon(item.app)} size={28} className={styles.mark} decorative /> : <Tile>{ICONS[item.kind] ?? <History size={16} strokeWidth={2} />}</Tile>}
-                      title={readableTimes(item.title, { timeZone })}
-                      detail={detail || undefined}
-                    >
-                      <time className={styles.time} dateTime={item.at}>{time.format(Date.parse(item.at))}</time>
-                    </Row>
-                  );
-                })}
-              </Section>
-            ))}
-            {!items.length ? <p className={styles.none}>Nothing here in your recent activity.</p> : null}
-            {history.hasNextPage ? (
-              <div className={styles.more}>
-                <Button ref={moreButton} variant="secondary" onClick={() => void showOlder()} loading={history.isFetchingNextPage}>Show Older Activity</Button>
+        {/* The filters are Silicon UI Tabs, as on a Silicon's page (Anil, 2026-11-14: "use the new updated tab design
+            everywhere"); one panel holds the feed for whichever is chosen. */}
+        <Tabs value={filter} onValueChange={value => setFilter(value as Filter)} className={styles.tabs}>
+          <TabsList aria-label="Show">
+            {FILTERS.map(({ value, label }) => <TabsTrigger key={value} value={value}>{label}</TabsTrigger>)}
+          </TabsList>
+          <TabsContent value={filter}>
+            {history.error && !history.data ? (
+              <Alert tone="danger" title="Your activity did not load">
+                {describeError(history.error)}
+                <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void history.refetch()}>Try Again</Button></span>
+              </Alert>
+            ) : !history.data || !zoneKnown ? (
+              <div className={styles.skeleton} aria-busy="true" aria-label="Loading your activity"><Skeleton label="Loading" lines={6} avatar /></div>
+            ) : !items.length && !history.hasNextPage ? (
+              <div className={styles.empty}>
+                {/* Names what the filter shows, so the empty state's heading sits one level under the page's: h1, h2, h3. */}
+                <h2 className="sr-only">{filter === "all" ? "All activity" : group.label}</h2>
+                <EmptyState icon={<History width={24} height={24} strokeWidth={1.5} />} title="Nothing here yet" description={EMPTY[filter]} />
               </div>
-            ) : null}
-            {history.isFetchNextPageError ? <p className={styles.error} role="alert">{describeError(history.error)}</p> : null}
-          </div>
-        )}
+            ) : (
+              <div ref={feed} role="region" aria-label="Account activity" className={styles.feed}>
+                {days.map(day => (
+                  <Section key={day.key} id={`activity-${day.key}`} title={dayLabel(day.key, now, timeZone)}>
+                    {day.items.map(item => {
+                      // Times inside the service's sentences read in the account's timezone, like the times around them.
+                      const detail = [item.detail ? readableTimes(item.detail, { timeZone }) : null, siliconOf(item, context), item.app && !item.title.includes(item.app.name) ? item.app.name : null].filter(Boolean).join(" · ");
+                      return (
+                        <Row
+                          key={item.id}
+                          lead={item.app && item.app.app_id !== FIRST_PARTY ? <AppMark app={withAppIcon(item.app)} size={28} className={styles.mark} decorative /> : <Tile>{ICONS[item.kind] ?? <History size={16} strokeWidth={2} />}</Tile>}
+                          title={readableTimes(item.title, { timeZone })}
+                          detail={detail || undefined}
+                        >
+                          <time className={styles.time} dateTime={item.at}>{time.format(Date.parse(item.at))}</time>
+                        </Row>
+                      );
+                    })}
+                  </Section>
+                ))}
+                {!items.length ? <p className={styles.none}>Nothing here in your recent activity.</p> : null}
+                {history.hasNextPage ? (
+                  <div className={styles.more}>
+                    <Button ref={moreButton} variant="secondary" onClick={() => void showOlder()} loading={history.isFetchingNextPage}>Show Older Activity</Button>
+                  </div>
+                ) : null}
+                {history.isFetchNextPageError ? <p className={styles.error} role="alert">{describeError(history.error)}</p> : null}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </Page>
     </div>
   );
