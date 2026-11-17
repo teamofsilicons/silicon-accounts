@@ -561,6 +561,7 @@ export interface AppPublic {
 
 /** `GET /v1/me/owned-apps` items. */
 export interface OwnedApp {
+  organization_id?: string | null;
   app_id: string;
   name: string;
   logo_url: string | null;

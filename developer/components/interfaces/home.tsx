@@ -116,15 +116,16 @@ export function InterfacesHome() {
       </Stack></form>
     </Surface>}
   </Page>;
-  return <Page><PageHeader title="Your interfaces" description="Bring Silicon apps together and manage your interface sign-in and publishing." actions={<Button variant="secondary" onClick={()=>{setCreating(true);setFailure(null);}}><Plus size={16} strokeWidth={1.75} aria-hidden="true"/>New interface</Button>}/>
+  const visibleInterfaces = list.data?.interfaces.filter(filter.matches) ?? [];
+  return <Page><PageHeader title="Your interfaces" description="Bring Silicon apps together and manage your interface sign-in and publishing." actions={<>{filter.controls(list.data?.interfaces ?? [])}<Button variant="secondary" onClick={()=>{setCreating(true);setFailure(null);}}><Plus size={16} strokeWidth={1.75} aria-hidden="true"/>New interface</Button></>}/>
     {alert}
-    {filter.controls(list.data?.interfaces??[])}{list.error && <Alert tone="danger" title={ApiError.from(list.error).message}>{ApiError.from(list.error).hint}</Alert>}
+    {list.error && <Alert tone="danger" title={ApiError.from(list.error).message}>{ApiError.from(list.error).hint}</Alert>}
     <Section title="Your interfaces" description="Manage sign-in, creators, publishing and releases.">
-      {list.isPending ? <p role="status">Loading interfaces…</p> : list.data?.interfaces.length ? <ul className={homeStyles.grid} role="list" aria-label="Your interfaces">{list.data.interfaces.filter(filter.matches).map(item=><li key={item.interface_id}><Link href={`/interfaces/${encodeURIComponent(item.interface_id)}`} data-sq="surface" className={homeStyles.tile}>
+      {list.isPending ? <p role="status">Loading interfaces…</p> : visibleInterfaces.length ? <ul className={homeStyles.grid} role="list" aria-label="Your interfaces">{visibleInterfaces.map(item=><li key={item.interface_id}><Link href={`/interfaces/${encodeURIComponent(item.interface_id)}`} data-sq="surface" className={homeStyles.tile}>
         <span className={homeStyles.tileTop}><AppIcon name={item.name} src={item.logo_url?mediaUrl(item.interface_id,item.logo_url):null} size={56} decorative/><Badge size="sm" tone={item.pending_operation?"warning":item.published?"success":"neutral"}>{item.pending_operation?"Save needs attention":item.published?"Published":"Draft"}</Badge></span>
         <span className={homeStyles.tileText}><span className={homeStyles.tileName}>{item.name}</span><span className={homeStyles.tileId}>{item.interface_id}</span></span>
         <span className={homeStyles.tileFoot}><span className={homeStyles.tileSource}>{item.published?"Manage interface":"Continue setup"}</span><ArrowRight className={homeStyles.tileArrow} size={16} strokeWidth={1.75} aria-hidden="true"/></span>
-      </Link></li>)}</ul> : !list.error ? <Surface padding="none"><EmptyState icon={<Braces size={24} strokeWidth={1.5}/>} title="No interfaces yet" description="Create an interface to bring apps together and configure sign-in." action={<Button onClick={()=>{setCreating(true);setFailure(null);}}>Create interface</Button>}/></Surface> : null}
+      </Link></li>)}</ul> : !list.error && filter.count ? filter.empty("interfaces") : !list.error ? <Surface padding="none"><EmptyState icon={<Braces size={24} strokeWidth={1.5}/>} title="No interfaces yet" description="Create an interface to bring apps together and configure sign-in." action={<Button onClick={()=>{setCreating(true);setFailure(null);}}>Create interface</Button>}/></Surface> : null}
     </Section>
     {me.data?.invites?.filter(x=>x.status==="pending").length ? <Section title="Invitations"><Stack>{me.data.invites.filter(x=>x.status==="pending").map(invite=><Surface key={invite.id}><Stack><strong>{invite.interface_name || invite.interface_id}</strong><div className={styles.actions}><Button size="sm" onClick={()=>void invitation(invite.id,"accept")}>Accept</Button><Button size="sm" variant="secondary" onClick={()=>void invitation(invite.id,"decline")}>Decline</Button></div></Stack></Surface>)}</Stack></Section> : null}
   </Page>;

@@ -94,6 +94,7 @@ test('organization readers can filter shared files by saved contact without edit
  await expect(page.getByRole('cell').filter({hasText:'Saved Assistant'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Upload file',exact:true})).toBeDisabled();
  await expect(page.getByRole('link',{name:'Download',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Filters',exact:true}).click();
  await page.getByRole('combobox',{name:'Show files'}).click();await page.getByRole('option',{name:'Shared with me',exact:true}).click();
  await expect.poll(()=>queries.at(-1)?.shared_with_me).toBe(true);
  await page.getByRole('combobox',{name:'Show files'}).click();await page.getByRole('option',{name:'From saved contacts',exact:true}).click();
@@ -122,4 +123,99 @@ test('exact lookup previews the requested account alongside higher trust saved c
  await expect(page.locator('img[src="https://example.test/new-person.png"]')).toHaveCount(1);
  await expect(page.getByRole('button',{name:'Save to Contacts',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Edit saved contact',exact:true})).toHaveCount(0);
+});
+
+for (const width of [1440, 390]) {
+  test(`compact app filters keep the grid visible at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 850 });
+    await platform(page);
+    const personal = makeApp();
+    const shared = { ...personal, app_id: 'shared-app', name: 'Team app', organization_id: 'example', publisher: {type:'organization', name:'Example Organization'}, authors: [member], shared_with_me: true };
+    await page.route('**/api/apps/apps?mine=true*', route => route.fulfill({json: {items: [personal, shared]}}));
+    const peopleRequests: string[] = [];
+    page.on('request', request => {
+      if (/\/api\/(contacts\/|(?:apps|cells|interfaces)\/people(?:\?|$))/.test(new URL(request.url()).pathname)) peopleRequests.push(request.url());
+    });
+    await page.goto('/apps');
+    const grid = page.getByRole('list', {name: 'Your apps'});
+    await expect(grid.getByRole('link', {name: /Team app/})).toBeVisible();
+    const navigation = page.getByRole('navigation', {name: 'Developer site'});
+    await expect(navigation.getByRole('link', {name: /Contacts|Organizations/})).toHaveCount(0);
+    await expect(page.getByText(/Connect your address book/)).toHaveCount(0);
+    await expect(page.getByRole('combobox', {name: 'Filter by person'})).toHaveCount(0);
+    const filters = page.getByRole('button', {name: 'Filters', exact: true});
+    const create = page.getByRole('button', {name: 'New app', exact:true});
+    const [filterBox, createBox, gridBox] = await Promise.all([filters.boundingBox(), create.boundingBox(), grid.boundingBox()]);
+    expect(Math.abs(filterBox!.y - createBox!.y)).toBeLessThan(4);
+    expect(gridBox!.y - (filterBox!.y + filterBox!.height)).toBeLessThan(65);
+    expect(peopleRequests).toEqual([]);
+
+    await filters.click();
+    const panel = page.getByRole('dialog', {name: 'Filters',exact:true});
+    const box = await panel.boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+    await panel.getByRole('combobox', {name:'Publisher'}).click();
+    await page.getByRole('option', {name:'Example Organization'}).click();
+    await panel.getByRole('combobox', {name:'Filter by person'}).fill('assistnt');
+    await panel.getByRole('option', {name:/Saved Assistant/}).click();
+    await panel.getByRole('button', {name:'Done'}).click();
+    await expect(grid.getByRole('link', {name:/Team app/})).toBeVisible();
+    await expect(grid.getByRole('link', {name:/A useful app/})).toHaveCount(0);
+    await page.getByRole('button', {name:'Filters, 2 active'}).click();
+    await expect(panel.getByText('Saved Assistant',{exact:true})).toBeVisible();
+    await panel.getByRole('button', {name:'Clear filters'}).click();
+    await page.keyboard.press('Escape');
+    await expect(filters).toBeFocused();
+    await expect(grid.getByRole('link', {name:/A useful app/})).toBeVisible();
+  });
+}
+
+test('saved contacts are requested in context and only connected with permission', async ({page}) => {
+  await platform(page);
+  let connected = false, grants = 0;
+  await page.route('**/api/contacts/connection', route => {
+    if (route.request().method() === 'POST') { grants++; connected = true; }
+    return route.fulfill({json: {connected}});
+  });
+  const listing = { ...makeApp(), authors: [member] };
+  await page.route('**/api/apps/apps?mine=true*', route => route.fulfill({json: {items: [listing]}}));
+  await page.goto('/apps');
+  await page.getByRole('button', {name:'Filters',exact:true}).click();
+  const panel = page.getByRole('dialog',{name:'Filters',exact:true});
+  async function chooseContacts() {
+    await panel.getByRole('combobox',{name:'Show resources'}).click();
+    await page.getByRole('option',{name:'From saved contacts'}).click();
+  }
+  await chooseContacts();
+  const question=page.getByRole('dialog',{name:'Use your saved contacts?'});
+  await question.getByRole('button',{name:'Cancel'}).click();
+  expect(grants).toBe(0);
+  await expect(panel.getByRole('combobox',{name:'Show resources'})).toContainText('All resources');
+  await chooseContacts();
+  await question.getByRole('button',{name:'Allow access'}).click();
+  await expect(panel.getByRole('combobox',{name:'Show resources'})).toContainText('From saved contacts');
+  await panel.getByRole('button',{name:'Done'}).click();
+  await expect(page.getByRole('list',{name:'Your apps'}).getByRole('link',{name:/A useful app/})).toBeVisible();
+  expect(grants).toBe(1);
+});
+
+test('an invite can use saved contacts without leaving the form', async ({ page }) => {
+  await platform(page);
+  let connected = false;
+  await page.route('**/api/contacts/connection', route => {
+    if (route.request().method() === 'POST') connected = true;
+    return route.fulfill({json: {connected}});
+  });
+  await page.goto('/apps/test-app/authors');
+  const input = page.getByRole('combobox', {name:'Invite an author'});
+  await expect(input).toBeVisible();
+  await expect(page.getByRole('button', {name:'Use saved contacts'})).toHaveCount(0);
+  await input.focus();
+  await page.getByRole('button', {name:'Use saved contacts'}).click();
+  await page.getByRole('dialog', {name:'Use your saved contacts?'}).getByRole('button', {name:'Allow access'}).click();
+  await input.fill('assistnt');
+  await page.getByRole('option', {name:/Saved Assistant/}).click();
+  await expect(input).toHaveValue('si:assistant');
+  await expect(page.locator('img[src="/api/contacts/photos/portrait"]').first()).toBeVisible();
 });
