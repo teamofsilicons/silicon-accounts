@@ -177,6 +177,9 @@ pub struct CopyText {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct OwnedApp {
+    /// Durable organization publisher, when not personally owned.
+    #[serde(default)]
+    pub organization_id: Option<String>,
     /// The app id.
     pub app_id: String,
     /// Name.
@@ -207,6 +210,12 @@ pub struct OwnedApp {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct AppDetails {
+    /// Durable organization publisher, when not personally owned.
+    #[serde(default)]
+    pub organization_id: Option<String>,
+    /// Resource policy; current membership still determines authority.
+    #[serde(default)]
+    pub organization_access: Option<serde_json::Value>,
     /// The app id.
     pub app_id: String,
     /// Name.

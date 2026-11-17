@@ -650,7 +650,17 @@ where
                 .bind(auth.uuid())
                 .fetch_one(&mut *conn)
                 .await?;
-                if app.owner_uuid.as_deref() != Some(auth.uuid()) && !coauthor {
+                let organization_allowed = crate::repo::publishing::permitted(
+                    &app_state,
+                    &auth,
+                    &parts.headers,
+                    &app_id,
+                    crate::repo::publishing::Permission::Manage,
+                )
+                .await?;
+                if !organization_allowed
+                    .unwrap_or(app.owner_uuid.as_deref() == Some(auth.uuid()) || coauthor)
+                {
                     return Err(ApiError::forbidden(
                         "not_app_owner",
                         format!(

@@ -1,4 +1,6 @@
 "use client";
+import {useResourceFilter} from "@/components/people/resource-filters";
+import {DeletedApps} from "@/components/publishing/Lifecycle";
 
 /** One app registry, with Accounts configuration and Apps publishing in the same workspace. */
 import Link from "next/link";
@@ -82,6 +84,7 @@ function TileSkeletons() {
 }
 
 export function DeveloperHome() {
+  const filter=useResourceFilter();
   const router = useRouter();
   const owned = useOwnedApps();
   const { status: sessionStatus } = useSession();
@@ -91,7 +94,7 @@ export function DeveloperHome() {
     return { items: page.items, next_cursor: page.next_offset == null ? null : String(page.next_offset) };
   }, sessionStatus === "signed_in");
   const [newApp, setNewApp] = useState(false);
-  const apps = owned.data || publishing.data ? mergeAppCatalog(owned.data?.items ?? [], publishing.data?.items ?? []) : undefined;
+  const apps = owned.data || publishing.data ? mergeAppCatalog(owned.data?.items ?? [], publishing.data?.items ?? []).filter(app=>filter.matches(publishing.data?.items.find(p=>p.app_id===app.app_id))) : undefined;
 
   useRegisterCommands(() => [
     ...[{
@@ -161,7 +164,9 @@ export function DeveloperHome() {
           <span className={styles.alertActions}><Button size="sm" variant="secondary" onClick={() => void publishing.refetch()}>Try again</Button></span>
         </Alert>
       ) : null}
+      {filter.controls(publishing.data?.items??[])}
       {content}
+      <DeletedApps/>
       <CreateApp open={newApp} close={() => { setNewApp(false); void owned.refetch(); void publishing.refetch(); }} />
     </Page>
   );

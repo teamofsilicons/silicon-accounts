@@ -36,6 +36,9 @@ import {
 import { Releases } from "./Management";
 import { InterfaceMetadata } from "./InterfaceMetadata";
 import { UserStorage } from "./UserStorage";
+import {ResourceAccessEditor} from "@/components/organizations/policy-editor";
+import {emptyResourcePolicy} from "@/components/organizations/api";
+import {AddPeople} from "@/components/people/person-field";
 type Props = { app: App; refresh: () => void };
 export function Setup({
   app,
@@ -43,7 +46,7 @@ export function Setup({
   refresh,
   go,
 }: Props & { step: number; go: (step: number) => Promise<void> }) {
-  return step === 1 ? (
+  const content = step === 1 ? (
     <><Details app={app} refresh={refresh} /><UserStorage key={app.app_id} app={app} refresh={refresh}/></>
   ) : step === 2 ? (
     <Access app={app} refresh={refresh} />
@@ -58,11 +61,14 @@ export function Setup({
   ) : (
     <Publish app={app} refresh={refresh} go={go} />
   );
+  const permission=step===2||step===6?"manage":step===7?"publish":"edit";
+  const allowed=app.permissions?.[permission]!==false;
+  return <>{!allowed&&<p className="muted">Your organization role can view this section. {permission} permission is needed to change it.</p>}<fieldset className="permission-fields" disabled={!allowed}>{content}</fieldset></>;
 }
 function Details({ app, refresh }: Props) {
   const save = useAutosave(
     `/apps/${app.app_id}`,
-    { name: app.name, description: app.description, tags: app.tags },
+    { name: app.name, tagline: app.tagline ?? "", description: app.description, tags: app.tags },
     "PATCH",
     refresh,
   );
@@ -84,6 +90,13 @@ function Details({ app, refresh }: Props) {
           value={app.app_id}
           readOnly
           description="Your app’s permanent identity. It cannot be changed."
+        />
+        <Input
+          label="Tagline"
+          value={save.draft.tagline}
+          onChange={(e) => save.update({ tagline: e.target.value })}
+          description={`${Array.from(save.draft.tagline).length}/60 characters. One plain line for store cards; required before first publication.`}
+          error={Array.from(save.draft.tagline).length > 60 ? "Keep your tagline to 60 characters." : undefined}
         />
         <Textarea
           label="Description"
@@ -137,7 +150,7 @@ function Access({ app, refresh }: Props) {
   return (
     <Section
       title="Choose who can find your app"
-      description="Public apps are available to everyone. Private apps are only visible to the accounts you share them with."
+      description={app.organization_id ? "Public apps are available to everyone. Private apps are shared with your organization, subject to the audience settings below." : "Public apps are available to everyone. Private apps are only visible to the accounts you share them with."}
     >
       <div className="form-stack">
         {!app.is_admin && (
@@ -173,14 +186,16 @@ function Access({ app, refresh }: Props) {
                 <small>
                   {value === "public"
                     ? "Anyone can discover and install it, without signing in."
-                    : "Only invited accounts and verified email domains can access it."}
+                    : app.organization_id ? "Organization members can access it according to the audience settings below." : "Only invited accounts and verified email domains can access it."}
                 </small>
               </span>
             </label>
           ))}
         </fieldset>
-        {save.draft.visibility === "private" && (
+        {app.organization_id&&<ResourceAccessEditor key={app.app_id} org={app.organization_id} value={app.organization_access??emptyResourcePolicy()} canManage={app.is_admin} onSave={async policy=>{await api(`/apps/${app.app_id}/organization-access`,{method:"PUT",body:policy});refresh();}}/>}
+        {save.draft.visibility === "private" && !app.organization_id && (
           <>
+            <AddPeople value={accounts} useIds disabled={!app.is_admin} onChange={value=>{setAccounts(value);save.update({account_ids:value.split(/[\n,]/).map(x=>x.trim()).filter(Boolean)});}}/>
             <Textarea
               label="Share with accounts"
               placeholder={"c:alice\nsi:assistant"}

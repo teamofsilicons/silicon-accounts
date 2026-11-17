@@ -9,6 +9,7 @@ test("event Tings keep recipients and payloads explicit while preserving retry a
   const message=()=>({id:delivery,event_id:id,event_type:"row.inserted",subscription_version:1,status:retried?"pending":"failed",attempts:2,manual_replays:retried?1:0,window_started_at:at,next_at:at,last_error:"ting_rejected",created_at:at,delivered_at:null});
   await page.route("**/api/cells/**",async route=>{
     const request=route.request(),url=new URL(request.url()),path=url.pathname.replace("/api/cells",""),method=request.method();let result:unknown={};
+    if(path==="/people")return route.fulfill({json:{items:[]}});
     if(path==="/cells/notes")result={cell:{uuid:id,cell_id:"notes",name:"Notes",status:"active",url:"https://notes.cells.example",created_at:at,deleted_at:null,settings:{allowed_origins:[],redirect_urls:[]}}};
     else if(path==="/cells/notes/ting-subscriptions"&&method==="GET")result={subscriptions:created&&(!deleted||url.searchParams.get("include_deleted")==="true")?[summary()]:[]};
     else if(path===`/cells/notes/ting-subscriptions/${id}/definition`){definitionReads++;result={definition,version};}

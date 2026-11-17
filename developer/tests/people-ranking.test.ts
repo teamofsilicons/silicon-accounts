@@ -1,0 +1,9 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {fuzzyMatch,mergePeople} from '../components/people/ranking';
+import {contactsProxyRoute} from '../lib/server/contacts-routes';
+test('invitation weight precedes recency, then contacts trust; snapshots overlay without double counting',()=>{
+ const people=mergePeople([{uuid:'a',id:'c:alice',sent:2,received:0,last_invited_at:'2026-01-01T00:00:00Z'},{uuid:'b',id:'si:bob',sent:0,received:3,last_invited_at:'2026-11-01T00:00:00Z'},{uuid:'a',sent:0,received:1}], [{uuid:'z',name:'Trusted contact',trust:200,account:{uuid:'z',id:'si:z'}},{uuid:'q',name:'Saved contact',trust:1,account:{uuid:'q'}},{uuid:'a',name:'Saved Alice',trust:2,photo_id:'photo',account:{uuid:'a',id:'c:alice',pfp_url:'https://example.test/a'}}]);
+ assert.deepEqual(people.map(p=>p.uuid),['a','b','z','q']);assert.equal(people[0].sent,2);assert.equal(people[0].received,1);assert.equal(people[0].display_name,'Saved Alice');assert.equal(people[0].pfp_url,'/api/contacts/photos/photo');
+});
+test('equal frequency uses recency; fuzzy filter accepts typos and preserves ranking',()=>{assert.deepEqual(mergePeople([{uuid:'a',sent:1,last_invited_at:'2026-01-01'},{uuid:'b',received:2,last_invited_at:'2026-02-01'}],[]).map(p=>p.uuid),['b','a']);assert.ok(fuzzyMatch('alce','Alice'));assert.ok(fuzzyMatch('skt','Saket'));assert.ok(fuzzyMatch('alyce','Alice'));assert.equal(fuzzyMatch('zzzz','Alice'),false);});
+test('blocked contacts are excluded and contact proxy cannot send messages or cross paths',()=>{assert.deepEqual(mergePeople([{uuid:'a',sent:10}],[{uuid:'a',name:'A',trust:1,blocked:true,account:{uuid:'a'}}]),[]);assert.equal(contactsProxyRoute('messages','POST'),null);assert.equal(contactsProxyRoute('contacts/%2e%2e','GET'),null);assert.equal(contactsProxyRoute('connection','POST'),'v1/integrations/developer/connection');assert.equal(contactsProxyRoute('photos/avatar','GET'),'v1/photos/avatar');});

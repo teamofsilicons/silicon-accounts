@@ -91,6 +91,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_PUBLIC_URL",
     "ACCOUNTS_REPORT_RECIPIENTS",
     "ACCOUNTS_SILICON_APPS_URL",
+    "ACCOUNTS_ORGANIZATIONS_URL",
     "ACCOUNTS_TOKEN_PEPPER",
     "ACCOUNTS_TING_URL",
     "ACCOUNTS_TRUST_FORWARDED_FOR",
@@ -305,6 +306,7 @@ pub struct Settings {
     pub trust_forwarded_for: bool,
     /// ACCOUNTS_SILICON_APPS_URL.
     pub silicon_apps_url: String,
+    pub organizations_url: String,
     /// Ting API origin for Silicon account delivery.
     pub ting_url: String,
     /// ACCOUNTS_DOCS_URL: where the published docs live (`GET /v1/meta` `docs_url`).
@@ -576,6 +578,7 @@ impl Settings {
             ],
             trust_forwarded_for: false,
             silicon_apps_url: "https://apps.teamofsilicons.com".into(),
+            organizations_url: "https://organizations.teamofsilicons.com".into(),
             ting_url: "https://backend.ting.teamofsilicons.com".into(),
             docs_url: DEFAULT_DOCS_URL.into(),
             developer_url: if prod {
@@ -891,6 +894,10 @@ impl Settings {
             .map(|h| h.to_ascii_lowercase())
             .collect();
         s.trust_forwarded_for = r.bool("ACCOUNTS_TRUST_FORWARDED_FOR", false);
+        s.organizations_url = r.http_url(
+            "ACCOUNTS_ORGANIZATIONS_URL",
+            "https://organizations.teamofsilicons.com",
+        );
         s.silicon_apps_url = r.http_url(
             "ACCOUNTS_SILICON_APPS_URL",
             "https://apps.teamofsilicons.com",

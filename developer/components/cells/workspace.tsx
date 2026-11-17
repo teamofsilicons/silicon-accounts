@@ -30,12 +30,17 @@ export function CellWorkspace({cellId,tab}:{cellId:string;tab:string}){
   const query=useCellData<{cell:Cell}>(cellId,"");
   const restore=useCellAction(cellId);
   const cell=query.data?.cell;
+  const permission=["authors","settings"].includes(tab)?"manage":["functions","templates","services","jobs","triggers","domains","webhooks","queues","tings"].includes(tab)?"publish":"edit";
+  const canChange=!cell?.organization_id||cell.permissions?.[permission]===true;
   return <Page><PageHeader title={cell?.name??cellId} description={cell?.url} back={{href:paths.cells,label:"Your cells"}}/>
     <Failure error={query.error}/>{query.isPending&&<p role="status">Loading cell…</p>}
     {cell&&<><nav className={styles.tabs} aria-label="Cell sections">{tabs.map(t=><Link key={t} href={paths.cell(cellId,t)} data-sq="surface" className={styles.tab} aria-current={tab===t?"page":undefined}>{t[0].toUpperCase()+t.slice(1)}</Link>)}</nav>
-      {cell.status!=="active"&&<Alert tone="warning" title={`This cell is ${cell.status}.`}>{cell.status==="restoring"?"Database recovery is in progress. Follow it in Backups.":cell.status==="failed"?"Recovery failed. Review the error and retry the operation in Backups.":cell.status==="deleted"?<>Restore within 30 days of deletion. The Cell admin can restore it. {" "}<Button loading={restore.busy} onClick={()=>void restore.run("/restore","POST")}>Restore cell</Button></>:`This cell is ${cell.status}.`}</Alert>}
+      {cell.status!=="active"&&<Alert tone="warning" title={`This cell is ${cell.status}.`}>{cell.status==="restoring"?"Database recovery is in progress. Follow it in Backups.":cell.status==="failed"?"Recovery failed. Review the error and retry the operation in Backups.":cell.status==="deleted"?<>Restore within 30 days of deletion. The Cell admin can restore it. {" "}<Button disabled={!!cell.organization_id&&!cell.permissions?.manage} loading={restore.busy} onClick={()=>void restore.run("/restore","POST")}>Restore cell</Button></>:`This cell is ${cell.status}.`}</Alert>}
       <Failure error={restore.error}/>
+      {!canChange&&!["overview","history","logs","files"].includes(tab)&&<p>Your organization role can view this section. {permission} permission is needed to change it.</p>}
+      <fieldset className={styles.permissionFields} disabled={!canChange&&!["overview","history","logs","files"].includes(tab)}>
       {tab==="usage"?<CellUsage cellId={cellId}/>:tab==="copies"?<CellCopies cell={cell}/>:tab==="logs"?<CellLogs cellId={cellId}/>:tab==="backups"?<CellBackups cell={cell}/>:tab==="settings"?<CellSettings cell={cell}/>:tab==="history"?<CellHistory cellId={cellId}/>:tab==="authors"?<CellAuthors cellId={cellId} active={cell.status==="active"}/>:tab==="overview"?<Overview cell={cell}/>:cell.status!=="active"?null:tab==="files"?<CellFiles cell={cell}/>:tab==="functions"?<CellFunctions cellId={cellId}/>:tab==="webhooks"?<CellWebhooks cellId={cellId}/>:tab==="queues"?<CellQueues cellId={cellId}/>:tab==="triggers"?<CellTriggers cellId={cellId}/>:tab==="jobs"?<CellJobs cellId={cellId}/>:tab==="realtime"?<CellRealtime cellId={cellId}/>:tab==="services"?<CellServices cellId={cellId}/>:tab==="templates"?<CellTemplates cellId={cellId}/>:tab==="domains"?<CellDomains cellId={cellId}/>:tab==="tings"?<CellEventTings cellId={cellId}/>:<CellDatabase cellId={cellId}/>}
+      </fieldset>
     </>}
   </Page>;
 }

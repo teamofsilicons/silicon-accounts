@@ -1,0 +1,11 @@
+export type Person={uuid:string;id?:string|null;display_name?:string|null;pfp_url?:string|null;sent?:number;received?:number;last_invited_at?:string|null;trust?:number;contact?:Contact};
+export type Contact={uuid:string;account:Person;name:string;photo_id?:string|null;trust:number;blocked?:boolean;note?:string;phone?:string;email?:string;birthday_month?:number|null;birthday_day?:number|null;birthday_year?:number|null};
+const normalized=(s:string)=>s.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+function close(a:string,b:string){if(Math.abs(a.length-b.length)>2)return false;let row=Array.from({length:b.length+1},(_,i)=>i);for(let i=0;i<a.length;i++){const next=[i+1];for(let j=0;j<b.length;j++)next[j+1]=Math.min(next[j]+1,row[j+1]+1,row[j]+(a[i]===b[j]?0:1));row=next;}return row[b.length]<=Math.min(2,Math.floor(a.length/3));}
+export function fuzzyMatch(query:string,text:string){const q=normalized(query),t=normalized(text);if(!q||t.includes(q))return true;let cursor=0;for(const c of t)if(c===q[cursor])cursor++;return cursor===q.length||t.split(/[\s:._-]+/).some(word=>close(q,word));}
+export function mergePeople(signals:Person[],contacts:Contact[]):Person[]{
+  const byId=new Map<string,Person>();
+  for(const p of signals){if(!p?.uuid)continue;const old=byId.get(p.uuid);byId.set(p.uuid,{...old,...p,id:p.id||old?.id,display_name:p.display_name||old?.display_name,pfp_url:p.pfp_url||old?.pfp_url,sent:(old?.sent??0)+(p.sent??0),received:(old?.received??0)+(p.received??0),last_invited_at:[old?.last_invited_at,p.last_invited_at].filter(Boolean).sort((a,b)=>(Date.parse(a!)||0)-(Date.parse(b!)||0)).at(-1)});}
+  for(const c of contacts){if(c.blocked){byId.delete(c.uuid);continue;}const old=byId.get(c.uuid);byId.set(c.uuid,{...c.account,...old,uuid:c.uuid,id:c.account.id||old?.id,display_name:c.name||c.account.display_name,pfp_url:c.photo_id?`/api/contacts/photos/${encodeURIComponent(c.photo_id)}`:c.account.pfp_url||old?.pfp_url,trust:c.trust,contact:c});}
+  return [...byId.values()].sort((a,b)=>((2*(b.sent??0)+(b.received??0))-(2*(a.sent??0)+(a.received??0))) || ((Date.parse(b.last_invited_at??'')||0)-(Date.parse(a.last_invited_at??'')||0)) || ((b.trust??0)-(a.trust??0)) || (a.display_name||a.id||a.uuid).localeCompare(b.display_name||b.id||b.uuid));
+}

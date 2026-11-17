@@ -1,0 +1,10 @@
+'use client';
+import {useState} from 'react';
+import {Select} from '@/components/silicon-ui/select/select';
+import {useSession} from '@/lib/query/session';
+import {useContacts} from './api';
+import {PersonField} from './person-field';
+export type ResourceOwner={organization_id?:string|null;created_by?:string|null;shared_with_me?:boolean;authors?:{uuid:string}[];creators?:{uuid:string}[]};
+export function useResourceFilter(){const {me}=useSession(),{contacts}=useContacts();const [scope,setScope]=useState('all'),[organization,setOrganization]=useState('all'),[person,setPerson]=useState(''),[uuid,setUuid]=useState('');const contactIds=new Set(contacts.data?.map(c=>c.uuid)??[]);
+ function matches(resource:ResourceOwner|undefined){if(!resource)return scope==='all'&&organization==='all'&&!uuid;const creator=resource.created_by||resource.creators?.[0]?.uuid||resource.authors?.[0]?.uuid;const peers=[creator,...(resource.creators??resource.authors??[]).map(a=>a.uuid)].filter(Boolean);return (organization==='all'||(organization==='personal'?!resource.organization_id:resource.organization_id===organization))&&(!uuid||peers.includes(uuid))&&(scope==='all'||scope==='mine'&&creator===me?.uuid||scope==='shared'&&(resource.shared_with_me??(!!creator&&creator!==me?.uuid))||scope==='contacts'&&peers.some(id=>contactIds.has(id!)));}
+ function controls(resources:ResourceOwner[]){const orgs=[...new Set(resources.map(r=>r.organization_id).filter((v):v is string=>!!v))];return <div><Select label='Show resources' value={scope} onValueChange={setScope} options={[{value:'all',label:'All resources'},{value:'mine',label:'Created by me'},{value:'shared',label:'Shared with me'},{value:'contacts',label:'From saved contacts'}]}/><Select label='Publisher filter' value={organization} onValueChange={setOrganization} options={[{value:'all',label:'All publishers'},{value:'personal',label:'Personal accounts'},...orgs.map(id=>({value:id,label:id}))]}/><PersonField label='Filter by person' value={person} onChange={v=>{setPerson(v);setUuid('');}} onSelect={p=>setUuid(p.uuid)}/></div>;}return {matches,controls};}

@@ -119,9 +119,17 @@ async fn app_info(
     Json(input): Json<AuthorToken>,
 ) -> ApiResult<Response> {
     service(&auth)?;
-    let (actor, _) = verify_author(&state, &input.access_token).await?;
+    let (actor, _, audience) = verify_author(&state, &input.access_token).await?;
     let mut tx = state.db.begin().await?;
-    let target = require_app_author(&mut tx, &app, &actor).await?;
+    let target = require_app_author(
+        &state,
+        &mut tx,
+        &app,
+        &actor,
+        &input.access_token,
+        &audience,
+    )
+    .await?;
     let authors:Vec<accounts_core::models::Account>=sqlx::query_as("select a.* from accounts a join app_authors au on au.account_uuid=a.uuid where au.app_id=$1 and a.status='active' order by au.joined_at,a.uuid").bind(&app).fetch_all(&mut *tx).await?;
     let mut authors = authors
         .iter()
@@ -138,15 +146,29 @@ async fn app_info(
             accounts_core::views::AccountSummary::from_account(&owner),
         );
     }
+    let organization: Option<(String, Value)> = sqlx::query_as(
+        "SELECT organization_id,access FROM app_organization_publishers WHERE app_id=$1",
+    )
+    .bind(&app)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if organization.is_some() && !authors.iter().any(|a| a.uuid == actor) {
+        if let Some(account) = accounts_core::repo::accounts::get(&mut tx, &actor).await? {
+            authors.push(accounts_core::views::AccountSummary::from_account(&account));
+        }
+    }
     Ok(super::respond::no_store(
         StatusCode::OK,
-        &json!({"app_id":target.app_id,"name":target.name,"authors":authors}),
+        &json!({"app_id":target.app_id,"name":target.name,"authors":authors,"organization_id":organization.as_ref().map(|o|&o.0),"organization_access":organization.as_ref().map(|o|&o.1)}),
     ))
 }
 async fn require_app_author(
+    state: &AppState,
     conn: &mut sqlx::PgConnection,
     app: &str,
     actor: &str,
+    token: &str,
+    audience: &str,
 ) -> ApiResult<accounts_core::models::App> {
     let target = apps::require_active(conn, app).await?;
     if target.is_first_party() {
@@ -154,6 +176,25 @@ async fn require_app_author(
             "first_party_delegation_forbidden",
             "Accounts and Developer cannot delegate their own identity privileges to a cell.",
         ));
+    }
+    if let Some((org, access)) = sqlx::query_as::<_, (String, Value)>(
+        "SELECT organization_id,access FROM app_organization_publishers WHERE app_id=$1",
+    )
+    .bind(app)
+    .fetch_optional(&mut *conn)
+    .await?
+    {
+        use accounts_core::repo::publishing::{self, Permission, ResourceKind, ResourcePolicy};
+        let policy: ResourcePolicy = serde_json::from_value(access)
+            .map_err(|_| ApiError::internal("Invalid organization policy."))?;
+        let context = publishing::token_context(state, token, audience, actor).await?;
+        if !context.allows(&org, ResourceKind::Apps, &policy, Permission::Manage) {
+            return Err(ApiError::forbidden(
+                "organization_permission_required",
+                "Linking Cells requires app management permission.",
+            ));
+        }
+        return Ok(target);
     }
     let coauthor: bool = sqlx::query_scalar(
         "select exists(select 1 from app_authors where app_id=$1 and account_uuid=$2)",
@@ -170,7 +211,7 @@ async fn require_app_author(
     }
     Ok(target)
 }
-async fn verify_author(state: &AppState, token: &str) -> ApiResult<(String, Value)> {
+async fn verify_author(state: &AppState, token: &str) -> ApiResult<(String, Value, String)> {
     let mut conn = state.db.acquire().await?;
     let verified = tokens::verify_access_token(&mut conn, &state.keys, token, None).await?;
     if ![CELLS, accounts_core::DEVELOPER_APP_ID].contains(&verified.family.app_id.as_str())
@@ -186,7 +227,7 @@ async fn verify_author(state: &AppState, token: &str) -> ApiResult<(String, Valu
     // Reuse the standard scoped view and live membership checks. In particular,
     // removing the Cells app's access also ends author access to this bridge.
     let view = super::userinfo::userinfo(state, token).await?;
-    Ok((verified.account.uuid, view))
+    Ok((verified.account.uuid, view, verified.claims.aud))
 }
 async fn author(
     State(state): State<AppState>,
@@ -194,7 +235,7 @@ async fn author(
     Json(input): Json<AuthorToken>,
 ) -> ApiResult<Response> {
     service(&auth)?;
-    let (_, view) = verify_author(&state, &input.access_token).await?;
+    let (_, view, _) = verify_author(&state, &input.access_token).await?;
     Ok(super::respond::no_store(StatusCode::OK, &view))
 }
 #[derive(Deserialize, Serialize)]
@@ -231,13 +272,13 @@ async fn link(
 ) -> ApiResult<Response> {
     service(&auth)?;
     callback(&input.callback_uri)?;
-    let (actor, _) = verify_author(&state, &input.actor_token).await?;
+    let (actor, _, audience) = verify_author(&state, &input.actor_token).await?;
     let mut tx = state.db.begin().await?;
     sqlx::query("select pg_advisory_xact_lock(hashtextextended($1,0))")
         .bind(format!("cells-link:{cell}:{app}"))
         .execute(&mut *tx)
         .await?;
-    require_app_author(&mut tx, &app, &actor).await?;
+    require_app_author(&state, &mut tx, &app, &actor, &input.actor_token, &audience).await?;
     // The cell UUID is globally assigned by the Cells service. The app author
     // cannot silently replace a live cell's callback with an unrelated address.
     if let Some(existing) = sqlx::query_scalar::<_, String>(

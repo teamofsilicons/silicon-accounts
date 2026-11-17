@@ -740,7 +740,7 @@ pub async fn manages_app(
     app_id: &str,
 ) -> ApiResult<bool> {
     Ok(sqlx::query_scalar(
-        "select exists(select 1 from apps a where a.app_id=$2 and \
+        "select exists(select 1 from apps a where a.app_id=$2 and not exists(select 1 from app_organization_publishers op where op.app_id=a.app_id) and \
          (a.owner_uuid=$1 or exists(select 1 from app_authors aa \
           where aa.app_id=a.app_id and aa.account_uuid=$1)))",
     )
@@ -756,13 +756,14 @@ pub async fn list_managed(
     conn: &mut PgConnection,
     account_uuid: &str,
     app_id: Option<&str>,
+    organization_apps: &[String],
     filter: &AppProofFilter<'_>,
 ) -> ApiResult<Vec<ManagedProofRow>> {
     Ok(sqlx::query_as::<_, ManagedProofRow>(concat!(
         "with f as materialized (select f.* from proof_families f join apps issuer \
          on issuer.app_id=f.issuing_app where f.kind='app_verification' \
-         and (issuer.owner_uuid=$1 or exists(select 1 from app_authors aa \
-           where aa.app_id=issuer.app_id and aa.account_uuid=$1)) \
+         and ((not exists(select 1 from app_organization_publishers op where op.app_id=issuer.app_id) and (issuer.owner_uuid=$1 or exists(select 1 from app_authors aa \
+           where aa.app_id=issuer.app_id and aa.account_uuid=$1))) or issuer.app_id=any($7)) \
          and ($2::text is null or f.issuing_app=$2) \
          and ($3::timestamptz is null or (f.created_at,f.id)<($3,$4::uuid)) \
          and ($5::text is null or (case when f.revoked_at is not null then 'revoked' \
@@ -782,6 +783,7 @@ pub async fn list_managed(
     .bind(filter.after.1)
     .bind(filter.status)
     .bind(filter.fetch)
+    .bind(organization_apps)
     .fetch_all(conn)
     .await?)
 }

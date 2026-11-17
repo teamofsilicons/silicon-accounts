@@ -7,12 +7,15 @@ import { api, useMutation, useResource } from "./api";
 import type { App } from "./types";
 import { Button, ErrorNotice, Input, Modal, SecretModal, Textarea } from "./ui";
 import { StorageFields } from "./UserStorage";
+import { PublisherSelect } from "@/components/organizations/publisher-select";
 import { parseStorageRows, type StorageRow } from "./storage-schema";
 export function CreateApp({ open, close }: { open: boolean; close: () => void }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [id, setId] = useState("");
   const [description, setDescription] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [organization, setOrganization] = useState("");
   const [logo, setLogo] = useState("");
   const [storage, setStorage] = useState<StorageRow[]>([]);
   const [checked, setChecked] = useState("");
@@ -48,17 +51,19 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
             )
               return;
             const result = await mutation.run(() =>
-              api<{ app: App; app_secret: string }>("/apps", {
+              api<{ app: App; app_secret?: string }>("/apps", {
                 method: "POST",
-                body: { name, app_id: id, description, logo, ...(storage.length ? {user_storage: parseStorageRows(storage)} : {}) },
+                body: { name, app_id: id, tagline, description, logo, ...(organization?{organization_id:organization}:{}), ...(storage.length ? {user_storage: parseStorageRows(storage)} : {}) },
               }),
             );
             if (result) {
               setCreated(result.app.app_id);
-              setSecret(result.app_secret);
+              if(result.app_secret)setSecret(result.app_secret);
+              else {close();navigate(`/apps/${result.app.app_id}/publishing`);}
             }
           }}
         >
+          <PublisherSelect kind="apps" value={organization} onChange={setOrganization} disabled={mutation.pending}/>
           <Input
             label="App name"
             value={name}
@@ -98,6 +103,13 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
               retry={availability.reload}
             />
           )}
+          <Input
+            label="Tagline (optional for drafts)"
+            value={tagline}
+            onChange={(e) => setTagline(e.target.value)}
+            description={`${Array.from(tagline).length}/60 characters. One plain line for your store card.`}
+            error={Array.from(tagline).length > 60 ? "Keep your tagline to 60 characters." : undefined}
+          />
           <Textarea
             label="Description (optional)"
             value={description}

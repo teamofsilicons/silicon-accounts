@@ -2972,6 +2972,7 @@ dependencies = [
  "serde_urlencoded",
  "sha2 0.10.9",
  "silicon-accounts-core",
+ "silicon-publishing-policy",
  "sqlx",
  "subtle",
  "thiserror",
@@ -3092,6 +3093,15 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "silicon-publishing-policy"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,4 +1,7 @@
 "use client";
+import {useContacts} from "@/components/people/api";
+import {PersonField,SavedPerson} from "@/components/people/person-field";
+import {useSession} from "@/lib/query/session";
 import {useEffect,useRef,useState} from "react";
 import {useInfiniteQuery,useQueryClient} from "@tanstack/react-query";
 import {Section,Surface,Stack,Cluster} from "@/components/foundation/layout/layout";
@@ -17,42 +20,46 @@ import {FileTrash} from "./trash";
 import {ImageDownload} from "./image-download";
 import {BucketEditor,StorageProvider,type Bucket} from "./storage-settings";
 import styles from "./cells.module.css";
-interface StoredFile {id:string;bucket:string;name:string;size:number;content_type:string;updated_at:string}
+interface StoredFile {owner_id?:string|null;id:string;bucket:string;name:string;size:number;content_type:string;updated_at:string}
 interface PendingUpload {id:string;bucket:string;name:string;size:number;status:string;expires_at:string}
 type FileAction={file:StoredFile;action:"copy"|"move"|"delete"|"sign"|"image"};
 export function CellFiles({cell}:{cell:Cell}){
+  const {me}=useSession(),{contacts}=useContacts();
+  const [scope,setScope]=useState("all"),[person,setPerson]=useState(""),[owner,setOwner]=useState("");
+  const ownerIds=owner|| (scope==="mine"?me?.uuid??"":scope==="contacts"?(contacts.data??[]).map(c=>c.uuid).join(","):undefined);
+  const canEdit=!cell.organization_id||!!cell.permissions?.edit,canManage=!cell.organization_id||!!cell.permissions?.manage;
   const id=cell.cell_id,buckets=useCellData<{buckets:Bucket[]}>(id,"/storage/buckets");
   const [chosen,setChosen]=useState(""),[prefix,setPrefix]=useState("");
   const bucket=buckets.data?.buckets.find(b=>b.id===chosen)??buckets.data?.buckets[0];
   const [edit,setEdit]=useState<Bucket|"new"|null>(null),[upload,setUpload]=useState<"new"|PendingUpload|null>(null),[action,setAction]=useState<FileAction|null>(null);
   return <Stack gap={8}>
-    <Section title="Files" description="Organize files into buckets and decide who can access them." actions={<Button variant="secondary" onClick={()=>setEdit("new")}>Create bucket</Button>}>
+    <Section title="Files" description="Organize files into buckets and decide who can access them." actions={<Button disabled={!canManage} variant="secondary" onClick={()=>setEdit("new")}>Create bucket</Button>}>
       <Failure error={buckets.error}/>{buckets.isPending&&<p role="status">Loading buckets…</p>}
       {bucket?<Stack><Cluster><Select label="Bucket" value={bucket.id} options={buckets.data!.buckets.map(b=>({label:b.id,value:b.id}))} onValueChange={value=>{setChosen(value);setPrefix("");}}/>
-        <Button variant="secondary" onClick={()=>setEdit(bucket)}>Bucket settings</Button><Button onClick={()=>setUpload("new")}>Upload file</Button></Cluster>
+        <Button disabled={!canManage} variant="secondary" onClick={()=>setEdit(bucket)}>Bucket settings</Button><Button disabled={!canEdit} onClick={()=>setUpload("new")}>Upload file</Button></Cluster>
         <Input label="Filter by path" value={prefix} onChange={e=>setPrefix(e.target.value)} placeholder="photos/"/>
-        <FileList key={bucket.id} cellId={id} bucket={bucket.id} prefix={prefix} onAction={setAction}/>
+        <Select label="Show files" value={scope} onValueChange={setScope} options={[{value:"all",label:"All accessible files"},{value:"mine",label:"Owned by me"},{value:"shared",label:"Shared with me"},{value:"contacts",label:"From saved contacts"}]}/><PersonField label="File owner" value={person} onChange={v=>{setPerson(v);setOwner("");}} onSelect={p=>setOwner(p.uuid)}/>
+        <FileList canEdit={canEdit} ownerIds={ownerIds} shared={scope==="shared"} key={bucket.id} cellId={id} bucket={bucket.id} prefix={prefix} onAction={setAction}/>
       </Stack>:!buckets.isPending&&!buckets.error&&<Surface><p>Create a bucket to start storing files.</p></Surface>}
     </Section>
-    {bucket&&<FileTrash key={bucket.id} cellId={id} bucket={bucket.id}/>}
-    <PendingUploads cellId={id} onResume={setUpload}/>
-    <StorageProvider cellId={id} cellUuid={cell.uuid}/>
-    <StorageLocations cellId={id}/>
+    {bucket&&canEdit&&<FileTrash key={bucket.id} cellId={id} bucket={bucket.id}/>}
+    {canEdit&&<PendingUploads cellId={id} onResume={setUpload}/>}
+    {canManage&&<StorageProvider cellId={id} cellUuid={cell.uuid}/>}
+    {canManage&&<StorageLocations cellId={id}/>}
     <Dialog open={edit!==null} onOpenChange={value=>{if(!value)setEdit(null);}}><DialogContent title={edit==="new"?"Create bucket":"Bucket settings"} description="Bucket limits apply when new files are uploaded.">{edit&&<BucketEditor key={typeof edit==="string"?"new":edit.id} cellId={id} bucket={edit==="new"?undefined:edit} onDone={()=>setEdit(null)}/>}</DialogContent></Dialog>
     <Dialog open={upload!==null} onOpenChange={value=>{if(!value)setUpload(null);}}><DialogContent title={upload==="new"?"Upload file":"Resume upload"} description="Uploaded parts are kept for seven days. You can return with the same file to continue.">{upload&&bucket&&<UploadEditor key={typeof upload==="string"?"new":upload.id} cellId={id} bucket={bucket.id} pending={upload==="new"?undefined:upload} onDone={()=>setUpload(null)}/>}</DialogContent></Dialog>
     <Dialog open={action!==null} onOpenChange={value=>{if(!value)setAction(null);}}><DialogContent title={action?.action==="image"?"Resize or convert image":action?`${action.action[0].toUpperCase()+action.action.slice(1)} file`:"File"} description={action?.file.name??""}>{action?.action==="image"?<ImageDownload key={action.file.id} cellId={id} file={action.file}/>:action&&<FileEditor key={`${action.action}:${action.file.id}`} cellId={id} target={action} onDone={()=>setAction(null)}/>}</DialogContent></Dialog>
   </Stack>;
 }
-function FileList({cellId,bucket,prefix,onAction}:{cellId:string;bucket:string;prefix:string;onAction:(value:FileAction)=>void}){
-  const files=useInfiniteQuery({queryKey:["cells",cellId,"files",bucket,prefix],initialPageParam:"",queryFn:({signal,pageParam})=>{
-    const params=new URLSearchParams({prefix,limit:"100"});if(pageParam)params.set("after",pageParam);
-    return cellsRequest<{files:StoredFile[];next:string|null}>(cellPath(cellId,`/storage-api/files/${encodeURIComponent(bucket)}?${params}`),{signal});
+function FileList({cellId,bucket,prefix,onAction,ownerIds,shared,canEdit}:{canEdit:boolean;ownerIds?:string;shared:boolean;cellId:string;bucket:string;prefix:string;onAction:(value:FileAction)=>void}){
+  const files=useInfiniteQuery({queryKey:["cells",cellId,"files",bucket,prefix,ownerIds,shared],initialPageParam:"",queryFn:({signal,pageParam})=>{
+    return cellsRequest<{files:StoredFile[];next:string|null}>(cellPath(cellId,`/storage-api/files/${encodeURIComponent(bucket)}/query`),{signal,method:"POST",body:{prefix,limit:100,...(ownerIds!==undefined?{owner_ids:ownerIds}:{}),shared_with_me:shared,...(pageParam?{after:pageParam}:{})}});
   },getNextPageParam:page=>page.next??undefined});
   const rows=files.data?.pages.flatMap(p=>p.files)??[];
-  return <Stack><Failure error={files.error}/>{files.isPending?<p role="status">Loading files…</p>:!rows.length?<p>No files match this path.</p>:<div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Files in {bucket}</caption><thead><tr><th>Name</th><th>Size</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{rows.map(file=><tr key={file.id}><td>{file.name}<p className={styles.muted}>{file.content_type}</p></td><td>{bytes(file.size)}</td><td>{date(file.updated_at)}</td><td><div className={styles.actions}>
+  return <Stack><Failure error={files.error}/>{files.isPending?<p role="status">Loading files…</p>:!rows.length?<p>No files match this path.</p>:<div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Files in {bucket}</caption><thead><tr><th>Name</th><th>Owner</th><th>Size</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{rows.map(file=><tr key={file.id}><td>{file.name}<p className={styles.muted}>{file.content_type}</p></td><td>{file.owner_id?<SavedPerson person={{uuid:file.owner_id}}/>:"—"}</td><td>{bytes(file.size)}</td><td>{date(file.updated_at)}</td><td><div className={styles.actions}>
     <a href={`/api/cells${cellPath(cellId,`/storage-api/object/${encodeURIComponent(bucket)}/${file.name.split("/").map(encodeURIComponent).join("/")}`)}`} download={file.name.split("/").at(-1)}>Download</a>
-    {["image/png","image/jpeg","image/webp"].includes(file.content_type.split(";")[0])&&<Button variant="ghost" size="sm" onClick={()=>onAction({file,action:"image"})}>Resize or convert</Button>}
-    {(["copy","move","sign","delete"] as const).map(action=><Button key={action} variant="ghost" size="sm" onClick={()=>onAction({file,action})}>{action==="sign"?"Share link":action[0].toUpperCase()+action.slice(1)}</Button>)}
+    {["image/png","image/jpeg","image/webp"].includes(file.content_type.split(";")[0])&&<Button disabled={!canEdit} variant="ghost" size="sm" onClick={()=>onAction({file,action:"image"})}>Resize or convert</Button>}
+    {(["copy","move","sign","delete"] as const).map(action=><Button key={action} disabled={!canEdit} variant="ghost" size="sm" onClick={()=>onAction({file,action})}>{action==="sign"?"Share link":action[0].toUpperCase()+action.slice(1)}</Button>)}
   </div></td></tr>)}</tbody></table></div>}{files.hasNextPage&&<Button variant="secondary" loading={files.isFetchingNextPage} onClick={()=>void files.fetchNextPage()}>Load more files</Button>}</Stack>;
 }
 function UploadEditor({cellId,bucket,pending,onDone}:{cellId:string;bucket:string;pending?:PendingUpload;onDone:()=>void}){

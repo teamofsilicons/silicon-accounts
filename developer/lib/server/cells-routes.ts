@@ -10,6 +10,7 @@ const FUNCTION = "[a-z][a-z0-9_-]{0,62}";
 const TEMPLATE = "(?!catalog(?:/|$))[a-z][a-z0-9-]{0,39}";
 const JOB = `(?!preview(?:/|$))${FUNCTION}`;
 const routes: [string, RegExp][] = [
+  ["GET HEAD PUT", new RegExp(`^cells/${CELL}/organization-access$`)],
   ["POST", new RegExp(`^cells/${CELL}/notifications/live$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/database/(reference|extensions|connections)$`)],
   ["POST", new RegExp(`^cells/${CELL}/database/password/rotate$`)],
@@ -26,7 +27,7 @@ const routes: [string, RegExp][] = [
   ["POST", new RegExp(`^cells/${PARENT}/copies/${COPY}/reset$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/logs$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/database/slow-queries$`)],
-  ["GET HEAD", /^me$/],
+  ["GET HEAD", /^(me|people|organizations)$/],
   ["GET HEAD POST", /^cells$/],
   ["GET HEAD", /^cells\/availability$/],
   ["GET HEAD POST", new RegExp(`^apps/${APP}/cell$`)],
@@ -100,6 +101,7 @@ const routes: [string, RegExp][] = [
   ["GET HEAD DELETE", new RegExp(`^cells/${CELL}/storage-api/uploads/${UUID}$`)],
   ["PUT", new RegExp(`^cells/${CELL}/storage-api/uploads/${UUID}/parts/[0-9]{1,4}$`)],
   ["POST", new RegExp(`^cells/${CELL}/storage-api/uploads/${UUID}/complete$`)],
+  ["POST", new RegExp(`^cells/${CELL}/storage-api/files/[a-z0-9][a-z0-9._-]{0,62}/query$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/storage-api/files/${BUCKET}$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/storage-api/object/${BUCKET}/.+$`)],
   ["POST", new RegExp(`^cells/${CELL}/storage-api/(files|sign)$`)],

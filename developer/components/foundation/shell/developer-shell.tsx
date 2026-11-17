@@ -154,6 +154,8 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
             }}>Apps</Link>
             <Link href={paths.cells} data-sq="surface" className={styles.navLink} aria-current={pathname===paths.cells||pathname.startsWith("/cells/")?"page":undefined}>Cells</Link>
             <Link href="/interfaces" data-sq="surface" className={styles.navLink} aria-current={pathname==="/interfaces"||pathname.startsWith("/interfaces/")?"page":undefined}>Interfaces</Link>
+            <Link href="/contacts" data-sq="surface" className={styles.navLink} aria-current={pathname==="/contacts"?"page":undefined}>Contacts</Link>
+            <Link href="/organizations" data-sq="surface" className={styles.navLink} aria-current={pathname==="/organizations"?"page":undefined}>Organizations</Link>
             <Link href={paths.appVerification()} data-sq="surface" className={styles.navLink} aria-current={pathname === paths.appVerification() ? "page" : undefined}>App verification</Link>
             <Link href={paths.invitations} data-sq="surface" className={styles.navLink} aria-current={pathname === paths.invitations ? "page" : undefined}>Invitations</Link>
           </nav>

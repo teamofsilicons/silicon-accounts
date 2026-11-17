@@ -5,15 +5,17 @@
 const APP = "[a-z0-9_-]{1,30}";
 const RESOURCE = "[A-Za-z0-9_-]+";
 const routes: [string, RegExp][] = [
-  ["GET HEAD", /^me$/],
+  ["GET HEAD", /^(me|people)$/],
+  ["GET HEAD", /^organizations$/],
   ["GET HEAD", /^targets$/],
   ["GET HEAD POST", /^apps$/],
   ["GET HEAD", new RegExp(`^apps/availability/${APP}$`)],
-  ["GET HEAD PATCH", new RegExp(`^apps/${APP}$`)],
+  ["GET HEAD PATCH DELETE", new RegExp(`^apps/${APP}$`)],
   ["PUT", new RegExp(`^apps/${APP}/access$`)],
+  ["GET HEAD PUT", new RegExp(`^apps/${APP}/organization-access$`)],
   ["GET HEAD PUT", new RegExp(`^apps/${APP}/storage-schema$`)],
   ["GET HEAD", new RegExp(`^apps/${APP}/(packages|releases|authors|invites|history|readiness)$`)],
-  ["POST", new RegExp(`^apps/${APP}/(media|releases|invites|publish|admin|authors/leave|secret/rotate|webhook/rotate)$`)],
+  ["POST", new RegExp(`^apps/${APP}/(media|releases|invites|publish|restore|admin|authors/leave|secret/rotate|webhook/rotate)$`)],
   ["POST", new RegExp(`^apps/${APP}/packages/${RESOURCE}$`)],
   ["GET HEAD", new RegExp(`^apps/${APP}/media/${RESOURCE}$`)],
   ["GET HEAD PUT", new RegExp(`^apps/${APP}/webhook$`)],
