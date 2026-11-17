@@ -36,7 +36,7 @@ export function PictureCards({ title, cards, ratio = "16 / 9", layout = "grid", 
     <section className={className ? `${styles.banner} ${className}` : styles.banner} aria-label={title}>
       <div className={styles.head}>
         <h3 className={styles.title}>{title}</h3>
-        <Button variant="ghost" size="xs" aria-label="Dismiss" onClick={onDismiss}><X size={14} strokeWidth={2} aria-hidden="true" /></Button>
+        {onDismiss ? <Button variant="ghost" size="xs" aria-label="Dismiss" onClick={onDismiss}><X size={14} strokeWidth={2} aria-hidden="true" /></Button> : null}
       </div>
       <ul className={styles.cards} data-layout={layout}>
         {cards.map(card => (

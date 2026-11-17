@@ -598,6 +598,17 @@ async fn link_identity(
     }
     let mut email_added = false;
     if let Some(e) = &email {
+        let primary_elsewhere: bool = sqlx::query_scalar("select exists(select 1 from account_emails where email=$1 and account_uuid<>$2 and is_primary and verified_at is not null)")
+            .bind(e).bind(&me.uuid).fetch_one(&mut *conn).await?;
+        if primary_elsewhere {
+            return Ok(Err(FlowError::new(
+                "email_in_use",
+                format!("{e} is the primary email of another account."),
+                format!(
+                    "Connect {name} on its primary account or use a different provider account."
+                ),
+            )));
+        }
         match contacts::add_verified_email(conn, &me.uuid, e, provider.verified_via()).await {
             Ok(outcome) => {
                 email_added = true;
@@ -1065,12 +1076,19 @@ async fn resolve_identity(
             claim_account_uuid: claim,
         })
     };
-    let refuse_inactive = |status: AccountStatus| {
-        FlowError::new(
+    let refuse_inactive = |status: AccountStatus| match status {
+        AccountStatus::Archived => FlowError::new(
+            "account_not_active",
+            format!(
+                "The account of this {name} sign-in was deleted; it's erased 10 days after that."
+            ),
+            "To keep it, sign in with a code sent to its email.",
+        ),
+        _ => FlowError::new(
             "account_not_active",
             format!("The account of this {name} sign-in is {status} and can't sign in."),
             "Use another sign-in method.",
-        )
+        ),
     };
 
     // A known identity signs its account in.

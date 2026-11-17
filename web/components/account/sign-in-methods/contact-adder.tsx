@@ -170,7 +170,7 @@ export function ContactAdder({ channel, existing, defaultCountry = "US", startOp
               value={value}
               onChange={event => { setValue(event.target.value); setError(null); }}
               error={error ?? undefined}
-              description="We send a 6-digit code to it. It signs you in once it is verified."
+              description="We send a 6-digit code to verify this email address."
             />
           )}
           <div className={styles.adderActions}>

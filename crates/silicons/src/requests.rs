@@ -240,7 +240,7 @@ pub async fn addressed_to(
         request_columns!(),
         " from custodian_requests r where r.status = 'pending' and r.expires_at > now() \
           and (r.to_uuid = $1 or r.to_email in \
-               (select e.email from account_emails e where e.account_uuid = $1 and e.verified_at is not null)) \
+               (select e.email from account_email_owners e where e.account_uuid = $1 and e.verified_at is not null)) \
           and ($2::uuid is null or r.id < $2) \
           order by r.id desc limit $3"
     ))
@@ -265,7 +265,7 @@ pub async fn is_addressed_to(
         return Ok(false);
     };
     Ok(sqlx::query_scalar::<_, bool>(
-        "select exists (select 1 from account_emails where email = $1 and account_uuid = $2 and verified_at is not null)",
+        "select exists (select 1 from account_email_owners where email = $1 and account_uuid = $2 and verified_at is not null)",
     )
     .bind(email)
     .bind(carbon_uuid)

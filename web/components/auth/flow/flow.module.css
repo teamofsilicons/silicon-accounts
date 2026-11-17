@@ -416,6 +416,7 @@ label.shareText[data-disabled] { cursor: default; }
 .complete > :last-child { justify-self: stretch; }
 .success { position: relative; width: 96px; height: 96px; margin-left: -4px; color: var(--success); }
 .successRing { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: rotate(-90deg); }
+.successPhoto, .accountRow { --avatar-radius: var(--radius-full); --avatar-corner-shape: round; }
 .successPhoto { position: absolute; inset: 4px; display: grid; }
 .successPhoto > span { width: 100% !important; height: 100% !important; }
 .successBadge {

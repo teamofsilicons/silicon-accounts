@@ -204,3 +204,7 @@ Silicon's activity, automation, cloud services, per-field sharing.
   gets there, with Browse Silicon Apps (Anil, 2026-11-13, /__apps-empty C). Category: Anil's choice.
 - **Home's introduction cards act** (You lights the photo's ring, Silicons and Apps are links); the prototype's cards
   don't. Category: Anil's choice (2026-11-13).
+
+## Browser profiles and Home, 2026-11-18
+
+The profile menu adds independent personal accounts and their linked work accounts. Home lists each pending item and keeps the introduction visible while both Apps and Silicons are empty. Personal info shows both contact editors even before an address has been added. These changes follow the requested behavior.

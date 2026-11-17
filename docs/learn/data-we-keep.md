@@ -180,7 +180,7 @@ silicon-accounts delete-account --confirm c:dora
 
 Over HTTP it's `DELETE /v1/me` with `{"confirm": "c:dora"}`. If you're the custodian of a Silicon, transfer it or delete it first (`409 custodian_of_silicons`), because every Silicon always has exactly one custodian. A Silicon can't delete itself: its custodian runs `silicon-accounts silicon delete si:dora_helper --confirm si:dora_helper`. [Deleting an account](accounts.md#deleting-an-account) has every rule.
 
-It happens at once, in one step, and can't be undone. Apps you signed in to get `account.deleted`. Then:
+A Carbon's account is archived first, for 10 days: you're signed out everywhere and we email your primary email, but we keep everything and apps aren't told. Signing in again with a code sent to your email or phone in that time brings the account back. After 10 days it's deleted in one step that can't be undone. Apps you signed in to get `account.deleted`. Then:
 
 **Removed:**
 
@@ -197,7 +197,7 @@ It happens at once, in one step, and can't be undone. Apps you signed in to get 
 
 **Kept:**
 
-- the account itself: the uuid stays reserved forever and the id is held for 10 days. Deleting clears the id, the ways to sign in and the photo, but the display name, date of birth and timezone stay in the account's record;
+- the account itself: the uuid stays reserved forever and the CarbonID becomes available when the ten-day recovery period ends and the account is purged. Deleting clears the id, the ways to sign in and the photo, but the display name, date of birth and timezone stay in the account's record;
 - your memberships, as each app's history, with the status `deleted` and none of your details shown to the app;
 - your sign-in history (with IP addresses and user agents), id history, custodian history and the audit log;
 - the copies of the emails and SMS we sent you, with their codes masked;

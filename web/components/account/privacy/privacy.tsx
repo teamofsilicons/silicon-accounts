@@ -25,7 +25,6 @@ import { useMe, useMeta } from "@/lib/query/session";
 import { appHref } from "../apps/apps";
 import { seen } from "../apps/app-page";
 import { AppMark } from "../parts/app-mark";
-import { withAppIcon } from "../parts/app-icons";
 import { asCarbon, asSilicon, describeError } from "../parts/common";
 import { PageBar } from "../parts/page-bar";
 import { useEveryApp } from "../parts/queries";
@@ -64,7 +63,7 @@ export function Privacy() {
                 <LinkItem
                   key={item.membership_id}
                   href={appHref(item.app.app_id)}
-                  lead={<AppMark app={withAppIcon(item.app)} size={28} className={styles.mark} decorative />}
+                  lead={<AppMark app={item.app} size={28} className={styles.mark} decorative />}
                   title={item.app.name}
                   detail={seesLine(item, me.data)}
                 />

@@ -24,7 +24,7 @@ export type AccountId = string;
 type Open<T extends string> = T | (string & {});
 
 export type AccountKind = "carbon" | "silicon";
-export type AccountStatus = "active" | "unclaimed" | "pending_custodian" | "deleted";
+export type AccountStatus = "active" | "unclaimed" | "pending_custodian" | "archived" | "deleted";
 export type AppStatus = "active" | "disabled";
 export type AppSource = "first_party" | "fake" | "silicon_apps";
 export type MembershipStatus = "active" | "access_removed" | "imported";
@@ -37,7 +37,7 @@ export type SigninMethod = "google" | "apple" | "email" | "phone";
 /** Account details an app can require or optionally ask for. */
 export type ContactField = "email" | "phone" | "dob" | "timezone";
 /** OAuth scopes. `profile` is always granted; `openid` adds an id_token; `offline_access` is accepted and ignored. */
-export type Scope = "profile" | "email" | "phone" | "dob" | "timezone" | "openid" | "offline_access";
+export type Scope = "profile" | "account_profile.write" | "email" | "phone" | "dob" | "timezone" | "openid" | "offline_access";
 export type OtpChannel = "email" | "phone";
 
 /** One page of a list endpoint. Pass `next_cursor` back as `cursor` for the next page; null on the last page. */

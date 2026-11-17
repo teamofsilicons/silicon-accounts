@@ -95,6 +95,37 @@ async function drawerTo(page: Page, heading: string) {
 const card = "#personal-profile";
 
 const shown: ScreenSpec[] = [
+  {
+    name: "account-needs-order", path: "/", waitFor: "[data-home]",
+    routes: [
+      ["GET /v1/me/sessions", () => ({ json: data.page([16, 8].map(days => ({
+        ...data.sessions[0], id: "inactive-" + days, label: "Device " + days, current: false, last_seen_at: fromNow(-days * 1440),
+      }))) })],
+      ["GET /v1/me/custodian-requests", () => ({ json: data.page([{ ...data.custodianRequests[0], created_at: fromNow(-20) }]) })],
+    ],
+    prepare: async page => {
+      const needs = page.getByRole("region", { name: "Needs you" });
+      await expect(needs.getByText("3", { exact: true })).toBeVisible();
+      const rows = needs.getByRole("listitem");
+      await expect(rows).toHaveCount(3);
+      await expect(rows.nth(0)).toContainText("Courier");
+      await expect(rows.nth(1)).toContainText("Device 8");
+      await expect(rows.nth(2)).toContainText("Device 16");
+      await rows.nth(1).getByRole("button", { name: "Keep" }).click();
+      await expect(needs.getByText("2", { exact: true })).toBeVisible();
+      await expect(rows).toHaveCount(2);
+    },
+  },
+  {
+    name: "account-personal-empty-contacts", path: "/personal", waitFor: card,
+    routes: [["GET /v1/me", () => ({ json: { ...data.carbon, emails: [], phones: [] } })]],
+    prepare: async page => {
+      await expect(page.locator('[data-edit="emails"]')).toContainText("Add an email");
+      await expect(page.locator('[data-edit="phones"]')).toBeVisible();
+      await page.locator('[data-edit="emails"]').click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    },
+  },
   // Home: needs you with a custodian request, then all clear with the introduction dismissed.
   { name: "account-home", path: "/", waitFor: "[data-home]" },
   { name: "account-font-lab", path: "/personal", waitFor: card, fullPage: false, prepare: async page => {
@@ -161,7 +192,7 @@ const shown: ScreenSpec[] = [
     await lab.getByRole("region", { name: "Text" }).getByRole("slider", { name: "Line height" }).scrollIntoViewIfNeeded();
   } },
   { name: "account-home-review", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => { await page.getByRole("link", { name: "Review" }).first().click(); await wait(page, 900); } },
-  { name: "account-home-new", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me/apps", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, phones: [], custodian_of: 0 } })]] },
+  { name: "account-home-new", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me/apps", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, phones: [], custodian_of: 0 } })]], prepare: async page => { await expect(page.getByText("One Account for Your Silicons & Apps", { exact: true })).toBeVisible(); await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toHaveCount(0); } },
   { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
   // Identity: the card, its back, the photo menu, the editors and the id dialog with a taken id.
   { name: "account-identity", path: "/personal", waitFor: card },

@@ -15,14 +15,39 @@ use serde_json::json;
 
 use crate::flow::signup;
 use crate::util::no_store;
+use accounts_core::http::browser_profiles::{BrowserProfiles, choices};
 
 /// `GET /v1/session` (session): the signed-in account and its session.
 ///
 /// Cookie: `{"account": AccountSummary, "session": {"id","kind":"browser","created_at",
 /// "expires_at","last_seen_at"}}`. A first-party Bearer token describes its sign-in instead
 /// (`"kind":"token"`, `access_token_expires_at`).
-pub async fn get_session(State(state): State<AppState>, auth: AccountAuth) -> ApiResult<Response> {
+pub async fn get_session(
+    State(state): State<AppState>,
+    auth: Result<AccountAuth, ApiError>,
+    headers: HeaderMap,
+) -> ApiResult<Response> {
     let mut conn = state.db.acquire().await?;
+    let mut resumed_cookie = None;
+    let auth = match auth {
+        Ok(auth) => auth,
+        Err(e)
+            if !headers.contains_key(axum::http::header::AUTHORIZATION)
+                && matches!(e.code.as_ref(), "unauthenticated" | "session_expired") =>
+        {
+            let profiles = BrowserProfiles::load(&mut conn, &state, &headers).await?;
+            let (session, cookie) = profiles.resume(&state).ok_or(e)?;
+            resumed_cookie = Some(cookie);
+            AccountAuth {
+                account: accounts_core::repo::accounts::require(&mut conn, &session.account_uuid)
+                    .await?,
+                via: AuthVia::Session {
+                    session_id: session.id,
+                },
+            }
+        }
+        Err(e) => return Err(e),
+    };
     let session = match &auth.via {
         AuthVia::Session { session_id } => {
             let s = sessions::get(&mut conn, *session_id)
@@ -69,6 +94,69 @@ pub async fn get_session(State(state): State<AppState>, auth: AccountAuth) -> Ap
         "session": session,
     }))
     .into_response();
+    if let Some(cookie) = resumed_cookie {
+        append_cookie(response.headers_mut(), &cookie);
+    }
+    no_store(response.headers_mut());
+    Ok(response)
+}
+
+fn require_browser(auth: &AccountAuth) -> ApiResult<()> {
+    if auth.is_cookie() {
+        return Ok(());
+    }
+    Err(ApiError::forbidden(
+        "browser_session_required",
+        "This account picker belongs to a signed-in browser.",
+    ))
+}
+
+pub async fn profiles(
+    State(state): State<AppState>,
+    auth: AccountAuth,
+    headers: HeaderMap,
+) -> ApiResult<Response> {
+    require_browser(&auth)?;
+    let mut conn = state.db.acquire().await?;
+    let roster = BrowserProfiles::load(&mut conn, &state, &headers).await?;
+    let mut response = axum::Json(
+        json!({"accounts": choices(&mut conn, auth.uuid(), &roster.accounts(), None).await?}),
+    )
+    .into_response();
+    no_store(response.headers_mut());
+    Ok(response)
+}
+
+#[derive(serde::Deserialize)]
+pub struct SwitchProfile {
+    account_uuid: String,
+}
+
+pub async fn switch_profile(
+    State(state): State<AppState>,
+    auth: AccountAuth,
+    meta: ClientMeta,
+    headers: HeaderMap,
+    accounts_core::http::Json(body): accounts_core::http::Json<SwitchProfile>,
+) -> ApiResult<Response> {
+    require_browser(&auth)?;
+    let mut tx = state.db.begin().await?;
+    let roster = BrowserProfiles::load(&mut tx, &state, &headers).await?;
+    let selection = roster
+        .select(&mut tx, &state, &meta, &body.account_uuid, false)
+        .await?;
+    let target = accounts_core::repo::accounts::require(&mut tx, &body.account_uuid).await?;
+    if !target.is_active() {
+        return Err(ApiError::forbidden(
+            "account_not_active",
+            "Choose an active account.",
+        ));
+    }
+    tx.commit().await?;
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    for cookie in selection.cookies {
+        append_cookie(response.headers_mut(), &cookie);
+    }
     no_store(response.headers_mut());
     Ok(response)
 }
@@ -117,7 +205,18 @@ pub async fn signout(
         return r;
     };
     match do_signout(&state, &meta, &headers, &auth).await {
-        Ok(()) => clear(StatusCode::NO_CONTENT.into_response()),
+        Ok(cookies) => {
+            let mut response = StatusCode::NO_CONTENT.into_response();
+            for cookie in cookies {
+                append_cookie(response.headers_mut(), &cookie);
+            }
+            append_cookie(
+                response.headers_mut(),
+                &clear_cookie(&state.settings, SIGNUP_COOKIE),
+            );
+            no_store(response.headers_mut());
+            response
+        }
         Err(e) => e.into_response(),
     }
 }
@@ -127,10 +226,15 @@ async fn do_signout(
     meta: &ClientMeta,
     headers: &HeaderMap,
     auth: &AccountAuth,
-) -> ApiResult<()> {
+) -> ApiResult<Vec<cookie::Cookie<'static>>> {
     let mut tx = state.db.begin().await?;
+    let mut changes = Vec::new();
     let what = match &auth.via {
         AuthVia::Session { session_id } => {
+            changes = BrowserProfiles::load(&mut tx, state, headers)
+                .await?
+                .sign_out(&mut tx, state, auth.uuid())
+                .await?;
             sessions::revoke(&mut tx, auth.uuid(), *session_id).await?;
             // A sign-up started in this browser shouldn't outlive the sign-out (shared devices).
             if let Some(s) = signup::from_cookie(&mut tx, state, headers).await?
@@ -162,5 +266,5 @@ async fn do_signout(
     )
     .await?;
     tx.commit().await?;
-    Ok(())
+    Ok(changes)
 }

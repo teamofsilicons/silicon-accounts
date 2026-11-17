@@ -7,7 +7,7 @@
 //! | `GET /v1/ids/available?id=` | public (120/min per IP) | can this `c:`/`si:` id be taken (or reclaimed by me)? |
 //! | `GET /v1/accounts/{uuid}` | app or session (600/min per caller) | session: AccountSummary (+ `custodian` for Silicons); app: the public identity only (uuid, kind, id, status, custodian ref) |
 //! | `GET /v1/accounts/by-id/{id}` | app or session (600/min per caller) | the same, for the current owner of an id |
-//! | `GET` / `PATCH` / `DELETE /v1/me` | session | the Me view; profile changes; account deletion (Carbons) |
+//! | `GET` / `PATCH` / `DELETE /v1/me` | session | the Me view; profile changes; account deletion (Carbons: archived, then deleted after 10 days) |
 //! | `POST /v1/me/id` | session | change my id (old id reserved 10 days, reclaimable; 5 changes per 24 h) |
 //! | `POST` / `DELETE /v1/me/photo`, `GET /v1/photos/{id}` | session / public | profile photos |
 //! | `/v1/me/emails…`, `/v1/me/phones…` | session (Carbon) | add (code), verify, primary, remove |
@@ -32,6 +32,7 @@ mod contacts;
 mod deletion;
 mod history;
 mod identities;
+mod interface_profile;
 mod lookup;
 mod my_apps;
 mod organizations;
@@ -42,6 +43,7 @@ mod util;
 mod work_invitations;
 
 pub use contacts::{CONTACT_ADDS_PER_ACCOUNT, CONTACT_ADDS_PER_IP};
+pub use deletion::delete_archived_accounts;
 pub use lookup::LOOKUPS_PER_MINUTE;
 pub use photos::{MAX_PHOTO_BYTES, PHOTO_UPLOADS_PER_HOUR};
 pub use profile::{ID_CHANGE_WINDOW_SECONDS, ID_CHANGES_PER_DAY};
@@ -49,6 +51,7 @@ pub use profile::{ID_CHANGE_WINDOW_SECONDS, ID_CHANGES_PER_DAY};
 /// HTTP routes of this crate (see the build spec 02-api.md, sections marked [account]).
 pub fn router() -> Router<AppState> {
     Router::new()
+        .merge(interface_profile::router())
         .merge(organizations::router())
         .merge(work_invitations::router())
         .route("/v1/ids/available", get(lookup::id_available))
@@ -95,23 +98,30 @@ pub fn router() -> Router<AppState> {
         .route("/v1/me/history", get(history::list))
 }
 
-/// How often the reservation sweep runs.
-const SWEEP_EVERY: Duration = Duration::from_secs(3600);
+/// How often the sweeps run (both are one indexed query when there's nothing to do).
+const SWEEP_EVERY: Duration = Duration::from_secs(60);
 
-/// Background tasks of this crate: an hourly sweep that deletes id reservations that ended over
-/// a day ago (expired reservations are already ignored everywhere; this only keeps the table
-/// small).
+/// Background tasks of this crate: a sweep every minute that deletes the Carbons archived over 10 days
+/// ago ([`delete_archived_accounts`]) and the id reservations that ended over a day ago (expired
+/// reservations are already ignored everywhere; this only keeps the table small).
 pub fn spawn_background(state: AppState) -> Vec<JoinHandle<()>> {
     vec![tokio::spawn(async move {
         let mut tick = tokio::time::interval(SWEEP_EVERY);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             tick.tick().await;
+            match delete_archived_accounts(&state).await {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(deleted = n, "deleted archived accounts"),
+                Err(e) => {
+                    tracing::warn!(error = %e, "archived account sweep failed; retrying next minute")
+                }
+            }
             match sweep_expired_reservations(&state.db).await {
                 Ok(0) => {}
                 Ok(n) => tracing::debug!(removed = n, "swept expired id reservations"),
                 Err(e) => {
-                    tracing::warn!(error = %e, "id reservation sweep failed; retrying next hour")
+                    tracing::warn!(error = %e, "id reservation sweep failed; retrying next minute")
                 }
             }
         }

@@ -1,3 +1,4 @@
+import { expect } from "@playwright/test";
 import type { ScreenSpec, MockRoute } from "../../scripts/screens-types";
 import { carbon, carbonSummary } from "../../scripts/mock/fixtures";
 import { FIRST_PARTY, sampleFlow } from "../auth/mocks/flows";
@@ -24,6 +25,7 @@ const choices = [
   },
 ];
 const linked: MockRoute[] = [
+  ["GET /v1/session/accounts", () => ({ json: { accounts: choices } })],
   ["GET /v1/me/linked-accounts/requests", () => ({ json: { items: [] } })],
   [
     "GET /v1/me/linked-accounts",
@@ -31,6 +33,25 @@ const linked: MockRoute[] = [
   ],
 ];
 const specs: ScreenSpec[] = [
+  {
+    name: "account-profile-menu", path: "/", waitFor: "[data-home]",
+    routes: [["GET /v1/session/accounts", () => ({ json: { accounts: [...choices, { ...carbonSummary, uuid: "second", display_name: "Morgan", id: "c:morgan", org: null }] } })]],
+    prepare: async page => {
+      await page.getByRole("button", { name: /^Account menu/ }).click();
+      await expect(page.getByRole("menuitem", { name: /Morgan/ })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: /alex.studio/ })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Add another account" })).toBeVisible();
+    },
+  },
+  {
+    name: "account-switch-home", path: "/linked-accounts", waitFor: "h1",
+    routes: [...linked, ["POST /v1/session/accounts/switch", () => ({ status: 204 })]],
+    prepare: async page => {
+      await page.getByRole("button", { name: "Switch", exact: true }).first().click();
+      await expect(page).toHaveURL(/\/$/);
+      await expect(page.locator("[data-home]")).toBeVisible();
+    },
+  },
   {
     name: "auth-work-existing-invitation",
     path: "/work-invitations/existing",
@@ -55,7 +76,7 @@ const specs: ScreenSpec[] = [
     name: "auth-work-picker",
     path: "/authorize/flow/work-picker",
     as: "signed-out",
-    waitFor: "[aria-label='Work accounts']",
+    waitFor: "#accounts-Work",
     routes: [
       [
         "GET /v1/flows/:id",

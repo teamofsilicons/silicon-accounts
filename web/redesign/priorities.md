@@ -5,7 +5,7 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-11-13
+Last updated: 2026-11-18
 
 ## Now
 1. developer-site e2e suites still use the old hosted sign-in words ("Email", "Create account": j-pages, b-bff-session,
@@ -18,6 +18,8 @@ Last updated: 2026-11-13
 
 Done since 2026-11-10 (ab05095 and after): Home without Your apps (2026-11-12), Silicons, Connected apps and Permissions, Security (Unlink dialog, row links,
 Change key on the page), Personal info, Data & privacy with the delete page, sign-in and sign-up, /goodbye.
+Done 2026-11-14 (uncommitted): deleting an account archives it for 10 days; the delete page's recovery card and
+/goodbye say how to come back (decisions.md 2026-11-14).
 
 ## Waiting on the API
 - Everything in [api-gaps.md](api-gaps.md): notifications, data download, a Silicon's activity, apps and sign-in
@@ -55,6 +57,8 @@ Change key on the page), Personal info, Data & privacy with the delete page, sig
   thin list; inbox placement; theme as a header control.
 
 ## Done (recent)
+
+- 2026-11-18. Home notification counting and ordering, empty contact editing, profile switching and the hosted sign-in avatar ring.
 - 2026-11-13 Activity is its own sidebar section below Security, also in the phone sheet and command menu (uncommitted).
 - 2026-11-13 Old opaque Silicon avatar PNGs recover transparent artwork in cards; new saves upload a transparent animated GIF with embedded settings (uncommitted).
 - 2026-11-12 Silicon UI #30 CommandPalette name, focus sequence and quiet text, and #31 headerless/top Dialog implemented in shared source and the account site's local patch; the account command menu now uses the shared Dialog (uncommitted; release deferred).

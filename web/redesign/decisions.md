@@ -548,3 +548,17 @@ Create Account; "Not You?" kept. After deleting an account: /goodbye, "Your acco
 - The top bar's Search label and ⌘K take muted too (they were lighter than muted, 2026-10-30), so all three of the
   bar's quiet words ("Accounts", "Search", ⌘K) pass.
 - The account site stays light only (lib/theme.ts); the audit now expects light for a dark-preferring visitor.
+
+## 2026-11-14: A deleted account is archived for 10 days, then deleted
+
+Saket: "make it so that it's archived, send them an mail, and after 10 days if they dont log back in it would
+automatically be deleted". DELETE /v1/me now archives the Carbon: signed out everywhere, its primary email told, its
+CarbonID, emails, Google or Apple links and app memberships kept, and no app told yet. Signing in with a code sent to
+one of its emails or phones within 10 days restores it; a Google or Apple sign-in is refused with a hint to use a code.
+After 10 days the API deletes it as before (apps get account.deleted, the CarbonID is released at the end of that recovery period, updated 2026-11-18). This
+replaces the 30 days of 2026-11-12 and answers its open questions. The delete page shows the recovery card with 10
+days (RECOVERY_DAYS) and /goodbye says how to come back. UNDERSTANDING.md doesn't say this yet.
+
+## 2026-11-18. Browser profiles and empty states
+
+The top-right profile menu and Your Accounts list independent sign-ins together with their linked work accounts. Selecting one opens Home in its session. Needs you shows one row per actionable request or inactive device, newest first. An empty account keeps its introduction and can configure both contact types from Personal info. Hosted sign-in uses the same circular outline for an avatar and its completion ring.

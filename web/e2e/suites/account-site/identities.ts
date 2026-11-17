@@ -50,8 +50,7 @@ const identities: Journey = {
     const refusedSame = await connect(env, ben.page, "Google", gmail, `Ben ${t}`);
     results.check("another Carbon connecting Ada's Google account is refused, with the reason", /Google was not connected/.test(refusedSame) && /another|already/i.test(refusedSame), refusedSame.slice(0, 240));
     const refusedEmail = await connect(env, ben.page, "Google", ada.email, `Ben Again ${t}`);
-    results.check("another Carbon connecting a Google account whose email is Ada's is refused, with the reason", /Google was not connected/.test(refusedEmail) && /belongs to another account|another account/i.test(refusedEmail), refusedEmail.slice(0, 240));
-    results.check("the email refusal reads correctly (\"An email can only belong to one account\", not \"A email…\")", !/\bA email\b/.test(refusedEmail) && /An email can only belong to one account/.test(refusedEmail), refusedEmail.match(/An? email can only[^.]*\./)?.[0] ?? refusedEmail.slice(0, 200));
+    results.check("a Google account with another Carbon's primary email must be connected on that account", /Google was not connected/.test(refusedEmail) && refusedEmail.includes("primary email of another account") && refusedEmail.includes("Connect Google on its primary account"), refusedEmail.slice(0, 240));
     await shot(env, ben.page, "acct-links-02-refused");
     const benMe = await getMe(ben.probe);
     results.check("…and nothing was linked or added to the other Carbon", benMe.identities.length === 0 && benMe.emails.length === 1, JSON.stringify({ identities: benMe.identities.length, emails: benMe.emails.map(item => item.email) }));

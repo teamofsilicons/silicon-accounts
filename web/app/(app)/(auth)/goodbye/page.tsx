@@ -5,7 +5,7 @@
 import type { Metadata } from "next";
 import { Goodbye } from "@/components/auth/goodbye";
 
-export const metadata: Metadata = { title: "Your account is deleted", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Account deletion requested", robots: { index: false, follow: false } };
 
 export default function Page() {
   return <Goodbye />;

@@ -40,11 +40,13 @@ async fn backfill_preserves_accounts_memberships_and_signin_history() {
     let report = accounts_core::db::migrate(&db.pool).await.unwrap();
     // Later additive migrations may also run; registration remains the first.
     assert_eq!(report.applied_now[0].version, 37);
-    let after: serde_json::Value =
-        sqlx::query_scalar("select jsonb_agg(to_jsonb(a) order by uuid) from accounts a")
-            .fetch_one(&db.pool)
-            .await
-            .unwrap();
+    // Without the columns later migrations add (0039: archived_at, null for every existing row).
+    let after: serde_json::Value = sqlx::query_scalar(
+        "select jsonb_agg(to_jsonb(a) - 'archived_at' order by uuid) from accounts a",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
     assert_eq!(
         accounts, after,
         "registration cannot activate or change an account"

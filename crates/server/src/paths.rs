@@ -46,10 +46,20 @@ pub const DISCOVERY_PATHS: [&str; 3] = ["/openapi.json", "/v1/openapi.json", "/v
 /// Cookie-bound flows and verified backend credentials never receive CORS headers.
 pub fn is_public_cors_path(path: &str) -> bool {
     is_interface_public_token_path(path)
+        || interface_profile_methods(path).is_some()
         || path.starts_with("/sdk/")
         || path.starts_with("/.well-known/")
         || DISCOVERY_PATHS.contains(&path)
         || is_app_public_config(path)
+}
+
+/// Cross-origin profile operations authenticate only with a delegated app bearer.
+pub fn interface_profile_methods(path: &str) -> Option<&'static str> {
+    match path {
+        "/v1/interface-accounts/me" => Some("GET, HEAD, PATCH, OPTIONS"),
+        "/v1/interface-accounts/me/id" | "/v1/interface-accounts/me/photo" => Some("POST, OPTIONS"),
+        _ => None,
+    }
 }
 
 pub fn is_interface_public_token_path(path: &str) -> bool {
@@ -159,7 +169,7 @@ impl RouteClass {
             return RouteClass::Default;
         }
         match path {
-            "/v1/me/photo" => RouteClass::PhotoUpload,
+            "/v1/me/photo" | "/v1/interface-accounts/me/photo" => RouteClass::PhotoUpload,
             _ if is_scoped_photo_upload(path) => RouteClass::PhotoUpload,
             "/v1/internal/apps/sync" => RouteClass::InternalSync,
             _ if app_route(path).is_some_and(|(_, tail)| tail == "imports") => RouteClass::Import,

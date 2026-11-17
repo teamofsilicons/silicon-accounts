@@ -72,10 +72,9 @@ impl Recipient {
             return Ok(true);
         }
         match &self.target {
-            CarbonTarget::Email(e) => Ok(contacts::verified_emails(conn, &carbon.uuid)
+            CarbonTarget::Email(e) => Ok(contacts::owner(conn, contacts::ContactKind::Email, e)
                 .await?
-                .iter()
-                .any(|v| v == e)),
+                .is_some_and(|(uuid, verified)| verified && uuid == carbon.uuid)),
             CarbonTarget::Id(id) => Ok(carbon.handle.as_deref() == Some(id.to_string().as_str())),
         }
     }

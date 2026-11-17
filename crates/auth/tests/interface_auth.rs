@@ -1301,37 +1301,24 @@ async fn trusted_interface_cannot_add_an_app_management_app() {
             )
             .await;
         assert_eq!(added.status, 403, "{app}: {}", added.json);
-        assert_eq!(added.json["error"]["code"], "first_party_delegation_forbidden", "{app}");
+        assert_eq!(
+            added.json["error"]["code"], "first_party_delegation_forbidden",
+            "{app}"
+        );
     }
     // A stored row naming Silicon Apps (written around the registry's check) is refused too.
-    sqlx::query("update interface_auth_clients set app_ids='{silicon-apps}' where interface_id='potato'")
-        .execute(&ctx.state.db)
-        .await
-        .unwrap();
+    sqlx::query(
+        "update interface_auth_clients set app_ids='{silicon-apps}' where interface_id='potato'",
+    )
+    .execute(&ctx.state.db)
+    .await
+    .unwrap();
     let started = ctx.call(router(),Req::post("/v1/interface-auth/flows").session(&ctx.state.settings,&cookie).json(json!({"interface_id":"potato","redirect_uri":"https://potato.example/callback","state":"privileged","code_challenge":pkce::s256_challenge(VERIFIER),"code_challenge_method":"S256"}))).await;
     assert_eq!(started.status, 403, "{}", started.json);
-    assert_eq!(started.json["error"]["code"], "first_party_delegation_forbidden");
-}
-
-#[tokio::test]
-async fn interface_consent_issues_a_separate_catalog_token() {
-    let ctx = TestContext::new().await;
-    let (account, cookie, _) = fixture(&ctx, "unverified", true).await;
-    sqlx::query("update interface_auth_clients set app_ids=ARRAY['silicon-apps-catalog'] where interface_id='potato'")
-        .execute(&ctx.state.db).await.unwrap();
-    let flow = begin(&ctx, &cookie).await;
-    assert_eq!(flow["consent_required"], true);
-    assert_eq!(flow["apps"][0]["app_id"], "silicon-apps-catalog");
-    let approved = decide(&ctx, &cookie, flow["flow_id"].as_str().unwrap(), true).await;
-    let issued = ctx.call(router(), exchange(&code(&approved), "catalog-signin")).await;
-    assert_eq!(issued.status, 200, "{}", issued.json);
-    assert!(issued.json["apps"].get("silicon-apps").is_none());
-    let token = issued.json["apps"]["silicon-apps-catalog"]["access_token"].as_str().unwrap();
-    let mut conn = ctx.conn().await;
-    use accounts_core::repo::tokens::verify_access_token;
-    let verified = verify_access_token(&mut conn, &ctx.state.keys, token, Some("silicon-apps-catalog")).await.unwrap();
-    assert_eq!(verified.family.account_uuid, account.uuid);
-    assert!(verify_access_token(&mut conn, &ctx.state.keys, token, Some("silicon-apps")).await.is_err());
+    assert_eq!(
+        started.json["error"]["code"],
+        "first_party_delegation_forbidden"
+    );
 }
 
 #[tokio::test]
@@ -1409,4 +1396,208 @@ async fn a_refresh_does_not_rewrite_receipts_already_unavailable() {
         .await
         .unwrap();
     assert_eq!(before, after, "an unavailable receipt is left as it is");
+}
+
+#[tokio::test]
+async fn ordinary_interface_can_register_a_new_carbon_without_signing_in_as_them() {
+    let ctx = TestContext::new().await;
+    let (_account, cookie, _) = fixture(&ctx, "unverified", true).await;
+    let start = "/v1/interface-accounts/potato/registrations";
+    let body =
+        json!({"email":"register@example.test","id":"c:registrant","display_name":"Registrant"});
+    let request = |key: &str| {
+        Req::post(start)
+            .bearer(SECRET)
+            .header("idempotency-key", key)
+            .json(body.clone())
+    };
+    assert_eq!(
+        ctx.call(router(), request("unconfigured")).await.status,
+        403
+    );
+    ctx.exec("update interface_auth_clients set app_ids=array['silicon-account-management']")
+        .await;
+    assert_eq!(
+        ctx.call(
+            router(),
+            Req::post(start)
+                .session(&ctx.state.settings, &cookie)
+                .header("idempotency-key", "cookie")
+                .json(body.clone())
+        )
+        .await
+        .status,
+        401
+    );
+    assert_eq!(
+        ctx.call(
+            router(),
+            request("web-secret").header("origin", "https://potato.example")
+        )
+        .await
+        .status,
+        401
+    );
+    let reg = ctx.call(router(), request("first")).await;
+    assert_eq!(reg.status, 201, "{}", reg.json);
+    assert_eq!(ctx.call(router(), request("first")).await.json, reg.json);
+    let finish = format!(
+        "{start}/{}/complete",
+        reg.json["registration_id"].as_str().unwrap()
+    );
+    let proof = common::last_code(&ctx, "register@example.test").await;
+    let complete = |code: &str, key: &str| {
+        Req::post(&finish)
+            .bearer(SECRET)
+            .header("idempotency-key", key)
+            .json(json!({"code":code}))
+    };
+    let wrong = if proof == "000000" {
+        "111111"
+    } else {
+        "000000"
+    };
+    assert_eq!(
+        ctx.call(router(), complete(wrong, "completion"))
+            .await
+            .status,
+        422
+    );
+    let created = ctx.call(router(), complete(&proof, "completion")).await;
+    assert_eq!(created.status, 201, "{}", created.json);
+    assert_eq!(created.json["account"]["id"], "c:registrant");
+    assert_eq!(created.json.as_object().unwrap().len(), 1);
+    assert!(!created.headers.contains_key("set-cookie"));
+    assert_eq!(
+        ctx.call(router(), complete(wrong, "other")).await.status,
+        409
+    );
+    assert_eq!(
+        ctx.call(router(), complete(&proof, "completion"))
+            .await
+            .json,
+        created.json
+    );
+    ctx.exec(
+        "update interface_auth_clients set signin_config=jsonb_build_object('allow_signup',false)",
+    )
+    .await;
+    assert_eq!(ctx.call(router(), request("disabled")).await.status, 403);
+}
+
+#[tokio::test]
+async fn interface_profile_requires_its_own_live_grant_and_explicit_write_scope() {
+    let ctx = TestContext::new().await;
+    let (account, cookie, other) = fixture(&ctx, "unverified", true).await;
+    let app = accounts_core::PROFILE_APP_ID;
+    ctx.exec("update interface_auth_clients set app_ids=array['silicon-account-management']")
+        .await;
+    let other_token = ctx
+        .tokens_for(&account, &other, &[Scope::Profile])
+        .await
+        .access_token;
+    let route = "/v1/interface-accounts/me";
+    let get = |token: &str| Req::get(route).bearer(token);
+    let patch = |token: &str, body: Value, key: &str| {
+        Req::patch(route)
+            .bearer(token)
+            .header("idempotency-key", key)
+            .json(body)
+    };
+    let direct = ctx.first_party_tokens(&account).await;
+    for invalid in [&direct.access_token, &other_token] {
+        assert!(
+            !ctx.call(accounts_account::router(), get(invalid))
+                .await
+                .status
+                .is_success()
+        );
+    }
+    let f = begin(&ctx, &cookie).await;
+    assert!(
+        f["apps"][0]["optional_scopes"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("account_profile.write"))
+    );
+    let approve = decide(&ctx, &cookie, f["flow_id"].as_str().unwrap(), true).await;
+    let readonly = ctx.call(router(), exchange(&code(&approve), "read")).await;
+    let token = readonly.json["apps"][app]["access_token"].as_str().unwrap();
+    let view = ctx.call(accounts_account::router(), get(token)).await;
+    assert_eq!(view.status, 200, "{}", view.json);
+    assert!(view.json.get("email").is_none());
+    assert_eq!(
+        ctx.call(
+            accounts_account::router(),
+            patch(token, json!({"display_name":"No"}), "denied")
+        )
+        .await
+        .status,
+        403
+    );
+    let f = begin(&ctx, &cookie).await;
+    let id = f["flow_id"].as_str().unwrap();
+    let approval=ctx.call(router(),Req::post(&format!("/v1/interface-auth/flows/{id}/decision")).session(&ctx.state.settings,&cookie).json(json!({"approve":true,"optional_scopes":{(app):["account_profile.write","timezone"]}}))).await;
+    let granted = ctx
+        .call(router(), exchange(&code(&approval.json), "write"))
+        .await;
+    let token = granted.json["apps"][app]["access_token"].as_str().unwrap();
+    let updated = ctx
+        .call(
+            accounts_account::router(),
+            patch(
+                token,
+                json!({"display_name":"Updated","timezone":"Europe/London"}),
+                "edit",
+            ),
+        )
+        .await;
+    assert_eq!(updated.status, 204, "{}", updated.json);
+    let view = ctx.call(accounts_account::router(), get(token)).await;
+    assert_eq!(view.json["display_name"], "Updated");
+    assert_eq!(view.json["timezone"], "Europe/London");
+    assert_eq!(
+        ctx.call(
+            accounts_account::router(),
+            patch(token, json!({"dob":"1990-01-01"}), "dob")
+        )
+        .await
+        .status,
+        403
+    );
+    assert!(
+        !ctx.call(accounts_account::router(), Req::get("/v1/me").bearer(token))
+            .await
+            .status
+            .is_success()
+    );
+    ctx.exec("update interface_auth_clients set active=false")
+        .await;
+    assert_eq!(
+        ctx.call(accounts_account::router(), get(token))
+            .await
+            .status,
+        403
+    );
+}
+
+#[tokio::test]
+async fn interface_consent_issues_a_separate_catalog_token() {
+    let ctx = TestContext::new().await;
+    let (account, cookie, _) = fixture(&ctx, "unverified", true).await;
+    sqlx::query("update interface_auth_clients set app_ids=ARRAY['silicon-apps-catalog'] where interface_id='potato'")
+        .execute(&ctx.state.db).await.unwrap();
+    let flow = begin(&ctx, &cookie).await;
+    assert_eq!(flow["consent_required"], true);
+    assert_eq!(flow["apps"][0]["app_id"], "silicon-apps-catalog");
+    let approved = decide(&ctx, &cookie, flow["flow_id"].as_str().unwrap(), true).await;
+    let issued = ctx.call(router(), exchange(&code(&approved), "catalog-signin")).await;
+    assert_eq!(issued.status, 200, "{}", issued.json);
+    assert!(issued.json["apps"].get("silicon-apps").is_none());
+    let token = issued.json["apps"]["silicon-apps-catalog"]["access_token"].as_str().unwrap();
+    let mut conn = ctx.conn().await;
+    use accounts_core::repo::tokens::verify_access_token;
+    let verified = verify_access_token(&mut conn, &ctx.state.keys, token, Some("silicon-apps-catalog")).await.unwrap();
+    assert_eq!(verified.family.account_uuid, account.uuid);
+    assert!(verify_access_token(&mut conn, &ctx.state.keys, token, Some("silicon-apps")).await.is_err());
 }

@@ -7,6 +7,8 @@ order: 86
 
 # Build verified Interface sign-in
 
+Any active registered interface can offer [account registration and profile editing](interface-accounts.md). The verified bridge below concerns the main sign-in experience.
+
 A verified or trusted Interface may build its own email and phone sign-in screens. Its confidential backend calls Silicon Accounts; the Interface secret, flow capability and Accounts cookies stay off the browser. The same app review and Interface authorization code are used as in the hosted flow. An unverified Interface uses the hosted flow instead.
 
 First register the Interface's exact callback URI and the origin of the Interface in its sign-in setup. Store the Interface secret securely on the backend. On each call below, authenticate to Accounts with `Authorization: Bearer <interface-secret>`. These are backend-to-backend endpoints; they do not permit cross-origin browser calls. Use HTTPS outside local development.

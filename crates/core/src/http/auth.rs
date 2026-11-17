@@ -265,6 +265,14 @@ async fn resolve(
         .hint(format!("Sign in again at {}.", state.settings.public_url)));
     };
     check_origin(&state.settings, &parts.headers, &parts.method)?;
+    if let Some(expected) = parts.headers.get("x-accounts-profile")
+        && expected.as_bytes() != session.account_uuid.as_bytes()
+    {
+        return Err(ApiError::conflict(
+            "browser_account_changed",
+            "The active account changed in another tab. Reload to continue with that account.",
+        ));
+    }
     let account = accounts::get(&mut conn, &session.account_uuid)
         .await?
         .ok_or_else(unauthenticated)?;

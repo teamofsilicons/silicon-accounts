@@ -27,6 +27,8 @@ In [Silicon Developer](https://developers.teamofsilicons.com), open your app's p
 
 Apps CLI 0.3.5 can also save the URL with `silicon-apps setup YOUR_APP_ID interface --api-docs https://example.com/openapi.json`.
 
+Silicon Accounts publishes its [registration and profile API for interfaces](/docs/accounts/start/interface-accounts). Include the resource app ID `silicon-account-management` to use it.
+
 ## 2. Verify app access on your API
 
 To embed the **Silicon Apps catalog** itself, add `silicon-apps-catalog` to your

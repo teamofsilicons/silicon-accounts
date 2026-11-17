@@ -78,6 +78,9 @@ pub fn canonical_first_party_app_id(app_id: &str) -> &str {
 /// signed-in Carbon's identity and manage the apps they own (see `http::auth`).
 pub const DEVELOPER_APP_ID: &str = "developer";
 
+/// Scoped resource for an interface managing an account profile.
+pub const PROFILE_APP_ID: &str = "silicon-account-management";
+
 /// Canonical app identity for the Silicon Apps catalog and CLI.
 pub const SILICON_APPS_APP_ID: &str = "silicon-apps";
 

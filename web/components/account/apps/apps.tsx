@@ -23,7 +23,6 @@ import { formatDate, formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useDeveloperUrl, useMeta } from "@/lib/query/session";
 import { AppMark } from "../parts/app-mark";
-import { withAppIcon } from "../parts/app-icons";
 import { describeError, useNow } from "../parts/common";
 import { ListCap } from "../parts/list-cap";
 import { PageBar } from "../parts/page-bar";
@@ -58,7 +57,7 @@ export function Apps() {
     <LinkItem
       key={item.membership_id}
       href={appHref(item.app.app_id)}
-      lead={<AppMark app={withAppIcon(item.app)} size={32} className={styles.mark} decorative />}
+      lead={<AppMark app={item.app} size={32} className={styles.mark} decorative />}
       title={item.app.name}
       detail={appLine(item, now)}
       end={item.status === "imported" ? <Badge size="sm" tone="warning">Imported you</Badge> : undefined}

@@ -1,7 +1,7 @@
 //! A Carbon's emails and phone numbers.
 //!
 //! Rules (UNDERSTANDING.md): up to 10 of each; any can sign in; exactly one primary; the primary
-//! can't be removed (make another primary first); an email/phone belongs to one account only;
+//! can't be removed (make another primary first); a primary email or any phone identifies at most one account;
 //! everything is verified before it's added.
 //!
 //! **Unverified rows.** The only unverified rows are the addresses an app import attached to an
@@ -102,7 +102,8 @@ impl ContactKind {
         match self {
             ContactKind::Email => {
                 "update account_emails set is_primary = true where account_uuid = $1 and email = ( \
-                   select email from account_emails where account_uuid = $1 and verified_at is not null \
+                   select e.email from account_emails e where e.account_uuid = $1 and e.verified_at is not null \
+                   and not exists (select 1 from account_emails p where p.email=e.email and p.is_primary and p.account_uuid<>$1) \
                    order by created_at, email limit 1) \
                  and not exists (select 1 from account_emails where account_uuid = $1 and is_primary)"
             }
@@ -118,7 +119,7 @@ impl ContactKind {
     fn sql_owner(&self) -> &'static str {
         match self {
             ContactKind::Email => {
-                "select account_uuid, verified_at is not null from account_emails where email = $1"
+                "select account_uuid, verified_at is not null from account_email_owners where email = $1"
             }
             ContactKind::Phone => {
                 "select account_uuid, verified_at is not null from account_phones where phone = $1"
@@ -306,26 +307,52 @@ pub async fn check_can_add(
     account_uuid: &str,
     value: &str,
 ) -> ApiResult<()> {
-    match owner(conn, kind, value).await? {
-        Some((holder, verified)) if holder == account_uuid => {
-            return if verified {
-                Err(already_added(kind, value))
-            } else {
-                Ok(())
-            };
-        }
-        // Taken by another account, unless it is an unproven row there (the prover takes it).
-        Some((holder, verified)) if verified || !is_unproven_on(conn, &holder).await? => {
-            return Err(in_use(kind, value));
-        }
-        Some(_) | None => {}
+    let existing: Option<(bool, bool)> = sqlx::query_as(kind.sql_row())
+        .bind(value)
+        .bind(account_uuid)
+        .fetch_optional(&mut *conn)
+        .await?;
+    if let Some((_, verified)) = existing {
+        return if verified {
+            Err(already_added(kind, value))
+        } else {
+            Ok(())
+        };
     }
+    check_other_owner(conn, kind, account_uuid, value).await?;
     let count: i64 = sqlx::query_scalar(kind.sql_count())
         .bind(account_uuid)
         .fetch_one(&mut *conn)
         .await?;
     if count >= MAX_PER_KIND {
         return Err(limit_reached(kind));
+    }
+    Ok(())
+}
+
+/// A secondary email is shareable. A first email becomes primary immediately.
+async fn check_other_owner(
+    conn: &mut PgConnection,
+    kind: ContactKind,
+    uuid: &str,
+    value: &str,
+) -> ApiResult<()> {
+    if kind == ContactKind::Email {
+        let conflict: bool = sqlx::query_scalar(
+            "select exists(select 1 from account_emails where email=$1 and account_uuid<>$2 and is_primary
+             and (verified_at is not null or account_uuid in(select uuid from accounts where status='unclaimed')))
+             and not exists(select 1 from account_emails where account_uuid=$2 and is_primary)
+             or exists(select 1 from account_emails e join accounts a on a.uuid=e.account_uuid
+                       where e.email=$1 and e.account_uuid<>$2 and a.status in ('unclaimed','archived'))")
+            .bind(value).bind(uuid).fetch_one(&mut *conn).await?;
+        if conflict {
+            return Err(in_use(kind, value));
+        }
+    } else if let Some((holder, verified)) = owner(conn, kind, value).await?
+        && holder != uuid
+        && (verified || !is_unproven_on(conn, &holder).await?)
+    {
+        return Err(in_use(kind, value));
     }
     Ok(())
 }
@@ -360,25 +387,20 @@ pub async fn add_verified(
 ) -> ApiResult<AddOutcome> {
     let mut tx = conn.begin().await?;
     lock_account(&mut tx, account_uuid).await?;
-    if let Some((holder, verified)) = owner(&mut tx, kind, value).await?
+    check_other_owner(&mut tx, kind, account_uuid, value).await?;
+    if let Some((holder, false)) = owner(&mut tx, kind, value).await?
         && holder != account_uuid
+        && is_unproven_on(&mut tx, &holder).await?
+        && let Some(other) = accounts::get(&mut tx, &holder).await?
     {
-        let unproven = if verified {
-            None
-        } else {
-            accounts::get(&mut tx, &holder).await?.filter(|a| {
-                !(a.kind == AccountKind::Carbon && a.status == AccountStatus::Unclaimed)
-            })
-        };
-        match unproven {
-            Some(other) => detach(&mut tx, kind, value, &other, None).await?,
-            None => return Err(in_use(kind, value)),
-        }
+        detach(&mut tx, kind, value, &other, None).await?;
     }
-    if let Some((holder, verified)) = owner(&mut tx, kind, value).await? {
-        if holder != account_uuid {
-            return Err(in_use(kind, value));
-        }
+    let existing: Option<(bool, bool)> = sqlx::query_as(kind.sql_row())
+        .bind(value)
+        .bind(account_uuid)
+        .fetch_optional(&mut *tx)
+        .await?;
+    if let Some((_, verified)) = existing {
         if verified {
             return Err(already_added(kind, value));
         }
@@ -499,7 +521,14 @@ pub async fn set_primary(
         .bind(account_uuid)
         .bind(value)
         .execute(&mut *tx)
-        .await?;
+        .await
+        .map_err(|e| {
+            if is_unique_violation(&e, None) {
+                in_use(kind, value)
+            } else {
+                e.into()
+            }
+        })?;
     tx.commit().await?;
     Ok(true)
 }
@@ -591,7 +620,7 @@ pub async fn remove_phone(
     remove(conn, ContactKind::Phone, account_uuid, phone).await
 }
 
-/// Verified emails of an account (used to find custodian requests addressed by email).
+/// All verified addresses attached to this account, for consent and domain policies.
 pub async fn verified_emails(
     conn: &mut PgConnection,
     account_uuid: &str,
@@ -618,7 +647,7 @@ async fn lock_account(conn: &mut PgConnection, account_uuid: &str) -> ApiResult<
             "account_not_found",
             format!("No account has the uuid '{account_uuid}'."),
         )),
-        Some(AccountStatus::Deleted) => Err(ApiError::conflict(
+        Some(AccountStatus::Deleted | AccountStatus::Archived) => Err(ApiError::conflict(
             "account_deleted",
             format!(
                 "The account {account_uuid} was deleted (possibly while this request was being handled), so nothing can be added to it."
@@ -788,6 +817,13 @@ pub async fn prove(
 }
 
 fn in_use(kind: ContactKind, value: &str) -> ApiError {
+    if kind == ContactKind::Email {
+        return ApiError::conflict(
+            "email_in_use",
+            format!("{value} is already a primary or reserved email on another account."),
+        )
+        .hint("Choose a different primary email.");
+    }
     let one = match kind {
         ContactKind::Email => "An email",
         ContactKind::Phone => "A phone number",

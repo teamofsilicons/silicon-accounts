@@ -42,6 +42,7 @@ use tokio::task::JoinHandle;
 mod cli_login;
 mod device;
 pub mod flow;
+mod interface_registration;
 mod interfaces;
 pub mod link;
 pub mod providers;
@@ -54,6 +55,7 @@ mod util;
 pub fn router() -> Router<AppState> {
     Router::new()
         .merge(interfaces::router())
+        .merge(interface_registration::router())
         // Hosted sign-in flow.
         .route("/v1/flows", post(flow::create::create_flow))
         .route("/v1/flows/{id}", get(flow::handlers::get_flow))
@@ -109,6 +111,8 @@ pub fn router() -> Router<AppState> {
         )
         // Browser session.
         .route("/v1/session", get(session::get_session))
+        .route("/v1/session/accounts", get(session::profiles))
+        .route("/v1/session/accounts/switch", post(session::switch_profile))
         .route("/v1/session/signout", post(session::signout))
         // Device approval (the CLI device flow's browser half).
         .route("/v1/device/{user_code}", get(device::show))

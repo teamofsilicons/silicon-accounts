@@ -82,6 +82,38 @@ async fn client(conn: &mut PgConnection, id: &str) -> ApiResult<Client> {
     Ok(c)
 }
 
+/// Registration is available to every active interface that configured Accounts.
+pub(super) async fn registration_client(
+    conn: &mut PgConnection,
+    id: &str,
+    state: &AppState,
+    headers: &HeaderMap,
+) -> ApiResult<accounts_core::models::SigninConfig> {
+    let c = client(conn, id).await?;
+    let secret = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .unwrap_or_default();
+    if headers.contains_key(header::ORIGIN) || !state.keys.pepper.verify(secret, &c.secret_hash) {
+        return Err(ApiError::unauthenticated(
+            "invalid_client",
+            "Use the registered Interface secret from its backend.",
+        ));
+    }
+    if !c.app_ids.iter().any(|a| a == accounts_core::PROFILE_APP_ID)
+        || c.signin_config.get("allow_signup") == Some(&json!(false))
+    {
+        return Err(ApiError::forbidden(
+            "registration_not_allowed",
+            "This interface must enable sign-up and include the account management app.",
+        ));
+    }
+    Ok(accounts_core::models::SigninConfig::from_stored(
+        &c.signin_config,
+    ))
+}
+
 async fn info(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult<Response> {
     let mut conn = state.db.acquire().await?;
     let c = client(&mut conn, &id).await?;
@@ -209,12 +241,19 @@ async fn descriptors(
         let scopes: Vec<&str> = std::iter::once("profile")
             .chain(config.required_fields.iter().map(|f| f.scope().as_str()))
             .collect();
-        let optional_scopes: Vec<&str> = config
+        let mut optional_scopes: Vec<&str> = config
             .optional_fields
             .iter()
             .map(|f| f.scope().as_str())
             .collect();
-        result.push(json!({"app_id":id,"name":app.name,"logo_url":app.logo_url,"description":c.app_descriptions.get(id).and_then(Value::as_str),"scopes":scopes,"optional_scopes":optional_scopes,"selected_optional_scopes":[]}));
+        if id == accounts_core::PROFILE_APP_ID {
+            optional_scopes.push(Scope::ProfileWrite.as_str());
+        }
+        let mut descriptor = json!({"app_id":id,"name":app.name,"logo_url":app.logo_url,"description":c.app_descriptions.get(id).and_then(Value::as_str),"scopes":scopes,"optional_scopes":optional_scopes,"selected_optional_scopes":[]});
+        if id == accounts_core::PROFILE_APP_ID {
+            descriptor["interface_api_documentation_url"] = json!(app.homepage_url);
+        }
+        result.push(descriptor);
     }
     Ok(result)
 }

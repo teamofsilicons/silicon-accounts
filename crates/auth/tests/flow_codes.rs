@@ -3,6 +3,7 @@
 
 mod common;
 
+use accounts_core::repo::accounts;
 use accounts_core::test_support::{CarbonSpec, Req, TestContext};
 use common::*;
 use serde_json::json;
@@ -113,6 +114,81 @@ async fn existing_account_signs_in_with_an_email_code() {
     .await
     .expect("history");
     assert_eq!(history, ("email".to_string(), "success".to_string()));
+}
+
+#[tokio::test]
+async fn an_archived_carbon_comes_back_by_signing_in_with_an_email_code() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let email = format!("{}@example.test", carbon.id().trim_start_matches("c:"));
+    let (app, _) = ctx.app("briefcase").await;
+    let mut old_browser = Browser::new(&ctx);
+    let old_id = id_of(&new_flow(&ctx, &mut old_browser, &app.app_id, json!({})).await);
+    let sent = old_browser
+        .post(
+            &ctx,
+            &format!("/v1/flows/{old_id}/email"),
+            json!({"email":email}),
+        )
+        .await;
+    assert_eq!(sent.status, 200);
+    let old_code = last_code(&ctx, &email).await;
+    let mut tx = ctx.state.db.begin().await.expect("begin");
+    let locked = accounts::lock(&mut tx, &carbon.uuid)
+        .await
+        .expect("lock")
+        .expect("account");
+    accounts::archive_account(&mut tx, &ctx.state.settings, &locked)
+        .await
+        .expect("archive");
+    tx.commit().await.expect("commit");
+
+    let old = old_browser
+        .post(
+            &ctx,
+            &format!("/v1/flows/{old_id}/verify"),
+            json!({"code":old_code}),
+        )
+        .await;
+    assert_ne!(
+        old.status, 200,
+        "a code sent before deletion must not restore an account"
+    );
+    assert_eq!(
+        accounts::require(&mut *ctx.conn().await, &carbon.uuid)
+            .await
+            .unwrap()
+            .status
+            .as_str(),
+        "archived"
+    );
+    // The user can now request a fresh recovery code.
+    sqlx::query(
+        "update otp_challenges set created_at=created_at-interval '1 minute' where destination=$1",
+    )
+    .bind(&email)
+    .execute(&ctx.state.db)
+    .await
+    .unwrap();
+    let mut b = Browser::new(&ctx);
+    let id = id_of(&new_flow(&ctx, &mut b, &app.app_id, json!({})).await);
+    let r = email_and_verify(&ctx, &mut b, &id, &email).await;
+    assert_eq!(r.status, 200, "{}", r.json);
+    assert_eq!(r.json["flow"]["signed_in_as"]["uuid"], carbon.uuid.as_str());
+    let mut conn = ctx.conn().await;
+    let back = accounts::require(&mut conn, &carbon.uuid)
+        .await
+        .expect("account");
+    assert_eq!(back.status.as_str(), "active");
+    assert_eq!(back.handle, carbon.handle);
+    let restored: i64 = sqlx::query_scalar(
+        "select count(*) from audit_log where account_uuid = $1 and action = 'account.restored'",
+    )
+    .bind(&carbon.uuid)
+    .fetch_one(&mut *conn)
+    .await
+    .expect("audit");
+    assert_eq!(restored, 1);
 }
 
 #[tokio::test]
@@ -939,4 +1015,59 @@ async fn a_burst_of_parallel_guesses_is_still_counted_per_address() {
     );
     assert_eq!(last, 1, "one of them started the cooldown");
     assert_eq!(locked, 50);
+}
+
+#[tokio::test]
+async fn explicit_signup_can_use_a_secondary_as_another_accounts_primary() {
+    let ctx = TestContext::new().await;
+    let original = ctx.carbon().await;
+    let email = "another-profile@example.test";
+    accounts_core::repo::contacts::add_verified_email(
+        &mut *ctx.conn().await,
+        &original.uuid,
+        email,
+        accounts_core::models::VerifiedVia::Code,
+    )
+    .await
+    .unwrap();
+    let mut browser = Browser::new(&ctx);
+    let f = new_flow(
+        &ctx,
+        &mut browser,
+        "silicon-accounts",
+        json!({"intent":"signup"}),
+    )
+    .await;
+    let id = id_of(&f);
+    assert_eq!(
+        email_and_verify(&ctx, &mut browser, &id, email).await.json["flow"]["step"],
+        "signup"
+    );
+    let created = browser
+        .post(&ctx, &format!("/v1/flows/{id}/signup"), json!({}))
+        .await;
+    assert_eq!(created.status, 200, "{}", created.json);
+    let owner = created.json["flow"]["signed_in_as"]["uuid"]
+        .as_str()
+        .unwrap();
+    assert_ne!(owner, original.uuid);
+    let contacts =
+        accounts_core::repo::contacts::list_emails(&mut *ctx.conn().await, &original.uuid)
+            .await
+            .unwrap();
+    assert!(
+        contacts
+            .iter()
+            .any(|contact| contact.email == email && !contact.is_primary)
+    );
+    ctx.exec("update otp_challenges set created_at=created_at-interval '1 minute'")
+        .await;
+    let mut other_browser = Browser::new(&ctx);
+    let signin = new_flow(&ctx, &mut other_browser, "silicon-accounts", json!({})).await;
+    assert_eq!(
+        email_and_verify(&ctx, &mut other_browser, &id_of(&signin), email)
+            .await
+            .json["flow"]["signed_in_as"]["uuid"],
+        owner
+    );
 }

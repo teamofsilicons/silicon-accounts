@@ -95,7 +95,7 @@ function ContactSection({ channel, carbon }: { channel: "email" | "phone"; carbo
     <Section
       title={isEmail ? "Emails" : "Phone numbers"}
       description={isEmail
-        ? "A code sent to any of these signs you in. Apps that can see your email get the primary one."
+        ? "Apps with email access see your primary address. Signing in with a shared email opens the account where it is primary."
         : "A code texted to any of these signs you in. Apps that can see your phone number get the primary one."}
       actions={<span className={styles.count} aria-label={`${count} of ${LIMIT} ${pluralNoun}`}><AnimatedCounter value={count} /> of {LIMIT}</span>}
     >

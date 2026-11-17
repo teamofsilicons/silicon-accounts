@@ -904,3 +904,7 @@ Work-invitation pages permit form handoff to the exact configured Organizations 
 Silicon creation and management use Ting notification setup in place of own webhook URLs and secrets.
 See `../docs/start/silicon-notifications.md` for anonymous approval receivers, authenticated account delivery,
 and migration behavior. App webhook management remains on the developer site.
+
+## Browser profile switching
+
+The header and Your Accounts load the browser’s independently authenticated profiles and their linked work accounts from `GET /v1/session/accounts`. Switching through `POST /v1/session/accounts/switch` opens Home with a fresh page cache. Account-page requests include the UUID rendered by the tab in `X-Accounts-Profile` so an old tab cannot apply a change to a different active account. App logos come from the app record. An empty account keeps the Home introduction visible.

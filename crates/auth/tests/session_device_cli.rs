@@ -702,3 +702,45 @@ async fn a_cli_code_lockout_shows_in_the_accounts_sign_in_history() {
         ("silicon-accounts", "email", "failed")
     );
 }
+
+#[tokio::test]
+async fn cli_restores_an_archived_carbon_with_a_new_verified_phone_code() {
+    let ctx = TestContext::new().await;
+    let phone = "+14155550124";
+    let carbon = ctx
+        .carbon_with(CarbonSpec {
+            email: Some(String::new()),
+            phone: Some(phone.into()),
+            ..Default::default()
+        })
+        .await;
+    let mut tx = ctx.state.db.begin().await.unwrap();
+    accounts_core::repo::accounts::archive_account(&mut tx, &ctx.state.settings, &carbon)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let sent = ctx
+        .call(
+            router(),
+            Req::post("/v1/cli/login/start").json(json!({"phone":phone})),
+        )
+        .await;
+    assert_eq!(sent.status, 200, "{}", sent.json);
+    let code = common::last_code(&ctx, phone).await;
+    let verified = ctx
+        .call(
+            router(),
+            Req::post("/v1/cli/login/verify")
+                .json(json!({"challenge_id":sent.json["challenge_id"],"code":code})),
+        )
+        .await;
+    assert_eq!(verified.status, 200, "{}", verified.json);
+    assert_eq!(
+        accounts_core::repo::accounts::require(&mut *ctx.conn().await, &carbon.uuid)
+            .await
+            .unwrap()
+            .status
+            .as_str(),
+        "active"
+    );
+}

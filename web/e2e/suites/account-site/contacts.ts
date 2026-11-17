@@ -1,7 +1,7 @@
 /**
  * Sign-in methods: emails and phone numbers, up to 10 of each, each verified with a code before it counts. One is
  * always primary; another can be made primary (apps that see it are told); the primary can't be removed; any of them
- * signs in to the same account, and a removed one no longer does. Both channels walk the same steps.
+ * signs in to the same account when unshared. Shared emails sign in to their primary account.
  */
 import type { Locator, Page } from "@playwright/test";
 import type { Ctx, Journey } from "../../context";
@@ -127,7 +127,7 @@ function contactJourney(channel: Channel): Journey {
   const isEmail = channel === "email";
   return {
     name: `account-site-${isEmail ? "emails" : "phones"}`,
-    title: `${w.plural} on Sign-in methods: added with a code up to 10 (the 11th refused, also when two codes race), refusals explained, make primary (${w.app === "dm" ? "DM" : "Briefcase"} told), the primary can't be removed, another can; any of them signs in to the same account`,
+    title: `${w.plural} on Sign-in methods: verification codes, the ten-contact limit, changing the primary, removal and sign-in routing`,
     async run(ctx) {
       const { env, results } = ctx;
       // A refused add (another account's address, a number the server rejects, an expired code) answers 409/410/422 on
@@ -168,12 +168,16 @@ function contactJourney(channel: Channel): Journey {
         await section.getByRole("button", { name: "Send code" }).click();
         await sleep(400);
         results.check("the account's own address (any case) is refused before sending", (await section.innerText()).includes(`${carbon.email} is already on your account.`));
-        await section.getByRole("textbox", { name: "Email address" }).fill("saketdev12@example.test");
-        await section.getByRole("button", { name: "Send code" }).click();
-        const taken = await until(async () => (await section.innerText()).replace(/\s+/g, " "), text => /already belongs to another account/.test(text), 8_000);
-        results.check("another account's address is refused by the server, in place", taken.includes("saketdev12@example.test already belongs to another account."), taken.match(/saketdev12[^.]*\./)?.[0] ?? "no message");
-        const takenApi = await call(probe, w.route, { method: "POST", json: { email: "saketdev12@example.test" } });
-        results.check("…the API's 409 email_in_use explains it in a correct sentence (\"An email can only belong to one account\", never \"A email\")", takenApi.status === 409 && codeOf(takenApi.body) === "email_in_use" && hintOf(takenApi.body) === "An email can only belong to one account. Sign in with it to use that account, or add a different email." && !/\bA email\b/.test(taken), `${takenApi.status} ${codeOf(takenApi.body)}: ${hintOf(takenApi.body)}`);
+        const holder = await newCarbon(ctx, "acct-email-holder");
+        const shared = await addContact(env, probe, "email", holder.email);
+        const saved = (await getMe(probe)).emails.find(email => email.email === holder.email);
+        results.check("another account's primary email can be verified here as a secondary", shared.status === 200 && saved?.is_primary === false && !!saved.verified_at);
+        const promotion = await call(probe, `${w.route}/${encodeURIComponent(holder.email)}/primary`, { method: "POST", json: {} });
+        results.check("a shared address can only be primary on one account", promotion.status === 409 && codeOf(promotion.body) === "email_in_use", messageOf(promotion.body));
+        const signedIn = await codeSignIn(ctx, "email", holder.email);
+        results.check("the shared address signs in to its primary account", signedIn.uuid === holder.uuid);
+        values.push(holder.email);
+        await holder.context.close();
       } else {
         // Another Carbon holds a number (added through the API with its code), for the refusal further down.
         const holder = await newCarbon(ctx, "acct-phone-holder");

@@ -28,13 +28,14 @@ import { Page } from "@/components/foundation/layout/layout";
 import { ApiError } from "@/lib/api/errors";
 import type { LinkedAccount } from "@/lib/api/types";
 import { paths } from "@/lib/navigation";
-import { useMe, useMeta } from "@/lib/query/session";
+import { firstPartySignInUrl, useMe, useMeta } from "@/lib/query/session";
 import {
   useAccountLinkRequests,
   type AccountLinkRequest,
   useLinkedAccountAction,
   useLinkedAccounts,
-  useSwitchLinkedAccount,
+  useSwitchBrowserAccount,
+  useBrowserAccounts,
 } from "@/lib/query/linked-accounts";
 import { PageBar } from "./parts/page-bar";
 import { LinkRow, Row, Section, Tile } from "./parts/rows";
@@ -73,8 +74,9 @@ export function LinkedAccountsPage({ completedLink }: { completedLink?: string }
   const meta = useMeta();
   const me = useMe();
   const linked = useLinkedAccounts();
+  const profiles = useBrowserAccounts();
   const requests = useAccountLinkRequests();
-  const switchAccount = useSwitchLinkedAccount();
+  const switchAccount = useSwitchBrowserAccount();
   const start = useLinkedAccountAction<{ link_id: string; authorize_url: string }, Record<string, never>>("linked-accounts/link/start");
   const complete = useLinkedAccountAction<unknown, { link_id: string }>("linked-accounts/link/complete");
   const create = useLinkedAccountAction<{ uuid: string }, { id: string }>("personal-account");
@@ -85,8 +87,8 @@ export function LinkedAccountsPage({ completedLink }: { completedLink?: string }
   const [switching, setSwitching] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const accounts = linked.data?.accounts ?? [];
-  const hasPersonal = accounts.some(account => !account.org);
+  const accounts = profiles.data?.accounts ?? linked.data?.accounts ?? [];
+  const hasPersonal = linked.data?.accounts.some(account => !account.org);
   const orgsUrl = meta.data?.organizations_url ?? "https://organizations.teamofsilicons.com";
 
   const beginLink = async () => {
@@ -116,7 +118,7 @@ export function LinkedAccountsPage({ completedLink }: { completedLink?: string }
       setLinkId(null);
       clearPendingLink();
       setMessage("Your accounts are linked. Their apps, history and details stay separate.");
-      await linked.refetch();
+      await Promise.all([linked.refetch(), profiles.refetch()]);
     } catch (failure) {
       setError(ApiError.from(failure));
     }
@@ -127,13 +129,13 @@ export function LinkedAccountsPage({ completedLink }: { completedLink?: string }
       setSwitching(uuid);
       await switchAccount.mutateAsync({ account_uuid: uuid });
       clearPendingLink();
-      window.location.assign(new URL(paths.linkedAccounts, window.location.origin).toString());
+      window.location.assign(paths.home);
     } catch (failure) {
       setSwitching(null);
       setError(ApiError.from(failure));
     }
   };
-  const problem = error ?? linked.error ?? requests.error;
+  const problem = error ?? profiles.error ?? linked.error ?? requests.error;
 
   const accountRow = (account: LinkedAccount) => {
     const current = account.uuid === me.data?.uuid;
@@ -161,7 +163,8 @@ export function LinkedAccountsPage({ completedLink }: { completedLink?: string }
     <div>
       <PageBar parent={{ label: "Personal Info", href: paths.personal }} title="Your Accounts" />
       <Page>
-        <p className={styles.lead}>One sign-in, separate accounts. Your orgs only see the work accounts that belong to them.</p>
+        <p className={styles.lead}>Switch between accounts signed in on this browser and their linked work accounts.</p>
+        <Button variant="secondary" size="sm" onClick={() => window.location.assign(firstPartySignInUrl(paths.home, { prompt: "login" }))}>Add another account</Button>
         {problem ? (
           <div className={styles.alert}>
             <Alert tone="danger" title="This could not be completed">{problem.message} {problem.hint}</Alert>
@@ -178,7 +181,7 @@ export function LinkedAccountsPage({ completedLink }: { completedLink?: string }
           <>
             <Section id="accounts-personal" title="Personal">
               {accounts.filter(account => !account.org).map(accountRow)}
-              {!hasPersonal ? <Row lead={icon(<UserRound size={16} strokeWidth={2} />)} title="You do not have a personal account linked yet." /> : null}
+              {!accounts.some(account => !account.org) ? <Row lead={icon(<UserRound size={16} strokeWidth={2} />)} title="You do not have a personal account linked yet." /> : null}
             </Section>
             <Section id="accounts-work" title="Work">
               {accounts.filter(account => account.org).map(accountRow)}
@@ -189,7 +192,7 @@ export function LinkedAccountsPage({ completedLink }: { completedLink?: string }
         {requests.data?.items.length ? (
           <Section id="accounts-requests" title="Account linking requests" description="A Silicon or its custodian must approve before an org work account can be linked.">
             {requests.data.items.map(item => (
-              <LinkRequest key={item.id} request={item} onDone={() => { void requests.refetch(); void linked.refetch(); }} />
+              <LinkRequest key={item.id} request={item} onDone={() => { void Promise.all([requests.refetch(), linked.refetch(), profiles.refetch()]); }} />
             ))}
           </Section>
         ) : null}
@@ -221,7 +224,7 @@ export function LinkedAccountsPage({ completedLink }: { completedLink?: string }
                   void create
                     .mutateAsync({ id: `c:${handle}` })
                     .then(result => switchAccount.mutateAsync({ account_uuid: result.uuid }))
-                    .then(() => window.location.assign(new URL(paths.linkedAccounts, window.location.origin).toString()))
+                    .then(() => window.location.assign(new URL(paths.home, window.location.origin).toString()))
                     .catch(failure => setError(ApiError.from(failure)));
                 }}
               >

@@ -40,6 +40,9 @@ pub(crate) fn inactive_account(account: &Account) -> OAuthError {
         AccountStatus::PendingCustodian => format!(
             "The Silicon {id} can't sign in yet: its custodian hasn't accepted it. Tokens are issued once the custodian accepts the request on accounts.teamofsilicons.com."
         ),
+        AccountStatus::Archived => format!(
+            "The Carbon {id} deleted its account, so no tokens can be issued for it; signing in again with a code within 10 days of deleting it restores the account."
+        ),
         AccountStatus::Unclaimed => format!(
             "The Carbon {id} was imported by an app and hasn't finished setting up the account; it must sign in once through the hosted pages (/authorize) before tokens can be issued."
         ),

@@ -405,7 +405,7 @@ pub async fn process_rows(
         // unverified address on any other account, so this changes nothing today; it makes sure
         // an import never links a membership through an address nobody proved.
         let found: Vec<(String, String, Option<String>)> = sqlx::query_as(
-            "select e.email, a.uuid, a.handle from account_emails e join accounts a on a.uuid = e.account_uuid \
+            "select e.email, a.uuid, a.handle from account_email_owners e join accounts a on a.uuid = e.account_uuid \
              where e.email = any($1) and (e.verified_at is not null or a.status = 'unclaimed')",
         )
         .bind(&emails)

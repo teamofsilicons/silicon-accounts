@@ -139,8 +139,8 @@ export function InterfaceAuthorize({ query }: { query: Record<string, string> })
                   detail={`Sees your ${app.scopes.join(", ")}`}
                 />
                 {app.optional_scopes.map(scope => (
-                  <Row key={scope} lead={<Tile>{ICON[scope] ?? <UserRound size={16} strokeWidth={2} />}</Tile>} title={`Share your ${scope}`} detail={`Optional, for ${app.name}`}>
-                    <Switch checked={(selected[app.app_id] ?? []).includes(scope)} onCheckedChange={on => share(app.app_id, scope, on)} aria-label={`Share your ${scope} with ${app.name}`} disabled={pending} />
+                  <Row key={scope} lead={<Tile>{ICON[scope] ?? <UserRound size={16} strokeWidth={2} />}</Tile>} title={scope === "account_profile.write" ? "Edit your account profile" : `Share your ${scope}`} detail={`Optional, for ${app.name}`}>
+                    <Switch checked={(selected[app.app_id] ?? []).includes(scope)} onCheckedChange={on => share(app.app_id, scope, on)} aria-label={scope === "account_profile.write" ? "Allow editing your account profile" : `Share your ${scope} with ${app.name}`} disabled={pending} />
                   </Row>
                 ))}
               </Fragment>

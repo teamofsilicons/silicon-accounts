@@ -24,7 +24,7 @@ export type AccountId = string;
 type Open<T extends string> = T | (string & {});
 
 export type AccountKind = "carbon" | "silicon";
-export type AccountStatus = "active" | "unclaimed" | "pending_custodian" | "deleted";
+export type AccountStatus = "active" | "unclaimed" | "pending_custodian" | "archived" | "deleted";
 export type AppStatus = "active" | "disabled";
 export type AppSource = "first_party" | "fake" | "silicon_apps";
 export type MembershipStatus = "active" | "access_removed" | "imported";

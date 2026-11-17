@@ -355,7 +355,10 @@ fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, 
         let app_id = a.app_id.trim().to_string();
         if let Err(m) = validate_app_id(&app_id) {
             f.add(at("app_id"), m);
-        } else if accounts_core::is_first_party_app_id(&app_id) || app_id == "silicon-apps-catalog" {
+        } else if accounts_core::is_first_party_app_id(&app_id)
+            || app_id == "silicon-apps-catalog"
+            || app_id == accounts_core::PROFILE_APP_ID
+        {
             f.add(
                 at("app_id"),
                 format!("'{app_id}' is one of Silicon Accounts' own apps and can't be synced"),
@@ -751,7 +754,7 @@ fn can_own(account: &Account) -> bool {
 /// nothing about who someone is).
 async fn verified_owner_of(conn: &mut PgConnection, email: &str) -> ApiResult<Option<Account>> {
     let uuid: Option<String> = sqlx::query_scalar(
-        "select e.account_uuid from account_emails e join accounts a on a.uuid = e.account_uuid \
+        "select e.account_uuid from account_email_owners e join accounts a on a.uuid = e.account_uuid \
          where e.email = $1 and e.verified_at is not null and a.kind = 'carbon' and a.status = 'active'",
     )
     .bind(email)

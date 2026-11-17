@@ -24,7 +24,6 @@ import { useHistory } from "@/lib/query/account";
 import { useMe } from "@/lib/query/session";
 import { timezoneLabel } from "@/lib/timezones";
 import { AppMark } from "../parts/app-mark";
-import { withAppIcon } from "../parts/app-icons";
 import { asCarbon, describeError, readableTimes } from "../parts/common";
 import { handFocus, pageMain } from "../parts/focus";
 import { PageBar } from "../parts/page-bar";
@@ -154,7 +153,7 @@ export function Activity() {
                   return (
                     <Row
                       key={item.id}
-                      lead={item.app && item.app.app_id !== FIRST_PARTY ? <AppMark app={withAppIcon(item.app)} size={28} className={styles.mark} decorative /> : <Tile>{ICONS[item.kind] ?? <History size={16} strokeWidth={2} />}</Tile>}
+                      lead={item.app && item.app.app_id !== FIRST_PARTY ? <AppMark app={item.app} size={28} className={styles.mark} decorative /> : <Tile>{ICONS[item.kind] ?? <History size={16} strokeWidth={2} />}</Tile>}
                       title={readableTimes(item.title, { timeZone })}
                       detail={detail || undefined}
                     >

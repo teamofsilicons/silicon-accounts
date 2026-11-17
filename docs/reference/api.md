@@ -24,6 +24,8 @@ This page is the map of the Accounts API. Find the endpoint you need, see who ca
 
 The [Rust client](rust-client.md) and the [silicon-accounts CLI](cli.md) call these same endpoints, so anything they do, you can also do with plain HTTP.
 
+Interface creators can find registration, profile operations, grants and retry behavior in the [Accounts interface API](../start/interface-accounts.md).
+
 ## Try it
 
 ```sh

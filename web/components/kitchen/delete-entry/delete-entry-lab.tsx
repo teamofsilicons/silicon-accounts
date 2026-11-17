@@ -15,7 +15,6 @@ import type { ReactNode } from "react";
 import { ArrowRight, Trash2 } from "lucide-react";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { AppMark } from "@/components/account/parts/app-mark";
-import { withAppIcon } from "@/components/account/parts/app-icons";
 import { appHref } from "@/components/account/apps/apps";
 import { useEveryApp } from "@/components/account/parts/queries";
 import { LinkItem, Section, Tile } from "@/components/account/parts/rows";
@@ -31,7 +30,7 @@ export function DeleteEntryLab() {
   const whatAppsSee = (key: string) => (
     <Section id={`apps-${key}`} title="What apps see" description="Change what each app can see from its page.">
       {items.map(item => (
-        <LinkItem key={item.membership_id} href={appHref(item.app.app_id)} lead={<AppMark app={withAppIcon(item.app)} size={28} className={styles.mark} decorative />} title={item.app.name} detail="Name, photo, CarbonID and more" />
+        <LinkItem key={item.membership_id} href={appHref(item.app.app_id)} lead={<AppMark app={item.app} size={28} className={styles.mark} decorative />} title={item.app.name} detail="Name, photo, CarbonID and more" />
       ))}
     </Section>
   );
