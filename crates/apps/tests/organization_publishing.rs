@@ -115,9 +115,16 @@ async fn organization_projection_keeps_ownership_and_revokes_departed_manager() 
     assert!(deleted.is_some());
     let exported = common::call(&ctx, Req::get("/v1/internal/apps").bearer(INTERNAL)).await;
     assert_eq!(exported.status, 200);
-    let record = exported.json["apps"]
-        .as_array()
-        .unwrap()
+    let registry = exported.json["apps"].as_array().unwrap();
+    for internal in [
+        "silicon-accounts",
+        "developer",
+        "silicon-account-management",
+        "silicon-apps-catalog",
+    ] {
+        assert!(registry.iter().all(|app| app["app_id"] != internal));
+    }
+    let record = registry
         .iter()
         .find(|v| v["app_id"] == "org-publishing-test")
         .unwrap();

@@ -346,6 +346,14 @@ fn is_visible_ascii(s: &str) -> bool {
     s.bytes().all(|b| (0x21..=0x7e).contains(&b))
 }
 
+// These Accounts clients and OAuth audiences do not have Silicon Apps publishers.
+const ACCOUNTS_ONLY_APP_IDS: [&str; 4] = [
+    accounts_core::FIRST_PARTY_APP_ID,
+    accounts_core::DEVELOPER_APP_ID,
+    accounts_core::PROFILE_APP_ID,
+    "silicon-apps-catalog",
+];
+
 fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, ApiError> {
     let mut f = FieldErrors::new();
     let mut out = Vec::with_capacity(apps.len());
@@ -355,10 +363,7 @@ fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, 
         let app_id = a.app_id.trim().to_string();
         if let Err(m) = validate_app_id(&app_id) {
             f.add(at("app_id"), m);
-        } else if accounts_core::is_first_party_app_id(&app_id)
-            || app_id == "silicon-apps-catalog"
-            || app_id == accounts_core::PROFILE_APP_ID
-        {
+        } else if ACCOUNTS_ONLY_APP_IDS.contains(&app_id.as_str()) {
             f.add(
                 at("app_id"),
                 format!("'{app_id}' is one of Silicon Accounts' own apps and can't be synced"),
@@ -1370,8 +1375,8 @@ pub(crate) fn authorize_internal(state: &AppState, headers: &HeaderMap) -> ApiRe
 async fn export_registry(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     authorize_internal(&state, &headers)?;
     let rows: Vec<Value> = sqlx::query_scalar(
-        "select jsonb_build_object('app_id',a.app_id,'name',a.name,'description',a.description,         'logo_url',a.logo_url,'homepage_url',a.homepage_url,'owner_uuid',a.owner_uuid,         'source',a.source,'status',a.status,'deleted_at',(select deleted_at from app_registry_lifecycle where app_id=a.app_id),'organization_id',(select organization_id from app_organization_publishers where app_id=a.app_id),'organization_access',(select access from app_organization_publishers where app_id=a.app_id),'created_at',a.created_at,'authors',coalesce((select jsonb_agg(         jsonb_build_object('uuid',ac.uuid,'id',ac.handle,'display_name',ac.display_name,'joined_at',au.joined_at))         from app_authors au join accounts ac on ac.uuid=au.account_uuid where au.app_id=a.app_id),'[]'::jsonb))         from apps a where a.app_id not in ('silicon-accounts','developer') order by a.app_id"
-    ).fetch_all(&state.db).await?;
+        "select jsonb_build_object('app_id',a.app_id,'name',a.name,'description',a.description,         'logo_url',a.logo_url,'homepage_url',a.homepage_url,'owner_uuid',a.owner_uuid,         'source',a.source,'status',a.status,'deleted_at',(select deleted_at from app_registry_lifecycle where app_id=a.app_id),'organization_id',(select organization_id from app_organization_publishers where app_id=a.app_id),'organization_access',(select access from app_organization_publishers where app_id=a.app_id),'created_at',a.created_at,'authors',coalesce((select jsonb_agg(         jsonb_build_object('uuid',ac.uuid,'id',ac.handle,'display_name',ac.display_name,'joined_at',au.joined_at))         from app_authors au join accounts ac on ac.uuid=au.account_uuid where au.app_id=a.app_id),'[]'::jsonb))         from apps a where not (a.app_id = any($1)) order by a.app_id"
+    ).bind(&ACCOUNTS_ONLY_APP_IDS[..]).fetch_all(&state.db).await?;
     Ok(Json(json!({"apps":rows})).into_response())
 }
 
