@@ -33,6 +33,8 @@ Node 24 or newer. Read the bundled Next docs in `node_modules/next/dist/docs/` b
 breaking changes (`proxy.ts` instead of `middleware.ts`, async `params`/`searchParams`, `PageProps<"/route">` from
 `next typegen`, Turbopack by default).
 
+The signed-in header uses `components/foundation/shell/profile-menu.tsx` for the profile picker. It opens a radio menu on desktop and a bottom drawer below 640px. Each profile shows its name and handle, with a check beside the current account.
+
 ## Topology
 
 The account site uses `silicon-accounts` as its first-party app ID. Existing browser cookies and saved return paths remain valid through the rename.

@@ -35,12 +35,44 @@ const linked: MockRoute[] = [
 const specs: ScreenSpec[] = [
   {
     name: "account-profile-menu", path: "/", waitFor: "[data-home]",
-    routes: [["GET /v1/session/accounts", () => ({ json: { accounts: [...choices, { ...carbonSummary, uuid: "second", display_name: "Morgan", id: "c:morgan", org: null }] } })]],
+    element: '[role="menu"]:has([role="group"][aria-label="Signed-in accounts"]), [role="dialog"]:has(nav[aria-label="Signed-in accounts"])',
+    routes: [["GET /v1/session/accounts", () => ({ json: { accounts: [
+      choices[0], choices[1],
+      { ...carbonSummary, display_name: "Morgan Lee", id: "c:morgan", uuid: "second", pfp_url: "", org: null },
+      { ...carbonSummary, display_name: "Morgan Lee", id: "c:morgan.studio", uuid: "second-work", pfp_url: "", org },
+    ] } })]],
     prepare: async page => {
-      await page.getByRole("button", { name: /^Account menu/ }).click();
-      await expect(page.getByRole("menuitem", { name: /Morgan/ })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: /alex.studio/ })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: "Add another account" })).toBeVisible();
+      const trigger = page.getByRole("button", { name: /^Account menu/ });
+      await trigger.click();
+      const phone = (page.viewportSize()?.width ?? 1440) < 640;
+      const panel = phone ? page.getByRole("dialog", { name: "Switch accounts" }) : page.getByRole("menu", { name: /^Account menu/ });
+      const profiles = phone ? panel.getByRole("navigation", { name: "Signed-in accounts" }).getByRole("button") : panel.getByRole("menuitemradio");
+      await expect(profiles).toHaveCount(4);
+      await expect(profiles.first()).toHaveAttribute(phone ? "aria-current" : "aria-checked", phone ? "page" : "true");
+      await expect(profiles.nth(1)).toContainText("c:alex.studio");
+      await expect(profiles.last()).toContainText("c:morgan.studio");
+      await expect(panel.getByRole(phone ? "button" : "menuitem", { name: "Add another account" })).toBeVisible();
+      await expect(panel.getByRole(phone ? "button" : "menuitem", { name: "Sign out" })).toBeVisible();
+      await expect.poll(() => profiles.evaluateAll(nodes => {
+        const first = nodes[0];
+        const firstNameX = first.querySelector("[title]")!.getBoundingClientRect().left;
+        const height = first.getBoundingClientRect().height;
+        return nodes.every(node => {
+          const [name, handle] = [...node.querySelectorAll("[title]")].map(line => line.getBoundingClientRect());
+          return height >= 44 && Math.abs(node.getBoundingClientRect().height - height) < 0.5
+            && Math.abs(name.left - firstNameX) < 0.5 && Math.abs(handle.left - name.left) < 0.5 && handle.top >= name.bottom;
+        });
+      })).toBe(true);
+      if (!phone) {
+        await page.keyboard.press("Home");
+        await page.keyboard.press("ArrowDown");
+        await expect(profiles.nth(1)).toBeFocused();
+      }
+      await page.keyboard.press("Escape");
+      await expect(trigger).toBeFocused();
+      await trigger.click();
+      await expect(profiles.first()).toBeVisible();
+      await page.waitForTimeout(700); // The screenshot includes the fully opened menu or sheet.
     },
   },
   {

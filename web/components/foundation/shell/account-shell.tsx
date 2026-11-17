@@ -14,22 +14,20 @@
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Database, LogOut, Menu, Search, SwatchBook, UserRoundPlus, UsersRound } from "lucide-react";
+import { ViewTransition, useCallback, useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { Database, LogOut, Menu, Search, SwatchBook } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
 import { Button } from "@teamofsilicons/silicon-ui/button";
-import { UserMenu, type UserMenuUser } from "@teamofsilicons/silicon-ui/user-menu";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, SkipLink } from "@/components/foundation/layout/layout";
-import { useCarbonPicture } from "@/lib/carbon-avatar";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
 import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
-import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
-import { browserProfileChanged, useBrowserAccounts, useSwitchBrowserAccount } from "@/lib/query/linked-accounts";
-import { beginSignIn, firstPartySignInUrl, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
+import { browserProfileChanged } from "@/lib/query/linked-accounts";
+import { beginSignIn, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
+import { ProfileMenu } from "./profile-menu";
 import { PrototypeMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
 import { LeaveQuestionHost } from "./leave-question";
@@ -103,9 +101,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { status, session, error, refetch } = useSession();
   const me = useMe();
-  const profiles = useBrowserAccounts(!!session);
-  const switchProfile = useSwitchBrowserAccount();
-  const { signOut } = useSignOut();
+  const { signOut, pending: signingOut } = useSignOut();
   const paletteOpen = useCommandPaletteOpen();
   const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const isHome = pathname === "/";
@@ -250,18 +246,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [go, paletteOpen, status]);
 
-  // A Carbon's picture is their photo or their pixel avatar (lib/carbon-avatar.ts).
-  const picture = useCarbonPicture(me.data ?? session?.account);
-  const account = useMemo<UserMenuUser | null>(() => {
-    const summary = session?.account;
-    if (!summary) return null;
-    const full = me.data;
-    return {
-      name: full?.display_name ?? summary.display_name,
-      email: full?.id ?? summary.id ?? summary.uuid,
-      avatarSrc: picture?.src ?? full?.pfp_url ?? summary.pfp_url,
-    };
-  }, [session, me.data, picture?.src]);
+  const account = session ? me.data ?? session.account : null;
 
   const brand = (
     <Link href={paths.home} aria-label="Team of Silicons Accounts" data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
@@ -283,28 +268,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
     </Button>
   );
   const accountMenu = account ? (
-    <UserMenu
-      className={styles.account}
-      user={account}
-      items={[
-        ...(profiles.data?.accounts ?? []).filter(profile => profile.uuid !== session?.account.uuid).map(profile => ({
-          label: `${profile.display_name} · ${profile.id ?? profile.uuid}`,
-          icon: <Avatar size="sm" name={profile.display_name} src={profile.pfp_url ?? undefined} />,
-          onSelect: () => { void (async () => {
-            if (!(await confirmNavigation(paths.home))) return;
-            await switchProfile.mutateAsync({ account_uuid: profile.uuid });
-            window.location.assign(paths.home);
-          })().catch(notifyError); },
-        })),
-        { label: "Add another account", icon: <UserRoundPlus size={16} />, onSelect: () => {
-          void confirmNavigation(paths.signIn).then(ok => { if (ok) window.location.assign(firstPartySignInUrl(paths.home, { prompt: "login" })); });
-        } },
-        { label: "Your accounts", icon: <UsersRound size={16} />, onSelect: () => void go(paths.linkedAccounts) },
-      ]}
-      showTheme={false}
-      onSignOut={menuSignOut}
-      align="end"
-    />
+    <ProfileMenu account={account} onManage={() => void go(paths.linkedAccounts)} onSignOut={menuSignOut} signingOut={signingOut} />
   ) : null;
 
   // The panel shell (redesign/decisions.md, 2026-10-30): the top bar (brand, search centred, the account menu), then

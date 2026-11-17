@@ -1,8 +1,7 @@
 "use client";
 
 /**
- * Home's Needs you, under the greeting (Anil, 2026-10-31): what is waiting on the Carbon, one row each, shown only when
- * something waits:
+ * Home's Needs you, under the greeting (Anil, 2026-10-31): the newest item waiting on the Carbon, with the total in the badge:
  *
  * - a Silicon asking them to be its custodian, with Review (Accept and Decline are in the review);
  * - a Carbon handing them a Silicon, with Review;
@@ -11,7 +10,7 @@
  * Nothing shows when nothing waits. The compact boxed design (Anil, 2026-11-11, picked from /__needs): one white list
  * with a clear border; each row a 28px mark (a Silicon's, or the browser's logo), the title over one line (a request's
  * time left, grey over a week, amber from a week, red under 3 days, "Ends today" under a day; or the device's last use),
- * and at most one outlined button, so nothing in the list is filled; the device also has Keep, a soft grey button (Anil, 2026-11-11). Newest first; the count is a neutral badge.
+ * and at most one outlined button, so nothing in the list is filled; the device also has Keep, a soft grey button (Anil, 2026-11-11). The next item appears when the current one is handled.
  */
 import Image from "next/image";
 import { useSyncExternalStore, type ReactNode } from "react";
@@ -53,7 +52,7 @@ export function HomeNeeds() {
 
   return (
     <div id={NEEDS_YOU_ID} className={styles.group} tabIndex={-1}>
-      <Requests id={NEEDS_YOU_ID} title="Needs you" waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={stale} now={now} />
+      <Requests id={NEEDS_YOU_ID} title="Needs you" limit={1} waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={stale} now={now} />
     </div>
   );
 }
@@ -83,7 +82,7 @@ function timeLeft(request: CustodianRequest, now: number): { text: string; tone:
   return { text: `${spanText(left)} left`, tone: left < 3 * DAY ? "danger" : left <= 7 * DAY ? "warning" : "neutral", used };
 }
 
-function Requests({ id, title, waiting, failed, error, retry, stale, now }: { id: string; title: string; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo[]; now: number }) {
+function Requests({ id, title, limit, waiting, failed, error, retry, stale, now }: { id: string; title: string; limit?: number; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo[]; now: number }) {
   const signOut = useSignOutSession();
   const items = [
     ...waiting.map(request => ({ kind: "request" as const, id: request.id, date: Date.parse(request.created_at), request })),
@@ -97,12 +96,12 @@ function Requests({ id, title, waiting, failed, error, retry, stale, now }: { id
         {items.length > 0 ? <Badge size="sm" tone="neutral">{items.length}</Badge> : null}
       </div>
       <ul data-sq="surface" className={styles.rows}>
-        {failed ? (
+        {failed && items.length === 0 ? (
           <Row lead={<span data-sq="surface" className={`${styles.icon} ${styles.iconDanger}`} aria-hidden="true"><TriangleAlert size={16} strokeWidth={2} /></span>} title="Requests waiting for you did not load" detail={describeError(error)}>
             <Button variant="secondary" size="sm" onClick={retry}>Try Again</Button>
           </Row>
         ) : null}
-        {items.map(item => {
+        {items.slice(0, limit).map(item => {
           if (item.kind === "device") {
             const session = item.session;
             return (

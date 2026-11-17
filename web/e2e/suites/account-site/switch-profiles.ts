@@ -21,7 +21,7 @@ const switchProfiles: Journey = {
 
     await page.goto(`${env.site}/personal`);
     await menu.click();
-    await page.getByRole("menuitem").filter({ hasText: first.id }).click();
+    await page.getByRole("menuitemradio", { checked: false }).filter({ hasText: first.id }).click();
     await page.waitForURL(`${env.site}/`);
     results.check("the top-right menu switches to the first profile and returns Home", (await getMe(first.probe)).uuid === first.uuid);
 
@@ -33,6 +33,15 @@ const switchProfiles: Journey = {
     await personal.getByRole("listitem").filter({ hasText: second.id }).getByRole("button", { name: "Switch" }).click();
     await page.waitForURL(`${env.site}/`);
     results.check("switching in Your accounts opens Home as the second profile", (await getMe(first.probe)).uuid === second.uuid);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${env.site}/personal`);
+    await menu.click();
+    const sheet = page.getByRole("dialog", { name: "Switch accounts" });
+    const choices = sheet.getByRole("navigation", { name: "Signed-in accounts" });
+    results.check("the phone picker marks the active account", await choices.locator('[aria-current="page"]').innerText().then(label => label.includes(second.id)));
+    await choices.getByRole("button").filter({ hasText: first.id }).click();
+    await page.waitForURL(`${env.site}/`);
+    results.check("the phone picker returns Home as the selected profile", (await getMe(first.probe)).uuid === first.uuid);
     await first.context.close();
   },
 };

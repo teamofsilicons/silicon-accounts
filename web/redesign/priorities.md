@@ -58,6 +58,8 @@ Done 2026-11-14 (uncommitted): deleting an account archives it for 10 days; the 
 
 ## Done (recent)
 
+- 2026-11-18 Home shows the newest pending item with the full count. The profile picker aligns avatars, names and handles and marks the current account.
+
 - 2026-11-18. Home notification counting and ordering, empty contact editing, profile switching and the hosted sign-in avatar ring.
 - 2026-11-13 Activity is its own sidebar section below Security, also in the phone sheet and command menu (uncommitted).
 - 2026-11-13 Old opaque Silicon avatar PNGs recover transparent artwork in cards; new saves upload a transparent animated GIF with embedded settings (uncommitted).

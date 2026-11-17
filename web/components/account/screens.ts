@@ -96,24 +96,24 @@ const card = "#personal-profile";
 
 const shown: ScreenSpec[] = [
   {
-    name: "account-needs-order", path: "/", waitFor: "[data-home]",
+    name: "account-needs-order", path: "/", waitFor: "[data-home]", element: "#needs-you",
     routes: [
       ["GET /v1/me/sessions", () => ({ json: data.page([16, 8].map(days => ({
         ...data.sessions[0], id: "inactive-" + days, label: "Device " + days, current: false, last_seen_at: fromNow(-days * 1440),
       }))) })],
-      ["GET /v1/me/custodian-requests", () => ({ json: data.page([{ ...data.custodianRequests[0], created_at: fromNow(-20) }]) })],
+      ["GET /v1/me/custodian-requests", () => ({ json: data.page([{ ...data.custodianRequests[0], created_at: fromNow(-4 * 1440) }]) })],
     ],
     prepare: async page => {
       const needs = page.getByRole("region", { name: "Needs you" });
+      const row = needs.getByRole("listitem");
       await expect(needs.getByText("3", { exact: true })).toBeVisible();
-      const rows = needs.getByRole("listitem");
-      await expect(rows).toHaveCount(3);
-      await expect(rows.nth(0)).toContainText("Courier");
-      await expect(rows.nth(1)).toContainText("Device 8");
-      await expect(rows.nth(2)).toContainText("Device 16");
-      await rows.nth(1).getByRole("button", { name: "Keep" }).click();
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText("Device 8");
+      await row.getByRole("button", { name: "Keep" }).click();
       await expect(needs.getByText("2", { exact: true })).toBeVisible();
-      await expect(rows).toHaveCount(2);
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText("Courier");
+      await expect(row.getByRole("link", { name: "Review" })).toBeVisible();
     },
   },
   {
