@@ -426,3 +426,5 @@ Every change, one line each, newest at the bottom. Format: `- YYYY-MM-DD <commit
 Updated the Home badge, item order, empty introduction and contact rows. The shell can add or switch browser profiles and the Your Accounts switch returns to Home. Account surfaces read connected app logos from their metadata. Hosted avatars follow the completion ring’s shape. Ordinary interfaces can request explicit profile editing permission on hosted consent.
 
 Home now advances through one notification at a time. The top-right account picker shows a two-line row for each profile in a desktop menu or phone sheet, followed by account actions.
+
+Your Accounts now uses the same profile pictures as the top-right picker. Work rows put the organization logo beside its name, with room for both on phones.

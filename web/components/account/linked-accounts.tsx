@@ -6,7 +6,7 @@
  * Accounts" row. The page bar (parts/page-bar.tsx), a lead line, then sections of the account pages' rows
  * (parts/rows.tsx):
  *
- * - Personal and Work: each account with its avatar (a work account's org logo), its id and org, Main or Linked, and
+ * - Personal and Work: each account with its own avatar, its id and org (logo beside the name), Main or Linked, and
  *   Switch (or "Currently Using" on the one in use).
  * - Account linking requests, when an org asks to link a Silicon's work account: Review Link, then Confirm and Link.
  * - Link another account: sign in to it in a window, then Finish Linking here.
@@ -16,14 +16,13 @@
  * The words and behaviour are main's; only the look moved onto the redesign.
  */
 import { useState, useSyncExternalStore, type ReactNode } from "react";
-import Image from "next/image";
 import { Building2, Cpu, Link2, UserRound } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
-import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Input } from "@teamofsilicons/silicon-ui/input";
 import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
+import { ProfileAvatar } from "@/components/foundation/avatar/profile-avatar";
 import { Page } from "@/components/foundation/layout/layout";
 import { ApiError } from "@/lib/api/errors";
 import type { LinkedAccount } from "@/lib/api/types";
@@ -37,6 +36,7 @@ import {
   useSwitchBrowserAccount,
   useBrowserAccounts,
 } from "@/lib/query/linked-accounts";
+import { AppMark } from "./parts/app-mark";
 import { PageBar } from "./parts/page-bar";
 import { LinkRow, Row, Section, Tile } from "./parts/rows";
 import styles from "./linked-accounts.module.css";
@@ -139,16 +139,28 @@ export function LinkedAccountsPage({ completedLink }: { completedLink?: string }
 
   const accountRow = (account: LinkedAccount) => {
     const current = account.uuid === me.data?.uuid;
+    const org = account.org;
     return (
       <Row
         key={account.uuid}
-        lead={account.org?.logo_url ? (
-          <Image src={account.org.logo_url} width={28} height={28} alt="" unoptimized data-sq="surface" className={styles.logo} />
-        ) : (
-          <Avatar name={account.display_name} src={account.pfp_url || undefined} size="sm" />
-        )}
+        lead={<ProfileAvatar profile={account} size="sm" />}
         title={account.display_name}
-        detail={<><span className="mono">{account.id ?? account.uuid}</span>{account.org ? ` · ${account.org.name}` : ""} · {account.is_main ? "Main account" : "Linked account"}</>}
+        detail={
+          <span className={styles.accountDetail}>
+            <span className="mono">{account.id ?? account.uuid}</span>
+            {org && (
+              <span className={styles.organization}>
+                <span className={styles.separator} aria-hidden="true">·</span>
+                {org.logo_url && <AppMark app={{ app_id: org.org_id, name: org.name, logo_url: org.logo_url }} size={16} decorative />}
+                <span>{org.name}</span>
+              </span>
+            )}
+            <span className={styles.relationship}>
+              <span className={styles.separator} aria-hidden="true">·</span>
+              {account.is_main ? "Main account" : "Linked account"}
+            </span>
+          </span>
+        }
       >
         {current ? (
           <Badge size="sm" tone="neutral">Currently Using</Badge>

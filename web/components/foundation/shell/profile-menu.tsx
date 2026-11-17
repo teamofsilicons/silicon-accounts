@@ -2,13 +2,12 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { Check, LogOut, UserRoundPlus, UsersRound } from "lucide-react";
-import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Drawer, DrawerContent, DrawerTrigger } from "@teamofsilicons/silicon-ui/drawer";
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuRoot, DropdownMenuSeparator, DropdownMenuTrigger } from "@teamofsilicons/silicon-ui/dropdown-menu";
 import { NavItem, NavList } from "@teamofsilicons/silicon-ui/nav-list";
+import { ProfileAvatar } from "@/components/foundation/avatar/profile-avatar";
 import type { AccountSummary } from "@/lib/api/types";
-import { useCarbonPicture } from "@/lib/carbon-avatar";
 import { paths } from "@/lib/navigation";
 import { confirmNavigation } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
@@ -22,11 +21,6 @@ const subscribePhone = (change: () => void) => {
   query.addEventListener("change", change);
   return () => query.removeEventListener("change", change);
 };
-
-function ProfileAvatar({ profile }: { profile: AccountSummary }) {
-  const picture = useCarbonPicture(profile);
-  return <Avatar name={profile.display_name} src={picture?.src ?? undefined} size="md" aria-hidden="true" />;
-}
 
 export function ProfileMenu({ account, onManage, onSignOut, signingOut }: {
   account: AccountSummary;

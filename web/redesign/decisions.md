@@ -562,3 +562,5 @@ days (RECOVERY_DAYS) and /goodbye says how to come back. UNDERSTANDING.md doesn'
 ## 2026-11-18. Browser profiles and empty states
 
 The top-right profile menu and Your Accounts list independent sign-ins together with their linked work accounts. The menu shows each name above its handle in an equal-height row, with a check on the current profile. Selecting another opens Home in its session. Needs you shows the newest pending request or inactive device. Its badge counts every pending item. Completing the visible item brings up the next. An empty account keeps its introduction and can configure both contact types from Personal info. Hosted sign-in uses the same circular outline for an avatar and its completion ring.
+
+Each work row in Your Accounts leads with that work profile’s picture. Its organization name carries a small logo when one is available.

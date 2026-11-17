@@ -208,3 +208,5 @@ Silicon's activity, automation, cloud services, per-field sharing.
 ## Browser profiles and Home, 2026-11-18
 
 The profile menu adds independent personal accounts and their linked work accounts. Home shows one pending item at a time with the full count, and keeps the introduction visible while both Apps and Silicons are empty. Personal info shows both contact editors even before an address has been added. These changes follow the requested behavior.
+
+The requested Your Accounts layout gives the person and organization distinct places in each work row. The account picture leads the row and the organization logo accompanies its name.

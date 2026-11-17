@@ -899,6 +899,8 @@ The hosted flow renders the server-driven `select_account` step before sharing d
 
 The account chooser uses Silicon UI avatars to display each personal and work account’s profile picture, with initials when a picture is missing or unavailable. Organization logos appear beside the organization name, separately from the account avatar. The `auth-work-picker` screenshot covers photos, an organization logo, and the missing-logo fallback.
 
+Your Accounts and the top-right profile menu share `components/foundation/avatar/profile-avatar.tsx`. Both display each work profile’s own picture, including its configured Carbon avatar. In Your Accounts, a 16px organization logo sits beside its name. The `account-work-linked` screen covers two profiles in one organization and a third in an organization without a logo.
+
 Work-invitation pages permit form handoff to the exact configured Organizations HTTP origin only when it is loopback; the value comes from trusted API metadata or `ACCOUNTS_ORGANIZATIONS_URL`. Other pages keep their existing form policy. Invitation pages send `Referrer-Policy: strict-origin`: only the Accounts origin reaches Organizations, preserving the Origin check without leaking the invitation ticket path.
 
 ## Silicon notification migration

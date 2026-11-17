@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import type { ScreenSpec, MockRoute } from "../../scripts/screens-types";
-import { carbon, carbonSummary } from "../../scripts/mock/fixtures";
+import { carbon, carbonSummary, portrait } from "../../scripts/mock/fixtures";
 import { FIRST_PARTY, sampleFlow } from "../auth/mocks/flows";
 const org = { org_id: "studio", name: "The Design Studio", logo_url: null };
 const choices = [
@@ -9,6 +9,8 @@ const choices = [
     ...carbonSummary,
     uuid: "wrk",
     id: "c:alex.studio",
+    display_name: "Alex Rivera",
+    pfp_url: portrait("Alex Rivera", 158),
     org: { ...org, logo_url: "/icon-192.png" },
     is_main: false,
     allowed: true,
@@ -18,14 +20,19 @@ const choices = [
     ...carbonSummary,
     uuid: "blocked",
     id: "c:alex.research",
+    display_name: "Alex Rivera",
+    pfp_url: "",
     org: { ...org, org_id: "research", name: "Research Collective" },
     is_main: false,
     allowed: false,
     reason: "Research Collective does not allow this app.",
   },
 ];
+const studioColleague = {
+  ...choices[1], uuid: "morgan-work", id: "c:morgan.studio", display_name: "Morgan Lee", pfp_url: portrait("Morgan Lee", 274),
+};
 const linked: MockRoute[] = [
-  ["GET /v1/session/accounts", () => ({ json: { accounts: choices } })],
+  ["GET /v1/session/accounts", () => ({ json: { accounts: [choices[0], choices[1], studioColleague, choices[2]] } })],
   ["GET /v1/me/linked-accounts/requests", () => ({ json: { items: [] } })],
   [
     "GET /v1/me/linked-accounts",
@@ -128,8 +135,33 @@ const specs: ScreenSpec[] = [
   {
     name: "account-work-linked",
     path: "/linked-accounts",
-    waitFor: "h1",
+    waitFor: "#accounts-work",
+    element: 'section[aria-labelledby="accounts-work"]',
     routes: linked,
+    prepare: async page => {
+      const work = page.getByRole("region", { name: "Work", exact: true });
+      for (const account of [choices[1], studioColleague]) {
+        const row = work.getByRole("listitem").filter({ hasText: account.id ?? account.uuid });
+        const photo = row.locator(":scope > [role=img] img");
+        await expect(photo).toHaveAttribute("src", account.pfp_url);
+        const organization = row.getByText(org.name, { exact: true });
+        const logo = organization.locator("..").locator("img");
+        await expect(logo).toHaveAttribute("src", "/icon-192.png");
+        await expect(logo).toHaveAttribute("alt", "");
+        for (const image of [photo, logo]) {
+          await expect.poll(() => image.evaluate(node => (node as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+        }
+        const mark = (await logo.boundingBox())!;
+        const name = (await organization.boundingBox())!;
+        expect(Math.abs(mark.y + mark.height / 2 - name.y - name.height / 2)).toBeLessThan(2);
+        expect(name.x - mark.x - mark.width).toBeGreaterThanOrEqual(0);
+        expect(name.x - mark.x - mark.width).toBeLessThan(8);
+      }
+      const research = work.getByRole("listitem").filter({ hasText: "c:alex.research" });
+      await expect(research.getByText("Research Collective", { exact: true })).toBeVisible();
+      await expect(research.locator("img")).toHaveCount(1);
+      await expect(research.locator(":scope > [role=img] img")).toHaveAttribute("src", /^data:image\/svg\+xml/);
+    },
   },
   {
     name: "account-work-link-recovery",

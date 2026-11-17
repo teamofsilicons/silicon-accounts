@@ -58,6 +58,7 @@ Done 2026-11-14 (uncommitted): deleting an account archives it for 10 days; the 
 
 ## Done (recent)
 
+- 2026-11-18 Your Accounts shows the work profile’s own picture and places the organization logo beside its name.
 - 2026-11-18 Home shows the newest pending item with the full count. The profile picker aligns avatars, names and handles and marks the current account.
 
 - 2026-11-18. Home notification counting and ordering, empty contact editing, profile switching and the hosted sign-in avatar ring.
