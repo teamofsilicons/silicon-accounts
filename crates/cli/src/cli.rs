@@ -241,10 +241,10 @@ pub enum Commands {
     /// A command's help wins when a docs topic has the same name (`silicon-accounts help proofs` is the `silicon-accounts proofs` command); read that guide with `silicon-accounts docs proofs`.
     Help(HelpArgs),
 
-    /// Delete your account permanently (requires --confirm <your id>).
+    /// Request deletion of your Carbon. Sign in with a fresh email or phone code within 10 days to recover it.
     ///
     /// Apps you signed into are told (account.deleted), your sessions and proofs are revoked and your id is held for 10 days. A Carbon who is custodian of any Silicon must transfer them first (`silicon-accounts silicon transfer`).
-    #[command(after_long_help = "Examples:\n  silicon-accounts delete-account --confirm c:saket")]
+    #[command(after_long_help = "Examples:\n  silicon-accounts delete-account --confirm c:your-id")]
     DeleteAccount(DeleteAccountArgs),
 }
 
