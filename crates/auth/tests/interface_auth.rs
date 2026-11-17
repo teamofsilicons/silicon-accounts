@@ -1314,6 +1314,27 @@ async fn trusted_interface_cannot_add_an_app_management_app() {
 }
 
 #[tokio::test]
+async fn interface_consent_issues_a_separate_catalog_token() {
+    let ctx = TestContext::new().await;
+    let (account, cookie, _) = fixture(&ctx, "unverified", true).await;
+    sqlx::query("update interface_auth_clients set app_ids=ARRAY['silicon-apps-catalog'] where interface_id='potato'")
+        .execute(&ctx.state.db).await.unwrap();
+    let flow = begin(&ctx, &cookie).await;
+    assert_eq!(flow["consent_required"], true);
+    assert_eq!(flow["apps"][0]["app_id"], "silicon-apps-catalog");
+    let approved = decide(&ctx, &cookie, flow["flow_id"].as_str().unwrap(), true).await;
+    let issued = ctx.call(router(), exchange(&code(&approved), "catalog-signin")).await;
+    assert_eq!(issued.status, 200, "{}", issued.json);
+    assert!(issued.json["apps"].get("silicon-apps").is_none());
+    let token = issued.json["apps"]["silicon-apps-catalog"]["access_token"].as_str().unwrap();
+    let mut conn = ctx.conn().await;
+    use accounts_core::repo::tokens::verify_access_token;
+    let verified = verify_access_token(&mut conn, &ctx.state.keys, token, Some("silicon-apps-catalog")).await.unwrap();
+    assert_eq!(verified.family.account_uuid, account.uuid);
+    assert!(verify_access_token(&mut conn, &ctx.state.keys, token, Some("silicon-apps")).await.is_err());
+}
+
+#[tokio::test]
 async fn declining_interface_details_cannot_be_bypassed_by_verified_backend() {
     let ctx = TestContext::new().await;
     let (account, _, _) = fixture(&ctx, "verified", true).await;
