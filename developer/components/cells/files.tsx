@@ -1,6 +1,8 @@
 "use client";
 import {useContacts} from "@/components/people/api";
 import {PersonField,SavedPerson} from "@/components/people/person-field";
+import {FilterMenu} from "@/components/people/filter-menu";
+import {ScopeSelect} from "@/components/people/contact-access";
 import {useSession} from "@/lib/query/session";
 import {useEffect,useRef,useState} from "react";
 import {useInfiniteQuery,useQueryClient} from "@tanstack/react-query";
@@ -24,21 +26,27 @@ interface StoredFile {owner_id?:string|null;id:string;bucket:string;name:string;
 interface PendingUpload {id:string;bucket:string;name:string;size:number;status:string;expires_at:string}
 type FileAction={file:StoredFile;action:"copy"|"move"|"delete"|"sign"|"image"};
 export function CellFiles({cell}:{cell:Cell}){
-  const {me}=useSession(),{contacts}=useContacts();
+  const {me}=useSession();
   const [scope,setScope]=useState("all"),[person,setPerson]=useState(""),[owner,setOwner]=useState("");
-  const ownerIds=owner|| (scope==="mine"?me?.uuid??"":scope==="contacts"?(contacts.data??[]).map(c=>c.uuid).join(","):undefined);
+  const {contacts}=useContacts(scope==="contacts");
+  const scopeOwners=scope==="mine" ? (me ? [me.uuid] : []) : scope==="contacts" ? (contacts.data??[]).filter(contact=>!contact.blocked).map(contact=>contact.uuid) : undefined;
+  const ownerIds=owner ? (scopeOwners && !scopeOwners.includes(owner) ? "" : owner) : scopeOwners?.join(",");
   const canEdit=!cell.organization_id||!!cell.permissions?.edit,canManage=!cell.organization_id||!!cell.permissions?.manage;
   const id=cell.cell_id,buckets=useCellData<{buckets:Bucket[]}>(id,"/storage/buckets");
   const [chosen,setChosen]=useState(""),[prefix,setPrefix]=useState("");
   const bucket=buckets.data?.buckets.find(b=>b.id===chosen)??buckets.data?.buckets[0];
   const [edit,setEdit]=useState<Bucket|"new"|null>(null),[upload,setUpload]=useState<"new"|PendingUpload|null>(null),[action,setAction]=useState<FileAction|null>(null);
+  const filterCount=Number(scope!=="all")+Number(!!owner)+Number(!!prefix);
+  function clearFilters(){setScope("all");setOwner("");setPerson("");setPrefix("");}
   return <Stack gap={8}>
-    <Section title="Files" description="Organize files into buckets and decide who can access them." actions={<Button disabled={!canManage} variant="secondary" onClick={()=>setEdit("new")}>Create bucket</Button>}>
+    <Section title="Files" description="Organize files into buckets and decide who can access them." actions={<>{bucket && <FilterMenu count={filterCount} clear={clearFilters}>
+        <Input label="Filter by path" value={prefix} onChange={e=>setPrefix(e.target.value)} placeholder="photos/"/>
+        <ScopeSelect label="Show files" value={scope} onValueChange={setScope} options={[{value:"all",label:"All accessible files"},{value:"mine",label:"Owned by me"},{value:"shared",label:"Shared with me"},{value:"contacts",label:"From saved contacts"}]}/>
+        <PersonField label="File owner" value={person} onChange={value=>{setPerson(value);setOwner("");}} onSelect={p=>setOwner(p.uuid)} allowContactEditing={false}/>
+      </FilterMenu>}<Button disabled={!canManage} variant="secondary" onClick={()=>setEdit("new")}>Create bucket</Button></>}>
       <Failure error={buckets.error}/>{buckets.isPending&&<p role="status">Loading buckets…</p>}
       {bucket?<Stack><Cluster><Select label="Bucket" value={bucket.id} options={buckets.data!.buckets.map(b=>({label:b.id,value:b.id}))} onValueChange={value=>{setChosen(value);setPrefix("");}}/>
         <Button disabled={!canManage} variant="secondary" onClick={()=>setEdit(bucket)}>Bucket settings</Button><Button disabled={!canEdit} onClick={()=>setUpload("new")}>Upload file</Button></Cluster>
-        <Input label="Filter by path" value={prefix} onChange={e=>setPrefix(e.target.value)} placeholder="photos/"/>
-        <Select label="Show files" value={scope} onValueChange={setScope} options={[{value:"all",label:"All accessible files"},{value:"mine",label:"Owned by me"},{value:"shared",label:"Shared with me"},{value:"contacts",label:"From saved contacts"}]}/><PersonField label="File owner" value={person} onChange={v=>{setPerson(v);setOwner("");}} onSelect={p=>setOwner(p.uuid)}/>
         <FileList canEdit={canEdit} ownerIds={ownerIds} shared={scope==="shared"} key={bucket.id} cellId={id} bucket={bucket.id} prefix={prefix} onAction={setAction}/>
       </Stack>:!buckets.isPending&&!buckets.error&&<Surface><p>Create a bucket to start storing files.</p></Surface>}
     </Section>
@@ -56,7 +64,7 @@ function FileList({cellId,bucket,prefix,onAction,ownerIds,shared,canEdit}:{canEd
     return cellsRequest<{files:StoredFile[];next:string|null}>(cellPath(cellId,`/storage-api/files/${encodeURIComponent(bucket)}/query`),{signal,method:"POST",body:{prefix,limit:100,...(ownerIds!==undefined?{owner_ids:ownerIds}:{}),shared_with_me:shared,...(pageParam?{after:pageParam}:{})}});
   },getNextPageParam:page=>page.next??undefined});
   const rows=files.data?.pages.flatMap(p=>p.files)??[];
-  return <Stack><Failure error={files.error}/>{files.isPending?<p role="status">Loading files…</p>:!rows.length?<p>No files match this path.</p>:<div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Files in {bucket}</caption><thead><tr><th>Name</th><th>Owner</th><th>Size</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{rows.map(file=><tr key={file.id}><td>{file.name}<p className={styles.muted}>{file.content_type}</p></td><td>{file.owner_id?<SavedPerson person={{uuid:file.owner_id}}/>:"—"}</td><td>{bytes(file.size)}</td><td>{date(file.updated_at)}</td><td><div className={styles.actions}>
+  return <Stack><Failure error={files.error}/>{files.isPending?<p role="status">Loading files…</p>:!rows.length?<p>No files match your filters.</p>:<div className={styles.tableWrap}><table className={styles.table}><caption className="sr-only">Files in {bucket}</caption><thead><tr><th>Name</th><th>Owner</th><th>Size</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{rows.map(file=><tr key={file.id}><td>{file.name}<p className={styles.muted}>{file.content_type}</p></td><td>{file.owner_id?<SavedPerson person={{uuid:file.owner_id}}/>:"—"}</td><td>{bytes(file.size)}</td><td>{date(file.updated_at)}</td><td><div className={styles.actions}>
     <a href={`/api/cells${cellPath(cellId,`/storage-api/object/${encodeURIComponent(bucket)}/${file.name.split("/").map(encodeURIComponent).join("/")}`)}`} download={file.name.split("/").at(-1)}>Download</a>
     {["image/png","image/jpeg","image/webp"].includes(file.content_type.split(";")[0])&&<Button disabled={!canEdit} variant="ghost" size="sm" onClick={()=>onAction({file,action:"image"})}>Resize or convert</Button>}
     {(["copy","move","sign","delete"] as const).map(action=><Button key={action} disabled={!canEdit} variant="ghost" size="sm" onClick={()=>onAction({file,action})}>{action==="sign"?"Share link":action[0].toUpperCase()+action.slice(1)}</Button>)}

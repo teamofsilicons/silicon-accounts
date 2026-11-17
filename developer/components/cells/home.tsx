@@ -36,11 +36,13 @@ export function CellsHome(){
     try{const result=await cellsApi.create(name,id,operation.current.key,organization||undefined);setCreated(result);operation.current=null;void cache.invalidateQueries({queryKey:["cells","list"]});}
     catch(error){setFailure(error);}finally{inFlight.current=false;setBusy(false);}
   }
-  return <Page><PageHeader title="Your cells" description="A backend for each thing you build." actions={<Button onClick={()=>setOpen(true)}>Create cell</Button>}/>
-    {filter.controls(query.data?.cells??[])}
+  const cells = query.data?.cells ?? [];
+  const activeCells = cells.filter(cell => cell.status !== "deleted");
+  const visibleCells = activeCells.filter(filter.matches);
+  return <Page><PageHeader title="Your cells" description="A backend for each thing you build." actions={<>{filter.controls(activeCells)}<Button onClick={()=>setOpen(true)}>Create cell</Button></>}/>
     {query.error&&<Alert tone="danger" title={ApiError.from(query.error).message}>{ApiError.from(query.error).hint}</Alert>}
     {query.isPending?<p role="status">Loading your cells…</p>:<><Section title="Cells you author" hideTitle>
-      {!query.data?.cells.some(cell=>cell.status!=="deleted")?<Surface><p>No active cells yet. Create one here, or connect a cell from an app or interface.</p></Surface>:<Grid>{query.data.cells.filter(filter.matches).filter(cell=>cell.status!=="deleted").map(cell=><Surface key={cell.uuid} className={styles.card}>
+      {!visibleCells.length && filter.count ? filter.empty("cells") : !activeCells.length ?<Surface><p>No active cells yet. Create one here, or connect a cell from an app or interface.</p></Surface>:<Grid>{visibleCells.map(cell=><Surface key={cell.uuid} className={styles.card}>
         <div><Link className={styles.cellName} href={paths.cell(cell.cell_id)}>{cell.name}</Link><p className={styles.muted}>{cell.cell_id}</p></div>
         <Cluster justify="between"><span className={styles.status}>{cell.status}</span><Link href={paths.cell(cell.cell_id)}>Open cell →</Link></Cluster>
       </Surface>)}</Grid>}

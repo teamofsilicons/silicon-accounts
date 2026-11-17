@@ -1,17 +1,43 @@
 'use client';
-import {useEffect,useId,useState} from 'react';
+import {useEffect,useId,useRef,useState} from 'react';
 import Image from 'next/image';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {Input} from '@/components/silicon-ui/input/input';
 import {Button} from '@/components/silicon-ui/button/button';
 import {contactsApi,safePhoto,usePeople} from './api';
+import {ContactAccess} from './contact-access';
 import {fuzzyMatch,mergePeople,type Person} from './ranking';
 import styles from './people.module.css';
 export function PersonAvatar({person}:{person:Person}){const url=safePhoto(person.pfp_url);return url?<Image className={styles.avatar} src={url} alt='' width={32} height={32} unoptimized referrerPolicy='no-referrer'/>:<span className={`${styles.avatar} ${styles.initial}`} aria-hidden='true'>{(person.display_name||person.id||'?').slice(0,2).toUpperCase()}</span>;}
 export function PersonLabel({person}:{person:Person}){return <><PersonAvatar person={person}/><span className={styles.detail}><strong>{person.display_name||person.id||person.uuid}</strong><small>{person.id||person.uuid}{person.contact?` · Trust ${person.trust}`:''}</small></span></>;}
 export function ContactEditor({person,onSaved}:{person:Person;onSaved?:()=>void}){const cache=useQueryClient();const [name,setName]=useState(person.display_name||person.id||'');const [trust,setTrust]=useState(String(person.trust||1));const [busy,setBusy]=useState(false);const [error,setError]=useState('');return <div className={styles.editor}><Input label='Saved contact name' value={name} onChange={e=>setName(e.target.value)} maxLength={200}/><Input label='Trust (1–255)' type='number' min={1} max={255} value={trust} onChange={e=>setTrust(e.target.value)}/><p className={styles.hint}>1 means saved; 2 means trusted. Higher values rank contacts higher.</p>{error&&<p role='alert'>{error}</p>}<Button type='button' loading={busy} disabled={!name.trim()||!Number.isInteger(Number(trust))||Number(trust)<1||Number(trust)>255} onClick={async()=>{setBusy(true);setError('');try{const c=person.contact;await contactsApi('contacts','POST',{id:person.uuid,name:name.trim(),trust:Number(trust),note:c?.note??'',phone:c?.phone??'',email:c?.email??'',photo_id:c?.photo_id??null,birthday_month:c?.birthday_month??null,birthday_day:c?.birthday_day??null,birthday_year:c?.birthday_year??null});await cache.invalidateQueries({queryKey:['contacts','list']});onSaved?.();}catch(e){setError(e instanceof Error?e.message:'Could not save this contact.');}finally{setBusy(false);}}}>Save contact</Button></div>;}
-export function PersonField({value,onChange,label='Carbon, Silicon or email',placeholder='c:name or si:name',disabled=false,onSelect}:{value:string;onChange:(v:string)=>void;label?:string;placeholder?:string;disabled?:boolean;onSelect?:(p:Person)=>void}){
- const id=useId(),data=usePeople();const [open,setOpen]=useState(false),[index,setIndex]=useState(0),[query,setQuery]=useState(value),[editing,setEditing]=useState(false);
+export function PersonField({value,onChange,label='Carbon, Silicon or email',placeholder='c:name or si:name',disabled=false,onSelect,allowContactEditing=true}:{allowContactEditing?:boolean;value:string;onChange:(v:string)=>void;label?:string;placeholder?:string;disabled?:boolean;onSelect?:(p:Person)=>void}){
+ const id=useId();const [open,setOpen]=useState(false),[requesting,setRequesting]=useState(false),[index,setIndex]=useState(0),[query,setQuery]=useState(value),[editing,setEditing]=useState(false);
+ const field = useRef<HTMLDivElement>(null);
+ const data=usePeople(open || !!value.trim());
+ // Finish an outside click before an inline suggestion disappears and shifts its target.
+ useEffect(() => {
+   if (!open) return;
+   let pressing = false;
+   function closeOutside(event: Event) {
+     if (event.target instanceof Node && !field.current?.contains(event.target)) setOpen(false);
+   }
+   function press() { pressing = true; }
+   function release() { pressing = false; }
+   function focus(event: FocusEvent) { if (!pressing) closeOutside(event); }
+   document.addEventListener("pointerdown", press, true);
+   document.addEventListener("pointerup", release, true);
+   document.addEventListener("pointercancel", release, true);
+   document.addEventListener("focusin", focus, true);
+   document.addEventListener("click", closeOutside);
+   return () => {
+     document.removeEventListener("pointerdown", press, true);
+     document.removeEventListener("pointerup", release, true);
+     document.removeEventListener("pointercancel", release, true);
+     document.removeEventListener("focusin", focus, true);
+     document.removeEventListener("click", closeOutside);
+   };
+ }, [open]);
  useEffect(()=>{const timer=setTimeout(()=>setQuery(value.trim()),250);return()=>clearTimeout(timer);},[value]);
  const lookup=useQuery({queryKey:['people','lookup',data.accountUuid,query],queryFn:({signal})=>contactsApi<Person>(`lookup?q=${encodeURIComponent(query)}`,'GET',undefined,signal),enabled:!!data.accountUuid&&(/^(?:c:|si:)[^\s]{2,}$/.test(query)||/^[a-f0-9-]{36}$/i.test(query)),retry:false,staleTime:30_000});
  const known=data.people.find(p=>p.uuid===value.trim()||p.id?.toLowerCase()===value.trim().toLowerCase());
@@ -21,11 +47,12 @@ export function PersonField({value,onChange,label='Carbon, Silicon or email',pla
  const matches=data.people.filter(p=>fuzzyMatch(value,[p.id,p.display_name,p.uuid,p.contact?.email].filter(Boolean).join(' '))).slice(0,8);
  const suggestions=exact&&!matches.some(p=>p.uuid===exact.uuid)?[exact,...matches].slice(0,8):matches;
  const choose=(p:Person)=>{onChange(p.id||p.uuid);onSelect?.(p);setOpen(false);setEditing(false);};
- return <div className={styles.field}><Input label={label} placeholder={placeholder} value={value} disabled={disabled} autoComplete='off' role='combobox' aria-autocomplete='list' aria-expanded={open&&suggestions.length>0} aria-controls={`${id}-list`} aria-activedescendant={open&&suggestions.length?`${id}-${Math.min(index,suggestions.length-1)}`:undefined} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),150)} onChange={e=>{onChange(e.target.value);setOpen(true);setIndex(0);setEditing(false);}} onKeyDown={e=>{if(e.key==='Escape')setOpen(false);if(e.key==='ArrowDown'){e.preventDefault();setOpen(true);setIndex(i=>Math.min(i+1,suggestions.length-1));}if(e.key==='ArrowUp'){e.preventDefault();setIndex(i=>Math.max(0,i-1));}if(e.key==='Enter'&&open&&suggestions[index]){e.preventDefault();choose(suggestions[index]);}}}/>
+ return <div className={styles.field} ref={field}><Input label={label} placeholder={placeholder} value={value} disabled={disabled} autoComplete='off' role='combobox' aria-autocomplete='list' aria-expanded={open&&suggestions.length>0} aria-controls={`${id}-list`} aria-activedescendant={open&&suggestions.length?`${id}-${Math.min(index,suggestions.length-1)}`:undefined} onFocus={()=>setOpen(true)} onChange={e=>{onChange(e.target.value);setOpen(true);setIndex(0);setEditing(false);}} onKeyDown={e=>{if(e.key==='Escape'&&open){e.stopPropagation();setOpen(false);}if(e.key==='ArrowDown'){e.preventDefault();setOpen(true);setIndex(i=>Math.max(0,Math.min(i+1,suggestions.length-1)));}if(e.key==='ArrowUp'){e.preventDefault();setIndex(i=>Math.max(0,i-1));}if(e.key==='Enter'&&open&&suggestions[index]){e.preventDefault();choose(suggestions[index]);}}}/>
  {open&&suggestions.length>0&&<div id={`${id}-list`} role='listbox' aria-label='People suggestions' className={styles.list} data-sq='surface'>{suggestions.map((p,i)=><button id={`${id}-${i}`} key={p.uuid} className={styles.person} role='option' aria-selected={index===i} type='button' onMouseDown={e=>e.preventDefault()} onClick={()=>choose(p)}><PersonLabel person={p}/></button>)}</div>}
- {selected&&<div className={styles.selected} data-sq='surface'><div className={styles.person}><PersonLabel person={selected}/></div>{data.connection.data?.connected&&<><Button type='button' variant='secondary' disabled={disabled} onClick={()=>setEditing(!editing)}>{selected.contact?'Edit saved contact':'Save to Contacts'}</Button>{editing&&<ContactEditor key={selected.uuid} person={selected} onSaved={()=>setEditing(false)}/>}</>}</div>}
- {data.history.data?.partial&&<p className={styles.hint}>Some invitation history is temporarily unavailable.</p>}
- {!data.connection.data?.connected&&<p className={styles.hint}>Connect your address book in <a href='/contacts'>Contacts</a> to include saved names, photos and trust.</p>}
+ {open&&!disabled&&data.accountUuid&&data.connection.data?.connected===false&&<Button type="button" variant="ghost" size="sm" onMouseDown={event=>event.preventDefault()} onClick={()=>{setOpen(false);setRequesting(true);}}>Use saved contacts</Button>}
+ {requesting&&<ContactAccess onGranted={()=>setRequesting(false)} onCancel={()=>setRequesting(false)}/>}
+ {selected&&<div className={styles.selected} data-sq='surface'><div className={styles.person}><PersonLabel person={selected}/></div>{allowContactEditing&&data.connection.data?.connected&&<><Button type='button' variant='secondary' disabled={disabled} onClick={()=>setEditing(!editing)}>{selected.contact?'Edit saved contact':'Save to Contacts'}</Button>{editing&&<ContactEditor key={selected.uuid} person={selected} onSaved={()=>setEditing(false)}/>}</>}</div>}
+ {open&&data.history.data?.partial&&<p className={styles.hint}>Some invitation history is temporarily unavailable.</p>}
  </div>;
 }
 
