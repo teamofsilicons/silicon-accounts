@@ -676,7 +676,6 @@ export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, su
           autoComplete="email"
           autoCapitalize="off"
           spellCheck={false}
-          placeholder="name@example.com"
           value={email}
           onChange={event => {
             setEmail(event.currentTarget.value);

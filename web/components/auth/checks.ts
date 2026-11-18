@@ -851,14 +851,15 @@ const hostedChecks: MockCheck[] = [
     },
   },
   {
-    name: "flow: in dark mode the default palette fills buttons with the brand blue; an app's own palette is kept",
+    name: "flow: an app that kept the default look wears the site's own tokens (Anil, 2026-11-18); an app's own palette is kept",
     path: flowPath("briefcase", "choose_method"),
     dark: true,
     run: async ({ page, base }) => {
-      const primaryOf = (locator: Locator) => locator.evaluate(el => ({ fill: getComputedStyle(el).getPropertyValue("--primary").trim().toUpperCase(), text: getComputedStyle(el).color }));
+      const primaryOf = (locator: Locator) => locator.evaluate(el => ({ fill: getComputedStyle(el).getPropertyValue("--primary").trim().toUpperCase(), text: getComputedStyle(el).color, bg: getComputedStyle(el).backgroundColor }));
+      const site = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--primary").trim().toUpperCase());
       const own = await primaryOf(page.getByRole("button", { name: "Continue", exact: true }));
-      expect(own.fill).toBe("#1F5FB8");
-      expect(contrast(own.text, "rgb(31, 95, 184)")).toBeGreaterThanOrEqual(4.5);
+      expect(own.fill).toBe(site);
+      expect(contrast(own.text, own.bg)).toBeGreaterThanOrEqual(4.5);
       await page.goto(`${base}${flowPath("acme-notes", "choose_method")}`);
       const acme = await primaryOf(page.getByRole("button", { name: "Continue", exact: true }));
       expect(acme.fill).toBe((appOf("acme-notes").branding.dark.primary ?? "").toUpperCase());

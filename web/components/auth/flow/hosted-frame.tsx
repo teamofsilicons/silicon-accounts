@@ -6,14 +6,16 @@
  * outside the branded subtree so no branding can restyle or hide it.
  *
  * Silicon Accounts' own pages (device approval, the account site's sign-in, problems with no app, the first-party
- * flow) wear the site's brand tokens instead of an app's branding.
+ * flow) wear the site's brand tokens instead of an app's branding. So does an app that kept the default colours and
+ * fonts and the visitor's theme (isSiliconLook): its pages look like Silicon Accounts' own, with its logo, its layout
+ * and "Powered by" (Anil, 2026-11-18: "two very different designs, we need to make this uniform").
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { BrandAside, BrandPanel, BrandStage, BrandingScope, PoweredBy } from "@/components/foundation/branding/branding";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import type { BrandLayout, Branding } from "@/lib/api/types";
 import { brandLogo, resolveBrandTheme, type PaintTheme } from "@/lib/branding/apply";
-import { normalizeBranding } from "@/lib/branding/defaults";
+import { isSiliconLook, normalizeBranding } from "@/lib/branding/defaults";
 import { legibleBranding } from "./legible";
 import type { FrameApp } from "./model";
 import styles from "./flow.module.css";
@@ -70,13 +72,19 @@ export interface HostedFrameProps {
 }
 
 export function HostedFrame({ app, site: siteProp, title, subtitle, children, footer, busy, poweredBy = true, plain, hideName, layout: pageLayout }: HostedFrameProps) {
-  const site = !!siteProp || !app;
-  const paint = usePaint(app, site);
   // The app's branding, with its error text kept readable (flow/legible.ts), in this page's layout.
   const branding = useMemo(() => {
     const base = legibleBranding(normalizeBranding(app?.branding as Partial<Branding> | undefined));
     return pageLayout && pageLayout !== base.layout ? { ...base, layout: pageLayout } : base;
   }, [app?.branding, pageLayout]);
+  // The site's own tokens: Silicon Accounts' pages, and apps that kept the default look (checked on the stored
+  // branding, before legibleBranding adjusts its error colour).
+  const defaultLook = useMemo(() => {
+    const stored = normalizeBranding(app?.branding as Partial<Branding> | undefined);
+    return isSiliconLook(stored) && stored.theme === "auto";
+  }, [app?.branding]);
+  const site = !!siteProp || !app || defaultLook;
+  const paint = usePaint(app, site);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [fontsTimedOut, setFontsTimedOut] = useState(false);
   // Fonts load on demand; the step fades in once they are there (or after 1.5 s), so headings never jump.
@@ -107,7 +115,9 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
     };
   }, [background]);
 
-  const layout = site ? "card" : branding.layout;
+  // Silicon Accounts' own pages are cards; an app in the default look keeps its own layout, background and density.
+  const own = !!siteProp || !app;
+  const layout = own ? "card" : branding.layout;
   const stage = (
     <BrandStage>
       <BrandAside>
@@ -128,8 +138,9 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
   return (
     <div className={styles.hosted} data-paint={paint} data-layout={layout} data-site={site || undefined}>
       {site ? (
-        // Silicon Accounts itself: the site's own brand tokens (styles/tokens.css), in the card layout.
-        <div className={`sa-brand ${styles.scope}`} data-layout="card" data-bg="plain" data-density="comfortable" data-look="silicon">{stage}</div>
+        // The site's own brand tokens (styles/tokens.css): Silicon Accounts itself in the card layout, an app in the
+        // default look in its own.
+        <div className={`sa-brand ${styles.scope}`} data-layout={layout} data-bg={own ? "plain" : branding.background_style} data-density={own ? "comfortable" : branding.density} data-look="silicon">{stage}</div>
       ) : (
         <BrandingScope branding={branding} theme={paint} className={styles.scope} onFontsReady={() => setFontsLoaded(true)}>
           {stage}

@@ -10,6 +10,12 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   for tools and other sites, dock for account destinations only. Why: Anil asked for these three. (2026-10-17)
 
 ## Design
+- **An app that kept the default look signs in with Silicon Accounts' own look (Anil, 2026-11-18).** Its hosted pages
+  wear the site's tokens (neutral ink buttons, Allo), as Silicon Accounts' own sign-in does, with the app's logo, its
+  layout and "Powered by Silicon Accounts". "Kept the default look" is isSiliconLook (the stored default colours and
+  font) with the visitor's theme; an app with any colour or font of its own keeps it. The stored default palette
+  (#1F5FB8) is unchanged; the pages just stop painting it. The email field has no placeholder on any page. Why: Anil,
+  on Silicon Apps' sign-in beside Silicon Accounts': "two very different designs, we need to make this uniform".
 
 - **Connected Apps with no app explains how one gets there (2026-11-13).** Anil chose /__apps-empty C: "No apps yet" over three rows (open an app, with Browse Silicon Apps; sign in with Silicon Accounts; it shows up here). Why: Home's Apps card sends someone who has just joined here, and an empty state with nothing to do was a dead end. The prototype's words stay as the line under the heading.
 - **Home's introduction cards act (2026-11-13).** You lights the photo's ring; Silicons opens Create a Silicon (Silicons once there is one); Apps opens Connected Apps.
@@ -161,7 +167,7 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   (Paper colours, Hedvig titles and Geist Pixel labels were kept then; replaced 2026-10-18, below.)
   Why: Anil chose Hanken and a neutral accent, matching Silicon Docs. (2026-10-17)
 - Hosted sign-in pages keep their own default branding (lib/branding/defaults.ts, brand blue #1F5FB8): apps change it
-  per app, so it is not the account site's theme. (2026-10-17) (my call, confirm)
+  per app, so it is not the account site's theme. (2026-10-17) (my call, confirm) Superseded 2026-11-18, below.
 - Security pillar = sign-in methods + "Where you are signed in" + a way to Activity, on /sign-in-methods (title
   "Security"); URL unchanged. Settings keeps Local time and Delete account, with a pointer to the new home of
   sessions. Activity stays its own page, linked from Security. (2026-10-17) (Activity placement: my default, confirm)
