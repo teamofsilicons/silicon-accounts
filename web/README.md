@@ -848,6 +848,10 @@ in `redesign/api-gaps.md`).
   deck in a dialog) and asks a Carbon with no phone to add one. The attention strip is gone.
 - **Avatars are circles** (Silicon UI's default): the 30% squircle override is gone from `styles/tokens.css`, so the
   account menu's hover, press and loading states match the picture.
+- **Silicon UI 0.6.0** (2026-11-18, teamofsilicons/silicon-ui#42): Allo as its face at roundness 20 (`--font-roundness`),
+  the weight tokens in every component, the nine type roles, `--font-mono` and `--leading-read`, all with this site's
+  values, so `styles/tokens.css` no longer declares them; it keeps `--font-body` (Allo with the system font behind it)
+  and the dev tools' exemption. Segmented control and Billing toggle have Tabs' 2px frame.
 - **Silicon UI 0.5.0** (2026-11-13): the local pnpm patch of 0.4.0 is gone; everything in it shipped in 0.5.0
   (teamofsilicons/silicon-ui#41, issues #28 to #40). The hint-size fallback is 12px upstream, which changes nothing here
   (`tokens.css` sets `--field-hint-size`). `hideHeader`, Button's `link` and Input's `prefix`/`suffix` are experimental
