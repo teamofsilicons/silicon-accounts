@@ -45,6 +45,7 @@ export async function mock(
     body: Record<string, unknown>;
     headers: Record<string, string>;
   }[] = [];
+  await page.route("**/api/organizations/publishing",route=>route.fulfill({json:{account_uuid:account.uuid,organizations:[]}}));
   await page.route("**/auth/session", route => route.fulfill({json: {signed_in: signedIn}}));
   await page.route("**/api/accounts/**", route => {
     const path = new URL(route.request().url()).pathname.replace("/api/accounts/", "");
@@ -81,7 +82,7 @@ export async function mock(
     } else if (path === "/apps/test-app/access") {
       app = { ...app, ...body };
       result = app;
-    } else if (path === "/apps/test-app/packages/macos-aarch64") {
+    } else if (path === "/apps/test-app/packages/linux-x86_64") {
       status = 422;
       result = {
         error: {

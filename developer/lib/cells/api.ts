@@ -1,7 +1,7 @@
 /** The developer browser uses only its same-origin BFF, never Accounts tokens. */
 import { ApiError } from "@/lib/api/errors";
 export interface Cell {
-  created_by?:string|null; organization_id?:string|null;organization_name?:string|null;organization_access?:import("@/components/organizations/api").ResourcePolicy;permissions?:Record<"read"|"edit"|"publish"|"manage",boolean>;
+  author_organizations?:string[]; created_by?:string|null; organization_id?:string|null;organization_name?:string|null;organization_access?:import("@/components/organizations/api").ResourcePolicy;permissions?:Record<"read"|"edit"|"publish"|"manage",boolean>;
   uuid: string; cell_id: string; name: string; status: string; url: string; auth_url?: string;
   created_at: string; deleted_at: string | null;
   settings: {allowed_origins: string[]; redirect_urls: string[]};
@@ -36,7 +36,7 @@ export async function cellsRequest<T>(path: string, options: {method?: string; b
   return body as T;
 }
 export const cellsApi = {
-  create: (name:string,cellId:string,key:string,organization_id?:string)=>cellsRequest<CreatedCell>("/cells",{method:"POST",body:{name,cell_id:cellId,linked_apps:[],...(organization_id?{organization_id}:{})},key}),
+  create: (name:string,cellId:string,key:string,organization_id?:string|null)=>cellsRequest<CreatedCell>("/cells",{method:"POST",body:{name,cell_id:cellId,linked_apps:[],organization_id},key}),
   get: (cell:string,signal?:AbortSignal)=>cellsRequest<{cell:Cell}>(`/cells/${encodeURIComponent(cell)}`,{signal}),
   list: (signal?: AbortSignal) => cellsRequest<{cells: Cell[]}>("/cells", {signal}),
   app: (app: string, signal?: AbortSignal) => cellsRequest<AppCell>(`/apps/${encodeURIComponent(app)}/cell`, {signal}),

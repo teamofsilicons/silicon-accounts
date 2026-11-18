@@ -10,6 +10,7 @@ const FUNCTION = "[a-z][a-z0-9_-]{0,62}";
 const TEMPLATE = "(?!catalog(?:/|$))[a-z][a-z0-9-]{0,39}";
 const JOB = `(?!preview(?:/|$))${FUNCTION}`;
 const routes: [string, RegExp][] = [
+  ["DELETE", new RegExp(`^cells/${CELL}/organization-authors/[a-z0-9_-]{3,30}$`)],
   ["GET HEAD PUT", new RegExp(`^cells/${CELL}/organization-access$`)],
   ["POST", new RegExp(`^cells/${CELL}/notifications/live$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/database/(reference|extensions|connections)$`)],

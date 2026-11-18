@@ -5,9 +5,10 @@ export function interfacesProxyRoute(raw: string, method: string): string | null
   const routes: [RegExp, string[]][] = [
     [/^(me|people)$/, ["GET"]],
     [new RegExp(`^interfaces/${id}/organization-access$`), ["PUT"]],
+    [new RegExp(`^interfaces/${id}/organization-authors/[a-z0-9_-]{3,30}$`), ["DELETE"]],
     [/^interfaces$/, ["GET", "POST"]],
-    [new RegExp(`^interfaces/${id}$`), ["GET", "PATCH"]],
-    [new RegExp(`^interfaces/${id}/(publish|unpublish|rotate-secret|leave|resume)$`), ["POST"]],
+    [new RegExp(`^interfaces/${id}$`), ["GET", "PATCH", "DELETE"]],
+    [new RegExp(`^interfaces/${id}/(publish|unpublish|restore|rotate-secret|leave|resume)$`), ["POST"]],
     [new RegExp(`^interfaces/${id}/(invites|requests)$`), ["GET", "POST"]],
     [new RegExp(`^interfaces/${id}/history$`), ["GET"]],
     [new RegExp(`^interfaces/${id}/readiness$`), ["GET"]],

@@ -36,6 +36,7 @@ export const DEVELOPER_TAB_LABELS: Record<AppTab, string> = {
   publishing: "Publishing",
   releases: "Releases",
   authors: "Authors",
+  settings: "Settings",
   history: "History",
   "sign-in": "Sign-in",
   details: "Details",

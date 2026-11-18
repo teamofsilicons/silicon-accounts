@@ -31,6 +31,7 @@ export type InterfaceLicense =
   | {kind: "link"; url: string}
   | {kind: "file"; name: string; content: string};
 export type App = {
+  author_organizations?:string[];
   deleted_at?:string|null;restore_until?:string|null;
   created_by?:string|null; organization_id?: string | null;
   organization_access?: import("@/components/organizations/api").ResourcePolicy;

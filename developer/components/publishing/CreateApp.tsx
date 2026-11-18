@@ -7,7 +7,7 @@ import { api, useMutation, useResource } from "./api";
 import type { App } from "./types";
 import { Button, ErrorNotice, Input, Modal, SecretModal, Textarea } from "./ui";
 import { StorageFields } from "./UserStorage";
-import { PublisherSelect } from "@/components/organizations/publisher-select";
+import { PublisherSelect, usePublisher } from "@/components/organizations/publisher-select";
 import { parseStorageRows, type StorageRow } from "./storage-schema";
 export function CreateApp({ open, close }: { open: boolean; close: () => void }) {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
   const [id, setId] = useState("");
   const [description, setDescription] = useState("");
   const [tagline, setTagline] = useState("");
-  const [organization, setOrganization] = useState("");
+  const publisher=usePublisher("apps");
   const [logo, setLogo] = useState("");
   const [storage, setStorage] = useState<StorageRow[]>([]);
   const [checked, setChecked] = useState("");
@@ -44,7 +44,7 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
             e.preventDefault();
             if (
               !name.trim() ||
-              !valid ||
+              !publisher.ready || !valid ||
               id !== checked ||
               !availability.data?.available ||
               mutation.pending
@@ -53,7 +53,7 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
             const result = await mutation.run(() =>
               api<{ app: App; app_secret?: string }>("/apps", {
                 method: "POST",
-                body: { name, app_id: id, tagline, description, logo, ...(organization?{organization_id:organization}:{}), ...(storage.length ? {user_storage: parseStorageRows(storage)} : {}) },
+                body: { name, app_id: id, tagline, description, logo, organization_id:publisher.organizationId, ...(storage.length ? {user_storage: parseStorageRows(storage)} : {}) },
               }),
             );
             if (result) {
@@ -63,7 +63,7 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
             }
           }}
         >
-          <PublisherSelect kind="apps" value={organization} onChange={setOrganization} disabled={mutation.pending}/>
+          <PublisherSelect publisher={publisher} disabled={mutation.pending}/>
           <Input
             label="App name"
             value={name}
@@ -131,7 +131,7 @@ export function CreateApp({ open, close }: { open: boolean; close: () => void })
             type="submit"
             disabled={
               !name.trim() ||
-              !valid ||
+              !publisher.ready || !valid ||
               !availability.data?.available ||
               id !== checked
             }

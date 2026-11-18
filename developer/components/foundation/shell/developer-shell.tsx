@@ -23,6 +23,7 @@ import { navigationType, paths } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
 import { beginSignIn, useMeta, useSession, useSignOut } from "@/lib/query/session";
+import { useOrganizations } from "@/components/organizations/api";
 import { PublishingGuard } from "@/components/publishing/guard";
 import { BrandMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
@@ -61,6 +62,8 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { status, me, error, refetch } = useSession();
+  const organizations = useOrganizations();
+  const canConfigureOrg = organizations.data?.account_uuid === me?.uuid && organizations.data?.organizations.some(org => org.admin);
   const meta = useMeta();
   const { signOut } = useSignOut();
   const paletteOpen = useCommandPaletteOpen();
@@ -112,14 +115,14 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
     { id: "go.apps", label: "Your apps", description: "Every app you own", group: "Go to", icon: <Boxes size={16} strokeWidth={1.75} />, keywords: ["apps", "home"], run: () => void go(paths.home) },
     { id: "go.cells", label: "Your cells", description: "Databases, files and backend resources", group: "Go to", icon: <Boxes size={16} />, keywords: ["cells", "database", "files"], run: () => void go(paths.cells) },
     { id: "go.interfaces", label: "Your interfaces", description: "Create and publish interfaces", group: "Go to", icon: <Boxes size={16} />, keywords: ["interfaces", "publish"], run: () => void go("/interfaces") },
-    { id: "go.organization-publishing", label: "Organization publishing settings", group: "Go to", icon: <Boxes size={16}/>, keywords: ["organizations", "permissions", "teams"], run: () => void go("/organizations") },
+    ...(canConfigureOrg ? [{ id: "go.organization-publishing", label: "Organization publishing settings", group: "Go to", icon: <Boxes size={16}/>, keywords: ["organizations", "permissions", "teams"], run: () => void go("/organizations") }] : []),
     { id: "go.saved-contacts", label: "Manage saved contacts", group: "Go to", icon: <CircleUserRound size={16}/>, keywords: ["contacts", "address book", "trust"], run: () => void go("/contacts") },
     { id: "go.app-verification", label: "App verification", description: "Issued tokens and history across your apps", group: "Go to", icon: <ShieldCheck size={16} />, keywords: ["verification", "token", "proof", "app-verification", "history"], run: () => void go(paths.appVerification()) },
     { id: "go.invitations", label: "Author invitations", group: "Go to", icon: <Mail size={16} />, keywords: ["invite", "author"], run: () => void go(paths.invitations) },
     { id: "go.docs", label: "Developer docs", description: "Accounts and Apps guides", group: "Go to", icon: <BookOpen size={16} strokeWidth={1.75} />, keywords: ["docs", "help", "guide"], run: () => void go(docsUrl) },
     { id: "go.account", label: "Your account", description: "Opens accounts.teamofsilicons.com in a new tab", group: "Go to", icon: <CircleUserRound size={16} strokeWidth={1.75} />, keywords: ["account", "profile"], run: () => openExternal(accountsUrl) },
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of the developer site", group: "Account", icon: <LogOut size={16} strokeWidth={1.75} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
-  ], [go, doSignOut, docsUrl, accountsUrl, openExternal]);
+  ], [go, doSignOut, docsUrl, accountsUrl, openExternal, canConfigureOrg]);
 
   // ⌘K toggles the palette.
   useEffect(() => {
@@ -156,11 +159,13 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
             }}>Apps</Link>
             <Link href={paths.cells} data-sq="surface" className={styles.navLink} aria-current={pathname===paths.cells||pathname.startsWith("/cells/")?"page":undefined}>Cells</Link>
             <Link href="/interfaces" data-sq="surface" className={styles.navLink} aria-current={pathname==="/interfaces"||pathname.startsWith("/interfaces/")?"page":undefined}>Interfaces</Link>
+            {canConfigureOrg && <Link href="/organizations" data-sq="surface" className={styles.navLink} aria-current={pathname==="/organizations"?"page":undefined}>Organization</Link>}
             <Link href={paths.appVerification()} data-sq="surface" className={styles.navLink} aria-current={pathname === paths.appVerification() ? "page" : undefined}>App verification</Link>
             <Link href={paths.invitations} data-sq="surface" className={styles.navLink} aria-current={pathname === paths.invitations ? "page" : undefined}>Invitations</Link>
           </nav>
         </div>
         <div className={styles.topEnd}>
+          {canConfigureOrg && <Link href="/organizations" data-sq="surface" className={`${styles.navLink} ${styles.mobileOrg}`} aria-current={pathname==="/organizations"?"page":undefined}>Organization</Link>}
           {/* The docs are the public pages, outside the console: a quiet link, not one of its pages. */}
           <a href={docsUrl} data-sq="surface" className={styles.docsLink}>
             Docs
@@ -178,6 +183,7 @@ export function DeveloperShell({ children }: { children: ReactNode }) {
               onSignOut={menuSignOut}
               align="end"
               items={[
+                ...(canConfigureOrg ? [{label:"Organization",icon:<Boxes size={16}/>,onSelect:()=>void go("/organizations")}] : []),
                 { label: "Your account", icon: <CircleUserRound size={16} strokeWidth={1.75} />, onSelect: () => openExternal(accountsUrl) },
                 { label: "App verification", icon: <ShieldCheck size={16} />, onSelect: () => void go(paths.appVerification()) },
                 { label: "Author invitations", icon: <Mail size={16} />, onSelect: () => void go(paths.invitations) },

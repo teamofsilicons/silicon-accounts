@@ -22,7 +22,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Package, History, Rocket, ArrowLeft, ArrowUpRight, Braces, CircleSlash, Code, KeyRound, LayoutDashboard, ListChecks, Palette, ShieldCheck, Upload, Users, Webhook, Workflow } from "lucide-react";
+import { Settings, Package, History, Rocket, ArrowLeft, ArrowUpRight, Braces, CircleSlash, Code, KeyRound, LayoutDashboard, ListChecks, Palette, ShieldCheck, Upload, Users, Webhook, Workflow } from "lucide-react";
 import { Alert } from "@/components/silicon-ui/alert/alert";
 import { Badge } from "@/components/silicon-ui/badge/badge";
 import { Button } from "@/components/silicon-ui/button/button";
@@ -58,6 +58,7 @@ const TAB_ICONS: Record<DeveloperTab, ReactNode> = {
   publishing: <Package size={16} strokeWidth={1.75} />,
   releases: <Rocket size={16} strokeWidth={1.75} />,
   authors: <Users size={16} strokeWidth={1.75} />,
+  settings: <Settings size={16} strokeWidth={1.75} />,
   history: <History size={16} strokeWidth={1.75} />,
   overview: <LayoutDashboard size={16} strokeWidth={1.75} />,
   "sign-in": <KeyRound size={16} strokeWidth={1.75} />,
@@ -98,7 +99,7 @@ export function AppScope({ appId, children }: { appId: string; children: ReactNo
   return <Page width="default">{content}{children}</Page>;
 }
 
-const PUBLISHING_SECTIONS: PublishingSection[] = ["publishing", "releases", "authors", "history"];
+const PUBLISHING_SECTIONS: PublishingSection[] = ["publishing", "releases", "authors", "history", "settings"];
 
 /** An Apps author need not administer the app's Accounts sign-in configuration. */
 function PublishingOnly({ appId, error, retry }: { appId: string; error: ApiError; retry: () => void }) {
