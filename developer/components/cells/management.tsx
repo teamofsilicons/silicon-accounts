@@ -24,12 +24,12 @@ import {CellIdInput} from "./cell-id-input";
 import styles from "./cells.module.css";
 interface Author {account:{uuid:string;id:string;display_name:string};joined_at:string}
 interface Key {id:string;name:string;kind:string;prefix:string;publishable_key:string|null;revoked_at:string|null}
-export function CellAuthors({cellId,active,canManage,personal}:{cellId:string;active:boolean;canManage:boolean;personal:boolean}){
+export function CellAuthors({cellId,active,canManage,personal,hasOrganizationAuthors}:{cellId:string;active:boolean;canManage:boolean;personal:boolean;hasOrganizationAuthors:boolean}){
   const query=useCellData<{authors:Author[];organizations?:string[]}>(cellId,"/authors"),invite=useCellAction(cellId),remove=useCellAction(cellId);
   const [target,setTarget]=useState(""),[sent,setSent]=useState(""),[selected,setSelected]=useState<Author|null>(null);
   const {me}=useSession();
   const orgAction=useCellAction(cellId);
-  const canInvitePeople=canManage||(personal&&query.data?.authors.some(a=>a.account.uuid===me?.uuid));
+  const canInvitePeople=canManage||(personal&&(!hasOrganizationAuthors||query.data?.authors.some(a=>a.account.uuid===me?.uuid)));
   return <Stack gap={8}><OrganizationAuthors organizations={query.data?.organizations??[]} canManage={active&&canManage}
     invite={org=>orgAction.request("/authors","POST",{target:`org:${org}`})}
     remove={org=>orgAction.request(`/organization-authors/${org}`,"DELETE")}/><Section title="Authors" description="Authors share control of this cell."><Stack><Failure error={query.error}/>{query.isPending?<p role="status">Loading authors…</p>:query.data?.authors.map(a=><Surface key={a.account.uuid}><Cluster justify="between"><div><SavedPerson person={a.account}/><p className={styles.muted}>{a.account.id} · Joined {date(a.joined_at)}</p></div>{active&&(canManage||a.account.uuid===me?.uuid)&&<Button variant="ghost" onClick={()=>setSelected(a)}>Remove</Button>}</Cluster></Surface>)}</Stack></Section>

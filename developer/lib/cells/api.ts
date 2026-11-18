@@ -1,7 +1,7 @@
 /** The developer browser uses only its same-origin BFF, never Accounts tokens. */
 import { ApiError } from "@/lib/api/errors";
 export interface Cell {
-  created_by?:string|null; organization_id?:string|null;organization_name?:string|null;organization_access?:import("@/components/organizations/api").ResourcePolicy;permissions?:Record<"read"|"edit"|"publish"|"manage",boolean>;
+  author_organizations?:string[]; created_by?:string|null; organization_id?:string|null;organization_name?:string|null;organization_access?:import("@/components/organizations/api").ResourcePolicy;permissions?:Record<"read"|"edit"|"publish"|"manage",boolean>;
   uuid: string; cell_id: string; name: string; status: string; url: string; auth_url?: string;
   created_at: string; deleted_at: string | null;
   settings: {allowed_origins: string[]; redirect_urls: string[]};
