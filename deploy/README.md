@@ -186,3 +186,11 @@ used. Caddy kept running from a deleted release's binary, byte-identical to the 
 next restart starts `/opt/accounts/current/bin/caddy`. Keep only a few releases from now on: each
 is about 470 MB on a 40 GB disk.
 
+## Developer site: historical 1–2 character app ids (PR 1) — 2026-11-13
+
+Release `accounts-dev1-c985cdd` changes only the developer site: its Silicon Apps proxy accepts app ids of 1 to
+30 characters, so the live `dm` app opens there (teamofsilicons/silicon-accounts#1). API binaries and
+the account site are release `accounts-sui05-fb03b11`'s exact files. Schema unchanged at 38;
+verified backup `backups/predeploy-redesign-20261113T200453Z.dump` first; SSM command `d18a3d81-ce23-4071-9815-df7a2b04e777`. Checked live:
+`/api/apps/apps/dm` answers 401 signed_out like any other id, no longer 404 not_proxied.
+
