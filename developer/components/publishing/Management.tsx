@@ -1,5 +1,6 @@
 "use client";
-import {OrganizationAuthors} from "@/components/organizations/organization-authors";
+import { OrganizationAuthors, organizationInviteTarget } from "@/components/organizations/organization-authors";
+import SegmentedControl from "@/components/silicon-ui/segmented-control/segmented-control";
 import {PersonField, SavedPerson} from "@/components/people/person-field";
 
 import { useState } from "react";
@@ -346,6 +347,8 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
     refresh();
   });
   const [to, setTo] = useState("");
+  const [organization, setOrganization] = useState("");
+  const [recipientType, setRecipientType] = useState("person");
   const [message, setMessage] = useState("");
   const [confirm, setConfirm] = useState<{
     title: string;
@@ -354,34 +357,65 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
   } | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const list = authors.data?.items || app.authors;
-  const canInvitePeople = app.is_admin || (!app.organization_id && list.some(author => author.uuid === account?.uuid));
+  const canInvite = app.is_admin || (!app.organization_id && list.some(author => author.uuid === account?.uuid));
+  const excludedRecipients = new Set([
+    ...list.flatMap(author => [author.uuid, author.id]),
+    ...(invites.data?.items ?? []).filter(invite => invite.status === "pending").flatMap(invite => [invite.to, invite.account_uuid]),
+  ].filter((id): id is string => !!id).map(id => id.toLowerCase()));
+  const invitingOrganization = recipientType === "organization";
+  const organizationId = organizationInviteTarget(organization);
+  const destination = invitingOrganization ? (organizationId && `org:${organizationId}`) : to.trim();
   return (
     <>
       <Section
         title="Build with others"
-        description="Invite Carbons and Silicons to become co-authors. They appear on your app after accepting, and every author can contribute."
+        description="Invite a Carbon, Silicon or organization to co-author this app."
       >
+        <fieldset className="invite-recipient" disabled={mutation.pending}>
+          <SegmentedControl
+            label="Invitation recipient"
+            options={[{ value: "person", label: "Person" }, { value: "organization", label: "Organization" }]}
+            value={recipientType}
+            onValueChange={value => {
+              setRecipientType(value);
+              setMessage("");
+              mutation.clearError();
+            }}
+          />
+        </fieldset>
         <form
           className="invite-form"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (!canInvite || !destination || mutation.pending) return;
             const result = await mutation.run(() =>
               api(`/apps/${app.app_id}/invites`, {
                 method: "POST",
-                body: { to },
+                body: { to: destination },
               }),
             );
             if (result) {
-              setMessage(`Invitation created for ${to}.`);
-              setTo("");
+              if (invitingOrganization) {
+                setMessage(`Invitation sent to ${organizationId}.`);
+                setOrganization("");
+              } else {
+                setMessage(`Invitation created for ${destination}.`);
+                setTo("");
+              }
             }
           }}
         >
-          <PersonField label="Invite an author" value={to} onChange={setTo} placeholder="c:alice, si:assistant, or email address" disabled={!canInvitePeople}/>
-          <Button type="submit" disabled={!canInvitePeople} loading={mutation.pending}>
-            <UserPlus size={16} /> Send invitation
+          {invitingOrganization ? (
+            <Input label="Organization ID" value={organization} onChange={event => setOrganization(event.target.value)}
+              placeholder="studio or org:studio" autoCapitalize="none" spellCheck={false} disabled={!canInvite || mutation.pending}/>
+          ) : (
+            <PersonField label="Invite an author" value={to} onChange={setTo} excludedRecipients={excludedRecipients} placeholder="c:alice, si:assistant, or email address" disabled={!canInvite || mutation.pending}/>
+          )}
+          <Button className="invite-submit" type="submit" disabled={!canInvite || !destination} loading={mutation.pending}>
+            <UserPlus size={16} /> {invitingOrganization ? "Invite organization" : "Send invitation"}
           </Button>
         </form>
+        {!canInvite && <p className="muted">An app manager can send author invitations.</p>}
         {message && (
           <p className="success" role="status">
             {message}
@@ -390,7 +424,6 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
         <ErrorNotice error={mutation.error} />
         <ErrorNotice error={authors.error} retry={authors.reload} />
         <OrganizationAuthors organizations={authors.data?.organizations??app.author_organizations??[]} canManage={app.is_admin}
-          invite={async org=>{await api(`/apps/${app.app_id}/invites`,{method:"POST",body:{to:`org:${org}`}});invites.reload();}}
           remove={async org=>{await api(`/apps/${app.app_id}/organization-authors/${org}`,{method:"DELETE"});authors.reload();refresh();}}/>
         <div className="members-list">
           {list.map((author) => (

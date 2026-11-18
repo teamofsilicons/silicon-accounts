@@ -31,7 +31,7 @@ instead of `middleware.ts`, async `params`, `PageProps`/`LayoutProps` from `next
 
 Work accounts default to their home organization in the Apps, Interfaces and Cells creation forms. The organization needs to grant the signed-in account Create permission for that resource type. Select **Personal account** to choose a different publisher. Organization owners and admins can open the **Organization** navigation tab to configure grants for accounts and teams.
 
-Open **Authors** on an app or Cell, or **Creators** on an interface. In **Organization authors**, enter the recipient organization ID and choose **Invite organization**. A recipient with Manage permission for the resource type can accept in **Invitations**. Members use their organization's current publishing permissions, and a host manager can remove the organization from the same tab. This workflow keeps the original publisher.
+On an app, open **Authors** and choose **Organization** next to **Person**. On a Cell, open **Authors → Organization authors**. On an interface, open **Creators → Organization authors**. Enter the recipient organization ID and choose **Invite organization**. A recipient with Manage permission for the resource type can accept in **Invitations**. Members use their organization's current publishing permissions, and a host manager can remove the organization from the same tab. This workflow keeps the original publisher.
 
 App and interface managers can open **Settings**, type the resource ID and choose **Delete**. Each resource's home page lists deleted items and offers **Restore** for 30 days. The ID stays reserved. Cells use their existing **Settings** deletion and restore flow.
 

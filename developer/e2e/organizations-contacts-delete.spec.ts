@@ -241,7 +241,11 @@ test('an invite can use saved contacts without leaving the form', async ({ page 
   await expect(input).toBeVisible();
   await expect(page.getByRole('button', {name:'Use saved contacts'})).toHaveCount(0);
   await input.focus();
-  await page.getByRole('button', {name:'Use saved contacts'}).click();
+  const connect = page.getByRole('button', {name:'Use saved contacts'});
+  await expect(connect).toBeVisible();
+  await input.press('Tab');
+  await expect(connect).toBeFocused();
+  await connect.press('Enter');
   await page.getByRole('dialog', {name:'Use your saved contacts?'}).getByRole('button', {name:'Allow access'}).click();
   await input.fill('assistnt');
   await page.getByRole('option', {name:/Saved Assistant/}).click();
@@ -295,11 +299,68 @@ test('organization invitations use the organization ID in each resource workspac
   });
   for(const url of ['/apps/test-app/authors','/interfaces/demo#interface-creators','/cells/demo/authors']) {
     await page.goto(url);
+    if (url.startsWith('/apps/')) await page.getByRole('button', {name:'Organization', exact:true}).click();
     await page.getByLabel('Organization ID',{exact:true}).fill('org:guest-studio');
     await page.getByRole('button',{name:'Invite organization',exact:true}).click();
     await expect(page.getByText('Invitation sent to guest-studio.')).toBeVisible();
   }
   expect(targets).toEqual(['org:guest-studio','org:guest-studio','org:guest-studio']);
+});
+
+for (const width of [1440, 390]) {
+  test(`people suggestions stay anchored without moving the invitation form at ${width}px`, async ({page}) => {
+    await page.setViewportSize({width, height: 800});
+    await page.emulateMedia({reducedMotion: 'reduce'});
+    await platform(page);
+    await page.route('**/api/apps/apps/test-app/authors', route => route.fulfill({
+      json: {items: [...makeApp().authors, {uuid:other, id:'c:recent', display_name:'Recent Person'}]},
+    }));
+    await page.goto('/apps/test-app/authors');
+    const field = page.getByRole('combobox', {name: 'Invite an author'});
+    const send = page.getByRole('button', {name: 'Send invitation'});
+    const pending = page.getByRole('heading', {name: 'Pending invitations'});
+    const top = (element: Element) => element.getBoundingClientRect().top + window.scrollY;
+    await field.evaluate(element => element.scrollIntoView({block: 'center'}));
+    const originalSend = await send.evaluate(top);
+    const originalPending = await pending.evaluate(top);
+    await field.focus();
+    const list = page.getByRole('listbox', {name:'People suggestions'});
+    await expect(list.getByRole('option').first()).toBeVisible();
+    await expect(list.getByRole('option', {name:/Recent Person/})).toHaveCount(0);
+    expect(Math.abs(await send.evaluate(top) - originalSend)).toBeLessThanOrEqual(1);
+    expect(Math.abs(await pending.evaluate(top) - originalPending)).toBeLessThanOrEqual(1);
+    const menu = (await list.boundingBox())!;
+    expect(menu.x).toBeGreaterThanOrEqual(0);
+    expect(menu.x + menu.width).toBeLessThanOrEqual(width);
+    expect(menu.y).toBeGreaterThanOrEqual(0);
+    expect(menu.y + menu.height).toBeLessThanOrEqual(800);
+    await field.press('ArrowDown');
+    await field.press('Enter');
+    await expect(field).toHaveValue('si:assistant');
+    await expect(list).toBeHidden();
+    expect(Math.abs(await send.evaluate(top) - originalSend)).toBeLessThanOrEqual(1);
+    await field.click();
+    await expect(list).toBeVisible();
+    await field.press('Escape');
+    await expect(list).toBeHidden();
+    await page.getByRole('button', {name:'Organization', exact:true}).click();
+    await page.getByLabel('Organization ID', {exact:true}).fill('studio');
+    await expect(page.getByRole('button', {name:'Invite organization', exact:true})).toBeEnabled();
+    await expect(list).toBeHidden();
+  });
+}
+
+test('organization members without app management cannot send invitations', async ({page}) => {
+  const changes = await mock(page, true, {
+    is_admin: false, is_author: true, organization_id: 'studio',
+    permissions: {read:true,edit:true,publish:false,manage:false},
+  });
+  await page.goto('/apps/test-app/authors');
+  await page.getByRole('button', {name:'Organization', exact:true}).click();
+  await expect(page.getByLabel('Organization ID', {exact:true})).toBeDisabled();
+  await expect(page.getByRole('button', {name:'Invite organization', exact:true})).toBeDisabled();
+  await expect(page.getByText('An app manager can send author invitations.')).toBeVisible();
+  expect(changes.filter(change => change.path.endsWith('/invites'))).toHaveLength(0);
 });
 
 test('interface Settings checks management permission, confirms the ID and restores the deleted item',async({page})=>{

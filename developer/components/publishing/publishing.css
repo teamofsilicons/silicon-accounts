@@ -661,9 +661,25 @@
 .publishing-panel .unsupported-reason {
   white-space: pre-wrap;
 }
+.publishing-panel .invite-recipient {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 0 var(--space-group);
+  padding: 0;
+  border: 0;
+}
+/* The input and submit button share a row. Contact details flow after the controls. */
+.publishing-panel .invite-form > [data-person-field] {
+  display: contents;
+}
+.publishing-panel .invite-submit {
+  grid-column: 2;
+  grid-row: 1;
+}
 .publishing-panel .invite-form {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 14px;
   max-width: 680px;
@@ -911,7 +927,9 @@
     grid-template-columns: 1fr;
     gap: 16px;
   }
-  .publishing-panel .invite-form button {
+  .publishing-panel .invite-submit {
+    grid-column: 1;
+    grid-row: 2;
     justify-self: start;
   }
   .publishing-panel .invitation {

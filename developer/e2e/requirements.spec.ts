@@ -204,6 +204,14 @@ test("non-admin authors can invite and rotate but cannot alter access or remove 
   expect(changes.find((x) => x.path.endsWith("/invites"))?.body).toEqual({
     to: "person@example.com",
   });
+  await page.getByRole("button", { name: "Organization", exact: true }).click();
+  const orgId = page.getByLabel("Organization ID", { exact: true });
+  const inviteOrganization = page.getByRole("button", { name: "Invite organization", exact: true });
+  await expect(inviteOrganization).toBeDisabled();
+  await orgId.fill("org:Studio");
+  await inviteOrganization.click();
+  await expect(page.getByText("Invitation sent to studio.")).toBeVisible();
+  expect(changes.filter(change => change.path.endsWith("/invites")).at(-1)?.body).toEqual({to:"org:studio"});
   expect(changes.filter((x) => x.path.endsWith("/access"))).toHaveLength(0);
 });
 

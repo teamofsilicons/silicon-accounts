@@ -1,1 +1,42 @@
-.field{position:relative;display:grid;gap:8px}.list{display:grid;gap:4px;max-height:280px;overflow:auto;padding:6px;border:1px solid var(--border-subtle,#ddd);background:var(--surface,#fff)}.person{display:flex;align-items:center;gap:10px;padding:8px;text-align:left;color:inherit;background:transparent;border:0;cursor:pointer;width:100%}.person[aria-selected=true]{background:var(--surface-hover,#eee)}.avatar{width:36px;height:36px;flex-shrink:0;object-fit:cover;clip-path:circle(50%)}.initial{display:grid;place-items:center;background:var(--surface-muted,#eee);font-size:13px}.detail{display:grid;gap:2px;min-width:0}.detail small,.hint{font-size:12px;color:var(--text-secondary,#666)}.selected{border:1px solid var(--border-subtle,#ddd);padding:10px;display:grid;gap:10px}.editor{display:grid;gap:10px}.list button:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+.field {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-related);
+}
+.popup {
+  --sq-r: var(--radius-container);
+  --sq-fill: var(--surface-raised);
+  --sq-stroke: var(--border);
+  z-index: 80;
+  display: grid;
+  width: var(--radix-popover-trigger-width);
+  max-width: var(--radix-popover-content-available-width);
+  max-height: min(20rem, var(--radix-popover-content-available-height));
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-tight);
+  border: 1px solid var(--sq-stroke);
+  background: var(--sq-fill);
+  color: var(--foreground);
+  box-shadow: var(--shadow-floating);
+}
+.list {
+  display: grid;
+  min-width: 0;
+}
+.popup .person:hover, .popup .person[aria-selected="true"] {
+  background: var(--surface-muted);
+}
+.popup .detail strong, .popup .detail small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connect {
+  justify-self: start;
+}
+.list + .connect, .popup .hint {
+  margin-block-start: var(--space-tight);
+}
+.person{display:flex;align-items:center;gap:10px;padding:8px;text-align:left;color:inherit;background:transparent;border:0;cursor:pointer;width:100%}.avatar{width:36px;height:36px;flex-shrink:0;object-fit:cover;clip-path:circle(50%)}.initial{display:grid;place-items:center;background:var(--surface-muted,#eee);font-size:13px}.detail{display:grid;gap:2px;min-width:0}.detail small,.hint{font-size:12px;color:var(--text-secondary,#666)}.selected{border:1px solid var(--border-subtle,#ddd);padding:10px;display:grid;gap:10px}.editor{display:grid;gap:10px}.list button:focus-visible{outline:2px solid currentColor;outline-offset:-2px}

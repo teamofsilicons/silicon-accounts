@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useId,useRef,useState} from 'react';
 import Image from 'next/image';
+import * as Popover from '@radix-ui/react-popover';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {Input} from '@/components/silicon-ui/input/input';
 import {Button} from '@/components/silicon-ui/button/button';
@@ -38,46 +39,144 @@ function useSelectedPerson(value: string, data: ReturnType<typeof usePeople>) {
  return mergePeople(history ? [history, profile] : [profile], contact ? [contact] : [])[0];
 }
 
-export function PersonField({value,onChange,label='Carbon, Silicon or email',placeholder='c:name or si:name',disabled=false,onSelect,allowContactEditing=true}:{allowContactEditing?:boolean;value:string;onChange:(v:string)=>void;label?:string;placeholder?:string;disabled?:boolean;onSelect?:(p:Person)=>void}){
- const id=useId();const [open,setOpen]=useState(false),[requesting,setRequesting]=useState(false),[index,setIndex]=useState(0),[editing,setEditing]=useState(false);
- const field = useRef<HTMLDivElement>(null);
- const data=usePeople(open || !!value.trim());
- const selected=useSelectedPerson(value,data);
- // Finish an outside click before an inline suggestion disappears and shifts its target.
- useEffect(() => {
-   if (!open) return;
-   let pressing = false;
-   function closeOutside(event: Event) {
-     if (event.target instanceof Node && !field.current?.contains(event.target)) setOpen(false);
-   }
-   function press() { pressing = true; }
-   function release() { pressing = false; }
-   function focus(event: FocusEvent) { if (!pressing) closeOutside(event); }
-   document.addEventListener("pointerdown", press, true);
-   document.addEventListener("pointerup", release, true);
-   document.addEventListener("pointercancel", release, true);
-   document.addEventListener("focusin", focus, true);
-   document.addEventListener("click", closeOutside);
-   return () => {
-     document.removeEventListener("pointerdown", press, true);
-     document.removeEventListener("pointerup", release, true);
-     document.removeEventListener("pointercancel", release, true);
-     document.removeEventListener("focusin", focus, true);
-     document.removeEventListener("click", closeOutside);
-   };
- }, [open]);
- const matches=data.people.filter(p=>fuzzyMatch(value,[p.id,p.display_name,p.uuid,p.contact?.email].filter(Boolean).join(' '))).slice(0,8);
- const suggestions = selected && !matches.some(person => person.uuid === selected.uuid)
-   ? [selected, ...matches].slice(0, 8)
-   : matches.map(person => person.uuid === selected?.uuid ? selected : person);
- const choose=(p:Person)=>{onChange(p.id||p.uuid);onSelect?.(p);setOpen(false);setEditing(false);};
- return <div className={styles.field} ref={field}><Input label={label} placeholder={placeholder} value={value} disabled={disabled} autoComplete='off' role='combobox' aria-autocomplete='list' aria-expanded={open&&suggestions.length>0} aria-controls={`${id}-list`} aria-activedescendant={open&&suggestions.length?`${id}-${Math.min(index,suggestions.length-1)}`:undefined} onFocus={()=>setOpen(true)} onChange={e=>{onChange(e.target.value);setOpen(true);setIndex(0);setEditing(false);}} onKeyDown={e=>{if(e.key==='Escape'&&open){e.stopPropagation();setOpen(false);}if(e.key==='ArrowDown'){e.preventDefault();setOpen(true);setIndex(i=>Math.max(0,Math.min(i+1,suggestions.length-1)));}if(e.key==='ArrowUp'){e.preventDefault();setIndex(i=>Math.max(0,i-1));}if(e.key==='Enter'&&open&&suggestions[index]){e.preventDefault();choose(suggestions[index]);}}}/>
- {open&&suggestions.length>0&&<div id={`${id}-list`} role='listbox' aria-label='People suggestions' className={styles.list} data-sq='surface'>{suggestions.map((p,i)=><button id={`${id}-${i}`} key={p.uuid} className={styles.person} role='option' aria-selected={index===i} type='button' onMouseDown={e=>e.preventDefault()} onClick={()=>choose(p)}><PersonLabel person={p}/></button>)}</div>}
- {open&&!disabled&&data.accountUuid&&data.connection.data?.connected===false&&<Button type="button" variant="ghost" size="sm" onMouseDown={event=>event.preventDefault()} onClick={()=>{setOpen(false);setRequesting(true);}}>Use saved contacts</Button>}
- {requesting&&<ContactAccess onGranted={()=>setRequesting(false)} onCancel={()=>setRequesting(false)}/>}
- {selected&&<div className={styles.selected} data-sq='surface'><div className={styles.person}><PersonLabel person={selected}/></div>{allowContactEditing&&data.connection.data?.connected&&<><Button type='button' variant='secondary' disabled={disabled} onClick={()=>setEditing(!editing)}>{selected.contact?'Edit saved contact':'Save to Contacts'}</Button>{editing&&<ContactEditor key={selected.uuid} person={selected} onSaved={()=>setEditing(false)}/>}</>}</div>}
- {open&&data.history.data?.partial&&<p className={styles.hint}>Some invitation history is temporarily unavailable.</p>}
- </div>;
+type PersonFieldProps = {
+  value: string;
+  onChange: (value: string) => void;
+  label?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  onSelect?: (person: Person) => void;
+  allowContactEditing?: boolean;
+  excludedRecipients?: ReadonlySet<string>;
+};
+
+export function PersonField({
+  value, onChange, label = 'Carbon, Silicon or email', placeholder = 'c:name or si:name',
+  disabled = false, onSelect, allowContactEditing = true, excludedRecipients,
+}: PersonFieldProps) {
+  const id = useId();
+  const anchor = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const contactsAction = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [dialog, setDialog] = useState<HTMLElement | null>(null);
+  const [index, setIndex] = useState(-1);
+  const [requesting, setRequesting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const data = usePeople(open || !!value.trim());
+  const selected = useSelectedPerson(value, data);
+  const available = (person: Person) => !excludedRecipients || ![person.uuid, person.id, person.contact?.email]
+    .some(identity => identity && excludedRecipients.has(identity.toLowerCase()));
+  const matches = data.people.filter(person => available(person) &&
+    fuzzyMatch(value, [person.id, person.display_name, person.uuid, person.contact?.email].filter(Boolean).join(' ')),
+  ).slice(0, 8);
+  const suggestions = selected && available(selected) && !matches.some(person => person.uuid === selected.uuid)
+    ? [selected, ...matches].slice(0, 8)
+    : matches.map(person => person.uuid === selected?.uuid ? selected : person);
+  const offerContacts = !!data.accountUuid && data.connection.data?.connected === false &&
+    (!value.trim() || suggestions.length > 0);
+  const partial = data.history.data?.partial;
+  const visible = open && !disabled && (suggestions.length > 0 || offerContacts || !!partial);
+  const active = visible && index >= 0 && index < suggestions.length ? index : -1;
+
+  useEffect(() => {
+    if (active >= 0) document.getElementById(`${id}-${active}`)?.scrollIntoView({block: 'nearest'});
+  }, [active, id]);
+
+  function choose(person: Person) {
+    onChange(person.id || person.uuid);
+    onSelect?.(person);
+    setOpen(false);
+    setIndex(-1);
+    setEditing(false);
+  }
+
+  return <div className={styles.field} data-person-field>
+    <Popover.Root open={visible} onOpenChange={setOpen}>
+      <Popover.Anchor asChild>
+        <div ref={anchor}>
+          <Input ref={input} label={label} placeholder={placeholder} value={value} disabled={disabled}
+            autoComplete="off" role="combobox" aria-autocomplete="list"
+            aria-expanded={visible && suggestions.length > 0}
+            aria-controls={visible && suggestions.length ? `${id}-list` : undefined}
+            aria-activedescendant={active >= 0 ? `${id}-${active}` : undefined}
+            onFocus={event => {
+              setDialog(event.currentTarget.closest<HTMLElement>('[role="dialog"], dialog'));
+              setOpen(true);
+              setIndex(-1);
+            }}
+            onClick={() => setOpen(true)}
+            onBlur={event => {
+              if (!panel.current?.contains(event.relatedTarget)) setOpen(false);
+            }}
+            onChange={event => {
+              onChange(event.target.value);
+              setOpen(true);
+              setIndex(-1);
+              setEditing(false);
+            }}
+            onKeyDown={event => {
+              if (event.key === 'Tab' && !event.shiftKey && visible && contactsAction.current) {
+                event.preventDefault();
+                contactsAction.current.focus();
+              } else if (event.key === 'Escape' && open) {
+                event.preventDefault();
+                event.stopPropagation();
+                setOpen(false);
+              } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                setOpen(true);
+                const last = suggestions.length - 1;
+                setIndex(event.key === 'ArrowDown' ? Math.min(active + 1, last) : active < 0 ? last : Math.max(0, active - 1));
+              } else if (event.key === 'Enter' && active >= 0) {
+                event.preventDefault();
+                choose(suggestions[active]);
+              }
+            }}/>
+        </div>
+      </Popover.Anchor>
+      <Popover.Portal container={dialog}>
+        <Popover.Content ref={panel} role="presentation" className={styles.popup} data-sq="surface"
+          align="start" sideOffset={4} collisionPadding={8}
+          onOpenAutoFocus={event => event.preventDefault()}
+          onCloseAutoFocus={event => event.preventDefault()}
+          onInteractOutside={event => { if (anchor.current?.contains(event.target as Node)) event.preventDefault(); }}>
+          {suggestions.length > 0 && <div id={`${id}-list`} role="listbox" aria-label="People suggestions" className={styles.list}>
+            {suggestions.map((person, i) => (
+              <button id={`${id}-${i}`} key={person.uuid} className={styles.person} role="option"
+                aria-selected={active === i} type="button" tabIndex={-1}
+                onMouseDown={event => event.preventDefault()} onClick={() => choose(person)}>
+                <PersonLabel person={person}/>
+              </button>
+            ))}
+          </div>}
+          {offerContacts && <Button ref={contactsAction} type="button" variant="ghost" size="sm" className={styles.connect}
+            onKeyDown={event => {
+              if (event.key !== 'Tab' && event.key !== 'Escape') return;
+              event.stopPropagation();
+              if (event.shiftKey || event.key === 'Escape') event.preventDefault();
+              input.current?.focus({preventScroll: true});
+              if (!event.shiftKey) setOpen(false);
+            }}
+            onMouseDown={event => event.preventDefault()} onClick={() => { setOpen(false); setRequesting(true); }}>
+            Use saved contacts
+          </Button>}
+          {partial && <p className={styles.hint}>Some invitation history is temporarily unavailable.</p>}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+    {requesting && <ContactAccess onGranted={() => setRequesting(false)} onCancel={() => setRequesting(false)}/>}
+    {selected && <div className={styles.selected} data-sq="surface">
+      <div className={styles.person}><PersonLabel person={selected}/></div>
+      {allowContactEditing && data.connection.data?.connected && <>
+        <Button type="button" variant="secondary" disabled={disabled} onClick={() => setEditing(!editing)}>
+          {selected.contact ? 'Edit saved contact' : 'Save to Contacts'}
+        </Button>
+        {editing && <ContactEditor key={selected.uuid} person={selected} onSaved={() => setEditing(false)}/>}
+      </>}
+    </div>}
+  </div>;
 }
 
 export function SavedPerson({person}:{person:Person}){const {people}=usePeople();const saved=people.find(p=>p.uuid===person.uuid);return <span className={styles.person}><PersonLabel person={{...person,...saved}}/></span>;}
