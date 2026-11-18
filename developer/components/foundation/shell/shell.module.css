@@ -43,7 +43,9 @@
 .docsLink:hover, .docsLink:focus-visible { outline: none; --sq-fill: var(--surface-muted); color: var(--foreground); }
 .searchLabel { white-space: nowrap; }
 /* Narrow windows: the pages and the docs live in the account menu (and the palette). */
+.mobileOrg { display: none; }
 @media (max-width: 900px) {
+  .mobileOrg { display: inline-flex; }
   .nav, .docsLink { display: none; }
 }
 

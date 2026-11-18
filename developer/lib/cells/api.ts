@@ -36,7 +36,7 @@ export async function cellsRequest<T>(path: string, options: {method?: string; b
   return body as T;
 }
 export const cellsApi = {
-  create: (name:string,cellId:string,key:string,organization_id?:string)=>cellsRequest<CreatedCell>("/cells",{method:"POST",body:{name,cell_id:cellId,linked_apps:[],...(organization_id?{organization_id}:{})},key}),
+  create: (name:string,cellId:string,key:string,organization_id?:string|null)=>cellsRequest<CreatedCell>("/cells",{method:"POST",body:{name,cell_id:cellId,linked_apps:[],organization_id},key}),
   get: (cell:string,signal?:AbortSignal)=>cellsRequest<{cell:Cell}>(`/cells/${encodeURIComponent(cell)}`,{signal}),
   list: (signal?: AbortSignal) => cellsRequest<{cells: Cell[]}>("/cells", {signal}),
   app: (app: string, signal?: AbortSignal) => cellsRequest<AppCell>(`/apps/${encodeURIComponent(app)}/cell`, {signal}),

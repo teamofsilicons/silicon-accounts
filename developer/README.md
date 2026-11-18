@@ -6,7 +6,7 @@ and setting up an app's authentication (its sign-in methods, Google and Apple, t
 pages, redirect URIs and allowed origins, its user base and imports, its webhook and deliveries, its app verifications, and the
 snippets to embed sign-in). The same app workspace also creates apps, saves seven setup steps, uploads and validates packages, manages releases and authors, and publishes through Silicon Apps. Each service retains its own backend. The portal contains no store catalog; discovery and installation live at apps.teamofsilicons.com.
 
-Your apps combines all pages of the Accounts configuration list and the Silicon Apps author list. Publishing-only apps, including Silicon Accounts itself, expose Publishing, Releases, Authors and History after Apps confirms authorship. Their protected Accounts configuration remains inaccessible; publishing authorship does not grant access to it.
+Your apps combines all pages of the Accounts configuration list and the Silicon Apps author list. Publishing-only apps, including Silicon Accounts itself, expose Publishing, Releases, Authors, History and Settings after Apps confirms authorship. Their protected Accounts configuration remains inaccessible; publishing authorship does not grant access to it.
 
 Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI, TanStack Query. The
 product contract is `../understanding/UNDERSTANDING.md` (never edited here); nothing in this app overrides it. Runtime-independent from the rest of this repository: documentation sources are bundled at build time.
@@ -26,6 +26,14 @@ pnpm test:production-routing # after pnpm build: standalone routing with Caddy H
 
 Node 24 or newer. Read the bundled Next docs in `node_modules/next/dist/docs/` before relying on memory (`proxy.ts`
 instead of `middleware.ts`, async `params`, `PageProps`/`LayoutProps` from `next typegen`).
+
+## Organization ownership and resource settings
+
+Work accounts default to their home organization in the Apps, Interfaces and Cells creation forms. The organization needs to grant the signed-in account Create permission for that resource type. Select **Personal account** to choose a different publisher. Organization owners and admins can open the **Organization** navigation tab to configure grants for accounts and teams.
+
+Open **Authors** on an app or Cell, or **Creators** on an interface. In **Organization authors**, enter the recipient organization ID and choose **Invite organization**. A recipient with Manage permission for the resource type can accept in **Invitations**. Members use their organization's current publishing permissions, and a host manager can remove the organization from the same tab. This workflow keeps the original publisher.
+
+App and interface managers can open **Settings**, type the resource ID and choose **Delete**. Each resource's home page lists deleted items and offers **Restore** for 30 days. The ID stays reserved. Cells use their existing **Settings** deletion and restore flow.
 
 ## Topology: a BFF
 

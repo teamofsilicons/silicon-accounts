@@ -22,8 +22,8 @@ export function useCellAction(id:string){
   const cache=useQueryClient(),pending=useRef(false);
   const operations=useRef(new Map<string,string>());
   const [busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null);
-  async function run<T>(tail:string,method:string,body?:unknown):Promise<T|undefined>{
-    if(pending.current)return undefined;
+  async function request<T>(tail:string,method:string,body?:unknown):Promise<T>{
+    if(pending.current)throw new Error("A change is already being saved.");
     pending.current=true;setBusy(true);setError(null);
     try{
       const bytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify([tail,method,body])));
@@ -36,10 +36,14 @@ export function useCellAction(id:string){
       void cache.invalidateQueries({queryKey:["cells",id]});
       void cache.invalidateQueries({queryKey:["cells","list"]});
       return result;
-    }catch(cause){setError(cause);return undefined;}
-    finally{pending.current=false;setBusy(false);}
+    }finally{pending.current=false;setBusy(false);}
   }
-  return {run,busy,error};
+  async function run<T>(tail:string,method:string,body?:unknown):Promise<T|undefined>{
+    if(pending.current)return undefined;
+    try{return await request<T>(tail,method,body);}
+    catch(cause){setError(cause);return undefined;}
+  }
+  return {run,request,busy,error};
 }
 export function bytes(value:number){
   if(value<1024)return `${value} B`;

@@ -1,4 +1,5 @@
 "use client";
+import {OrganizationAuthors} from "@/components/organizations/organization-authors";
 import {PersonField, SavedPerson} from "@/components/people/person-field";
 
 import { useState } from "react";
@@ -333,7 +334,7 @@ export function Releases({
 export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
   const navigate = useNavigate();
   const { account } = useSession();
-  const authors = useResource<{ items: Author[] }>(
+  const authors = useResource<{ items: Author[]; organizations?: string[] }>(
     `/apps/${app.app_id}/authors`,
   );
   const invites = useResource<{ items: Invite[] }>(
@@ -353,6 +354,7 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
   } | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const list = authors.data?.items || app.authors;
+  const canInvitePeople = app.is_admin || (!app.organization_id && list.some(author => author.uuid === account?.uuid));
   return (
     <>
       <Section
@@ -375,8 +377,8 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
             }
           }}
         >
-          <PersonField label="Invite an author" value={to} onChange={setTo} placeholder="c:alice, si:assistant, or email address" disabled={!!app.organization_id&&!app.permissions?.manage}/>
-          <Button type="submit" disabled={!!app.organization_id&&!app.permissions?.manage} loading={mutation.pending}>
+          <PersonField label="Invite an author" value={to} onChange={setTo} placeholder="c:alice, si:assistant, or email address" disabled={!canInvitePeople}/>
+          <Button type="submit" disabled={!canInvitePeople} loading={mutation.pending}>
             <UserPlus size={16} /> Send invitation
           </Button>
         </form>
@@ -387,6 +389,9 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
         )}
         <ErrorNotice error={mutation.error} />
         <ErrorNotice error={authors.error} retry={authors.reload} />
+        <OrganizationAuthors organizations={authors.data?.organizations??app.author_organizations??[]} canManage={app.is_admin}
+          invite={async org=>{await api(`/apps/${app.app_id}/invites`,{method:"POST",body:{to:`org:${org}`}});invites.reload();}}
+          remove={async org=>{await api(`/apps/${app.app_id}/organization-authors/${org}`,{method:"DELETE"});authors.reload();refresh();}}/>
         <div className="members-list">
           {list.map((author) => (
             <div className="member-row" key={author.uuid}>
@@ -640,7 +645,9 @@ export function Invitations() {
                             )
                           )
                             setMessage(
-                              `You are now an author of ${invite.app_id}. Find it in Your apps.`,
+                              invite.to.startsWith("org:")
+                                ? `${invite.to.slice(4)} is now an author of ${invite.app_id}.`
+                                : `You are now an author of ${invite.app_id}. Find it in Your apps.`,
                             );
                         }}
                       >

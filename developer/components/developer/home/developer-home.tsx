@@ -169,7 +169,7 @@ export function DeveloperHome() {
       ) : null}
       {content}
       <DeletedApps/>
-      <CreateApp open={newApp} close={() => { setNewApp(false); void owned.refetch(); void publishing.refetch(); }} />
+      {newApp && <CreateApp open close={() => { setNewApp(false); void owned.refetch(); void publishing.refetch(); }} />}
     </Page>
   );
 }
