@@ -58,6 +58,34 @@ test('delete requires app ID and supports restore in the workspace',async({page}
  await expect(page).toHaveURL(/\/apps$/);await expect(page.getByRole('heading',{name:'Deleted apps'})).toBeVisible();
  await page.getByRole('button',{name:'Restore app'}).click();await expect(page.getByRole('heading',{name:'Deleted apps'})).toHaveCount(0);expect(restored).toBe(true);
 });
+for (const service of ['cells', 'interfaces'] as const) {
+ test(`${service} invites show the resolved profile picture of a past invitee`, async ({page}) => {
+  await platform(page);
+  const profile = {uuid: other, id: 'c:recent', display_name: 'Recent Person', pfp_url: '/api/contacts/photos/public-portrait'};
+  await page.route('**/api/contacts/lookup?*', route => route.fulfill({json: profile}));
+  const resource = service === 'cells'
+    ? {cell: {cell_id: 'sample', name: 'Sample', status: 'active', settings: {allowed_origins: [], redirect_urls: []}}}
+    : {interface: {interface_id: 'sample', name: 'Sample', kind: 'unverified', revision: 1, app_ids: [], creators: [], releases: [], links: [], platforms: [], images: []}};
+  await page.route(`**/api/${service}/**`, route => {
+   const path = new URL(route.request().url()).pathname;
+   if (path.endsWith('/people')) return route.fallback();
+   if (path.endsWith('/sample')) return route.fulfill({json: resource});
+   const section = path.split('/').at(-1)!;
+   const data = section === 'readiness' ? {ready: false, missing: []} : section === 'history' ? {events: []} : {[section]: []};
+   return route.fulfill({json: data});
+  });
+  await page.goto(service === 'cells' ? '/cells/sample/authors' : '/interfaces/sample#interface-creators');
+  const field = page.getByRole('combobox', {name: /Carbon or Silicon ID/});
+  await field.fill('rcnt');
+  await page.getByRole('option', {name: /Recent Person/}).click();
+  await expect(field).toHaveValue(profile.id);
+  await expect(page.getByRole('listbox', {name: 'People suggestions'})).toBeHidden();
+  const photo = page.locator('img[src="/api/contacts/photos/public-portrait"]');
+  await expect(photo).toBeVisible();
+  await expect.poll(() => photo.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+ });
+}
+
 test('organization cell creation preserves publisher and omits credential reveal on mobile',async({page})=>{
  await page.setViewportSize({width:390,height:844});await platform(page);let body:Record<string,unknown>|undefined;
  await page.route('**/api/cells/**',async route=>{const req=route.request(),url=new URL(req.url());
