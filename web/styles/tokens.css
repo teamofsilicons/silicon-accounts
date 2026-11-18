@@ -97,9 +97,10 @@
      (display -.03em, body -.01em) and line heights (display 1.1, body 1.4) come from its styles.css untouched; only the
      title face is Hanken here too, where Silicon UI ships Geist. Silicon UI has no monospace, so code and ids use the
      system one. Every component reads these tokens, so the dev panel's type lab retypes the whole interface. */
-  /* Trying the system font as the site's face (Anil, 2026-11-09); Hanken was:
+  /* Trying Allo as the site's face (Anil, 2026-11-18, app/fonts.ts); before it the system font
+     (system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif), and before that Hanken:
      var(--font-hanken-grotesk, "Hanken Grotesk Variable"), sans-serif */
-  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: var(--font-allo, "Allo"), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: var(--font-body);
   --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
   /* Weights for our own text. Silicon UI's components keep their fixed 500 and 400 (prototype-differences.md). */
@@ -283,6 +284,13 @@
   --field-hint-size: var(--text-sm);
   --field-hint-colour: var(--text-secondary);
 }
+
+/* Allo's roundness, 0 (sharp) to 100 (round), at 20 to match the Apps store (Anil, 2026-11-18, silicon-apps
+   store/styles/base.css); faces without the axis ignore it. Set on every element and marked important, since the
+   `font` shorthand the type tokens use resets it to normal. It names only ROND, so weight and optical size still follow
+   font-weight and font-size. The dev tools keep the shipped type. */
+*, *::before, *::after { font-variation-settings: "ROND" 20 !important; }
+[data-type-inspect-exempt], [data-type-inspect-exempt] * { font-variation-settings: normal !important; }
 
 /* The dev tools' own text (development only: the dev panel, the type lab, the inspectors, all marked
    [data-type-inspect-exempt]) keeps Silicon UI's shipped type while the type lab changes the page's tokens, so the

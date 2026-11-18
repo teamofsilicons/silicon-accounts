@@ -95,5 +95,16 @@ const cooperHewitt = localFont({
   preload: false,
 });
 
+/**
+ * Allo (Josh Puckett, SIL OFL 1.1, assets/fonts/allo/OFL.txt), the site's face on trial (Anil, 2026-11-18): Inter 4.1
+ * redrawn, variable in weight, optical size and roundness (default 50; tune with font-variation-settings "ROND").
+ * Self-hosted from allo-font 1.0.1's AlloVariable.woff2 and preloaded, since it sets every page.
+ */
+const allo = localFont({
+  src: [{ path: "../assets/fonts/allo/AlloVariable.woff2", weight: "100 900", style: "normal" }],
+  variable: "--font-allo",
+  display: "swap",
+});
+
 /** The class names that put the site's two faces and the branding font variables on <html>. */
-export const brandFontVariables = [hankenGrotesk.variable, geist.variable, GeistSerif.variable, instrumentSerif.variable, jetbrainsMono.variable, inter.variable, workSans.variable, texGyreHeros.variable, liberationSans.variable, cooperHewitt.variable].join(" ");
+export const brandFontVariables = [allo.variable, hankenGrotesk.variable, geist.variable, GeistSerif.variable, instrumentSerif.variable, jetbrainsMono.variable, inter.variable, workSans.variable, texGyreHeros.variable, liberationSans.variable, cooperHewitt.variable].join(" ");

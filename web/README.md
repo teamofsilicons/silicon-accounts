@@ -192,6 +192,8 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   --space-section 16, --space-block 24, --space-page 32), and the title roles one step down (display 28, h1 22, h2 18,
   h3 16); text stays at 16. `:root[data-density="comfortable"]` holds the scale before; the dev panel's Look → Density
   sets it, kept in this browser (`accounts.dev.density`), to compare.
+- **Allo on trial** (2026-11-18): `--font-body` (and so `--font-display`) is Allo, self-hosted from
+  `assets/fonts/allo` as `--font-allo` in `app/fonts.ts`, with the system font behind it. The note below is the shipped type.
 - **Typography** (`styles/tokens.css`, `app/fonts.ts`, 2026-11-09): Silicon UI's typography as it ships, in Hanken
   Grotesk for text and titles (preloaded; Silicon UI ships Geist for titles). Its tokens are untouched: `--text-xs` to
   `--text-5xl` (12, 14, 16, 18, 22, 28, 36, 52, 72 px), `--tracking-display` -.03em and `--tracking-body` -.01em,
