@@ -203,7 +203,7 @@ const interactionScreens: ScreenSpec[] = [
   },
   { name: "auth-first-party", path: flowPath("silicon-accounts", "choose_method"), as: "signed-out", routes: flowRoutes, waitFor: READY },
   // After an account is deleted (the CarbonID comes from session storage; without it the page names none).
-  { name: "auth-goodbye", path: "/goodbye", as: "signed-out", waitFor: "h1:has-text(\"Your account is deleted\")" },
+  { name: "auth-goodbye", path: "/goodbye", as: "signed-out", waitFor: "h1:has-text(\"Account deletion requested\")" },
   {
     // No fake app uses a background image: briefcase with one (and a logo-only header), to see the image treatment.
     name: "auth-branding-image",
@@ -273,4 +273,19 @@ const deviceScreens: ScreenSpec[] = [
  */
 const errorScreens = process.env.SCREENS_ERRORS === "1" ? problemScreens : [];
 
-export const screens: ScreenSpec[] = [...stepScreens, ...extraScreens, ...interactionScreens, ...errorScreens, ...deviceScreens];
+/** An Interface asking to sign you in to two apps, one with a detail you may choose to share (/interface-authorize). */
+const interfaceQuery = new URLSearchParams({ interface_id: "potato", redirect_uri: "https://potato.example/callback", state: "s1", code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", code_challenge_method: "S256" });
+const interfaceFlow: MockRoute = ["POST /v1/interface-auth/flows", () => ({ json: {
+  flow_id: "if_1",
+  interface: { interface_id: "potato", name: "Potato", logo_url: null, branding: {} },
+  apps: [
+    { app_id: "briefcase", name: "Briefcase", logo_url: null, description: "Your files, kept in one place.", scopes: ["name", "email"], optional_scopes: ["phone"] },
+    { app_id: "dm", name: "DM", logo_url: null, description: null, scopes: ["name"], optional_scopes: [] },
+  ],
+  consent_required: true,
+} })];
+const interfaceScreens: ScreenSpec[] = [
+  { name: "auth-interface-authorize", path: `/interface-authorize?${interfaceQuery}`, routes: [interfaceFlow], waitFor: "h1:has-text(\"Continue to Potato\")" },
+];
+
+export const screens: ScreenSpec[] = [...stepScreens, ...extraScreens, ...interactionScreens, ...errorScreens, ...deviceScreens, ...interfaceScreens];

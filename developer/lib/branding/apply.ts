@@ -28,7 +28,8 @@ const px = (value: number) => `${Math.round(value * 100) / 100}px`;
 /** `url("…")` for https and data:image URLs only; anything else is ignored (the server allows https only). */
 function cssUrl(value: string | null): string | null {
   if (!value) return null;
-  if (!/^https:\/\//i.test(value) && !/^data:image\//i.test(value)) return null;
+  const interfacePreview = /^\/api\/interfaces\/interfaces\/[a-z0-9_-]{3,60}\/uploads\/[0-9a-f-]{36}$/i.test(value);
+  if (!/^https:\/\//i.test(value) && !/^data:image\//i.test(value) && !interfacePreview) return null;
   return `url(${JSON.stringify(value)})`;
 }
 
@@ -151,34 +152,6 @@ export function brandingAttributes(input: Branding | Partial<Branding> | null | 
     "data-density": branding.density,
     // styles/branding.css sets the Silicon Accounts look's heading weight from this.
     ...(isSiliconLook(branding) ? { "data-look": "silicon" } : {}),
-  };
-}
-
-const applied = new WeakMap<HTMLElement, { vars: string[]; attrs: string[] }>();
-
-/**
- * Paints `branding` in `theme` onto `el` imperatively (for code without React) and returns a function that removes
- * it again. Calling it again on the same element replaces the previous branding, so it can follow a live draft.
- */
-export function applyBranding(el: HTMLElement, branding: Branding | Partial<Branding> | null | undefined, theme: PaintTheme): () => void {
-  const vars = brandingVariables(branding, theme);
-  const attrs = brandingAttributes(branding, theme);
-  const previous = applied.get(el);
-  if (previous) {
-    for (const name of previous.vars) if (!(name in vars)) el.style.removeProperty(name);
-    for (const name of previous.attrs) if (!(name in attrs)) el.removeAttribute(name);
-  }
-  for (const [name, value] of Object.entries(vars)) el.style.setProperty(name, value);
-  for (const [name, value] of Object.entries(attrs)) el.setAttribute(name, value);
-  el.style.colorScheme = theme;
-  applied.set(el, { vars: Object.keys(vars), attrs: Object.keys(attrs) });
-  return () => {
-    const current = applied.get(el);
-    if (!current) return;
-    for (const name of current.vars) el.style.removeProperty(name);
-    for (const name of current.attrs) el.removeAttribute(name);
-    el.style.removeProperty("color-scheme");
-    applied.delete(el);
   };
 }
 

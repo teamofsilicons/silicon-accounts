@@ -27,7 +27,7 @@ use serde_json::{Value, json};
 use sqlx::PgConnection;
 use time::OffsetDateTime;
 
-use crate::credentials::{Presented, classify, membership_status, refresh_token_info};
+use crate::credentials::{Presented, classify, membership_state, refresh_token_info};
 use crate::params::{opt, parse_body};
 use crate::respond::{no_store, oauth_error};
 
@@ -96,7 +96,10 @@ async fn membership_live(
     if is_first_party_app_id(&app.app_id) {
         return Ok(true);
     }
-    Ok(membership_status(conn, &app.app_id, account_uuid).await? == Some(MembershipStatus::Active))
+    Ok(membership_state(conn, &app.app_id, account_uuid)
+        .await?
+        .map(|m| m.status)
+        == Some(MembershipStatus::Active))
 }
 
 pub(crate) async fn access_token(

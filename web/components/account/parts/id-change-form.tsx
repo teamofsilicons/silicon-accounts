@@ -71,7 +71,7 @@ export function IdChangeForm({ prefix, currentId, uuid, subject, submit, onChang
   // Only what a change does for you (Anil, 2026-11-11: copy B); that apps know you by the uuid is for developers.
   const told = subject === "self"
     ? `Every app you've signed into gets your new ${prefix === "c:" ? "CarbonID" : "id"}.`
-    : "Its webhook and every app it has signed into get its new id.";
+    : "It is notified through Ting, and every app it has signed into gets its new id.";
   return (
     <form className={styles.form} onSubmit={onSubmit} noValidate>
       <IdField

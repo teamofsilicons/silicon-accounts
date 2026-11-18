@@ -13,6 +13,15 @@ test("publishing proxy forwards only authoring with own-app catalog and immutabl
   for (const [path, verb] of [["apps", "GET"], ["apps/my_app/review", "PUT"], ["apps/my_app/install", "POST"], ["apps/my_app/resolve", "GET"], ["reports", "POST"], ["platforms", "POST"], ["auth/login", "GET"], ["apps/my_app/../secret", "POST"], ["apps/my_app/%2e%2e", "GET"], ["apps/my_app/authors/a%2fb", "DELETE"], ["apps/my_app/admin/extra", "POST"], ["apps/my_app/packages/x64", "GET"]]) assert.equal(proxyRoute(path, verb), null, `${verb} ${path}`);
 });
 
+test("historical 1–2 character app ids reach their publishing paths; malformed ids still do not", () => {
+  for (const [path, verb] of [["apps/dm", "GET"], ["apps/dm", "PATCH"], ["apps/dm/access", "PUT"], ["apps/dm/readiness", "GET"], ["apps/dm/packages/linux-x86_64", "POST"], ["apps/dm/releases/release-1/promote", "POST"], ["apps/availability/dm", "GET"], ["apps/x/history", "GET"]]) {
+    assert.deepEqual(proxyRoute(path, verb), {path: `v1/${path}`}, `${verb} ${path}`);
+  }
+  for (const [path, verb] of [["apps/DM", "GET"], ["apps/d.m", "GET"], ["apps/" + "a".repeat(31), "GET"], ["apps//access", "PUT"], ["apps/dm/review", "PUT"]]) {
+    assert.equal(proxyRoute(path, verb), null, `${verb} ${path}`);
+  }
+});
+
 test("the same underscore app ID reaches Accounts settings and all native publishing tabs", () => {
   assert.ok(accountsRoute("apps/my_app/signin-config", "PATCH"));
   assert.ok(accountsRoute("apps/_my_app/signin-config", "PATCH"));

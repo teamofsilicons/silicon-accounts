@@ -14,9 +14,9 @@ related:
 
 # Webhook deliveries and events
 
-These are the headers and JSON fields we send in a webhook request. Apps hear about changes to their users, and a Silicon can hear about changes to its own account.
+These are the headers and JSON fields we send in a webhook request. Apps hear about changes to their users. Silicon account notifications use [Ting](../../start/silicon-notifications.md).
 
-Set an app's URL with [`PUT /v1/apps/{app_id}/webhook`](apps.md#put-v1appsapp_idwebhook), or a Silicon's with [`PUT /v1/me/webhook`](silicons.md#put-v1mewebhook). To build a handler, follow [Webhooks](../../start/webhooks.md); [How webhooks work](../../learn/webhooks.md) explains delivery and retries.
+Set an app's URL with [`PUT /v1/apps/{app_id}/webhook`](apps.md#put-v1appsapp_idwebhook). To build a handler, follow [Webhooks](../../start/webhooks.md); [How webhooks work](../../learn/webhooks.md) explains delivery and retries.
 
 A real delivery:
 
@@ -107,7 +107,7 @@ secret.
 
 ## Deliveries and replay
 
-Apps and Silicons list and replay their deliveries the same way:
+Apps list and replay their deliveries:
 
 - a list, newest first (`?status=pending|delivered|failed`, `limit`, `cursor`);
 - one delivery, with every attempt and the exact `payload`;
@@ -120,30 +120,23 @@ A replay keeps the `event_id` and the payload, goes to the **current** URL signe
 | Who | List | One delivery | Replay |
 |---|---|---|---|
 | an app (or one of its authors) | [`GET /v1/apps/{app_id}/webhook/deliveries`](apps.md#get-v1appsapp_idwebhookdeliveries) | `GET /v1/apps/{app_id}/webhook/deliveries/{delivery_id}` | [`POST /v1/apps/{app_id}/webhook/replay`](apps.md#post-v1appsapp_idwebhookreplay) |
-| a Silicon | [`GET /v1/me/webhook/deliveries`](silicons.md#get-v1mewebhookdeliveries) | `GET /v1/me/webhook/deliveries/{delivery_id}` | [`POST /v1/me/webhook/replay`](silicons.md#post-v1mewebhookreplay) |
-| its custodian | [`GET /v1/me/silicons/{uuid}/webhook/deliveries`](silicons.md#get-v1mesiliconsuuidwebhookdeliveries) | `GET /v1/me/silicons/{uuid}/webhook/deliveries/{delivery_id}` | [`POST /v1/me/silicons/{uuid}/webhook/replay`](silicons.md#post-v1mesiliconsuuidwebhookreplay) |
 
-There are two differences. First, a replay never sends an app the data of an account that
-removed its access or was deleted: it's skipped as `membership_inactive` or `account_deleted`,
-and its detail shows `payload_redacted: true`. A Silicon's events are all about the Silicon
-itself, so nothing is ever held back from it or its custodian. Second, a Silicon's test pings are
-never replayed (skipped as `test_ping`, counted in `not_replayable`), because a replay would get
-around its limit of 10 test pings an hour. An app's `ping` replays like any other event.
+A replay never sends an app the data of an account that removed its access or was deleted:
+it is skipped as `membership_inactive` or `account_deleted`, with `payload_redacted: true`.
 
 ## Event stream
 
 ### `GET /v1/events/stream`
 
-The same events, pushed to you over one long HTTP response as
+App events, pushed over one long HTTP response as
 [Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events.html), so you don't
 need a public URL to hear about changes. Each event's `data` is exactly the body a webhook gets.
 
 | Who | Auth | Gets |
 |---|---|---|
 | an app | `Authorization: Basic base64(app_id:app_secret)` | the events of its stream subscription ([create one](apps.md#post-v1appsapp_idsubscriptions) with `{"delivery":"stream"}` first), filtered by the updates it picked |
-| a Silicon | its access token (or the account site's session) | its own Silicon events |
-| a Carbon | its access token (or the account site's session) | the Silicon events of the Silicons it is custodian of |
-| a self-created Silicon waiting for its custodian | `Authorization: Bearer sarq_…` (the request token from `POST /v1/silicons`) | its own events; the stream ends after the custodian's decision |
+
+Account, custodian and request-token callers receive `410 silicon_notifications_moved`; use [Ting](../../start/silicon-notifications.md).
 
 | Parameter | |
 |---|---|
@@ -180,18 +173,17 @@ data: {"message":"The app's stream subscription was deleted, so nothing more is 
 - Every event has `id:` (its `event_id`), `event:` (its type) and `data:` (the webhook body).
 - `: heartbeat` comes after 15 seconds without events, so proxies keep the connection open.
 - `stream.closed` (with no `id`) comes right before we end a stream. Its `reason` is
-  `token_expired` (refresh your token and reconnect), `access_removed` (the credentials stopped
-  working: signed out, revoked, an STK rotation, a rotated app secret, a disabled app),
-  `subscription_deleted`, `request_decided` (a waiting Silicon's custodian answered),
+  `access_removed` (a rotated app secret or disabled app), `subscription_deleted`,
   `max_duration` (a stream lasts at most an hour) or `server_restarting`. Reconnect with
-  `Last-Event-ID` for anything except `subscription_deleted` and `request_decided`.
+  `Last-Event-ID` for anything except `subscription_deleted`.
 - Delivery is at least once, like webhooks: a resumed stream can repeat an event, so dedupe on
   `event_id`. Within one stream, events arrive in the order their changes were saved.
 - We check the credentials again every 30 seconds while the stream is open.
 
 Errors:
 
-- 401: no or bad credentials (`invalid_request_token` for an unknown `sarq_` token);
+- 401: no or bad credentials;
+- 410 `silicon_notifications_moved`: account or request-token credentials;
 - 409 `stream_subscription_required`: an app without a stream subscription;
 - 400 `unknown_event_id`: the cursor isn't an event of this feed;
 - 400 `invalid_query`: a type this feed never carries;
@@ -200,7 +192,6 @@ Errors:
 
 ```sh
 curl -N "$ACCOUNTS_URL/v1/events/stream" -u "$APP_ID:$APP_SECRET"
-curl -N "$ACCOUNTS_URL/v1/events/stream?types=silicon.custodian.accepted" -H "Authorization: Bearer $TOKEN"
 curl -N "$ACCOUNTS_URL/v1/events/stream" -u "$APP_ID:$APP_SECRET" -H "Last-Event-ID: $LAST_EVENT_ID"
 ```
 

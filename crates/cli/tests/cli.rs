@@ -222,6 +222,14 @@ fn silicon_login_whoami_slt_and_logout() {
     assert_eq!(json["kind"], "silicon");
     assert_eq!(json["id"], "si:scout");
     assert_eq!(json["uuid"], "b9Z");
+    let enabled = env
+        .cmd()
+        .args(["notifications", "enable", "--json"])
+        .output()
+        .unwrap();
+    assert!(enabled.status.success());
+    assert_eq!(stdout_json(&enabled)["enabled"], true);
+    assert_eq!(mock.count("POST", "/v1/me/notifications/ting"), 1);
 
     // The session is stored privately and remembers its URL.
     let session_path = env.state_file("session.json");
@@ -712,6 +720,55 @@ fn app_use_stores_credentials_for_later_commands() {
         .success()
         .stdout(predicate::str::contains("google, email"))
         .stdout(predicate::str::contains("acting as"));
+    // A secret in argv works but warns.
+    env.cmd()
+        .args([
+            "--url",
+            &mock.url,
+            "app",
+            "--app-secret",
+            APP_SECRET,
+            "show",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("exposes it"));
+    // The stored secret is only sent to the URL it was stored for.
+    let other = Mock::start();
+    let output = env
+        .cmd()
+        .args(["--url", &other.url, "app", "show", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3));
+    assert_eq!(
+        stdout_json(&output)["error"]["code"],
+        "app_credentials_required"
+    );
+}
+
+#[test]
+fn an_expired_code_sign_in_no_longer_chooses_the_url() {
+    let env = Env::new();
+    std::fs::create_dir_all(env.state_file("")).unwrap();
+    let url_after = |expires_at: &str| {
+        std::fs::write(
+            env.state_file("login-challenge.json"),
+            json!({"challenge_id": "ch1", "contact": "me@example.com", "destination": "m***@example.com",
+                   "expires_at": expires_at, "url": "https://staging.example"})
+            .to_string(),
+        )
+        .unwrap();
+        stdout_json(
+            &env.cmd()
+                .args(["config", "get", "url", "--json"])
+                .output()
+                .unwrap(),
+        )["source"]
+            .clone()
+    };
+    assert_eq!(url_after("2099-01-01T00:00:00Z"), "pending_login");
+    assert_eq!(url_after("2000-01-01T00:00:00Z"), "default");
 }
 
 #[test]

@@ -1,4 +1,5 @@
 "use client";
+import {PersonField, SavedPerson} from "@/components/people/person-field";
 
 import { useState } from "react";
 import { useNavigate } from "./navigation";
@@ -36,19 +37,16 @@ export function Releases({
   app,
   refresh,
   compact = false,
-  packagesRevision = 0,
 }: {
   app: App;
   refresh: () => void;
   compact?: boolean;
-  packagesRevision?: number;
 }) {
   const releases = useResource<{ items: Release[] }>(
     `/apps/${app.app_id}/releases`,
   );
   const packages = useResource<{ items: Package[] }>(
     `/apps/${app.app_id}/packages`,
-    packagesRevision,
   );
   const mutation = useMutation(() => {
     releases.reload();
@@ -85,6 +83,7 @@ export function Releases({
           {releases.data?.items.length || 0} releases
         </span>
         <Button
+          disabled={!!app.organization_id&&!app.permissions?.publish}
           onClick={() => {
             setCreate(true);
             mutation.clearError();
@@ -119,6 +118,7 @@ export function Releases({
                   <Button
                     variant="secondary"
                     size="sm"
+                    disabled={!!app.organization_id&&!app.permissions?.publish}
                     onClick={() => {
                       setPromote(release);
                       setProduction("");
@@ -375,14 +375,8 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
             }
           }}
         >
-          <Input
-            label="Invite an author"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            placeholder="c:alice, si:assistant, or email address"
-            required
-          />
-          <Button type="submit" loading={mutation.pending}>
+          <PersonField label="Invite an author" value={to} onChange={setTo} placeholder="c:alice, si:assistant, or email address" disabled={!!app.organization_id&&!app.permissions?.manage}/>
+          <Button type="submit" disabled={!!app.organization_id&&!app.permissions?.manage} loading={mutation.pending}>
             <UserPlus size={16} /> Send invitation
           </Button>
         </form>
@@ -397,24 +391,12 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
           {list.map((author) => (
             <div className="member-row" key={author.uuid}>
               <div className="row">
-                <div data-sq="surface" className="avatar">
-                  {(author.display_name || author.id).slice(0, 1).toUpperCase()}
-                </div>
-                <div>
-                  <span>
-                    {author.display_name || author.id}
-                    {author.uuid === account?.uuid && (
-                      <span className="muted"> (you)</span>
-                    )}
-                  </span>
-                  <p className="small muted">
-                    {author.id} · Joined {date(author.joined_at)}
-                  </p>
-                </div>
+                <SavedPerson person={author}/>
               </div>
               {app.is_admin && author.uuid !== account?.uuid && (
                 <div className="row">
                   <Button
+                    disabled={!!app.organization_id}
                     variant="secondary"
                     size="sm"
                     onClick={() =>
@@ -473,6 +455,7 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
                   <Button
                     variant="secondary"
                     size="sm"
+                    disabled={!!app.organization_id&&!app.permissions?.manage}
                     loading={mutation.pending}
                     onClick={async () => {
                       if (
@@ -497,9 +480,10 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
       </Section>
       <Section
         title="App credentials"
-        description="All authors can rotate the app secret. The previous secret stops working immediately."
+        description="An authorized manager can rotate the app secret. The previous secret stops working immediately."
       >
         <Button
+          disabled={!!app.organization_id&&!app.permissions?.manage}
           variant="secondary"
           onClick={() =>
             setConfirm({
@@ -523,14 +507,14 @@ export function Authors({ app, refresh }: { app: App; refresh: () => void }) {
       <Section
         title="Leave this app"
         description={
-          list.length === 1
+          !app.organization_id&&list.length === 1
             ? "You are the last author. Invite another author and wait for them to join before leaving."
             : "You can leave at any time. If you administer this app, administration passes to the oldest remaining author."
         }
       >
         <Button
           variant="danger"
-          disabled={list.length === 1}
+          disabled={!app.organization_id&&list.length === 1}
           onClick={() =>
             setConfirm({
               title: `Leave ${app.name}?`,

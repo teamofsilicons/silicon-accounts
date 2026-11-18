@@ -16,7 +16,6 @@ import {
 export const dynamic = "force-dynamic";
 
 const PREFIX = "/api/apps/";
-/** Refresh this long before the access token expires. */
 /** Request headers passed on to the API (everything else, cookies included, stays here). */
 const FORWARD = ["accept", "content-type", "idempotency-key", "x-apps-platform-confirmed"];
 /** Response headers passed back. */

@@ -4,8 +4,17 @@ import { test } from "node:test";
 import type { SigninFlow } from "../lib/api/types";
 import { NO_SECRETS, defaultFlowOf, normalizeConfig, reconcileFlow, sectionOf, sectionPatch } from "../components/developer/lib/config";
 import { flowProblems } from "../components/developer/lib/validate";
+import {brandingVariables} from "../lib/branding/apply";
+import {DEFAULT_BRANDING} from "../lib/branding/defaults";
 
 const step = (id: string, fields: SigninFlow["steps"][number]["fields"]) => ({ id, fields, title: null, subtitle: null, continue_label: null, layout: null });
+
+test("Interface background previews accept only the exact private-media BFF path",()=>{
+  const base={...DEFAULT_BRANDING,background_style:"image" as const};
+  const url="/api/interfaces/interfaces/potato/uploads/12345678-1234-1234-1234-123456789abc";
+  assert.equal(brandingVariables({...base,background_image_url:url},"light")["--brand-bg-image"],`url(${JSON.stringify(url)})`);
+  assert.equal(brandingVariables({...base,background_image_url:"/api/interfaces/../../escape"},"light")["--brand-bg-image"],undefined);
+});
 
 test("a ticked detail joins the last page; an unticked one leaves its page; an emptied page goes", () => {
   const flow: SigninFlow = { steps: [step("contact", ["email"]), step("about", ["timezone"])], review: true };

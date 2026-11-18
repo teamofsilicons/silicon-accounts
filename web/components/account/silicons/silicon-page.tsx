@@ -5,18 +5,18 @@
  * with its si:id, its status and since when it is in your care, then two tabs on the account pages' rows
  * (parts/rows.tsx):
  *
- *   Access     its secret key (Change), its webhook (Set, Change, Remove)
+ *   Access     its secret key (Change), and how it hears about its account (Silicon Ting)
  *   Settings   About: name, id, timezone, photo, looked after by (Hand Over / Cancel Handover); then Delete
  *
- * Every change asks or takes its input in a dialog (the dialog rules, redesign/decisions.md). A new key or webhook
- * secret is shown once above the tabs until the Carbon says it is stored (parts/reveals.ts).
+ * Every change asks or takes its input in a dialog (the dialog rules, redesign/decisions.md). A new key is shown once
+ * above the tabs until the Carbon says it is stored (parts/reveals.ts).
  *
  * Not shown, because the API has no way to say it yet (prototype-differences.md): its last sign-in, the apps it uses,
  * its sign-ins over 14 days, its Activity tab, Apps it may use, Automation and Cloud services.
  */
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CaseSensitive, Clock, ImageUp, KeyRound, Trash2, UserRound, Webhook } from "lucide-react";
+import { Bell, CaseSensitive, Clock, ImageUp, KeyRound, Trash2, UserRound } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
@@ -40,8 +40,8 @@ import { PhotoUrlForm, TimezoneForm } from "../parts/detail-editors";
 import { IdChangeForm } from "../parts/id-change-form";
 import { recipient } from "../parts/handover";
 import { PageBar } from "../parts/page-bar";
-import { useCancelTransferSettled, useChangeSiliconIdInForm, useDeleteSiliconSettled, useEverySilicon, useRemoveSiliconWebhookSettled, useSetSiliconWebhookOnce, useSiliconDefaultPhoto, useStartTransfer } from "../parts/queries";
-import { addReveal, dismissReveal, dismissRevealsOf, usePendingReveals } from "../parts/reveals";
+import { useCancelTransferSettled, useChangeSiliconIdInForm, useDeleteSiliconSettled, useEverySilicon, useSiliconDefaultPhoto, useStartTransfer } from "../parts/queries";
+import { dismissReveal, dismissRevealsOf, usePendingReveals } from "../parts/reveals";
 import { Row, Section, Strong, Tile } from "../parts/rows";
 import { SecretReveal } from "../parts/secret-reveal";
 import { SiliconMark } from "../parts/silicon-mark";
@@ -127,7 +127,7 @@ export function SiliconPage({ uuid }: { uuid: string }) {
         </TabsList>
         <TabsContent value="access" className={styles.panel}>
           <SecretKey silicon={silicon} now={now} />
-          <WebhookSection silicon={silicon} />
+          <Notifications silicon={silicon} />
         </TabsContent>
         <TabsContent value="settings" className={styles.panel}>
           <About silicon={silicon} me={carbon} now={now} />
@@ -169,81 +169,14 @@ function SecretKey({ silicon, now }: { silicon: ManagedSilicon; now: number }) {
   );
 }
 
-/* Access: the webhook ------------------------------------------------------------------------------------------------ */
+/* Access: notifications --------------------------------------------------------------------------------------------- */
 
-function urlProblem(raw: string): string | null {
-  const value = raw.trim();
-  if (!value) return "Enter the URL the Silicon receives events at.";
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return `\u201c${value}\u201d isn\u2019t a full URL. Start it with https://, for example https://scout.example/hooks/accounts.`;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return `A webhook URL starts with https:// (this one starts with ${url.protocol}//).`;
-  return null;
-}
-
-function WebhookSection({ silicon }: { silicon: ManagedSilicon }) {
-  const [editing, setEditing] = useState(false);
-  const [removing, setRemoving] = useState(false);
-  const [url, setUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const setWebhook = useSetSiliconWebhookOnce();
-  const removeWebhook = useRemoveSiliconWebhookSettled();
+/** Changes to the Silicon's account reach it through Silicon Ting: Silicon webhooks were retired (the API answers 410). */
+function Notifications({ silicon }: { silicon: ManagedSilicon }) {
   const id = idOf(silicon);
-  const current = silicon.webhook_url;
-  const close = () => { setEditing(false); setRemoving(false); setError(null); };
-  const save = async (event: FormEvent) => {
-    event.preventDefault();
-    const problem = urlProblem(url);
-    if (problem) return setError(problem);
-    setError(null);
-    try {
-      const answer = await setWebhook.run({ uuid: silicon.uuid, url: url.trim() });
-      close();
-      addReveal({
-        silicon: silicon.uuid,
-        origin: "webhook",
-        title: `${id}\u2019s webhook signing secret`,
-        description: `Events to ${answer.webhook_url} are signed with it (X-Accounts-Signature: v1=HMAC-SHA256 of "{timestamp}.{body}"). A new secret is made each time the URL is set.`,
-        secrets: [{ label: "Signing secret", value: answer.webhook_secret }],
-      });
-    } catch (raw) {
-      setError(describeError(raw));
-    }
-  };
-  const remove = async () => {
-    setError(null);
-    try {
-      await removeWebhook.mutateAsync(silicon.uuid);
-      close();
-    } catch (raw) {
-      setError(describeError(raw));
-    }
-  };
   return (
-    <Section id="silicon-webhook" title="Webhook">
-      <Row lead={<Tile><Webhook size={16} strokeWidth={2} /></Tile>} title={current ?? "Not set"} detail={current ? "Signed events about its own account" : "Where Silicon Accounts tells it about its own account"} wide={!!current}>
-        {current ? <Button variant="secondary" size="sm" onClick={() => setRemoving(true)}>Remove</Button> : null}
-        <Button variant="secondary" size="sm" onClick={() => { setUrl(current ?? ""); setEditing(true); }}>{current ? "Change" : "Set"}</Button>
-        <Ask open={editing} onClose={close} busy={setWebhook.isPending} title={current ? "Change the webhook" : "Set a webhook"} description={<>Where Silicon Accounts tells <strong>{id}</strong> about its own account: id and detail changes, key changes and handovers. Every event is signed.</>}>
-          <form className={styles.form} onSubmit={event => void save(event)} noValidate>
-            <Input label="Webhook URL" type="url" inputMode="url" placeholder="https://scout.example/hooks/accounts" value={url} onChange={event => { setUrl(event.target.value); setError(null); }} error={error ?? undefined} autoComplete="off" spellCheck={false} autoFocus description="A new signing secret is made and shown to you once." />
-            <Actions>
-              <Button type="button" variant="ghost" onClick={close} disabled={setWebhook.isPending}>Cancel</Button>
-              <Button type="submit" loading={setWebhook.isPending}>{current ? "Save" : "Set Webhook"}</Button>
-            </Actions>
-          </form>
-        </Ask>
-        <Ask open={removing} onClose={close} busy={removeWebhook.isPending} title="Remove the webhook?" description={<><strong>{id}</strong> stops getting events about its own account.</>}>
-          {error ? <p className={styles.error} role="alert">{error}</p> : null}
-          <Actions>
-            <Button variant="ghost" onClick={close} disabled={removeWebhook.isPending}>Cancel</Button>
-            <Button variant="danger" loading={removeWebhook.isPending} onClick={() => void remove()}>Remove</Button>
-          </Actions>
-        </Ask>
-      </Row>
+    <Section id="silicon-notifications" title="Notifications" description={<>Silicon Ting delivers changes to <strong>{id}</strong>&rsquo;s account to its signed-in sessions, and keeps them in its inbox while nothing is listening.</>}>
+      <Row lead={<Tile><Bell size={16} strokeWidth={2} /></Tile>} title="Silicon Ting" detail={<>Signed in as {id}, run <span className="mono">silicon-accounts notifications enable</span>, then <span className="mono">ting listen</span>. After a key change it signs in again.</>} />
     </Section>
   );
 }

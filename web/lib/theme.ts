@@ -37,9 +37,6 @@ export function themePreference(): ThemePreference {
   return "light";
 }
 
-/** What a preference would show: always light on this site. */
-export const resolveTheme: (value: ThemePreference) => Theme = () => "light";
-
 /** Kept for callers; the site has one theme, so this only makes sure it is applied. */
 export const setThemePreference: (value: ThemePreference) => void = () => applyTheme();
 

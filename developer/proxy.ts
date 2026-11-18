@@ -47,7 +47,7 @@ function docsAddressMissing(pathname: string): boolean {
   if (!pathname.startsWith("/docs/")) return false;
   let path: string;
   try { path = decodeURIComponent(pathname.slice(6)).replace(/\/+$/, ""); } catch { return true; }
-  if (!path || path === "search-index.json" || path === "search" || path === "index" || /^(apps|accounts)\/index$/.test(path)) return false;
+  if (!path || path === "interfaces" || path === "search-index.json" || path === "search" || path === "index" || /^(apps|accounts)\/index$/.test(path)) return false;
   return path.endsWith(".md") ? !findPageByPath(path) : !findPage(path) && !isGroup(path);
 }
 

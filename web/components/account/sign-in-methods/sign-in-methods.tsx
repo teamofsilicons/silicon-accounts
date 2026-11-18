@@ -95,7 +95,7 @@ function ContactSection({ channel, carbon }: { channel: "email" | "phone"; carbo
     <Section
       title={isEmail ? "Emails" : "Phone numbers"}
       description={isEmail
-        ? "A code sent to any of these signs you in. Apps that can see your email get the primary one."
+        ? "Apps with email access see your primary address. Signing in with a shared email opens the account where it is primary."
         : "A code texted to any of these signs you in. Apps that can see your phone number get the primary one."}
       actions={<span className={styles.count} aria-label={`${count} of ${LIMIT} ${pluralNoun}`}><AnimatedCounter value={count} /> of {LIMIT}</span>}
     >
@@ -407,6 +407,23 @@ const LINK_ERRORS: Record<string, string> = {
   flow_expired: "It took too long, so the connection expired. Connect it again.",
 };
 
+/**
+ * The Interface sign-in that sent you here to add a detail it needs (interface-authorize.tsx). Anything else is dropped;
+ * a value starting "/interface-authorize?" is always a path on this site, so the server and the browser agree on it.
+ */
+export function interfaceReturn(value: string | null): string | null {
+  return value?.startsWith("/interface-authorize?") ? value : null;
+}
+
+/** /sign-in-methods, opening a list (`edit`) and keeping the way back to an Interface sign-in (`return_to`). */
+export function securityHref(backTo: string | null, edit?: "email" | "phone"): string {
+  const query = new URLSearchParams();
+  if (edit) query.set("edit", edit);
+  if (backTo) query.set("return_to", backTo);
+  const text = query.toString();
+  return text ? `${paths.signInMethods}?${text}` : paths.signInMethods;
+}
+
 /** The outcome of connecting Google or Apple (`?linked=…` or `?link_error=…`), read once; the address is cleaned up. */
 export function LinkResult() {
   const search = useSearchParams();
@@ -421,8 +438,8 @@ export function LinkResult() {
   const [open, setOpen] = useState(true);
   const flow = useLinkFlow(result && !result.linked ? result.flow : null);
   useEffect(() => {
-    if (result) router.replace(paths.signInMethods, { scroll: false });
-  }, [result, router]);
+    if (result) router.replace(securityHref(interfaceReturn(search.get("return_to"))), { scroll: false });
+  }, [result, router, search]);
   if (!result) return null;
   const name = result.provider ? PROVIDER_NAMES[result.provider] : "The account";
   if (result.linked) {

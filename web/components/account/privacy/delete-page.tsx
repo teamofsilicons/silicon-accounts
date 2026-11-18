@@ -10,13 +10,14 @@
  *   What you'll lose access to    each app, permissions between apps, devices, emails, phones and Google or Apple
  *                                 links, and the CarbonID
  *   (an inset line)
- *   the 30 days to change your mind (only once the API keeps deleted accounts: RECOVERY_DAYS), then how many checks
- *   are left beside Delete Account, which asks for the CarbonID typed.
+ *   the days to change your mind (RECOVERY_DAYS), then how many checks are left beside Delete Account, which asks
+ *   for the CarbonID typed.
  *
- * Deleting is immediate and final until the API ships recovery (redesign/api-gaps.md #11, decisions.md 2026-11-12), so
- * with RECOVERY_DAYS null the page says what is true today: no recovery card, and the CarbonID held for 10 days.
+ * DELETE /v1/me archives the account for 10 days (decisions.md 2026-11-14): signing in with an email or phone code
+ * before then brings it back; after that the API deletes it.
  */
 import { useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AtSign, Check, Cpu, Inbox, Laptop, Link2, RotateCcw } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
@@ -45,8 +46,8 @@ import {
   useEveryCustodianRequest,
   useEveryProof,
   useEverySession,
+  refreshSiliconViews,
   useEverySilicon,
-  useSetMeView,
   useStartTransfer,
 } from "../parts/queries";
 import { Row, Tile } from "../parts/rows";
@@ -54,11 +55,8 @@ import { SiliconMark } from "../parts/silicon-mark";
 import { requestHref } from "../silicons/request-page";
 import styles from "./delete-page.module.css";
 
-/**
- * Days a deleted account can still be brought back by signing in. null until the API keeps deleted accounts (today
- * DELETE /v1/me is final); then 30, and the page shows the card and holds the CarbonID for as long.
- */
-const RECOVERY_DAYS: number | null = null;
+/** Days a deleted account can still be brought back by signing in (the API's ARCHIVE_DAYS); null hides the card. */
+const RECOVERY_DAYS: number | null = 10;
 /** How long a CarbonID is held after deletion today (UNDERSTANDING.md: an old id stays reserved for 10 days). */
 const ID_HELD_DAYS = 10;
 
@@ -235,7 +233,7 @@ function SiliconCheck({ silicon, carbon, now }: { silicon: ManagedSilicon; carbo
 
   return (
     <Row
-      lead={<SiliconMark seed={silicon.uuid} size={28} />}
+      lead={<SiliconMark seed={silicon.uuid} photo={silicon.pfp_url} size={28} />}
       title={transfer ? `${name} is going to ${personLabel(transfer.to)}` : `${name} needs a new home`}
       detail={transfer ? `Waiting for them to accept · ${spanText(msUntil(transfer.expires_at, now))} left` : "Hand it to someone, or delete it"}
       wide
@@ -291,7 +289,7 @@ function Foot({ carbon, silicons, now }: { carbon: CarbonMe; silicons: ManagedSi
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const remove = useDeleteAccount();
-  const view = useSetMeView();
+  const client = useQueryClient();
   const id = carbon.id ?? carbon.uuid;
   const left = silicons.length;
   const waiting = silicons.filter(item => item.pending_transfer);
@@ -313,8 +311,9 @@ function Foot({ carbon, silicons, now }: { carbon: CarbonMe; silicons: ManagedSi
       window.setTimeout(() => leaveDeletedAccount(id), 600);
     } catch (raw) {
       const failure = ApiError.from(raw);
-      // A Silicon came into this Carbon's care since the page loaded: the checks show it once the account is read again.
-      if (failure.code === "custodian_of_silicons") void view.refresh();
+      // A Silicon came into this Carbon's care since the page loaded: the checks (read from the Silicons list) show it
+      // once the list and the account are read again.
+      if (failure.code === "custodian_of_silicons") refreshSiliconViews(client);
       setError(describeError(failure));
     }
   };

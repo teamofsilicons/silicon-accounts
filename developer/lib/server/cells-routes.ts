@@ -3,12 +3,15 @@ const PARENT = "[a-z][a-z0-9-]{1,28}[a-z0-9]";
 const COPY = "[a-z](?:[a-z0-9-]{0,28}[a-z0-9])?";
 const CELL = `${PARENT}(?:--${COPY})?`;
 const APP = "[a-z0-9_-]{3,30}";
+const INTERFACE = "[a-z0-9_-]{3,60}";
 const UUID = "[0-9a-f-]{36}";
 const BUCKET = "[a-z0-9][a-z0-9_-]{0,62}";
 const FUNCTION = "[a-z][a-z0-9_-]{0,62}";
 const TEMPLATE = "(?!catalog(?:/|$))[a-z][a-z0-9-]{0,39}";
 const JOB = `(?!preview(?:/|$))${FUNCTION}`;
 const routes: [string, RegExp][] = [
+  ["GET HEAD PUT", new RegExp(`^cells/${CELL}/organization-access$`)],
+  ["POST", new RegExp(`^cells/${CELL}/notifications/live$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/database/(reference|extensions|connections)$`)],
   ["POST", new RegExp(`^cells/${CELL}/database/password/rotate$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/database/password-rotations/${UUID}$`)],
@@ -24,12 +27,13 @@ const routes: [string, RegExp][] = [
   ["POST", new RegExp(`^cells/${PARENT}/copies/${COPY}/reset$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/logs$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/database/slow-queries$`)],
-  ["GET HEAD", /^me$/],
+  ["GET HEAD", /^(me|people|organizations)$/],
   ["GET HEAD POST", /^cells$/],
   ["GET HEAD", /^cells\/availability$/],
   ["GET HEAD POST", new RegExp(`^apps/${APP}/cell$`)],
+  ["GET HEAD POST", new RegExp(`^interfaces/${INTERFACE}/cell$`)],
   ["GET HEAD DELETE", new RegExp(`^cells/${CELL}$`)],
-  ["POST", new RegExp(`^cells/${CELL}/(restore|sql|schema|import)$`)],
+  ["POST", new RegExp(`^cells/${CELL}/(restore|rename|sql|schema|import)$`)],
   ["PUT", new RegExp(`^cells/${CELL}/(admin|settings)$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/(users|apps|history|tables|secrets|notifications)$`)],
   ["GET HEAD POST", new RegExp(`^cells/${CELL}/ting-subscriptions$`)],
@@ -97,6 +101,7 @@ const routes: [string, RegExp][] = [
   ["GET HEAD DELETE", new RegExp(`^cells/${CELL}/storage-api/uploads/${UUID}$`)],
   ["PUT", new RegExp(`^cells/${CELL}/storage-api/uploads/${UUID}/parts/[0-9]{1,4}$`)],
   ["POST", new RegExp(`^cells/${CELL}/storage-api/uploads/${UUID}/complete$`)],
+  ["POST", new RegExp(`^cells/${CELL}/storage-api/files/[a-z0-9][a-z0-9._-]{0,62}/query$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/storage-api/files/${BUCKET}$`)],
   ["GET HEAD", new RegExp(`^cells/${CELL}/storage-api/object/${BUCKET}/.+$`)],
   ["POST", new RegExp(`^cells/${CELL}/storage-api/(files|sign)$`)],
@@ -133,4 +138,9 @@ export function cellsFunctionInvocation(path: string, method: string): boolean {
 
 export function cellsBackupDownload(path:string,method:string):boolean {
   return ["GET","HEAD"].includes(method) && new RegExp(`^v1/cells/${CELL}/backups/${UUID}/download$`).test(path);
+}
+
+/** Only this new integration is phased; existing Cells and app routes remain available. */
+export function isInterfaceCellRoute(path: string): boolean {
+  return new RegExp(`^v1/interfaces/${INTERFACE}/cell$`).test(path);
 }

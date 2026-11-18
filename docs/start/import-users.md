@@ -546,7 +546,7 @@ These answers come back before a job exists, so nothing was imported. Errors hav
 | status | code | why | fix |
 |---|---|---|---|
 | 400 | `invalid_content_type` | The body is not `text/csv` (or another CSV type) or `application/json`. | Set the `Content-Type`. |
-| 400 | `invalid_query` | A query parameter is not an option, or has a bad value (`dry_run=maybe`, `default_country=USA`). | Use `default_country`, `ignore_unknown_columns`, `dry_run`, `update_existing`. |
+| 400 | `invalid_query` | A query parameter is not an option, has a bad value (`dry_run=maybe`, `default_country=USA`), or is given twice. | Use `default_country`, `ignore_unknown_columns`, `dry_run`, `update_existing`. |
 | 400 | `invalid_json` | The JSON body doesn't parse. | Send valid UTF-8 JSON. |
 | 413 | `payload_too_large` | More than 50 MB. | Split the file. |
 | 422 | `unknown_columns` | Columns outside the list (`details.unknown_columns`, `details.allowed_columns`). | Remove them, or `ignore_unknown_columns=true`. |

@@ -156,11 +156,19 @@ pub fn open_browser(url: &str) -> bool {
     if std::env::var_os("ACCOUNTS_NO_BROWSER").is_some_and(|v| !v.is_empty() && v != "0") {
         return false;
     }
+    // The URL comes from the server: never let it name a local app or file.
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return false;
+    }
     let mut command = if cfg!(target_os = "macos") {
         let mut c = Command::new("open");
         c.arg(url);
         c
     } else if cfg!(target_os = "windows") {
+        // cmd interprets these even inside an argument, so `&calc` would run calc.
+        if url.contains(['&', '|', '^', '<', '>', '"', '%']) {
+            return false;
+        }
         let mut c = Command::new("cmd");
         c.args(["/C", "start", "", url]);
         c
@@ -286,6 +294,12 @@ pub fn normalize_stk(stk: &str) -> CliResult<String> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn browser_opens_only_web_urls() {
+        assert!(!open_browser("/nonexistent/silicon-accounts-test.app"));
+        assert!(!open_browser("file:///nonexistent/silicon-accounts-test"));
+    }
 
     #[test]
     fn durations() {

@@ -34,7 +34,7 @@ use accounts_core::repo::accounts::{self, NewCarbon, NewContact, ProfileUpdate};
 use accounts_core::repo::audit::{self, AuditEntry};
 use accounts_core::repo::contacts::{self, ContactKind};
 use accounts_core::repo::{identities, photos};
-use accounts_core::timefmt::{date, format_rfc3339_ms, parse_date, rfc3339_ms};
+use accounts_core::timefmt::{date, format_rfc3339_ms, parse_date, rfc3339_ms, today_utc};
 use accounts_core::{ApiError, ApiResult, AppState, FieldErrors, events};
 use axum::body::Body;
 use axum::extract::State;
@@ -510,7 +510,7 @@ fn validate_details(
     };
     let dob = match &body.dob {
         None => Some(prefill.dob),
-        Some(raw) => match parse_date(raw).and_then(|d| validate_dob(d, view::today())) {
+        Some(raw) => match parse_date(raw).and_then(|d| validate_dob(d, today_utc())) {
             Ok(d) => Some(d),
             Err(m) => {
                 fields.add("dob", m);
@@ -563,7 +563,7 @@ pub async fn submit_signup(
     let mut flow = load_bound(&mut tx, &state, &headers, &Method::POST, &id, true).await?;
     model::ensure_live(&flow)?;
     model::ensure_step(&flow, &[Step::Signup], "complete sign-up")?;
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     fa.ensure_active()?;
     let mut session = match bound_session(&mut tx, &state, &headers, &flow).await {
         Ok(s) => s,
@@ -592,7 +592,7 @@ pub async fn submit_signup(
         },
         None => None,
     };
-    let refusal = if claimed.is_none() && !fa.config.allow_signup && !fa.first_party() {
+    let refusal = if claimed.is_none() && !fa.config.allow_signup && !fa.bypass_account_policies() {
         // Nothing here this app accepts (it closed sign-ups, or the import this sign-up was
         // finishing was finished by someone else).
         Some(next::signup_not_allowed(&fa))
@@ -672,7 +672,7 @@ pub async fn submit_signup(
     )
     .await?;
     tx.commit().await?;
-    let mut cookies: Vec<Cookie<'static>> = signed.cookie.into_iter().collect();
+    let mut cookies: Vec<Cookie<'static>> = signed.cookies;
     cookies.push(clear_cookie(&state.settings, SIGNUP_COOKIE));
     Ok(FlowResponse::ok(view, cookies))
 }
@@ -698,7 +698,7 @@ pub async fn upload_signup_photo(
     let mut flow = load_bound(&mut tx, &state, &headers, &Method::POST, &id, true).await?;
     model::ensure_live(&flow)?;
     model::ensure_step(&flow, &[Step::Signup], "upload a sign-up photo")?;
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     fa.ensure_active()?;
     let session = match bound_session(&mut tx, &state, &headers, &flow).await {
         Ok(s) => s,
@@ -734,7 +734,7 @@ async fn create_account(
     session: &SignupSession,
     details: SignupDetails,
 ) -> ApiResult<Account> {
-    if !fa.config.allow_signup && !fa.first_party() {
+    if !fa.config.allow_signup && !fa.bypass_account_policies() {
         return Err(next::signup_not_allowed(fa));
     }
     // This sign-up proved its email/phone: an unverified row an import left on another account
@@ -917,8 +917,9 @@ pub fn may_resume(
     fa: &FlowApp,
     settings: &accounts_core::Settings,
 ) -> bool {
-    let allowed =
-        session.claim_account_uuid.is_some() || fa.config.allow_signup || fa.first_party();
+    let allowed = session.claim_account_uuid.is_some()
+        || fa.config.allow_signup
+        || fa.bypass_account_policies();
     let method_ok = fa
         .config
         .available_methods(settings)

@@ -356,7 +356,7 @@ async fn a_rotation_kills_the_old_stk_at_once() {
     let old_session = first.json["access_token"].as_str().expect("jwt");
     let r = call(
         &ctx,
-        Req::put("/v1/me/webhook")
+        Req::post("/v1/me/notifications/ting")
             .bearer(old_session)
             .json(json!({"url": "http://127.0.0.1:8593/hooks/x"})),
     )
@@ -399,4 +399,24 @@ async fn parallel_guesses_get_no_more_than_ten_checks() {
     assert_eq!(wrong + locked, 30, "{statuses:?}");
     // Locked now, even for the right STK.
     assert_eq!(login(&ctx, &id, &stk).await.status, 423);
+}
+
+#[tokio::test]
+async fn ting_enrollment_reads_the_bearer_token_as_sign_in_does() {
+    let mut settings = accounts_core::test_support::test_settings();
+    // Nothing listens here: a token that is read correctly ends at 503 ting_unavailable.
+    settings.ting_url = "http://127.0.0.1:9".into();
+    let ctx = TestContext::with_settings(settings).await;
+    ctx.exec("insert into apps(app_id,name,status,source,secret_hash) values('ting','Ting','active','fake',decode('00','hex'))")
+        .await;
+    let carbon = ctx.carbon().await;
+    let (silicon, _) = ctx.silicon(&carbon.uuid).await;
+    let access = token(&ctx, &silicon).await;
+    let r = call(
+        &ctx,
+        Req::post("/v1/me/notifications/ting")
+            .header("authorization", &format!("bearer  {access}")),
+    )
+    .await;
+    assert_eq!(r.error_code(), Some("ting_unavailable"), "{}", r.json);
 }

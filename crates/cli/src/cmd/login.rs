@@ -257,7 +257,7 @@ async fn reuse_session(ctx: &Ctx, app: Option<&str>) -> CliResult<Outcome> {
 }
 
 /// Best-effort revocation of the session being replaced.
-async fn retire_previous(ctx: &Ctx, previous: &StoredSession, current: &StoredSession) {
+pub(crate) async fn retire_previous(ctx: &Ctx, previous: &StoredSession, current: &StoredSession) {
     let Some(refresh) = previous.refresh_token.as_deref() else {
         return;
     };
@@ -373,6 +373,11 @@ async fn federated_login(
                 ));
             }
         }
+    };
+    // A re-exchange later may run from another directory.
+    let source = match source {
+        TokenSource::File(p) => TokenSource::File(std::path::absolute(&p).unwrap_or(p)),
+        other => other,
     };
     if matches!(source, TokenSource::Literal(_)) {
         ctx.out.warn("Passing a token as an argument exposes it to other processes; prefer env:VAR or @file.");

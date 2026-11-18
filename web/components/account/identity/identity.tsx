@@ -95,7 +95,7 @@ export function Identity() {
           <>
             <Box title="Profile">
               <Row label="Photo" edit="photo"><Avatar name={account.display_name} src={picture?.src ?? account.pfp_url} size="md" /></Row>
-              <Row label="Name" edit="name">{account.display_name}</Row>
+              <Row label="Name" edit="name">{account.display_name || <span className={styles.muted}>Add a name</span>}</Row>
               <Row
                 label="CarbonID"
                 edit={org ? undefined : "id"}
@@ -103,8 +103,8 @@ export function Identity() {
               >
                 <span className="mono">{account.id ?? account.uuid}</span>
               </Row>
-              <Row label="Date of birth" edit="dob">{account.dob ? formatDate(`${account.dob}T12:00:00Z`) : <span className={styles.muted}>Not added</span>}</Row>
-              <Row label="Timezone" edit="timezone">{account.timezone}</Row>
+              <Row label="Date of birth" edit={carbon ? "dob" : undefined}>{account.dob ? formatDate(account.dob) : <span className={styles.muted}>Not added</span>}</Row>
+              <Row label="Timezone" edit="timezone">{account.timezone || <span className={styles.muted}>Add a timezone</span>}</Row>
             </Box>
             {carbon ? <ContactBox carbon={carbon} /> : null}
             <div className={styles.accounts}>
@@ -124,9 +124,11 @@ function ContactBox({ carbon }: { carbon: CarbonMe }) {
   const primary = <Badge size="sm" tone="neutral">Primary</Badge>;
   return (
     <Box title="Contact">
-      {emails.map((item, index) => (
+      {emails.length ? emails.map((item, index) => (
         <Row key={item.email} label={index === 0 ? "Email" : ""} edit="emails" end={item.is_primary && emails.length > 1 ? primary : null}>{item.email}</Row>
-      ))}
+      )) : (
+        <Row label="Email" edit="emails"><span className={styles.muted}>Add an email</span></Row>
+      )}
       {phones.length ? phones.map((item, index) => (
         <Row key={item.phone} label={index === 0 ? "Phone" : ""} edit="phones" end={item.is_primary && phones.length > 1 ? primary : null}>{formatPhone(item.phone)}</Row>
       )) : (
@@ -267,7 +269,7 @@ function Editors({ me, editing, onClose, onReserved }: EditorsProps) {
       {carbon ? (
         <>
           <Dialog {...dialog("emails")}>
-            <DialogContent title="Email addresses" onCloseAutoFocus={backToRow("emails")} description="Once verified, an email can sign you in with a code.">
+            <DialogContent title="Email addresses" onCloseAutoFocus={backToRow("emails")} description="If an email is shared, signing in with it opens its primary account.">
               <ContactList channel="email" carbon={carbon} />
               <div className={styles.actions}><Button variant="secondary" onClick={onClose}>Close</Button></div>
             </DialogContent>

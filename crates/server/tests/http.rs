@@ -885,14 +885,6 @@ async fn silicon_photos_and_their_history_through_the_whole_service() {
     assert_eq!(r.status, 200, "{}", r.json);
     let r = send(
         &ctx,
-        Req::put(&format!("/v1/me/silicons/{uuid}/webhook"))
-            .bearer(&token)
-            .json(json!({"url": "https://hooks.example.test/shot"})),
-    )
-    .await;
-    assert_eq!(r.status, 200, "{}", r.json);
-    let r = send(
-        &ctx,
         Req::get("/v1/me/history?kind=security").bearer(&token),
     )
     .await;
@@ -902,18 +894,12 @@ async fn silicon_photos_and_their_history_through_the_whole_service() {
     for expected in [
         format!("STK of {id} rotated"),
         format!("New profile photo for {id}"),
-        format!("Webhook of {id} set"),
     ] {
         assert!(
             titles.contains(&expected.as_str()),
             "{expected}: {titles:?}"
         );
     }
-    let webhook = items
-        .iter()
-        .find(|i| i["meta"]["action"] == "silicon.webhook.set")
-        .expect("webhook entry");
-    assert_eq!(webhook["detail"], "Events go to https://hooks.example.test");
     for item in &items {
         assert_eq!(item["meta"]["silicon"]["uuid"], uuid.as_str(), "{item}");
         assert_eq!(item["meta"]["silicon"]["id"], id.as_str());
@@ -986,14 +972,34 @@ async fn panics_and_timeouts_become_json_errors() {
     };
     let router: Router = middleware::apply(
         Router::new()
-            .route("/v1/test/panic", get(panics))
-            .route("/v1/test/slow", get(sleeps)),
+            .route("/v1/test/panic/{secret}", get(panics))
+            .route("/v1/test/slow/{secret}", get(sleeps))
+            .route(
+                "/v1/test/fail/{secret}",
+                get(|| async { (axum::http::StatusCode::BAD_GATEWAY, "upstream failed") }),
+            ),
         &ctx.state,
         policy,
     )
     .with_state(ctx.state.clone());
+    // Path segments can be tickets or emails: the error logs must never carry them.
+    const SECRET: &str = "tkt_path_secret_7f3a";
+    let log = tempfile::NamedTempFile::new().expect("log file");
+    let _logs = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(log.reopen().expect("log writer"))
+            .finish(),
+    );
 
-    let r = call(router.clone(), Req::get("/v1/test/panic")).await;
+    let r = call(router.clone(), Req::get(&format!("/v1/test/fail/{SECRET}"))).await;
+    assert_eq!(r.status, 502);
+
+    let r = call(
+        router.clone(),
+        Req::get(&format!("/v1/test/panic/{SECRET}")),
+    )
+    .await;
     assert_eq!(r.status, 500);
     assert_eq!(r.error_code(), Some("internal"));
     let id = header(&r, "x-request-id").expect("request id").to_string();
@@ -1004,10 +1010,24 @@ async fn panics_and_timeouts_become_json_errors() {
     );
     assert_eq!(header(&r, "x-content-type-options"), Some("nosniff"));
 
-    let r = call(router, Req::get("/v1/test/slow")).await;
+    let r = call(router, Req::get(&format!("/v1/test/slow/{SECRET}"))).await;
     assert_eq!(r.status, 503);
     assert_eq!(r.error_code(), Some("request_timeout"));
     assert_eq!(r.json["error"]["details"]["timeout_seconds"], 0);
+
+    let logged = std::fs::read_to_string(log.path()).expect("read logs");
+    assert!(
+        logged.contains("handler exploded"),
+        "logs were captured: {logged}"
+    );
+    assert!(
+        logged.contains("upstream failed"),
+        "logs were captured: {logged}"
+    );
+    assert!(
+        !logged.contains(SECRET),
+        "a raw path reached the logs: {logged}"
+    );
 }
 
 #[tokio::test]
@@ -1406,4 +1426,46 @@ async fn dev_outbox_shows_sealed_codes_after_sending() {
             .as_str()
             .is_some_and(|t| t.starts_with(&code))
     );
+}
+
+#[tokio::test]
+async fn interface_profile_preflight_accepts_bearers_and_keeps_registration_server_side() {
+    let ctx = TestContext::new().await;
+    assert_eq!(
+        accounts_server::paths::RouteClass::of(
+            &axum::http::Method::POST,
+            "/v1/interface-accounts/me/photo"
+        ),
+        accounts_server::paths::RouteClass::PhotoUpload
+    );
+    for (url, method, allowed) in [
+        ("/v1/interface-accounts/me", "PATCH", true),
+        ("/v1/interface-accounts/me/photo", "POST", true),
+        ("/v1/interface-accounts/potato/registrations", "POST", false),
+    ] {
+        let r = accounts_core::test_support::call(
+            accounts_server::build_router(ctx.state.clone()),
+            Req::new(axum::http::Method::OPTIONS, url)
+                .header("origin", "https://potato.example")
+                .header("access-control-request-method", method)
+                .header(
+                    "access-control-request-headers",
+                    "authorization, content-type, idempotency-key",
+                ),
+        )
+        .await;
+        assert_eq!(
+            r.headers.contains_key("access-control-allow-origin"),
+            allowed
+        );
+        if allowed {
+            assert!(
+                r.headers["access-control-allow-methods"]
+                    .to_str()
+                    .unwrap()
+                    .contains(method)
+            );
+            assert!(!r.headers.contains_key("access-control-allow-credentials"));
+        }
+    }
 }

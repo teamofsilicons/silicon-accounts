@@ -39,6 +39,8 @@ pub const FLOW_CREATE_PER_IP: Limit = Limit::new(300, 60);
 #[serde(default)]
 pub struct CreateFlowBody {
     pub link_id: Option<String>,
+    pub interface_id: Option<String>,
+    pub interface_request: Option<String>,
     pub app_id: Option<String>,
     /// Alias of `app_id` (OAuth clients send `client_id`).
     pub client_id: Option<String>,
@@ -119,7 +121,7 @@ pub async fn create_flow(
     };
     let app_id = accounts_core::canonical_first_party_app_id(&app_id).to_string();
     let mut tx = state.db.begin().await?;
-    let fa = match FlowApp::load(&mut tx, &state.settings, &app_id).await {
+    let mut fa = match FlowApp::load(&mut tx, &state.settings, &app_id).await {
         Ok(fa) => fa,
         Err(e) if e.code == "unknown_app" => {
             return Err(ApiError::bad_request(
@@ -136,6 +138,15 @@ pub async fn create_flow(
             format!("The app '{app_id}' is disabled, so nobody can sign in to it right now."),
         )
         .hint("Ask the app's owner to re-enable it in Silicon Apps."));
+    }
+
+    if let Some(interface_id) = clean(&body.interface_id) {
+        if app_id != accounts_core::FIRST_PARTY_APP_ID || body.link_id.is_some() {
+            return Err(ApiError::invalid_request(
+                "Interface branding is available only for an Accounts sign-in.",
+            ));
+        }
+        fa.apply_interface(&mut tx, interface_id).await?;
     }
 
     // The redirect URI.
@@ -407,6 +418,8 @@ pub async fn create_flow(
         },
     )
     .await?;
+    let mut current = browser::current(&mut tx, &state, &headers).await?;
+    let mut response_cookies = vec![flow_cookie(&state.settings, &binding)];
     if let Some(raw) = body.link_id.as_deref() {
         if app_id != accounts_core::FIRST_PARTY_APP_ID || !prompt.login {
             return Err(ApiError::forbidden(
@@ -419,8 +432,7 @@ pub async fn create_flow(
         let source:Option<String>=sqlx::query_scalar("select source_uuid from account_link_requests where id=$1 and expires_at>now() and completed_at is null").bind(link).fetch_optional(&mut *tx).await?;
         let source = source
             .ok_or_else(|| ApiError::gone("link_expired", "This linking request expired."))?;
-        let browser = browser::current(&mut tx, &state, &headers).await?;
-        if browser.as_ref().map(|b| b.account.uuid.as_str()) != Some(source.as_str()) {
+        if current.as_ref().map(|b| b.account.uuid.as_str()) != Some(source.as_str()) {
             return Err(ApiError::forbidden(
                 "link_initiator_required",
                 "Begin linking from the account that requested it.",
@@ -428,18 +440,73 @@ pub async fn create_flow(
         }
         flow.extras.link_request_id = Some(link);
     }
+    flow.extras.interface_id = clean(&body.interface_id).map(str::to_string);
+    if let Some(raw) = clean(&body.interface_request) {
+        let request: crate::interfaces::InterfaceBinding = serde_json::from_str(raw)
+            .map_err(|_| ApiError::invalid_request("The Interface request binding is invalid."))?;
+        if flow.extras.interface_id.as_deref() != Some(request.interface_id.as_str())
+            || request.state.is_empty()
+            || request.code_challenge.len() != 43
+        {
+            return Err(ApiError::invalid_request(
+                "The Interface request binding does not match this sign-in.",
+            ));
+        }
+        let client:Option<(i64,Vec<String>)>=sqlx::query_as("select revision,redirect_uris from interface_auth_clients where interface_id=$1 and active for share")
+            .bind(&request.interface_id).fetch_optional(&mut *tx).await?;
+        let (revision, redirects) = client.ok_or_else(|| {
+            ApiError::forbidden(
+                "interface_disabled",
+                "This Interface is not accepting sign-ins.",
+            )
+        })?;
+        if !redirects.contains(&request.redirect_uri) {
+            return Err(ApiError::invalid_request(
+                "The Interface callback is not registered.",
+            ));
+        }
+        flow.extras.interface_request_binding =
+            Some(crate::interfaces::binding_hash(&state, &request));
+        flow.extras.interface_revision = Some(revision);
+    }
     flow.extras.intent = intent;
     flow.extras.browser_timezone = clean(&body.timezone).and_then(|t| normalize_timezone(t).ok());
 
-    let current = browser::current(&mut tx, &state, &headers).await?;
+    if fa.config.remember_browser && !prompt.login && flow.extras.link_request_id.is_none() {
+        let profiles =
+            accounts_core::http::browser_profiles::BrowserProfiles::load(&mut tx, &state, &headers)
+                .await?;
+        if current.is_none()
+            && let Some((session, cookie)) = profiles.resume(&state)
+        {
+            current = Some(browser::BrowserAccount {
+                session_id: session.id,
+                account: accounts_core::repo::accounts::require(&mut tx, &session.account_uuid)
+                    .await?,
+            });
+            response_cookies.push(cookie);
+        }
+        flow.extras.saved_sessions = profiles.session_ids();
+    }
     let usable_browser = current
         .as_ref()
         .filter(|b| b.is_active_carbon() && fa.config.remember_browser && !prompt.login);
     if prompt.none {
         // Given the browser's account as it is: when it can't be used, the error says why.
         silent_sign_in(&mut tx, &state, &meta, &mut flow, &fa, current.as_ref()).await?;
-    } else if usable_browser.is_none()
-        && let Some(session) = signup::from_cookie(&mut tx, &state, &headers).await?
+    } else if let Some(browser) = usable_browser {
+        // A proved browser can choose among linked accounts immediately; this does not
+        // authorize either identity until the choice is made and checked again.
+        let choices =
+            browser::choices(&mut tx, &browser.account.uuid, &flow, &fa.app.app_id).await?;
+        if choices.len() > 1 {
+            flow.step = Step::SelectAccount;
+            flow.account_uuid = Some(browser.account.uuid.clone());
+            flow.extras.authenticated_account_uuid = Some(browser.account.uuid.clone());
+            flow.extras.browser_session_id = Some(browser.session_id);
+            flow.extras.auth_method = Some(accounts_core::repo::audit::method::SESSION.to_string());
+        }
+    } else if let Some(session) = signup::from_cookie(&mut tx, &state, &headers).await?
         && signup::may_resume(&session, &fa, &state.settings)
     {
         // A sign-up verified in this browser in the last 48 hours continues here.
@@ -463,7 +530,7 @@ pub async fn create_flow(
     Ok(FlowResponse {
         status: StatusCode::CREATED,
         view,
-        cookies: vec![flow_cookie(&state.settings, &binding)],
+        cookies: response_cookies,
     })
 }
 
@@ -551,7 +618,7 @@ async fn silent_sign_in(
             ),
         );
     }
-    if !fa.first_party() {
+    if !fa.bypass_account_policies() {
         let standing = Standing::load(conn, &fa.app.app_id, &b.account).await?;
         if !details::missing_required_fields(&fa.config, &standing).is_empty() {
             return next::fail(
@@ -585,13 +652,8 @@ async fn silent_sign_in(
     flow.account_uuid = Some(b.account.uuid.clone());
     flow.extras.auth_method = Some(accounts_core::repo::audit::method::SESSION.to_string());
     flow.extras.browser_session_id = Some(b.session_id);
-    let choices = accounts_core::repo::organizations::linked_accounts(
-        conn,
-        &b.account.uuid,
-        Some(&fa.app.app_id),
-    )
-    .await?;
-    if choices["accounts"].as_array().is_some_and(|a| a.len() > 1) {
+    let choices = browser::choices(conn, &b.account.uuid, &flow, &fa.app.app_id).await?;
+    if choices.len() > 1 {
         return next::fail(
             state,
             flow,

@@ -1,7 +1,6 @@
 /* One column that never grows past the page: a wide control inside (the status filter) scrolls in its own track. */
 .proofs { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); gap: var(--space-12); }
 .muted { color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
-.problemList { display: grid; gap: var(--space-1); margin: var(--space-2) 0 0; padding: 0 0 0 1.1em; }
 
 /* The App verification creator. */
 .creator { display: grid; gap: var(--space-6); }
@@ -62,7 +61,6 @@
   .suggestion { transition: none; }
 }
 
-.alertLine { display: block; margin: 0; }
 .problemLines { display: grid; gap: var(--space-1); margin-top: var(--space-2); }
 .problemLines > span { display: block; }
 .wrapCode pre { white-space: pre-wrap; overflow-wrap: anywhere; }

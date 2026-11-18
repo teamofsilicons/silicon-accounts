@@ -265,11 +265,6 @@ impl Keyring {
     pub fn decrypt_string(&self, data: &[u8]) -> Result<String, CryptoError> {
         String::from_utf8(self.decrypt(data)?).map_err(|_| CryptoError::NotUtf8)
     }
-
-    /// True when the ciphertext was made with an older key (re-encrypt it on the next write).
-    pub fn needs_rotation(&self, data: &[u8]) -> bool {
-        data.first().is_some_and(|v| *v != self.current)
-    }
 }
 
 impl fmt::Debug for Keyring {
@@ -288,8 +283,6 @@ pub mod stk {
 
     use super::{CryptoError, random_bytes};
 
-    /// Generated STKs are `stk-` + 12 lowercase hex characters.
-    pub const GENERATED_HEX_LEN: usize = 12;
     /// Self-set STKs are 8..=32 hex characters.
     pub const MIN_HEX_LEN: usize = 8;
     pub const MAX_HEX_LEN: usize = 32;
@@ -567,7 +560,6 @@ mod tests {
             k2.decrypt_string(&ct).expect("old version still decrypts"),
             "whsec_secret"
         );
-        assert!(k2.needs_rotation(&ct));
         let ct2 = k2.encrypt_str("x").expect("encrypt");
         assert_eq!(ct2[0], 2);
         assert_eq!(k1.decrypt(&ct2), Err(CryptoError::UnknownKeyVersion(2)));

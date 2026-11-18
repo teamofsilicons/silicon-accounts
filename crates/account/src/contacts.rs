@@ -15,7 +15,7 @@
 use accounts_core::delivery;
 use accounts_core::events;
 use accounts_core::http::{CarbonAuth, ClientMeta, IdempotencyKey, Json, Path};
-use accounts_core::models::{AccountField, OtpChannel, OtpPurpose, VerifiedVia};
+use accounts_core::models::{OtpChannel, OtpPurpose, VerifiedVia};
 use accounts_core::normalize;
 use accounts_core::repo::contacts::{self, ContactKind};
 use accounts_core::repo::rate_limit::{self, Limit};
@@ -50,13 +50,6 @@ fn channel(kind: ContactKind) -> OtpChannel {
     match kind {
         ContactKind::Email => OtpChannel::Email,
         ContactKind::Phone => OtpChannel::Phone,
-    }
-}
-
-fn field(kind: ContactKind) -> AccountField {
-    match kind {
-        ContactKind::Email => AccountField::Email,
-        ContactKind::Phone => AccountField::Phone,
     }
 }
 
@@ -245,7 +238,7 @@ async fn verify(
         let announced = outcome.became_primary || primary_verified;
         if announced {
             let account = accounts::bump_version(&mut tx, me.uuid()).await?;
-            events::account_updated(&mut tx, &account, &[field(kind)]).await?;
+            events::account_updated(&mut tx, &account, &[kind.field()]).await?;
         }
         audit_self(
             &mut tx,
@@ -279,7 +272,7 @@ async fn make_primary(
     let changed = contacts::set_primary(&mut tx, kind, me.uuid(), &value).await?;
     if changed {
         let account = accounts::bump_version(&mut tx, me.uuid()).await?;
-        events::account_updated(&mut tx, &account, &[field(kind)]).await?;
+        events::account_updated(&mut tx, &account, &[kind.field()]).await?;
         audit_self(
             &mut tx,
             me.uuid(),

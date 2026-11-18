@@ -67,15 +67,3 @@
   .tile, .newTile, .tileArrow { transition: none; }
   .tile:active, .newTile:active { scale: none; }
 }
-
-/* "New app": where apps come from. */
-.dialog.dialog { width: min(calc(100vw - var(--space-8)), 520px); }
-.dialogBody { display: grid; gap: var(--space-4); }
-.dialogBody p { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-body); }
-.dialogBody .dialogLabel { color: var(--foreground); font-weight: 500; }
-.standIns { display: grid; gap: 2px; margin: -6px 0 0; padding: 0; list-style: none; }
-.standIn { --sq-r: 12px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: 6px 10px 6px 6px; border-radius: 12px; color: var(--foreground); text-decoration: none; }
-.standIn:hover, .standIn:focus-visible { outline: none; background: var(--surface-muted); color: var(--foreground); }
-.standInText { display: grid; min-width: 0; gap: 1px; font-size: var(--text-sm); }
-.standInText code { color: var(--text-secondary); font-size: var(--text-xs); }
-.dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }

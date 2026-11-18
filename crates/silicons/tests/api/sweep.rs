@@ -17,7 +17,7 @@ async fn the_sweep_expires_overdue_requests_and_releases_their_silicons() {
     let overdue = self_created(
         &ctx,
         &cid,
-        json!({"webhook_url": "http://127.0.0.1:8593/hooks/expiring"}),
+        json!({"ting_session_id":"recv_11111111111111111111111111111111"}),
     )
     .await;
     let fresh = self_created(&ctx, &cid, json!({})).await;
@@ -61,7 +61,7 @@ async fn the_sweep_expires_overdue_requests_and_releases_their_silicons() {
     );
     assert_eq!(
         delivery_urls(&ctx, uuid, "silicon.custodian.expired").await,
-        vec!["http://127.0.0.1:8593/hooks/expiring".to_string()]
+        Vec::<String>::new()
     );
     let actions = audit_actions(&ctx, uuid).await;
     assert!(actions.contains(&"silicon.custodian.expired".to_string()));
@@ -159,7 +159,7 @@ async fn silicons_named_by_a_deleted_carbon_are_released_by_the_deletion() {
     let polled = self_created(
         &ctx,
         &cid,
-        json!({"webhook_url": "http://127.0.0.1:8593/hooks/orphan"}),
+        json!({"ting_session_id":"recv_11111111111111111111111111111111"}),
     )
     .await;
     let signs_in = self_created(&ctx, &cid, json!({})).await;

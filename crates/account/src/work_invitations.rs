@@ -124,14 +124,14 @@ async fn invite_action(
             let scope=format!("org:{org}:invite:{id}:notify");
             let mut tx=state.db.begin().await?;
             if let Some(saved)=durable_replay(&mut tx,&state,&scope,key.as_deref(),&fingerprint).await?{tx.commit().await?;return Ok((StatusCode::OK,saved))}
-            let target:Option<String>=sqlx::query_scalar("select coalesce(i.account_uuid,(select e.account_uuid from account_emails e where e.email=i.email and e.verified_at is not null)) from organization_invitations i where i.invite_id=$1 and i.org_id=$2 and i.status='pending' and i.expires_at>now()").bind(&id).bind(&org).fetch_optional(&mut *tx).await?.flatten();
+            let target:Option<String>=sqlx::query_scalar("select coalesce(i.account_uuid,(select e.account_uuid from account_email_owners e where e.email=i.email and e.verified_at is not null)) from organization_invitations i where i.invite_id=$1 and i.org_id=$2 and i.status='pending' and i.expires_at>now()").bind(&id).bind(&org).fetch_optional(&mut *tx).await?.flatten();
             let mut delivered=0;
             if let Some(target)=target {
                 let mut notification=body.get("notification").cloned().ok_or_else(||ApiError::unprocessable("notification_required","Provide a notification."))?;
                 validate_notification_type(string(&notification,"type")?)?;
                 let stable_key=string(&notification,"key")?.to_owned();
                 notification["for"]=json!(target);notification["key"]=json!(format!("{stable_key}:invite:{id}"));
-                let base=std::env::var("ACCOUNTS_TING_URL").unwrap_or_else(|_|"https://ting.teamofsilicons.com".into());
+                let base=&state.settings.ting_url;
                 let response=state.http.post(format!("{}/v1/tings",base.trim_end_matches('/'))).bearer_auth(string(&body,"proof_token")?).json(&notification).send().await.map_err(|_|ApiError::unavailable("ting_unavailable","Ting could not be reached; retry the same notification."))?;
                 if !response.status().is_success(){return Err(ApiError::unavailable("ting_delivery_failed","Ting refused this invitation notification. Retry after the recipient's subscription is available."))}
                 delivered=1;
@@ -396,7 +396,7 @@ async fn mail(
         let mut destinations=vec![];
         if org=="system" {
             let email=body.get("to_email").and_then(Value::as_str).unwrap_or("");
-            if body.get("kind").and_then(Value::as_str)!=Some("bug_report") || !["saketdev12@gmail.com","shubhastro2@gmail.com","bugs@teamofsilicons.com"].contains(&email) || body.get("to_uuid").is_some(){return Err(ApiError::forbidden("report_recipient_forbidden","System mail is restricted to configured bug-report recipients."))}
+            if body.get("kind").and_then(Value::as_str)!=Some("bug_report") || !state.settings.report_recipients.iter().any(|r| r==email) || body.get("to_uuid").is_some(){return Err(ApiError::forbidden("report_recipient_forbidden","System mail is restricted to configured bug-report recipients."))}
         }
         if let Some(email)=body.get("to_email").and_then(Value::as_str){destinations.push(accounts_core::normalize::normalize_email(email)?);}
         if let Some(uuid)=body.get("to_uuid").and_then(Value::as_str){
@@ -404,7 +404,7 @@ async fn mail(
             let invited:bool=sqlx::query_scalar("select exists(select 1 from organization_invitations where org_id=$1 and account_uuid=$2)").bind(&org).bind(uuid).fetch_one(&mut *tx).await?;
             if !own&&!invited{return Err(ApiError::forbidden("notification_recipient_forbidden","Notify only this organization's work accounts or invited Carbons."))}
             let main=orgs::main_uuid(&mut tx,uuid).await?;
-            let emails:Vec<String>=sqlx::query_scalar("select email from account_emails where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in (select account_uuid from account_links where main_uuid=$2)) order by is_primary desc,email").bind(uuid).bind(&main).fetch_all(&mut *tx).await?;
+            let emails:Vec<String>=sqlx::query_scalar("select email from account_email_owners where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in (select account_uuid from account_links where main_uuid=$2)) order by is_primary desc,email").bind(uuid).bind(&main).fetch_all(&mut *tx).await?;
             destinations.extend(emails);
             let old:Vec<String>=sqlx::query_scalar("select email from organization_notification_contacts where account_uuid=$1 and expires_at>now()").bind(uuid).fetch_all(&mut *tx).await?;destinations.extend(old);
         }

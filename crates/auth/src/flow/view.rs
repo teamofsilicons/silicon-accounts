@@ -7,10 +7,10 @@ use accounts_core::models::{Branding, Method, OtpChannel, OtpPurpose, SigninCopy
 use accounts_core::repo::{accounts, otp};
 use accounts_core::timefmt::rfc3339_ms;
 use accounts_core::views::AccountSummary;
-use accounts_core::{ApiResult, AppState};
+use accounts_core::{ApiError, ApiResult, AppState};
 use serde::Serialize;
 use sqlx::PgConnection;
-use time::{Date, OffsetDateTime};
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use super::FlowApp;
@@ -157,42 +157,59 @@ pub async fn build(
 
     let choices = if flow.step == Step::SelectAccount {
         match flow.extras.authenticated_account_uuid.as_deref() {
-            Some(uuid) => accounts_core::repo::organizations::linked_accounts(
-                conn,
-                uuid,
-                Some(&fa.app.app_id),
-            )
-            .await?["accounts"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default(),
+            Some(uuid) => super::browser::choices(conn, uuid, flow, &fa.app.app_id).await?,
             None => vec![],
         }
     } else {
         vec![]
     };
-    let branding = fa.config.branding.clone();
+    let mut branding = fa.config.branding.clone();
+    let mut app_view = FlowAppView {
+        app_id: fa.app.app_id.clone(),
+        name: fa.app.name.clone(),
+        logo_url: branding
+            .logo_url
+            .clone()
+            .or_else(|| fa.app.logo_url.clone()),
+        logo_dark_url: branding
+            .logo_dark_url
+            .clone()
+            .or_else(|| fa.app.logo_dark_url.clone()),
+        homepage_url: fa.app.homepage_url.clone(),
+        branding: branding.clone(),
+        copy: fa.config.copy.clone(),
+        first_party: fa.first_party(),
+    };
+    if let Some(interface_id) = &flow.extras.interface_id {
+        let row: Option<(String, Option<String>, serde_json::Value)> = sqlx::query_as("select name,logo_url,branding from interface_auth_clients where interface_id=$1 and active")
+            .bind(interface_id).fetch_optional(&mut *conn).await?;
+        let (name, logo_url, appearance) = row.ok_or_else(|| {
+            ApiError::forbidden(
+                "interface_disabled",
+                "This interface is no longer accepting sign-ins.",
+            )
+        })?;
+        branding = accounts_core::models::SigninConfig::from_stored(
+            &serde_json::json!({"branding":appearance}),
+        )
+        .branding;
+        app_view = FlowAppView {
+            app_id: format!("interface:{interface_id}"),
+            name,
+            logo_url: branding.logo_url.clone().or(logo_url),
+            logo_dark_url: branding.logo_dark_url.clone(),
+            homepage_url: None,
+            branding,
+            copy: fa.config.copy.clone(),
+            first_party: false,
+        };
+    }
     Ok(FlowView {
         id: flow.id.clone(),
         step: flow.step,
         accounts: choices,
         expires_at: flow.expires_at,
-        app: FlowAppView {
-            app_id: fa.app.app_id.clone(),
-            name: fa.app.name.clone(),
-            logo_url: branding
-                .logo_url
-                .clone()
-                .or_else(|| fa.app.logo_url.clone()),
-            logo_dark_url: branding
-                .logo_dark_url
-                .clone()
-                .or_else(|| fa.app.logo_dark_url.clone()),
-            homepage_url: fa.app.homepage_url.clone(),
-            branding,
-            copy: fa.config.copy.clone(),
-            first_party: fa.first_party(),
-        },
+        app: app_view,
         methods: fa.config.available_methods(&state.settings),
         signed_in_as,
         challenge,
@@ -217,9 +234,4 @@ pub(crate) async fn live_challenge(
         .await?
         .filter(|c| c.purpose == purpose && c.consumed_at.is_none())
         .map(|c| ChallengeView::from_challenge(&c)))
-}
-
-/// Today's date (UTC) — the sign-up dob suggestion is based on it.
-pub fn today() -> Date {
-    accounts_core::timefmt::today_utc()
 }

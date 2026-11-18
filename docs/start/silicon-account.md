@@ -88,7 +88,7 @@ silicon-accounts silicon create --id si:scout --custodian c:saket --wait
 | `--custodian c:saket` or `--custodian saket@example.com` | the Carbon you ask; required when a Silicon creates its own account |
 | `--display-name "Scout"` | defaults to a name made from the id (`si:head_of_growth` becomes `Head of growth`) |
 | `--timezone Europe/Berlin` | an IANA timezone; defaults to this machine's timezone, else `UTC` |
-| `--webhook https://…` | your own webhook; see [Get notified](#get-notified-with-a-webhook) |
+| `--ting-session-id recv_…` | attach a live anonymous Ting receiver; see [Notifications](silicon-notifications.md) |
 | `--stk-stdin` | choose your own STK instead of a generated one; see [The STK](#the-stk) |
 | `--wait` | keep running until the custodian decides, then sign in |
 | `--idempotency-key <key>` | reuse it when retrying; see [Retry safely](#retry-safely) |
@@ -123,7 +123,7 @@ silicon-accounts silicon request status 01a11433-097f-71b5-9ab2-9fbf26649772 --w
 polling token (`sarq_…`) in `{home}/.accounts/requests/<request-id>.json` (mode 0600):
 
 ```sh
-silicon-accounts silicon create --id si:ledger --custodian c:saket --webhook https://ledger.example/hooks/accounts
+silicon-accounts silicon create --id si:ledger --custodian c:saket --ting-session-id recv_0123456789abcdef0123456789abcdef
 ```
 
 ```text
@@ -159,9 +159,7 @@ silicon-accounts silicon request status 01a11435-b2e0-75eb-98ff-d43d2c839070 --j
 `request status` reads the token from that saved file. From another home or another machine, pass
 it with `--token sarq_…`.
 
-**Be told (`--webhook`).** If you run for days, this is the one to pick. Polling for two weeks is
-wasteful, and a webhook reaches you within seconds of the decision. See
-[Get notified with a webhook](#get-notified-with-a-webhook).
+**Be told through Ting.** Start `ting listen --anonymous --app silicon-accounts --json` and pass its session ID with `--ting-session-id`. Hints contain only the request ID; fetch the decision with your saved request token. See [session setup and reconnects](silicon-notifications.md).
 
 ### 3. Act on the answer
 
@@ -196,7 +194,7 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons \
   -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: create-si-ledger-1' \
   -d '{"id":"si:ledger","display_name":"Ledger","custodian":"saket@example.com",
-       "timezone":"Asia/Kolkata","webhook_url":"https://ledger.example/hooks/accounts"}'
+       "timezone":"Asia/Kolkata","ting_session_id":"recv_0123456789abcdef0123456789abcdef"}'
 ```
 
 `201 Created`:
@@ -225,17 +223,17 @@ curl -s -X POST https://accounts.teamofsilicons.com/v1/silicons \
     "updated_at": "2026-10-07T02:32:47.969Z",
     "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba",
     "version": 1,
-    "webhook_url": "https://ledger.example/hooks/accounts"
+    "webhook_url": null
   },
   "stk": "stk-08708e31e274",
-  "webhook_secret": "whsec_qJSJ8t7NKvzI528yBKXce_HkzO71Y31sL5mULCu5f0I"
+  "webhook_secret": null
 }
 ```
 
 In the body, `id`, `display_name` (1 to 100 characters) and `custodian` (a `c:id` or an email) are
-required. `timezone`, `pfp_url` (https), `stk` and `webhook_url` are optional, and we refuse any
+required. `timezone`, `pfp_url` (https), `stk` and `ting_session_id` are optional, and we refuse any
 field we don't know. In the response, `stk` is `null` when you chose your own STK, and
-`webhook_secret` is `null` when you gave no webhook. A custodian you named by email comes back
+The legacy `webhook_secret` field is always `null`. A custodian you named by email comes back
 masked (`s***@example.com`); one you named by `c:id` comes back as the `c:id`.
 
 Then poll the request with its token:
@@ -415,130 +413,13 @@ The same session gets you identity tokens for AWS, Google Cloud and Microsoft En
 Silicon in CI and the cloud](ci-and-cloud.md) has the full setup for GitHub Actions, GitLab and
 each cloud.
 
-## Get notified with a webhook
+## Receive account notifications through Ting
 
-A webhook tells you, the Silicon, about your own account. Set it when you create the account
-(`--webhook` or `webhook_url`), or later, signed in as the Silicon:
-
-```sh
-silicon-accounts webhook set https://scout.example/hooks/accounts
-```
-
-```text
-Webhook of si:scout set to https://scout.example/hooks/accounts.
-Signing secret (shown once, store it now): whsec_VtcXQvX85bClvfp5_3WPNR0BML_AwWmNkncNKqqmqww
-Verify every delivery's X-Accounts-Signature with it (`silicon-accounts docs webhooks`).
-```
-
-`silicon-accounts webhook test` queues a `ping`, and `silicon-accounts webhook remove` stops the
-notifications. Setting the URL again gives you a new secret. Your custodian can set or remove the
-same webhook with `silicon-accounts silicon webhook set si:scout https://scout.example/hooks/accounts`
-and `silicon-accounts silicon webhook remove si:scout`.
-
-Every delivery is a signed `POST` with a JSON body. These are the events, and a real payload
-follows the table:
-
-| event | when | `data` |
-|---|---|---|
-| `silicon.created` | the account was created (by you or a Carbon) | `uuid`, `id`, `status`, `silicon` (your account), `request` (`null` when a Carbon created it) |
-| `silicon.custodian.accepted` | your custodian accepted; you can sign in | `uuid`, `id`, `request_id`, `custodian`, `silicon` |
-| `silicon.custodian.declined` | the Carbon declined, or deleted their account first; the account was released | `uuid`, `id`, `request_id`, `custodian`, `decided_at`, `reason` (`declined` or `custodian_account_deleted`), `released: true` |
-| `silicon.custodian.expired` | nobody accepted within 14 days; the account was released | `uuid`, `id`, `request_id`, `custodian`, `expired_at`, `released: true` |
-| `silicon.updated` | your display name, timezone or photo changed | `uuid`, `id`, `changed`, `silicon` |
-| `silicon.id_changed` | your si:id changed | `uuid`, `old_id`, `new_id` |
-| `silicon.stk_rotated` | your custodian rotated your STK; your sessions are gone | `uuid`, `id`, `rotated_at`, `rotated_by` |
-| `silicon.custodian.changed` | a transfer moved you to another custodian | `uuid`, `id`, `from`, `to` (each a full account summary; apps get only `{uuid, id}`) |
-| `silicon.federation.added` | you or your custodian trusted a CI job's tokens ([Run a Silicon in CI and the cloud](ci-and-cloud.md)) | `uuid`, `id`, `federation`, `by` |
-| `silicon.federation.removed` | a trust was removed; the sign-ins it started ended (CI sign-ins, and app sign-ins made from their short-lived tokens) | `uuid`, `id`, `federation`, `ended_sessions` (both kinds counted), `by` |
-| `silicon.identity_audiences.changed` | your custodian changed which clouds you may get identity tokens for | `uuid`, `id`, `audiences`, `by` |
-| `ping` | a test from `silicon-accounts webhook test` | `{}` |
-
-Here is the envelope, for an expired request:
-
-```json
-{
-  "app_id": null,
-  "data": {
-    "custodian": "c:shubham",
-    "expired_at": "2026-10-07T02:35:04.937Z",
-    "id": "si:courier",
-    "released": true,
-    "request_id": "01a11436-72f0-7296-a867-39e04d9a53c0",
-    "uuid": "93524e0d-db12-458e-aa7a-07d08c9906d5"
-  },
-  "event_id": "01a11437-0385-74ac-bda4-e23549dd0e06",
-  "occurred_at": "2026-10-07T02:35:12.133Z",
-  "silicon": "93524e0d-db12-458e-aa7a-07d08c9906d5",
-  "type": "silicon.custodian.expired"
-}
-```
-
-`silicon` is your uuid, and `app_id` is always `null` on a Silicon webhook. Every delivery carries
-the headers `X-Accounts-Event-Id`, `X-Accounts-Event-Type`, `X-Accounts-Delivery-Id`,
-`X-Accounts-Timestamp` and `X-Accounts-Signature: v1=<hex HMAC-SHA256(secret, "{timestamp}.{raw body}")>`,
-and comes with `User-Agent: SiliconAccounts-Webhooks/1`.
-
-Here's a receiver in TypeScript (Node 22 or later). It verifies the signature, refuses stale
-timestamps and drops duplicates:
-
-```ts
-import { createServer } from 'node:http';
-import { createHmac, timingSafeEqual } from 'node:crypto';
-
-const SECRET = process.env.SILICON_WEBHOOK_SECRET!; // whsec_…, the whole string is the key
-const seen = new Set<string>(); // use durable storage in production
-
-function verify(timestamp: string | undefined, signature: string | undefined, raw: Buffer): boolean {
-  if (!timestamp || !signature) return false;
-  if (!(Math.abs(Date.now() / 1000 - Number(timestamp)) <= 300)) return false; // 5 minutes
-  const expected = createHmac('sha256', SECRET).update(`${timestamp}.`).update(raw).digest();
-  // The header is a comma-separated list of v1=<hex> entries; accept any that matches.
-  return signature.split(',').some((entry) => {
-    const given = Buffer.from(entry.trim().replace(/^v1=/, ''), 'hex');
-    return entry.trim().startsWith('v1=') && given.length === expected.length && timingSafeEqual(given, expected);
-  });
-}
-
-createServer((req, res) => {
-  const chunks: Buffer[] = [];
-  req.on('data', (c) => chunks.push(c));
-  req.on('end', () => {
-    const raw = Buffer.concat(chunks); // verify the raw bytes, before parsing
-    const ok = verify(req.headers['x-accounts-timestamp'] as string, req.headers['x-accounts-signature'] as string, raw);
-    if (!ok) return void res.writeHead(401).end();
-    res.writeHead(204).end(); // answer within 10 seconds, then do the work
-    const event = JSON.parse(raw.toString('utf8'));
-    if (seen.has(event.event_id)) return; // retries and replays reuse the event id
-    seen.add(event.event_id);
-    if (event.type === 'silicon.stk_rotated') {
-      // your STK changed: stop, and get the new one from your custodian
-    }
-  });
-}).listen(8080);
-```
-
-What to know when you rely on it:
-
-- **`silicon.created` usually arrives before you have stored the secret.** We send it the moment
-  the account exists, often before the create response reaches you. Answer it with a non-2xx
-  status and we retry it 10 seconds later, then after 30 s, 1 min, 5 min, 15 min, 30 min and then
-  hourly, for up to 72 hours, always with the same `event_id`.
-- **Answer with any 2xx within 10 seconds**, then do the work. Anything else counts as a failed
-  attempt.
-- **Deduplicate on `event_id`.** The same event can arrive more than once.
-- **The URL must be https** and reach a public server. We refuse local and private addresses.
-- **Test pings are limited** to 10 per hour per Silicon, and a new ping replaces earlier ones that
-  are still being retried.
-- **A delivery that still fails 72 hours after the event is marked failed, and you can replay
-  it.** See what failed with `silicon-accounts webhook deliveries --status failed`
-  (`GET /v1/me/webhook/deliveries?status=failed`), fix your endpoint, then send it again with
-  `silicon-accounts webhook replay --failed` (`POST /v1/me/webhook/replay` `{"status": "failed"}`).
-  A replay keeps the same `event_id`, uses your current URL and secret, and gets a fresh 72 hours.
-  Test pings are never replayed, so just send a new one. Your custodian can do the same for you
-  ([A Silicon's deliveries and replays](webhooks.md#a-silicons-deliveries-and-replays)).
-
-You'll find signature verification in Rust, replays and every delivery rule in
-[Receive webhooks](webhooks.md) and [How webhooks work](../learn/webhooks.md).
+Use `silicon-accounts notifications enable`, sign into Ting as the same Silicon and run `ting listen`.
+For self-creation before sign-in, use an anonymous Ting session and `--ting-session-id`; reconnect with
+`silicon request attach-session`. See [Silicon account notifications](silicon-notifications.md) for the full
+setup, event catalog, consent, reconnect and revocation behavior. Own-Silicon webhooks and account event
+streams have been replaced by Ting.
 
 ## Retry safely
 
@@ -551,7 +432,7 @@ silicon-accounts silicon create --id si:scout --custodian c:saket --idempotency-
 ```
 
 Within 10 minutes, the same key with the same body returns the original response: the same STK,
-request token and webhook secret, plus the header `Idempotent-Replayed: true`. The window is 10
+request token, plus the header `Idempotent-Replayed: true`. The window is 10
 minutes instead of the usual 24 hours because the stored copy holds those secrets (we keep it
 encrypted). For self-creation the key belongs to the network you call from, so retry from the same
 machine. The same key with a different body answers `409 idempotency_key_reused`.

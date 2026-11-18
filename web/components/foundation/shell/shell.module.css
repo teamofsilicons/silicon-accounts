@@ -40,22 +40,7 @@
 /* A phone has no keyboard shortcut to show. */
 @media (max-width: 899px) { .keys { display: none; } }
 
-/* The account menu's row at Search's height (--control-height-sm, 32px here) with a 24px photo, not UserMenu's 40 with 32 (Anil, 2026-11-17:
-   "reduce the height"; it was 44 with 36 in the top bar). UserMenu has no size option, so this reaches into its
-   trigger: a tolerated difference (redesign/prototype-differences.md). */
-.account.account { height: var(--control-height-sm); }
-/* At the sidebar's foot the trigger runs the sidebar's width (Anil, 2026-11-17: "a full width element"): the photo,
-   the name filling the row (UserMenu caps it at 11rem), the chevron at the end. UserMenu has no full-width option, so
-   this reaches into its trigger: a tolerated difference (redesign/prototype-differences.md). */
-/* Its corners are the sidebar's other rows' (NavList, Search: --radius-control), not a pill, and the photo's follow
-   them, less the trigger's 4px inset (Anil, 2026-11-17: "uniform border radius like other elements, and also for the
-   pfp"; the photo through Silicon UI's --avatar-radius). */
-.account.account { --avatar-radius: calc(var(--radius-control) - var(--space-tight)); --avatar-corner-shape: var(--corner-shape); width: 100%; min-width: 0; justify-content: flex-start; border-radius: var(--radius-control); corner-shape: var(--corner-shape); }
-.account.account [data-size] + span { max-width: none; flex: 1; min-width: 0; text-align: start; }
-/* UserMenu hides the name and chevron under 640px (a top bar's room); in the phone sheet the row is full width, so
-   they stay. */
-@media (max-width: 639px) { .account.account [data-size] + span, .account.account > svg { display: block; } }
-.account.account [data-size="sm"] { --face-size: calc(var(--control-height-sm) - 2 * var(--space-tight)); }
+/* The account row at the sidebar's foot is the account switcher's (profile-menu.module.css). */
 
 /* Below the top bar: the section list and the page, inset 8px, with 8px between them. */
 .body { --sidebar-width: 248px; position: relative; display: grid; min-width: 0; flex: 1; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); gap: var(--space-related); padding: var(--space-related); transition: grid-template-columns var(--duration-standard) var(--ease-standard); }

@@ -6,6 +6,8 @@ and setting up an app's authentication (its sign-in methods, Google and Apple, t
 pages, redirect URIs and allowed origins, its user base and imports, its webhook and deliveries, its app verifications, and the
 snippets to embed sign-in). The same app workspace also creates apps, saves seven setup steps, uploads and validates packages, manages releases and authors, and publishes through Silicon Apps. Each service retains its own backend. The portal contains no store catalog; discovery and installation live at apps.teamofsilicons.com.
 
+Your apps combines all pages of the Accounts configuration list and the Silicon Apps author list. Publishing-only apps, including Silicon Accounts itself, expose Publishing, Releases, Authors and History after Apps confirms authorship. Their protected Accounts configuration remains inaccessible; publishing authorship does not grant access to it.
+
 Next.js 16 (App Router, Turbopack) with React 19 and TypeScript in strict mode, pnpm, Arc UI, TanStack Query. The
 product contract is `../understanding/UNDERSTANDING.md` (never edited here); nothing in this app overrides it. Runtime-independent from the rest of this repository: documentation sources are bundled at build time.
 
@@ -95,6 +97,8 @@ Read at request time (`lib/server/config.ts`), never baked into the build:
 | Variable | Default | What |
 | --- | --- | --- |
 | `APPS_API_URL` | dev: `http://127.0.0.1:4310`; prod: `https://apps.teamofsilicons.com` | Silicon Apps upstream, server to server. It must trust the same Silicon Accounts as `ACCOUNTS_API_URL` (its `APPS_ACCOUNTS_URL` is that service's public URL), or it refuses this site's tokens and the pages say so. `scripts/dev.sh` sets it per stack (base + 6). |
+| `DEVELOPER_INTERFACE_CELLS_ENABLED` | dev: enabled; prod: disabled | Set exactly `true` to enable Interface Cell setup after the Cells upgrade is verified, or `false` to disable it. Other Cells features are unaffected. |
+| `INTERFACES_API_URL` | dev: `http://127.0.0.1:8670`; prod: `https://api.interfaces.teamofsilicons.com` | Silicon Interfaces upstream for authoring. The browser calls the same-origin `/api/interfaces/*` proxy and never receives the Accounts access token. |
 | `ACCOUNTS_API_URL` | `http://127.0.0.1:8589` | The Silicon Accounts API, server to server. |
 | `ACCOUNTS_PUBLIC_URL` | dev `http://localhost:8590`, prod `https://accounts.teamofsilicons.com` | The accounts site: hosted sign-in, the SDK. |
 | `DEVELOPER_PUBLIC_URL` (or `ACCOUNTS_DEVELOPER_URL`) | dev `http://localhost:$PORT` (8600), prod `https://developers.teamofsilicons.com` | This site's origin; the redirect URI is exactly `{it}/auth/callback`, as the API's `ACCOUNTS_DEVELOPER_URL` says. |
@@ -226,6 +230,8 @@ See `lib/docs/README.md` for the Markdown authoring format. Accounts' former doc
 
 ## The app's tabs
 
+Interfaces are managed at `/interfaces`: creation and one-time secret display, invitations, listing and sign-in configuration, creator management, image and release uploads, release creation, publishing readiness, verification requests and history. The BFF forwards only allowlisted author routes, requires the sealed developer session and same-origin mutations, and bounds and streams uploaded files. Publishing app links include the app's interface API documentation, optional Markdown use cases and license; incomplete use cases are kept as a local draft until saved. `/docs/interfaces` is the introductory guide.
+
 - **Publishing** (`components/publishing/`): seven freely traversable setup steps. Autosaves flush before the portal navigates; a failed save blocks links and tabs. Browser Back/Forward keeps a failed draft in memory and offers a return action. Reloading or closing still requires the browser’s unsaved-work warning. Secrets remain component-local and are never written to storage. Releases, author administration, invitations and history share the same app and shell.
 - **Shared identity**: the Apps API validates the first-party developer token’s signature, issuer, expiry and live Accounts token family on every call, then enforces its UUID author/admin policy. The browser never receives or reuses a token directly.
 
@@ -329,5 +335,34 @@ Registration uses explicit consent from the Cells CLI; the Developer bearer
 session cannot issue that proof. Files shows the latest storage permission check
 and outage state. A 2026-10-28 manual local browser pass retried a rejected
 notification and verified its transition to Accepted by Ting through a controlled
-receiver using real Accounts proofs. Production Ting compatibility and the full
-Cells acceptance pass remain outstanding; see the Cells repository ledger.
+receiver using real Accounts proofs. Production Ting catalog registration, explicit shared-Silicon self-delivery and
+Cells acceptance subsequently passed; see the Cells repository release record.
+
+
+Compiled functions can be uploaded through **Functions → Upload WebAssembly**.
+The browser accepts a compiled `.wasm` file directly, preserves its binary bytes,
+and checks the supported command ABI before sending it to the server for isolated
+runtime validation. It never compiles arbitrary source into Wasm. See the Cells
+repository’s `docs/functions.md` for `wasm32-wasip1`, `_start`, WASI Preview 1 and
+`cells.function.v1`. Existing JavaScript/TypeScript editing and versioning remain.
+
+The Cells feature collection is in that repository’s `docs/README.md` and the
+versioned CLI guides. The public docs builder above still includes Accounts and
+Apps only; `/docs/cells` has not been published by this release.
+
+## Cells Ting 0.4 sessions
+
+The Cells History notification panel can explicitly opt into live updates.
+`POST /api/cells/cells/{cell}/notifications/live` is the sole new proxy route;
+it keeps the existing CSRF checks and sealed Accounts session. Cells opens and
+bounds the Ting receiver server-side. Only empty refresh hints return as SSE;
+private records are refetched through author-only routes. Polling resumes when
+the live connection ends, and stopping/unmounting cancels the stream. It does
+not grant the account a durable Ting subscription or change its preferences.
+
+Event Ting recipient configuration accepts account UUID lines and session JSON
+lines (`{"session_id":"recv_…","for":"ACCOUNT_UUID"}`). The backend preserves
+original targets and cancels old pending targets on replacement. The original
+recipient form is shown only in the explicit private delivery detail. See the
+Cells repository's `docs/ting-sessions.md` and `docs/ting-types.json` for the
+required catalog/migration and deployment boundary.

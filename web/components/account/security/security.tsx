@@ -34,7 +34,7 @@ import { formatPhone, formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useMe, useMeta } from "@/lib/query/session";
 import { browserLogo, browserOf } from "../parts/browser";
-import { keepSession, readKept, staleSession, subscribeKept } from "../parts/checkup";
+import { keepSession, readKept, staleSessions, subscribeKept } from "../parts/checkup";
 import { asCarbon, asSilicon, describeError, spanText, stkRotatedAt, useNow } from "../parts/common";
 import { useConnectProvider, useEverySession, useEverySilicon, useSignOutSession, useUnlinkProvider } from "../parts/queries";
 import { PageBar } from "../parts/page-bar";
@@ -42,22 +42,22 @@ import { SiliconMark } from "../parts/silicon-mark";
 import { ChangeKeyDialog } from "../silicons/change-key";
 import { dismissReveal, usePendingReveals } from "../parts/reveals";
 import { SecretReveal } from "../parts/secret-reveal";
-import { ContactList, LinkResult, PROVIDER_NAMES, ProviderMark } from "../sign-in-methods/sign-in-methods";
+import { ContactList, interfaceReturn, LinkResult, PROVIDER_NAMES, ProviderMark, securityHref } from "../sign-in-methods/sign-in-methods";
 import { sessionName } from "./sessions";
 import { LinkItem, LinkRow, Row, Section, Tile } from "../parts/rows";
 import styles from "./security.module.css";
-
-/** Email code and Text code open their list in a dialog at ?edit=email or ?edit=phone, like Personal info's rows. */
-const editHref = (channel: "email" | "phone") => `${paths.signInMethods}?edit=${channel}`;
 
 export function Security() {
   const me = useMe();
   const carbon = asCarbon(me.data);
   const silicon = asSilicon(me.data);
   const router = useRouter();
-  const asked = useSearchParams().get("edit");
+  const search = useSearchParams();
+  const asked = search.get("edit");
   const editing = asked === "email" || asked === "phone" ? asked : null;
-  const close = () => router.replace(paths.signInMethods, { scroll: false });
+  // An Interface sign-in sent you here for a detail it needs; every link on this page keeps the way back.
+  const backTo = interfaceReturn(search.get("return_to"));
+  const close = () => router.replace(securityHref(backTo), { scroll: false });
 
   return (
     <div>
@@ -69,17 +69,27 @@ export function Security() {
           <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => void me.refetch()}>Try Again</Button></span>
         </Alert>
       ) : silicon ? (
-        <EmptyState
-          icon={<KeyRound width={24} height={24} strokeWidth={1.5} />}
-          title="Silicons sign in with an STK"
-          description={`${silicon.id ?? "This Silicon"} signs in with its si:id and STK, not with emails or phone numbers. Its custodian can rotate the STK.`}
-        />
+        <>
+          <EmptyState
+            icon={<KeyRound width={24} height={24} strokeWidth={1.5} />}
+            title="Silicons sign in with an STK"
+            description={`${silicon.id ?? "This Silicon"} signs in with its si:id and STK, not with emails or phone numbers. Its custodian can rotate the STK.`}
+          />
+          {/* A Silicon signed in here can still see where it is signed in, and end what it doesn't recognise. */}
+          <Devices />
+        </>
       ) : carbon ? (
         <>
           <LinkResult />
-          <Checkup carbon={carbon} onAddPhone={() => router.push(editHref("phone"), { scroll: false })} />
+          {backTo ? (
+            <Alert tone="info" title="Return to your Interface">
+              Add and verify the detail it needs, then continue signing in.
+              <span className={styles.alertAction}><Button variant="secondary" size="sm" onClick={() => router.push(backTo)}>Continue Signing In</Button></span>
+            </Alert>
+          ) : null}
+          <Checkup carbon={carbon} onAddPhone={() => router.push(securityHref(backTo, "phone"), { scroll: false })} />
           <SiliconKeys />
-          <YourSignIn carbon={carbon} />
+          <YourSignIn carbon={carbon} backTo={backTo} />
           <Devices />
           <ActivityRow />
           <Dialog open={!!editing} onOpenChange={open => { if (!open) close(); }}>
@@ -88,7 +98,7 @@ export function Security() {
                 // With no number yet the dialog opens on the form, so it says what it's for (Anil, 2026-11-10, copy B).
                 title={editing === "email" ? "Email code" : carbon.phones.length === 0 ? "Add a phone number" : "Text code"}
                 description={editing === "email"
-                  ? "A code sent to any of these emails signs you in. Apps that can see your email get the primary one."
+                  ? "Your primary email signs you in and is shared with apps you approve. If you use an email on more than one account, it signs in to the account where it is primary."
                   : carbon.phones.length === 0
                     ? "Once it’s verified, you can sign in with a code texted to it."
                     : "A code texted to any of these numbers signs you in. Apps that can see your phone number get the primary one."}
@@ -120,7 +130,7 @@ function Checkup({ carbon, onAddPhone }: { carbon: CarbonMe; onAddPhone: () => v
   const signOut = useSignOutSession();
   const now = useNow(30_000);
   const kept = useSyncExternalStore(subscribeKept, readKept, () => "");
-  const stale = staleSession(sessions.data?.items, now, kept);
+  const [stale] = staleSessions(sessions.data?.items, now, kept);
   const noPhone = carbon.phones.length === 0;
   const count = Number(noPhone) + Number(!!stale);
   if (!count) return null;
@@ -164,7 +174,7 @@ function SiliconKeys() {
         {list.map(silicon => {
           const made = stkRotatedAt(silicon) ?? silicon.created_at;
           return (
-            <Row key={silicon.uuid} lead={<SiliconMark seed={silicon.uuid} size={28} />}
+            <Row key={silicon.uuid} lead={<SiliconMark seed={silicon.uuid} photo={silicon.pfp_url} size={28} />}
               title={silicon.display_name || silicon.id || "A Silicon"}
               detail={<>Made <span className={styles.strong}>{formatRelative(made, now)}</span></>}>
               <Button variant="secondary" size="sm" aria-label={`Change ${silicon.display_name || silicon.id || "this Silicon"}'s key`} onClick={() => setChanging(silicon.uuid)}>Change</Button>
@@ -179,7 +189,7 @@ function SiliconKeys() {
 
 /* Your sign-in ------------------------------------------------------------------------------------------------------- */
 
-function YourSignIn({ carbon }: { carbon: CarbonMe }) {
+function YourSignIn({ carbon, backTo }: { carbon: CarbonMe; backTo: string | null }) {
   const meta = useMeta();
   const connect = useConnectProvider();
   const [connecting, setConnecting] = useState<Provider | null>(null);
@@ -190,7 +200,7 @@ function YourSignIn({ carbon }: { carbon: CarbonMe }) {
     setError(null);
     setConnecting(provider);
     try {
-      const connection = await connect.mutateAsync({ provider, returnTo: paths.signInMethods });
+      const connection = await connect.mutateAsync({ provider, returnTo: securityHref(backTo) });
       window.location.assign(connection.authorize_url);
     } catch (raw) {
       setError({ provider, text: describeError(raw) });
@@ -217,8 +227,8 @@ function YourSignIn({ carbon }: { carbon: CarbonMe }) {
         );
       })}
       {/* The prototype's srow: the whole row opens its list in a dialog (?edit=…), a chevron at its end. */}
-      <LinkItem href={editHref("email")} replace scroll={false} lead={<Tile><AtSign size={16} strokeWidth={2} /></Tile>} title="Email code" detail={emails.length ? emails.join(", ") : "Not set up"} />
-      <LinkItem href={editHref("phone")} replace scroll={false} lead={<Tile><Phone size={16} strokeWidth={2} /></Tile>} title="Text code" detail={phones.length ? phones.join(", ") : "Not set up"} />
+      <LinkItem href={securityHref(backTo, "email")} replace scroll={false} lead={<Tile><AtSign size={16} strokeWidth={2} /></Tile>} title="Email code" detail={emails.length ? emails.join(", ") : "Not set up"} />
+      <LinkItem href={securityHref(backTo, "phone")} replace scroll={false} lead={<Tile><Phone size={16} strokeWidth={2} /></Tile>} title="Text code" detail={phones.length ? phones.join(", ") : "Not set up"} />
     </Section>
   );
 }
@@ -284,6 +294,7 @@ function Devices() {
   const now = useNow(60_000);
   const [signingOutOthers, setSigningOutOthers] = useState(false);
   const [othersError, setOthersError] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
 
   if (sessions.error && !sessions.data) {
     return (
@@ -304,14 +315,18 @@ function Devices() {
   const signOutOthers = async () => {
     setOthersError(null);
     setSigningOutOthers(true);
-    try {
-      // No one call signs out every other session; each one ends on its own.
-      for (const session of others) await revoke.mutateAsync(session.id);
-    } catch (raw) {
-      setOthersError(describeError(raw));
-    } finally {
-      setSigningOutOthers(false);
+    // No one call signs out every other session; each one ends on its own, and one that fails doesn't stop the rest.
+    let failed: unknown = null;
+    for (const session of others) {
+      try {
+        await revoke.mutateAsync(session.id);
+      } catch (raw) {
+        failed ??= raw;
+      }
     }
+    setSigningOutOthers(false);
+    if (failed) setOthersError(describeError(failed));
+    else setAsking(false);
   };
 
   return (
@@ -321,8 +336,19 @@ function Devices() {
         {ordered.map(session => <DeviceRow key={session.id} session={session} now={now} />)}
         {others.length ? (
           <li className={styles.foot}>
-            <Button variant="danger" size="sm" onClick={() => void signOutOthers()} loading={signingOutOthers}>Sign Out of All Other Devices</Button>
-            {othersError ? <span className={styles.rowError} role="alert">{othersError}</span> : null}
+            <Button variant="danger" size="sm" onClick={() => { setOthersError(null); setAsking(true); }}>Sign Out of All Other Devices</Button>
+            <Dialog open={asking} onOpenChange={open => { if (!open && !signingOutOthers) setAsking(false); }}>
+              <DialogContent
+                title="Sign out of all other devices?"
+                description={<>{others.length === 1 ? "1 other sign-in ends" : `${others.length} other sign-ins end`}, including the silicon-accounts CLI and the developer site. This device stays signed in.</>}
+              >
+                {othersError ? <p className={styles.rowError} role="alert">{othersError}</p> : null}
+                <div className={styles.actions}>
+                  <Button variant="ghost" onClick={() => setAsking(false)} disabled={signingOutOthers}>Cancel</Button>
+                  <Button variant="danger" loading={signingOutOthers} onClick={() => void signOutOthers()}>Sign Out</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </li>
         ) : null}
       </ul>

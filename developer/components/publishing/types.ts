@@ -25,10 +25,22 @@ export type Links = {
   ios?: string;
   custom?: { label: string; url: string; logo: string }[];
 };
+export type InterfaceUseCase = { name: string; files: {name: string; content: string}[] };
+export type InterfaceLicense =
+  | {kind: "preset"; preset: "free" | "attribution" | "attribution_unless_paid" | "permission_required"}
+  | {kind: "link"; url: string}
+  | {kind: "file"; name: string; content: string};
 export type App = {
+  deleted_at?:string|null;restore_until?:string|null;
+  created_by?:string|null; organization_id?: string | null;
+  organization_access?: import("@/components/organizations/api").ResourcePolicy;
+  publisher?: {type:"organization"|"personal";id?:string;name?:string;logo_url?:string};
+  permissions?: {read:boolean;edit:boolean;publish:boolean;manage:boolean};
+  user_storage?: import("./storage-schema").StorageSchema | null;
   app_id: string;
   name: string;
   description: string;
+  tagline?: string;
   logo: string;
   logo_alt?: string;
   banner: string;
@@ -38,6 +50,9 @@ export type App = {
   domains?: string[];
   account_ids?: string[];
   links: Links;
+  interface_api_documentation_url?: string | null;
+  interface_use_cases?: InterfaceUseCase[] | null;
+  interface_license?: InterfaceLicense | null;
   carousel: Media[];
   published: boolean;
   setup_step: number;
@@ -78,13 +93,6 @@ export type Invite = {
   account_uuid?: string;
   status: string;
   created_at: string;
-};
-export type Review = {
-  uuid: string;
-  id: string;
-  rating: number;
-  text: string;
-  updated_at: string;
 };
 export type Readiness = {
   ready: boolean;

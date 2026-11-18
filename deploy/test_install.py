@@ -8,16 +8,18 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+import urllib.parse
 
 # install.py remains an executable operator script. Load just its pure helper.
 source = ast.parse(Path(__file__).with_name('install.py').read_text())
 wanted = [node for node in source.body
-          if (isinstance(node, ast.FunctionDef) and node.name in ('prepare_release', 'api_environment'))
+          if (isinstance(node, ast.FunctionDef) and node.name in ('prepare_release', 'api_environment', 'role_sql'))
           or (isinstance(node, ast.Assign) and any(getattr(t, 'id', None) == 'RETIRED' for t in node.targets))]
-namespace = {'hashlib': hashlib, 'os': os, 'tarfile': tarfile}
+namespace = {'hashlib': hashlib, 'os': os, 'tarfile': tarfile, 'urllib': urllib}
 exec(compile(ast.Module(body=wanted, type_ignores=[]), 'install.py', 'exec'), namespace)
 prepare_release = namespace['prepare_release']
 api_environment = namespace['api_environment']
+role_sql = namespace['role_sql']
 
 
 class ReleaseTests(unittest.TestCase):
@@ -60,6 +62,10 @@ class EnvironmentTests(unittest.TestCase):
         self.assertEqual(api, {'ACCOUNTS_PUBLIC_URL': 'https://accounts.example'})
         self.assertIn('ACCOUNTS_TELEMETRY_TABLE_KEY', printed.getvalue())
         self.assertNotIn('old-key', printed.getvalue())
+
+    def test_role_password_is_decoded_and_quoted(self):
+        self.assertEqual(role_sql("postgres://accounts:p'w%40x@h/d"),
+                         "CREATE ROLE accounts LOGIN PASSWORD 'p''w@x'")
 
 
 if __name__ == '__main__':

@@ -46,25 +46,19 @@ export function handleFromName(name: string): string {
 }
 
 /**
- * The secrets a new Silicon comes back with (its generated STK, its webhook signing secret), kept as a reveal for its
- * own page to show once (parts/reveals.ts): the only copy there will ever be.
+ * The STK a new Silicon comes back with, kept as a reveal for its own page to show once (parts/reveals.ts): the only
+ * copy there will ever be. Silicon webhooks were replaced by Ting, so there is no signing secret to show.
  */
 export function revealCreated(created: SiliconCreated) {
+  if (!created.stk) return;
   const item = created.silicon;
   const id = item.id ?? item.uuid;
-  const secrets = [
-    ...(created.stk ? [stkSecret(id, created.stk)] : []),
-    ...(created.webhook_secret ? [{ label: "Webhook signing secret", value: created.webhook_secret, note: `Verifies the events sent to ${item.webhook_url ?? "its webhook"}.` }] : []),
-  ];
-  if (!secrets.length) return;
   addReveal({
     silicon: item.uuid,
     origin: "created",
-    title: created.stk ? `${id} is ready. Store its STK now` : `${id} is ready. Store its webhook secret now`,
-    description: created.stk
-      ? `This is the password ${id} signs in with. Silicon Accounts keeps only its hash, so it can never be shown again; if it is lost, rotate it.`
-      : "Silicon Accounts cannot show it again. Setting the webhook URL again makes a new one.",
-    secrets,
+    title: `${id} is ready. Store its STK now`,
+    description: `This is the password ${id} signs in with. Silicon Accounts keeps only its hash, so it can never be shown again; if it is lost, rotate it.`,
+    secrets: [stkSecret(id, created.stk)],
   });
 }
 

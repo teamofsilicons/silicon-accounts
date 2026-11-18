@@ -4,7 +4,7 @@
 //! | endpoint | who | what |
 //! |---|---|---|
 //! | `POST /v1/silicons/{id}/keys` | the Silicon, or its custodian | `{"public_key", "name"?}` → 201 the key |
-//! | `GET /v1/silicons/{id}/keys` | the same | `{"items": [key…], "next_cursor": null}`, newest first, revoked ones too |
+//! | `GET /v1/silicons/{id}/keys` | the same | `{"items": [key…], "next_cursor": null}`, live first, each group newest first, revoked ones too |
 //! | `DELETE /v1/silicons/{id}/keys/{key_id}` | the same | 204: the key stops working and the sign-ins it started end |
 //!
 //! `{id}` is the Silicon's si:id or uuid. Anyone else gets 404 `silicon_not_found`. At most
@@ -47,13 +47,18 @@ pub(crate) async fn silicon_for(
         Some(a)
             if a.kind == AccountKind::Silicon
                 && a.status != AccountStatus::Deleted
-                && (a.uuid == me.account.uuid
-                    || a.custodian_uuid.as_deref() == Some(me.account.uuid.as_str())) =>
+                && is_mine(&a, me) =>
         {
             Ok(a)
         }
         _ => Err(silicon_not_found(key)),
     }
+}
+
+/// The caller is the Silicon itself or its custodian.
+pub(crate) fn is_mine(silicon: &Account, me: &AccountAuth) -> bool {
+    silicon.uuid == me.account.uuid
+        || silicon.custodian_uuid.as_deref() == Some(me.account.uuid.as_str())
 }
 
 #[derive(Debug, Deserialize)]
@@ -99,7 +104,10 @@ pub(crate) async fn add(
     if accounts_core::federation::is_federated_session(&mut tx, &me).await? {
         return Err(accounts_core::federation::federated_session_refused("keys"));
     }
-    let Some(silicon) = accounts::lock(&mut tx, &silicon.uuid).await? else {
+    let Some(silicon) = accounts::lock(&mut tx, &silicon.uuid)
+        .await?
+        .filter(|s| is_mine(s, &me))
+    else {
         return Err(silicon_not_found(&key));
     };
     if silicon.status != AccountStatus::Active {
@@ -176,7 +184,7 @@ pub(crate) async fn list(
     let mut conn = state.db.acquire().await?;
     let silicon = silicon_for(&mut conn, &me, &key).await?;
     let rows: Vec<SiliconKey> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "select {KEY_COLUMNS} from silicon_keys where silicon_uuid = $1 order by created_at desc, id desc limit 200"
+        "select {KEY_COLUMNS} from silicon_keys where silicon_uuid = $1 order by (revoked_at is not null), created_at desc, id desc limit 200"
     )))
     .bind(&silicon.uuid)
     .fetch_all(&mut *conn)

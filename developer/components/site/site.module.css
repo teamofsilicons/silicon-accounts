@@ -86,35 +86,12 @@ ul.navList {
 }
 .navLink:hover, .navLink:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
 .navLink[aria-current] { --sq-fill: var(--surface-pressed); color: var(--foreground); }
-.navExternal { margin-left: 3px; color: var(--text-muted); }
 
 .actions { display: flex; flex: none; align-items: center; gap: var(--space-2); margin-left: var(--space-2); }
 .nav + .actions { margin-left: var(--space-3); }
 .account { flex: none; }
 /* Sign in: outlined, lifted a little, like "Book a call" on teamofsilicons.com. */
 .signIn { box-shadow: var(--shadow-raised); }
-
-/* The signed-in account: a plain link to Settings. */
-.accountChip {
-  --sq-r: 11px;
-  --sq-fill: var(--surface);
-  --sq-stroke: var(--border);
-  display: inline-flex;
-  max-width: 220px;
-  height: 38px;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--sq-stroke);
-  padding: 0 12px 0 5px;
-  background: var(--sq-fill);
-  color: var(--foreground);
-  font-size: var(--text-sm);
-  text-decoration: none;
-  box-shadow: var(--shadow-raised);
-  transition: background-color var(--duration-fast) var(--ease-standard);
-}
-.accountChip:hover, .accountChip:focus-visible { --sq-fill: var(--surface-muted); color: var(--foreground); }
-.accountId { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-pixel); font-size: .8125rem; letter-spacing: 0; }
 
 /* Icon buttons (search, theme, menu): 38 px on an 11 px squircle. */
 .iconButton {
@@ -219,6 +196,6 @@ ul.navList {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand, .navLink, .iconButton, .footerLink, .accountChip { transition: none; }
+  .brand, .navLink, .iconButton, .footerLink { transition: none; }
   .iconButton:active { transform: none; }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Secrets waiting to be stored (a new Silicon's STK, a rotated STK, a webhook signing secret). They live in memory for
+ * Secrets waiting to be stored (a new Silicon's STK, a rotated STK). They live in memory for
  * as long as this tab does, so leaving the Silicons page and coming back still shows them until "I've stored it"; they
  * are never written to storage or to the query cache. While one is waiting, closing or reloading the tab asks first,
  * because the service cannot show it again.
@@ -13,7 +13,7 @@
 import { useSyncExternalStore } from "react";
 
 export interface RevealedSecret {
-  /** "STK", "Webhook signing secret". */
+  /** "STK". */
   label: string;
   value: string;
   /** One line under the value: what it is for. */
@@ -32,8 +32,8 @@ export interface Reveal {
   title: string;
   description: string;
   secrets: SecretSlot[];
-  /** What made it (a Silicon created, its STK rotated, its webhook set): where focus goes once it is stored. */
-  origin?: "created" | "stk" | "webhook";
+  /** What made it (a Silicon created, its STK rotated): where focus goes once it is stored. */
+  origin?: "created" | "stk";
 }
 
 /** A reveal as it is handed over, values included. */

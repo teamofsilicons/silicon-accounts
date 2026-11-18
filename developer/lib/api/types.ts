@@ -24,7 +24,7 @@ export type AccountId = string;
 type Open<T extends string> = T | (string & {});
 
 export type AccountKind = "carbon" | "silicon";
-export type AccountStatus = "active" | "unclaimed" | "pending_custodian" | "deleted";
+export type AccountStatus = "active" | "unclaimed" | "pending_custodian" | "archived" | "deleted";
 export type AppStatus = "active" | "disabled";
 export type AppSource = "first_party" | "fake" | "silicon_apps";
 export type MembershipStatus = "active" | "access_removed" | "imported";
@@ -561,6 +561,7 @@ export interface AppPublic {
 
 /** `GET /v1/me/owned-apps` items. */
 export interface OwnedApp {
+  organization_id?: string | null;
   app_id: string;
   name: string;
   logo_url: string | null;

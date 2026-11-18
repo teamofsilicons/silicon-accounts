@@ -73,6 +73,12 @@ pub(crate) fn router() -> Router<AppState> {
 /// An app as Silicon Apps describes it (plus the testkit's webhook extras).
 #[derive(Debug, Clone, Deserialize)]
 pub struct SiliconAppsApp {
+    #[serde(default)]
+    pub deleted_at: Option<String>,
+    #[serde(default)]
+    pub organization_id: Option<String>,
+    #[serde(default)]
+    pub organization_access: Option<Value>,
     pub app_id: String,
     pub name: String,
     #[serde(default)]
@@ -315,6 +321,9 @@ struct OwnerSpec {
 /// An app payload after validation.
 #[derive(Debug, Clone)]
 struct ValidApp {
+    deleted_at: Option<OffsetDateTime>,
+    organization_id: Option<String>,
+    organization_access: Option<Value>,
     app_id: String,
     name: String,
     description: String,
@@ -337,6 +346,14 @@ fn is_visible_ascii(s: &str) -> bool {
     s.bytes().all(|b| (0x21..=0x7e).contains(&b))
 }
 
+// These Accounts clients and OAuth audiences do not have Silicon Apps publishers.
+const ACCOUNTS_ONLY_APP_IDS: [&str; 4] = [
+    accounts_core::FIRST_PARTY_APP_ID,
+    accounts_core::DEVELOPER_APP_ID,
+    accounts_core::PROFILE_APP_ID,
+    "silicon-apps-catalog",
+];
+
 fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, ApiError> {
     let mut f = FieldErrors::new();
     let mut out = Vec::with_capacity(apps.len());
@@ -346,7 +363,7 @@ fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, 
         let app_id = a.app_id.trim().to_string();
         if let Err(m) = validate_app_id(&app_id) {
             f.add(at("app_id"), m);
-        } else if accounts_core::is_first_party_app_id(&app_id) {
+        } else if ACCOUNTS_ONLY_APP_IDS.contains(&app_id.as_str()) {
             f.add(
                 at("app_id"),
                 format!("'{app_id}' is one of Silicon Accounts' own apps and can't be synced"),
@@ -526,7 +543,23 @@ fn validate(state: &AppState, apps: &[SiliconAppsApp]) -> Result<Vec<ValidApp>, 
                 None
             }
         };
+        let deleted_at = match opt(&a.deleted_at) {
+            Some(value) => match accounts_core::timefmt::parse_rfc3339(&value) {
+                Ok(at) => Some(at),
+                Err(message) => {
+                    f.add(at("deleted_at"), message);
+                    None
+                }
+            },
+            None => None,
+        };
+        if deleted_at.is_some() && status != Some(AppStatus::Disabled) {
+            f.add(at("deleted_at"), "Deleted apps must have disabled status.");
+        }
         out.push(ValidApp {
+            deleted_at,
+            organization_id: a.organization_id.clone(),
+            organization_access: a.organization_access.clone(),
             app_id,
             name,
             description,
@@ -563,6 +596,68 @@ pub async fn sync_apps(
         let (synced, credentials_changed) = upsert_app(&mut tx, state, app, mode).await?;
         if credentials_changed {
             invalidate.push(app.app_id.clone());
+        }
+        sqlx::query("INSERT INTO app_registry_lifecycle(app_id,deleted_at) VALUES($1,$2) ON CONFLICT(app_id) DO UPDATE SET deleted_at=excluded.deleted_at")
+            .bind(&app.app_id).bind(app.deleted_at).execute(&mut *tx).await?;
+        if let Some(org) = &app.organization_id {
+            if !(3..=30).contains(&org.len())
+                || !org
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
+            {
+                return Err(ApiError::unprocessable(
+                    "invalid_organization",
+                    "Use the organization's permanent ID.",
+                ));
+            }
+            let policy: accounts_core::repo::publishing::ResourcePolicy = serde_json::from_value(
+                app.organization_access.clone().unwrap_or_else(|| json!({})),
+            )
+            .map_err(|_| {
+                ApiError::unprocessable(
+                    "invalid_organization_access",
+                    "Invalid organization resource policy.",
+                )
+            })?;
+            policy
+                .validate()
+                .map_err(|e| ApiError::unprocessable("invalid_organization_access", e))?;
+            let prior: Option<String> = sqlx::query_scalar(
+                "SELECT organization_id FROM app_organization_publishers WHERE app_id=$1",
+            )
+            .bind(&app.app_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+            if prior.as_deref().is_some_and(|id| id != org) {
+                return Err(ApiError::unprocessable(
+                    "organization_owner_immutable",
+                    "The organization's ownership cannot change through app synchronization.",
+                ));
+            }
+            sqlx::query("INSERT INTO app_organization_publishers(app_id,organization_id,access) VALUES($1,$2,$3) ON CONFLICT(app_id) DO UPDATE SET access=excluded.access,updated_at=now()")
+                .bind(&app.app_id).bind(org).bind(json!(policy)).execute(&mut *tx).await?;
+            sqlx::query("UPDATE apps SET owner_uuid=NULL WHERE app_id=$1")
+                .bind(&app.app_id)
+                .execute(&mut *tx)
+                .await?;
+            sqlx::query("DELETE FROM app_authors WHERE app_id=$1")
+                .bind(&app.app_id)
+                .execute(&mut *tx)
+                .await?;
+            report.push(synced);
+            continue;
+        }
+        let organization_owned: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM app_organization_publishers WHERE app_id=$1)",
+        )
+        .bind(&app.app_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if organization_owned {
+            return Err(ApiError::unprocessable(
+                "organization_owner_required",
+                "Organization-owned apps must retain their organization publisher.",
+            ));
         }
         if let Some(authors) = &app.author_uuids {
             if authors.is_empty() || authors.len() > 1000 {
@@ -664,7 +759,7 @@ fn can_own(account: &Account) -> bool {
 /// nothing about who someone is).
 async fn verified_owner_of(conn: &mut PgConnection, email: &str) -> ApiResult<Option<Account>> {
     let uuid: Option<String> = sqlx::query_scalar(
-        "select e.account_uuid from account_emails e join accounts a on a.uuid = e.account_uuid \
+        "select e.account_uuid from account_email_owners e join accounts a on a.uuid = e.account_uuid \
          where e.email = $1 and e.verified_at is not null and a.kind = 'carbon' and a.status = 'active'",
     )
     .bind(email)
@@ -1280,8 +1375,8 @@ pub(crate) fn authorize_internal(state: &AppState, headers: &HeaderMap) -> ApiRe
 async fn export_registry(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
     authorize_internal(&state, &headers)?;
     let rows: Vec<Value> = sqlx::query_scalar(
-        "select jsonb_build_object('app_id',a.app_id,'name',a.name,'description',a.description,         'logo_url',a.logo_url,'homepage_url',a.homepage_url,'owner_uuid',a.owner_uuid,         'source',a.source,'created_at',a.created_at,'authors',coalesce((select jsonb_agg(         jsonb_build_object('uuid',ac.uuid,'id',ac.handle,'display_name',ac.display_name,'joined_at',au.joined_at))         from app_authors au join accounts ac on ac.uuid=au.account_uuid where au.app_id=a.app_id),'[]'::jsonb))         from apps a where a.app_id not in ('silicon-accounts','developer') order by a.app_id"
-    ).fetch_all(&state.db).await?;
+        "select jsonb_build_object('app_id',a.app_id,'name',a.name,'description',a.description,         'logo_url',a.logo_url,'homepage_url',a.homepage_url,'owner_uuid',a.owner_uuid,         'source',a.source,'status',a.status,'deleted_at',(select deleted_at from app_registry_lifecycle where app_id=a.app_id),'organization_id',(select organization_id from app_organization_publishers where app_id=a.app_id),'organization_access',(select access from app_organization_publishers where app_id=a.app_id),'created_at',a.created_at,'authors',coalesce((select jsonb_agg(         jsonb_build_object('uuid',ac.uuid,'id',ac.handle,'display_name',ac.display_name,'joined_at',au.joined_at))         from app_authors au join accounts ac on ac.uuid=au.account_uuid where au.app_id=a.app_id),'[]'::jsonb))         from apps a where not (a.app_id = any($1)) order by a.app_id"
+    ).bind(&ACCOUNTS_ONLY_APP_IDS[..]).fetch_all(&state.db).await?;
     Ok(Json(json!({"apps":rows})).into_response())
 }
 

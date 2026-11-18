@@ -78,3 +78,111 @@ origin park their provider answer on the production API, redirect an opaque sing
 ticket to the local callback proxy, and require the original flow cookie there before
 exchanging the provider code. The registered provider callback stays on production.
 Other apps do not get this handoff. Do not add wildcard origins or disable cookie security.
+
+## Automatic Silicon Accounts registration — 2026-11-06
+
+Migration 0037 registers all non-deleted identities with `silicon-accounts` and installs an
+account INSERT trigger for future registrations. Production now has 10/10 active Carbons
+and 11/11 active Silicons registered. The deleted Silicon remains a tombstone without a new
+membership. The migration creates no sessions or sign-in timestamps and grants no other app
+access. Existing memberships are preserved.
+
+The rollout changed only the embedded `accounts-migrate` binary in a verified copy of the
+current composite release. API, web, Developer, Node, and Caddy files were unchanged; no
+service restart was needed. Source is based on the deployed interface broker revision, not
+the older `main` snapshot. Future full releases must include migrations 0029–0037 and retain
+the current composite frontend builds. The historical component revisions in production.json
+are not an authoritative description of this composite release.
+
+Receipt: [verification-automatic-registration-2026-11-06.json](verification-automatic-registration-2026-11-06.json).
+The predeployment PostgreSQL backup was verified and uploaded. Production checks covered
+complete membership coverage, idempotent rerun, migration readiness, and Carbon/Silicon
+creation in a rolled-back transaction. Local verification: 348 integration tests passed.
+
+## Contacts basic directory access — 2026-11-06
+
+The API now supports an explicit `ACCOUNTS_PROFILE_DIRECTORY_APP_IDS` operator grant, empty
+by default. Production enables only `silicon-contacts`, persisted in the Accounts runtime
+secret and service environment. This grants name/photo lookup for active identities with an
+active Accounts registration; it grants no private contact fields or first-party sessions.
+
+API source `afaf544a0a667e8ae7d556aa3e6c2cac8fd60a93` was built from the deployed registration/
+interface broker source. Deployment preserved all other files in the current composite
+release, including migration 0037, Accounts web, and Developer. Both API services passed
+readiness. The integrated Contacts add-contact preview was verified in a production browser
+as `si:saket-agents`, without saving a contact.
+
+Receipt: [verification-contacts-directory-2026-11-06.json](verification-contacts-directory-2026-11-06.json).
+
+## Silicon notifications through Ting — 2026-11-10
+
+API and web source `869bb868e6b0` are live with migration 0038. The old API was
+stopped before the verified backup and migration, so the previous callback sender
+could not race the cutover. Runtime configuration, Node, Caddy and the deployed
+Contacts, Interfaces, registration and chooser features were retained. All twelve
+Accounts notification types registered in Ting. Verification using only
+`si:saket-agents` covered idempotent consent enrollment, an accepted outbox send,
+durable inbox retrieval and delivery to an authenticated terminal receiver.
+The labelled probes did not change profile data or notify another account.
+
+Developer source `2a12ead2b61d` additionally fixes the app list and workspace for
+publishing authors without access to Accounts sign-in configuration. Silicon
+Accounts' protected first-party record remains protected; its publishing authors
+can manage the store listing, releases, authors and history through Silicon Apps.
+The Developer overlay preserved API and account-site files byte for byte.
+
+Receipt: [verification-ting-2026-11-10.json](verification-ting-2026-11-10.json).
+Rust validation passed 1,029 tests; the single OpenAPI coverage failure is identical
+on the deployed baseline `7f1aa7c`. Both sites passed builds, typecheck, lint and
+production routing; web and Developer unit suites passed 29 and 97 tests.
+Three browser checks covered publishing-only access, non-author denial and
+existing package upload confirmation, with desktop/mobile visual review.
+CLI 0.7.0 is published on all nine targets as production release
+`70dd7da4-8ee6-46c3-8a8b-84357bc0de4e`. Packages passed native verification in
+workflow run 42823876740, Linux server validation, and uploader attestation for
+Windows/macOS. The receipt records package hashes and publication separately
+from service deployment.
+
+## Account site redesign (PR 23) — 2026-11-13
+
+Release `accounts-redesign-b08d20a` (source `b08d20a`) is live: the account site redesign on Silicon UI
+(teamofsilicons/silicon-accounts#23) merged onto the composite production source, which is the Ting
+branch (`869bb86`) plus the live developer delta (`6844616`). It is a code-only overlay: API, web and
+Developer files over `cells-ting-dev-68446168ce4e`, with Node, Caddy, configuration and the schema
+(migration 38) unchanged. No migration ran. A verified predeployment backup was uploaded first.
+
+Also in this release: Interfaces can no longer be granted Silicon Apps (app-management) tokens, both
+sites run Next.js 16.4.6 (GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr, GHSA-p3m5-59mp-jv5r), and the
+developer site's zod is 4.6.6 (GHSA-mrhx-c7xc-m3w5). Production had no Interface or session that
+named a privileged app.
+
+Rollback is a symlink switch: no schema changed, so `/opt/accounts/previous-release` can be restored
+directly. Receipt: [verification-redesign-2026-11-13.json](verification-redesign-2026-11-13.json).
+
+## Audit fixes — 2026-11-13
+
+Release `accounts-audit-c38050a` (source `c38050a`) replaced `accounts-redesign-b08d20a` 35 minutes
+later, the same way: a code-only overlay, schema unchanged at 38, verified backup first. It carries
+104 fixes from a reviewed audit of every crate and both sites, among them: key sign-in no longer
+outlives a concurrent key revocation; federation errors no longer reveal internal DNS; logs no
+longer carry raw paths (tickets, device codes, emails); production refuses the internal tokens
+.env.example used to publish (checked first: production's own tokens differ); the developer site's
+API proxy caps request bodies; embeds no longer allow wildcard or plain-http framing origins; the
+client library refuses id_tokens as access tokens. The OpenAPI document now covers every route.
+Receipt: [verification-audit-2026-11-13.json](verification-audit-2026-11-13.json).
+
+## Silicon UI 0.5.0 (PR 24) — 2026-11-13
+
+Release `accounts-sui05-fb03b11` changes only the account site: Silicon UI 0.5.0 from npm, with the
+local 0.4.0 patch removed (teamofsilicons/silicon-accounts#24). Every file the patch changed is
+identical in 0.5.0 except a hint-size fallback that tokens.css overrides site-wide. API binaries and
+the developer site are release `accounts-audit-c38050a`'s exact files (ApiSourceRevision and
+DeveloperSourceRevision stay `c38050a`). Schema unchanged at 38; verified backup first; backup
+`backups/predeploy-redesign-20261113T183320Z.dump`, SSM command `a83ebfaa-7202-424b-b79f-c0c095853160`.
+
+On 2026-11-13 the 67 older releases and the staging archives (all also in S3 under `releases/`)
+were deleted, keeping only `current` and `previous-release`: the root disk went from 92% to 17%
+used. Caddy kept running from a deleted release's binary, byte-identical to the current one; its
+next restart starts `/opt/accounts/current/bin/caddy`. Keep only a few releases from now on: each
+is about 470 MB on a 40 GB disk.
+

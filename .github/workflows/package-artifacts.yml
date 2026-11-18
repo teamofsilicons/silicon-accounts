@@ -67,7 +67,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           path: .release-tools
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: "1.98.0"
           targets: ${{ matrix.rust_target }}
@@ -132,7 +132,7 @@ jobs:
       - name: Retain verified archive, checksum and verification evidence
         uses: actions/upload-artifact@v4
         with:
-          name: accounts-${{ matrix.target }}-${{ github.sha }}
+          name: accounts-${{ matrix.target }}-${{ inputs.reuse_commit || github.sha }}
           path: |
             dist/silicon-accounts-*.tar.gz
             dist/silicon-accounts-*.tar.gz.sha256

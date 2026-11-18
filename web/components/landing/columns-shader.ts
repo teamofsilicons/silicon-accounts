@@ -1,11 +1,5 @@
 // Silicon backdrop, Columns style, from the landing framework hero (Figma node 72:39).
-import type { Shader } from "./figma-shader/types";
-
-type Frame = {
-  state: Record<string, GPUShaderModule | GPURenderPipeline | GPUBuffer | GPUTextureFormat | null>;
-  params?: Record<string, unknown>;
-  output: { width: number; height: number; format: GPUTextureFormat; createView: () => GPUTextureView };
-};
+import type { CustomEffectState as Frame, Shader } from "./figma-shader/types";
 
 const wgsl = `diagnostic(off,derivative_uniformity);
 struct Uniforms {
@@ -172,17 +166,19 @@ function ch(color: unknown, channel: string, fallback: number) {
 }
 
 export function render(device: GPUDevice, frame: Frame) {
+  const output = frame.output;
+  if (!output) return;
   const params = frame.params ?? {};
   const paper = params.paper;
   const hue = params.hue;
-  device.queue.writeBuffer(frame.state.uniforms, 0, new Float32Array([
+  device.queue.writeBuffer(frame.state.uniforms as GPUBuffer, 0, new Float32Array([
     ch(paper, "r", 0.988), ch(paper, "g", 0.988), ch(paper, "b", 0.988), 1,
     ch(hue, "r", 0.227), ch(hue, "g", 0.427), ch(hue, "b", 0.94), 1,
-    frame.output.width, frame.output.height, num(params.style, 0), num(params.intensity, 0.85),
+    output.width, output.height, num(params.style, 0), num(params.intensity, 0.85),
     num(params.clearX, 25) / 100, num(params.clearY, 45) / 100, num(params.clearRadius, 45) / 100, num(params.softness, 35) / 100,
     num(params.cellSize, 40), num(params.seed, 1), num(params.scale, 420), num(params.grain, 0.12),
   ]));
-  const outputFormat = frame.output.format;
+  const outputFormat = output.format;
   if (frame.state.pipeline == null || frame.state.pipelineFormat !== outputFormat) {
     frame.state.pipeline = device.createRenderPipeline({
       layout: "auto",
@@ -198,7 +194,7 @@ export function render(device: GPUDevice, frame: Frame) {
         }],
       },
       fragment: {
-        module: frame.state.module,
+        module: frame.state.module as GPUShaderModule,
         entryPoint: "fs_main",
         targets: [{ format: outputFormat }],
       },
@@ -209,7 +205,7 @@ export function render(device: GPUDevice, frame: Frame) {
   const encoder = device.createCommandEncoder();
   const pass = encoder.beginRenderPass({
     colorAttachments: [{
-      view: frame.output.createView(),
+      view: output.createView(),
       loadOp: "clear",
       clearValue: { r: 0, g: 0, b: 0, a: 0 },
       storeOp: "store",

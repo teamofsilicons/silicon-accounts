@@ -119,18 +119,6 @@ impl<'a> Actor<'a> {
     }
 }
 
-/// `https://hooks.example.com:8443` from a webhook URL. Audit entries keep only this: a path or
-/// query string may carry a token.
-pub fn url_origin(url: &str) -> String {
-    match url.split_once("://") {
-        Some((scheme, rest)) => {
-            let host = rest.split(['/', '?', '#']).next().unwrap_or("");
-            format!("{scheme}://{host}")
-        }
-        None => String::new(),
-    }
-}
-
 /// Appends a custodian change (`from` is null for a Silicon's first custodian).
 pub async fn custodian_change(
     conn: &mut PgConnection,
@@ -151,19 +139,4 @@ pub async fn custodian_change(
     .execute(&mut *conn)
     .await?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::url_origin;
-
-    #[test]
-    fn origins_drop_paths_and_queries() {
-        assert_eq!(
-            url_origin("https://hooks.example.com:8443/in/abc?token=secret#x"),
-            "https://hooks.example.com:8443"
-        );
-        assert_eq!(url_origin("http://127.0.0.1:8593"), "http://127.0.0.1:8593");
-        assert_eq!(url_origin("nonsense"), "");
-    }
 }

@@ -14,23 +14,23 @@
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Database, LogOut, Menu, Search, SwatchBook } from "lucide-react";
+import { ViewTransition, useCallback, useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { Database, LogOut, Menu, Search, SwatchBook, UserRound, UserRoundPlus } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
 import { Button } from "@teamofsilicons/silicon-ui/button";
-import { UserMenu, type UserMenuUser } from "@teamofsilicons/silicon-ui/user-menu";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, SkipLink } from "@/components/foundation/layout/layout";
-import { useCarbonPicture } from "@/lib/carbon-avatar";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
 import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
-import { beginSignIn, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
+import { browserProfileChanged, useBrowserAccounts, useSwitchBrowserAccount } from "@/lib/query/linked-accounts";
+import { beginSignIn, firstPartySignInUrl, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
 import { PrototypeMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
 import { LeaveQuestionHost } from "./leave-question";
+import { ProfileList, ProfileMenu } from "./profile-menu";
 import { Sidebar } from "./sidebar";
 import { SIDEBAR_STEPS, SidebarResize, useSidebarStep } from "./sidebar-resize";
 import styles from "./shell.module.css";
@@ -101,7 +101,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { status, session, error, refetch } = useSession();
   const me = useMe();
-  const { signOut } = useSignOut();
+  const { signOut, pending: signingOut } = useSignOut();
   const paletteOpen = useCommandPaletteOpen();
   const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const isHome = pathname === "/";
@@ -141,6 +141,29 @@ export function AccountShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.getElementById("main")?.scrollTo({ top: 0 });
   }, [pathname]);
+
+  // Another tab switched this browser to another account (Saket, 2026-11-18): this one follows, to Home.
+  useEffect(() => {
+    const onSwitch = (event: StorageEvent) => {
+      if (event.key === browserProfileChanged && event.newValue !== session?.account.uuid) window.location.replace(paths.home);
+    };
+    window.addEventListener("storage", onSwitch);
+    return () => window.removeEventListener("storage", onSwitch);
+  }, [session?.account.uuid]);
+
+  // The accounts signed in on this browser, for the palette's switch commands (the switcher reads the same query).
+  const browserAccounts = useBrowserAccounts(status === "signed_in");
+  const switchAccount = useSwitchBrowserAccount();
+  const switchTo = useCallback(async (uuid: string) => {
+    if (!(await confirmNavigation(paths.home))) return;
+    try {
+      await switchAccount.mutateAsync({ account_uuid: uuid });
+      window.location.assign(paths.home);
+    } catch (failure) {
+      notifyError(failure);
+    }
+  }, [switchAccount]);
+  const otherAccounts = (browserAccounts.data?.accounts ?? []).filter(other => other.uuid !== session?.account.uuid);
 
   // Links in the pages ask too while a guard protects where they go.
   useGuardedLinks(push);
@@ -213,8 +236,26 @@ export function AccountShell({ children }: { children: ReactNode }) {
           { id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={2} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) },
         ]
       : []),
+    ...otherAccounts.map(other => ({
+      id: `account.switch.${other.uuid}`,
+      label: `Switch to ${other.display_name}`,
+      description: other.org ? `${other.id ?? other.uuid} · ${other.org.name}` : (other.id ?? other.uuid),
+      group: "Account",
+      icon: <UserRound size={16} strokeWidth={2} />,
+      keywords: ["switch", "account", "profile", other.id ?? "", other.display_name],
+      run: () => void switchTo(other.uuid),
+    })),
+    {
+      id: "account.add",
+      label: "Add another account",
+      description: "Sign in to another account in this browser",
+      group: "Account",
+      icon: <UserRoundPlus size={16} strokeWidth={2} />,
+      keywords: ["add", "account", "sign in", "another", "profile"],
+      run: () => void confirmNavigation(paths.signIn).then(ok => { if (ok) window.location.assign(firstPartySignInUrl(paths.home, { prompt: "login" })); }),
+    },
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={2} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
-  ], [go, doSignOut, developerUrl]);
+  ], [go, doSignOut, developerUrl, otherAccounts.map(other => other.uuid).join(), switchTo]);
 
   // ⌘K toggles the palette; 1 to 7 jump to sections (never while typing or with a layer open).
   useEffect(() => {
@@ -238,18 +279,8 @@ export function AccountShell({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [go, paletteOpen, status]);
 
-  // A Carbon's picture is their photo or their pixel avatar (lib/carbon-avatar.ts).
-  const picture = useCarbonPicture(me.data ?? session?.account);
-  const account = useMemo<UserMenuUser | null>(() => {
-    const summary = session?.account;
-    if (!summary) return null;
-    const full = me.data;
-    return {
-      name: full?.display_name ?? summary.display_name,
-      email: full?.id ?? summary.id ?? summary.uuid,
-      avatarSrc: picture?.src ?? full?.pfp_url ?? summary.pfp_url,
-    };
-  }, [session, me.data, picture?.src]);
+  // The signed-in account: its full record once loaded (the switcher's photo, name and id).
+  const account = session ? me.data ?? session.account : null;
 
   const brand = (
     <Link href={paths.home} aria-label="Team of Silicons Accounts" data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
@@ -280,16 +311,13 @@ export function AccountShell({ children }: { children: ReactNode }) {
       <kbd data-sq="surface" className={styles.keys}>{isApple ? "⌘K" : "Ctrl K"}</kbd>
     </Button>
   );
-  // The account menu at the sidebar's foot, with the name beside the photo (as the Apps store's profile row).
+  // The account switcher at the sidebar's foot (profile-menu.tsx): beside the page a full-width row opening a menu; in
+  // the phone sheet its rows are listed in place.
   const accountMenu = account ? (
-    <UserMenu
-      className={styles.account}
-      user={account}
-      showTheme={false}
-      showName
-      onSignOut={menuSignOut}
-      align="start"
-    />
+    <ProfileMenu account={account} onManage={() => void go(paths.linkedAccounts)} onSignOut={menuSignOut} signingOut={signingOut} />
+  ) : null;
+  const accountList = account ? (
+    <ProfileList account={account} onManage={() => void go(paths.linkedAccounts)} onSignOut={menuSignOut} signingOut={signingOut} onDone={() => setSheetOpen(false)} />
   ) : null;
 
   // The full-height shell (Anil, 2026-11-17, from the Apps store): from 900px no top bar; the sidebar carries the
@@ -310,7 +338,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
             onOpenChange={setSheetOpen}
             trigger={<Button variant="ghost" size="sm" aria-label="Menu"><Menu size={18} strokeWidth={2} aria-hidden="true" /></Button>}
           >
-            <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} head={search} account={accountMenu} />
+            <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} head={search} account={accountList} />
           </BottomSheet>
         ) : null}
       </header>

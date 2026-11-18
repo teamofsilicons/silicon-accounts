@@ -59,14 +59,6 @@
 .steps li > span { display: block; margin-bottom: var(--space-2); }
 .steps li::marker { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
-/* Shared details. */
-.details { display: grid; gap: var(--space-6); }
-.detailGroup { display: grid; gap: var(--space-2); }
-.detailLabel { color: var(--foreground); font-size: var(--text-sm); font-weight: 500; }
-.detailHint { margin-top: -6px; color: var(--text-secondary); font-size: var(--text-sm); }
-
-.texts { display: grid; gap: var(--space-5); }
-
 /* The rail. */
 .rail { position: sticky; top: var(--space-6); display: none; gap: var(--space-8); }
 @media (min-width: 1180px) { .rail { display: grid; } }

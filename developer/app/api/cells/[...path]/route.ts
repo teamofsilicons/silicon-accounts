@@ -1,7 +1,7 @@
 /** Same-origin author proxy. The sealed Accounts session stays on the server. */
 import { NextRequest, NextResponse } from "next/server";
-import { cellsApiUrl } from "@/lib/server/config";
-import { cellsProxyRoute, cellsUploadPart, cellsFunctionBody, cellsFunctionInvocation, cellsBackupDownload } from "@/lib/server/cells-routes";
+import { cellsApiUrl, interfaceCellsEnabled } from "@/lib/server/config";
+import { cellsProxyRoute, cellsUploadPart, cellsFunctionBody, cellsFunctionInvocation, cellsBackupDownload, isInterfaceCellRoute } from "@/lib/server/cells-routes";
 import { actionForAppsRefusal, signInStateAtAccounts } from "@/lib/server/apps-refusal";
 import { clearSession, clientHeaders, errorBody, readSession, refreshSession, sameOriginProblem, writeSession } from "@/lib/server/session";
 
@@ -25,6 +25,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   if (!path) return json(404, errorBody("not_proxied", "This Cells route is not part of the developer author interface.", "Use the cell management pages."));
   const problem = sameOriginProblem(request);
   if (problem) return json(403, errorBody("cross_site_request", problem, "Use the developer site's own pages."));
+  if (isInterfaceCellRoute(path) && !interfaceCellsEnabled()) return json(503, errorBody("interface_cell_unavailable", "Cell sign-in for interfaces is temporarily unavailable.", "Use Silicon Accounts sign-in directly while this integration is unavailable."));
   let session = readSession(request);
   if (!session) return signedOut();
   let rotated = false;

@@ -505,3 +505,42 @@ async fn concurrent_refreshes_of_one_token_rotate_it_once() {
     // The token the winner got dies with the proof.
     assert_eq!(w.verify_bc(&minted[0]).await, invalid());
 }
+
+#[tokio::test]
+async fn organization_policy_is_checked_after_the_issuer_and_reuse() {
+    let w = World::new().await;
+    let p = w.issue_user_verification().await;
+    let ok = w.refresh(&refresh_token(&p)).await;
+    assert_eq!(ok.status, 200, "{}", ok.json);
+    // The subject becomes a work account whose organization allows no app.
+    w.ctx
+        .exec(&format!(
+            "insert into organization_projections(org_id, name) values ('testorg', 'Test organization'); \
+             update accounts set org_id = 'testorg', handle = 'c:member.testorg' where uuid = '{}'",
+            w.carbon.uuid
+        ))
+        .await;
+    let r = w
+        .call(
+            Req::post("/v1/proofs/refresh")
+                .basic(&w.briefcase.app_id, &w.briefcase_secret)
+                .json(json!({"proof_refresh_token": refresh_token(&ok.json)})),
+        )
+        .await;
+    assert_eq!(r.error_code(), Some("not_issuing_app"), "{}", r.json);
+    assert!(!r.json.to_string().contains("Test organization"));
+    let r = w.refresh(&refresh_token(&ok.json)).await;
+    assert_eq!(
+        r.error_code(),
+        Some("organization_app_not_allowed"),
+        "{}",
+        r.json
+    );
+    let r = w.refresh(&refresh_token(&p)).await;
+    assert_eq!(
+        r.error_code(),
+        Some("proof_refresh_token_reused"),
+        "{}",
+        r.json
+    );
+}

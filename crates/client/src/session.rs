@@ -48,6 +48,16 @@ impl<'a> AccountSession<'a> {
         }
     }
 
+    /// Explicitly allow Silicon Accounts notifications through Ting for this Silicon.
+    pub async fn enable_ting_notifications(&self) -> Result<serde_json::Value> {
+        self.post(
+            &["v1", "me", "notifications", "ting"],
+            &serde_json::json!({}),
+            None,
+        )
+        .await
+    }
+
     /// The client this session uses.
     pub fn client(&self) -> &'a AccountsClient {
         self.client
@@ -334,6 +344,34 @@ impl<'a> AccountSession<'a> {
     /// proofs it issued about you are revoked; it gets `membership.access_removed`).
     pub async fn remove_app_access(&self, app_id: &str) -> Result<()> {
         self.send(Method::DELETE, &["v1", "me", "apps", app_id], None)
+            .await
+            .map(|_| ())
+    }
+
+    /// Active Interface sessions of this account.
+    pub async fn interface_sessions(&self) -> Result<Vec<crate::InterfaceSessionInfo>> {
+        #[derive(serde::Deserialize)]
+        struct Response {
+            sessions: Vec<crate::InterfaceSessionInfo>,
+        }
+        let result: Response = self.get(&["v1", "me", "interface-sessions"]).await?;
+        Ok(result.sessions)
+    }
+
+    /// End one Interface session and its app-token families.
+    pub async fn revoke_interface_session(&self, id: &str) -> Result<()> {
+        self.send(
+            Method::DELETE,
+            &["v1", "me", "interface-sessions", id],
+            None,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// End every session for this Interface without removing independent app sign-ins.
+    pub async fn remove_interface_access(&self, id: &str) -> Result<()> {
+        self.send(Method::DELETE, &["v1", "me", "interfaces", id], None)
             .await
             .map(|_| ())
     }
@@ -860,7 +898,7 @@ impl<'a> AccountSession<'a> {
         .json()
     }
 
-    /// `GET /v1/silicons/{id}/keys`: the Silicon's keys, newest first, revoked ones too.
+    /// `GET /v1/silicons/{id}/keys`: the Silicon's keys, live ones first, then revoked ones, each newest first.
     pub async fn silicon_keys(&self, silicon: &str) -> Result<Vec<SiliconKeyInfo>> {
         let page: Page<SiliconKeyInfo> = self
             .get(&["v1", "silicons", silicon.trim(), "keys"])
@@ -904,7 +942,7 @@ impl<'a> AccountSession<'a> {
         .json()
     }
 
-    /// `GET /v1/silicons/{id}/federations`: the Silicon's trusts, newest first, removed ones
+    /// `GET /v1/silicons/{id}/federations`: the Silicon's trusts, live ones first, each group newest first, removed ones
     /// too.
     pub async fn federations(&self, silicon: &str) -> Result<Vec<crate::types::Federation>> {
         let page: Page<crate::types::Federation> = self

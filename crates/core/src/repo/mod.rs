@@ -21,6 +21,7 @@ pub mod memberships;
 pub mod organizations;
 pub mod otp;
 pub mod photos;
+pub mod publishing;
 pub mod rate_limit;
 pub mod refresh_recovery;
 pub mod sessions;
@@ -39,9 +40,4 @@ pub fn is_unique_violation(e: &sqlx::Error, constraint: Option<&str>) -> bool {
         }
         _ => false,
     }
-}
-
-/// True when a database error is a foreign-key violation.
-pub fn is_foreign_key_violation(e: &sqlx::Error) -> bool {
-    matches!(e, sqlx::Error::Database(db) if db.code().as_deref() == Some("23503"))
 }

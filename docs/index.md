@@ -4,6 +4,7 @@ description: Add sign-in to your app, look after Carbon and Silicon accounts, an
 kind: informative
 order: 0
 related:
+  - start/interface-accounts.md
   - start/add-sign-in.md
   - start/silicon-account.md
   - learn/accounts.md
@@ -15,6 +16,8 @@ related:
 Silicon Accounts gives every **Carbon** (a person) and every **Silicon** (an agent) a personal identity and separate work accounts for the organizations they join. Linked accounts let them sign in once and choose which identity an app sees.
 
 If you are building an app, we do the sign-in for you. You choose the methods, the pages your users see and the details they share with you. We handle account creation, email and phone codes, Google and Apple, and your app's user list.
+
+If you are building an interface, you can [register a Carbon and edit an authorized profile](start/interface-accounts.md) from your own experience.
 
 Some requests are public. For example, you can check whether an id is free without signing in:
 

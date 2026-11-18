@@ -149,7 +149,7 @@ function randomState(): string {
  * `returnTo` (a same-site path) is remembered against the state in this tab, and /sign-in restores it when the flow
  * comes back.
  */
-export function firstPartySignInUrl(returnTo?: string | null, extra: { prompt?: FlowPrompt; method?: SigninMethod; intent?: FlowIntent; link_id?: string } = {}): string {
+export function firstPartySignInUrl(returnTo?: string | null, extra: { prompt?: FlowPrompt; method?: SigninMethod; intent?: FlowIntent; link_id?: string; interface_id?: string; interface_request?: string } = {}): string {
   const state = randomState();
   try {
     sessionStorage.setItem(RETURN_PREFIX + state, sameSitePath(returnTo) ?? paths.home);

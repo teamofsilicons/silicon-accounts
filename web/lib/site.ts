@@ -26,8 +26,6 @@ export const LINKS = {
   teamOfSilicons: "https://teamofsilicons.com",
   developers: "https://developers.teamofsilicons.com",
   developerDocs: "https://developers.teamofsilicons.com/docs/accounts",
-  developerLlms: "https://developers.teamofsilicons.com/llms.txt",
-  apps: "https://apps.teamofsilicons.com",
   store: "https://apps.teamofsilicons.com",
   /** Silicon Accounts and Silicon Apps are both open source under the MIT license; the code and the LICENSE live here. */
   accountsGithub: "https://github.com/teamofsilicons/silicon-accounts",

@@ -47,7 +47,7 @@ async fn a_silicon_journey_through_the_rust_client() {
         id: wanted.clone(),
         display_name: "Journey".into(),
         custodian: saket.handle.clone().expect("id"),
-        webhook_url: Some("http://127.0.0.1:8593/hooks/journey".into()),
+        ting_session_id: Some("recv_11111111111111111111111111111111".into()),
         ..Default::default()
     };
     let created = client
@@ -64,7 +64,7 @@ async fn a_silicon_journey_through_the_rust_client() {
     assert_eq!(created.stk.as_ref().and_then(|s| s.prefix()), Some("stk-"));
     assert_eq!(
         created.webhook_secret.as_ref().and_then(|s| s.prefix()),
-        Some("whsec_")
+        None
     );
     let replay = client
         .silicon_self_create(&request, Some("journey-1"))
@@ -141,15 +141,19 @@ async fn a_silicon_journey_through_the_rust_client() {
         .expect("slt");
     assert_eq!(slt.app_id, remind.app_id);
     assert_eq!(slt.slt.prefix(), Some("slt_"));
-    let hook = silicon
-        .set_my_webhook("http://127.0.0.1:8593/hooks/journey-2")
+    let retired = silicon
+        .set_my_webhook("http://127.0.0.1:8593/hooks/old")
         .await
-        .expect("set webhook");
-    assert_eq!(hook.webhook_url, "http://127.0.0.1:8593/hooks/journey-2");
-    assert!(hook.webhook_secret.is_some());
-    let ping = silicon.test_my_webhook().await.expect("ping");
-    assert!(ping.event_id.is_some());
-    silicon.remove_my_webhook().await.expect("remove webhook");
+        .unwrap_err();
+    assert_eq!(retired.code(), "silicon_notifications_moved");
+    client
+        .silicon_request_ting_session(
+            &created.request.id,
+            created.request_token.expose(),
+            "recv_22222222222222222222222222222222",
+        )
+        .await
+        .expect("rebind request");
     let wrong = client
         .silicon_login(&wanted, "stk-000000000000", None)
         .await
@@ -188,15 +192,6 @@ async fn a_silicon_journey_through_the_rust_client() {
         .silicon_login(&renamed_to, &new_stk, None)
         .await
         .expect("login with the new STK");
-    let set = custodian
-        .set_silicon_webhook(&uuid, "http://127.0.0.1:8593/hooks/by-custodian")
-        .await
-        .expect("custodian webhook");
-    assert!(set.webhook_secret.is_some());
-    custodian
-        .remove_silicon_webhook(&uuid)
-        .await
-        .expect("remove custodian webhook");
     let transfer = custodian
         .transfer_silicon(&uuid, newcomer.handle.as_deref().expect("id"))
         .await

@@ -38,14 +38,6 @@ async fn transfer_accepted_moves_the_silicon_and_tells_everyone() {
     let ft = token(&ctx, &from).await;
     let tt = token(&ctx, &to).await;
     let (silicon, _) = ctx.silicon(&from.uuid).await;
-    let hook = call(
-        &ctx,
-        Req::put(&format!("/v1/me/silicons/{}/webhook", silicon.uuid))
-            .bearer(&ft)
-            .json(json!({"url": "http://127.0.0.1:8593/hooks/tr"})),
-    )
-    .await;
-    assert_eq!(hook.status, 200);
     let (app, _) = ctx.app("member").await;
     ctx.set_app_webhook(&app.app_id, "http://127.0.0.1:8593/member/webhooks")
         .await;

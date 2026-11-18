@@ -134,6 +134,8 @@ impl ClientBuilder {
         let http = reqwest::Client::builder()
             .user_agent(user_agent)
             .connect_timeout(self.connect_timeout)
+            // A redirect would re-send STK and token bodies to another host, or over http.
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| {
                 Error::invalid_input(
@@ -304,6 +306,7 @@ impl AccountsClient {
     pub(crate) async fn execute(&self, request: Request<'_>) -> Result<Response> {
         let what = format!("{} {}", request.method, request.url.path());
         let repeatable = request.method == Method::GET || request.idempotency_key.is_some();
+        let timeout = request.timeout.unwrap_or(self.timeout);
         let mut attempt: u32 = 0;
         loop {
             let builder = self.build_request(&request);
@@ -320,7 +323,7 @@ impl AccountsClient {
                     let body = response
                         .bytes()
                         .await
-                        .map_err(|e| self.transport_error(e, &what))?;
+                        .map_err(|e| self.transport_error(e, &what, timeout))?;
                     if status.is_success() {
                         return Ok(Response { status, body, what });
                     }
@@ -334,7 +337,7 @@ impl AccountsClient {
                         attempt += 1;
                         continue;
                     }
-                    return Err(self.transport_error(err, &what));
+                    return Err(self.transport_error(err, &what, timeout));
                 }
             }
         }
@@ -373,12 +376,12 @@ impl AccountsClient {
         }
     }
 
-    fn transport_error(&self, err: reqwest::Error, what: &str) -> Error {
+    fn transport_error(&self, err: reqwest::Error, what: &str, timeout: Duration) -> Error {
         let base = self.base.as_str().trim_end_matches('/');
         let cause = root_cause(&err);
         let (message, hint) = if err.is_timeout() {
             (
-                format!("Silicon Accounts at {base} did not answer {what} within {}s.", self.timeout.as_secs()),
+                format!("Silicon Accounts at {base} did not answer {what} within {}s.", timeout.as_secs()),
                 "Check your network, or raise the timeout if the service is slow; the request may or may not have been applied, so retry with the same idempotency key where the command supports one.".to_owned(),
             )
         } else if cause.to_ascii_lowercase().contains("certificate") {
@@ -815,6 +818,23 @@ mod tests {
             url.as_str(),
             "https://example.com/prefix/v1/ids/available?id=c%3Aa+b"
         );
+    }
+
+    #[tokio::test]
+    async fn timeout_error_names_the_request_timeout() {
+        // Bound but never accepted: the request connects and then gets no answer.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let client = AccountsClient::builder()
+            .base_url(format!("http://{}", listener.local_addr().unwrap()))
+            .max_retries(0)
+            .build()
+            .unwrap();
+        let request = Request::new(Method::GET, client.endpoint(&["v1", "me"]), Auth::None)
+            .timeout(Duration::from_secs(1));
+        let Err(err) = client.execute(request).await else {
+            panic!("expected a timeout");
+        };
+        assert!(err.message().contains("within 1s"), "{err}");
     }
 
     #[test]

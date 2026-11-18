@@ -280,8 +280,7 @@ export const journey: Journey = {
       const orbitProblems = pageProblems(orbit.reply, { framing: "none" });
       results.check("each app's embed is framed by that app's own origins: quill-docs by its two origins only (no fake-app origin), orbit-games with none by nobody (frame-ancestors 'none' + DENY), briefcase still by its own, within the site's 30 s cache", quillSet.status === 200 && orbitSet.status === 200 && quillProblems.length === 0 && orbitProblems.length === 0 && ancestorsOf(briefcaseAgain) === `'self' ${appsOrigin}` && quill.ms <= 35_000 && orbit.ms <= 35_000, `quill-docs (${quill.ms} ms): ${quillProblems.join("; ") || ancestorsOf(quill.reply)}; orbit-games (${orbit.ms} ms): ${orbitProblems.join("; ") || ancestorsOf(orbit.reply)}; briefcase: ${ancestorsOf(briefcaseAgain)}; patches ${quillSet.status}/${orbitSet.status}`);
       // CSP syntax or a wildcard that stands for every host as an allowed origin never gets stored (the site also
-      // filters what it reads, but a wildcard passes for an origin there): `https://*` would let any https page frame
-      // the app's embed.
+      // drops wildcards and plain http from what it reads): `https://*` would let any https page frame the app's embed.
       const hostile = ["*", "https://*", "https://*:443", "https://a.example 'unsafe-inline'", "https://a.example; script-src *", "'self'", "javascript:alert(1)", "data:", "http://evil.example"];
       const kept: string[] = [];
       for (const value of hostile) {

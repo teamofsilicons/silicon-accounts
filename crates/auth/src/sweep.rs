@@ -24,6 +24,16 @@ pub struct SweepReport {
 /// Deletes long-expired flows and sign-up sessions, and the uploads of sign-ups that ended.
 pub async fn run_once(pool: &PgPool) -> Result<SweepReport, sqlx::Error> {
     let signup_photos = accounts_core::repo::photos::sweep_signup_photos(pool).await?;
+    // These records hold encrypted broker cookies and reference their underlying
+    // Accounts flows. Erase them as soon as the short bridge lifetime ends.
+    sqlx::query("update browser_sessions set revoked_at=coalesce(revoked_at,now()) where id in (select browser_session_id from verified_interface_auth_flows where expires_at<=now() and browser_session_id is not null)")
+        .execute(pool).await?;
+    sqlx::query("delete from verified_interface_auth_flows where expires_at <= now()")
+        .execute(pool)
+        .await?;
+    sqlx::query("delete from interface_login_flows where expires_at < now() - interval '1 day'")
+        .execute(pool)
+        .await?;
     let flows = sqlx::query("delete from signin_flows where expires_at < now() - interval '1 day'")
         .execute(pool)
         .await?

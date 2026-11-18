@@ -78,6 +78,7 @@ struct OwnedQuery {
 /// One item of `GET /v1/me/owned-apps`.
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct OwnedApp {
+    pub organization_id: Option<String>,
     pub app_id: String,
     pub name: String,
     pub logo_url: Option<String>,
@@ -93,6 +94,7 @@ async fn owned_apps(
     State(state): State<AppState>,
     me: AccountAuth,
     Query(q): Query<OwnedQuery>,
+    headers: axum::http::HeaderMap,
 ) -> ApiResult<Response> {
     let page = accounts_core::http::PageParams {
         limit: q.limit,
@@ -104,19 +106,22 @@ async fn owned_apps(
         Some((us, id)) => (Some(from_micros(us)?), Some(id)),
         None => (None, None),
     };
+    let organization_apps =
+        accounts_core::repo::publishing::manageable_apps(&state, &me, &headers).await?;
     let mut conn = state.db.acquire().await?;
     let rows = sqlx::query_as::<_, OwnedApp>(
-        "select a.app_id, a.name, a.logo_url, a.status, a.source, a.created_at, \
+        "select a.app_id, a.name, a.logo_url, a.status, a.source, a.created_at, (select organization_id from app_organization_publishers where app_id=a.app_id) as organization_id, \
            (select count(*) from memberships m join accounts ac on ac.uuid = m.account_uuid \
              where m.app_id = a.app_id and m.status in ('active', 'imported') and ac.status <> 'deleted') as users \
-         from apps a where (a.owner_uuid = $1 or exists(select 1 from app_authors au where au.app_id=a.app_id and au.account_uuid=$1)) \
-           and ($2::timestamptz is null or (a.created_at, a.app_id) < ($2, $3)) \
+         from apps a where ((not exists(select 1 from app_organization_publishers op where op.app_id=a.app_id) and (a.owner_uuid = $1 or exists(select 1 from app_authors au where au.app_id=a.app_id and au.account_uuid=$1))) or a.app_id=any($5)) \
+           and not exists(select 1 from app_registry_lifecycle l where l.app_id=a.app_id and l.deleted_at is not null) and ($2::timestamptz is null or (a.created_at, a.app_id) < ($2, $3)) \
          order by a.created_at desc, a.app_id desc limit $4",
     )
     .bind(me.uuid())
     .bind(after_ts)
     .bind(after_id)
     .bind(limit + 1)
+    .bind(&organization_apps)
     .fetch_all(&mut *conn)
     .await?;
     let page = paginate(rows, limit, |r| (micros(r.created_at), r.app_id.clone()));
@@ -125,7 +130,7 @@ async fn owned_apps(
 
 async fn app_details(State(state): State<AppState>, auth: AppOrOwner) -> ApiResult<Response> {
     let mut conn = state.db.acquire().await?;
-    let body = details_body(&mut conn, &state, &auth.app).await?;
+    let body = details_body(&mut conn, &auth.app).await?;
     Ok(Json(body).into_response())
 }
 
@@ -197,12 +202,7 @@ pub(crate) async fn masked_config(
 }
 
 /// The `GET /v1/apps/{app_id}` body (also returned by `PATCH …/signin-config`).
-pub(crate) async fn details_body(
-    conn: &mut PgConnection,
-    state: &AppState,
-    app: &App,
-) -> ApiResult<Value> {
-    let _ = state;
+pub(crate) async fn details_body(conn: &mut PgConnection, app: &App) -> ApiResult<Value> {
     // Re-read the app: the extractor's copy may come from the 60 s credential cache.
     let app = apps_repo::get(conn, &app.app_id)
         .await?
@@ -216,6 +216,12 @@ pub(crate) async fn details_body(
         None => None,
     };
     let stats = app_stats(conn, &app.app_id).await?;
+    let organization: Option<(String, Value)> = sqlx::query_as(
+        "SELECT organization_id,access FROM app_organization_publishers WHERE app_id=$1",
+    )
+    .bind(&app.app_id)
+    .fetch_optional(&mut *conn)
+    .await?;
     Ok(json!({
         "app_id": app.app_id,
         "name": app.name,
@@ -224,6 +230,8 @@ pub(crate) async fn details_body(
         "logo_dark_url": app.logo_dark_url,
         "homepage_url": app.homepage_url,
         "owner": owner,
+        "organization_id":organization.as_ref().map(|(id,_)|id),
+        "organization_access":organization.as_ref().map(|(_,access)|access),
         "status": app.status,
         "source": app.source,
         "created_at": accounts_core::timefmt::format_rfc3339_ms(app.created_at),

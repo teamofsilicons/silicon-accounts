@@ -71,7 +71,7 @@ pub async fn lookup(
         "select ",
         session_columns!(),
         " from browser_sessions s where token_hash = $1 and revoked_at is null and expires_at > now() \
-          and exists (select 1 from accounts a where a.uuid = s.account_uuid and a.status <> 'deleted')"
+          and exists (select 1 from accounts a where a.uuid = s.account_uuid and a.status not in ('archived','deleted'))"
     ))
     .bind(pepper.hash(token))
     .fetch_optional(&mut *conn)

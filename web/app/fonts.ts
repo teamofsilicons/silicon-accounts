@@ -3,8 +3,8 @@
  * may pick for its hosted sign-in pages (lib/branding/fonts.ts). They are downloaded at build and self-hosted under
  * /_next/static/media (font-src 'self'), never preloaded, and a browser only fetches one when an app's branded page
  * actually uses it. Hanken Grotesk, Silicon UI's --font-body (through --font-hanken-grotesk), is the site's face for
- * text and titles (styles/tokens.css), so it is preloaded; Geist, Silicon UI's own title face, is preloaded too for the
- * pages and the type lab that use it.
+ * text and titles (styles/tokens.css), so it is preloaded; Geist, Silicon UI's own title face, is not (only branded pages and the
+ * type lab use it).
  *
  * Geist Serif (the geist package, self-hosted by next/font/local as --font-geist-serif) sets Home's "Create your first
  * Silicon" heading (Anil, 2026-10-31).
@@ -20,11 +20,13 @@ const hankenGrotesk = Hanken_Grotesk({
   display: "swap",
 });
 
-/** Silicon UI's shipped display face; the site sets titles in Hanken (styles/tokens.css). */
+/** Silicon UI's shipped display face; the site sets titles in Hanken (styles/tokens.css). Not preloaded (as before
+ * the redesign): only apps branded with Geist and the type lab paint it, so other pages, the embed included, skip it. */
 const geist = Geist({
   subsets: ["latin", "latin-ext"],
   variable: "--font-geist",
   display: "swap",
+  preload: false,
 });
 
 const instrumentSerif = Instrument_Serif({

@@ -9,13 +9,3 @@ export function BrandMark({ className }: { className?: string }) {
     </span>
   );
 }
-
-/** "Silicon Developer" with the mark. */
-export function Wordmark() {
-  return (
-    <>
-      <BrandMark />
-      <span className={styles.brandText}>Silicon Developer</span>
-    </>
-  );
-}

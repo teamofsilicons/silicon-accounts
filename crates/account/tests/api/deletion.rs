@@ -1,8 +1,8 @@
-//! `DELETE /v1/me`, and the reservation sweep.
+//! `DELETE /v1/me` (archive, then the sweep deletes after 10 days), and the reservation sweep.
 
 use accounts_core::events::types;
 use accounts_core::models::{Provider, Scope};
-use accounts_core::repo::{contacts, identities};
+use accounts_core::repo::{accounts, contacts, identities};
 use accounts_core::test_support::{Req, TestContext};
 use serde_json::json;
 use uuid::Uuid;
@@ -133,6 +133,32 @@ async fn deleting_an_account_removes_it_everywhere() {
         .expect("cookie cleared");
     assert!(set_cookie.contains("Max-Age=0"));
 
+    // Archived for 10 days: signed out, kept with its id and emails, emailed; apps hear nothing.
+    let archived = reload(&ctx, &carbon.uuid).await;
+    assert_eq!(archived.status.as_str(), "archived");
+    assert_eq!(archived.handle.as_deref(), Some(old_id.as_str()));
+    let email = format!("{}@example.test", old_id.trim_start_matches("c:"));
+    let outbox = ctx.outbox(&email).await;
+    assert_eq!(outbox[0].0, "account_archived");
+    assert!(outbox[0].1.contains(&old_id), "{}", outbox[0].1);
+    let kept: i64 = scalar(
+        &ctx,
+        "select count(*) from account_emails where account_uuid = $1",
+        &carbon.uuid,
+    )
+    .await;
+    assert_eq!(kept, 1);
+    let live: i64 = scalar(
+        &ctx,
+        "select count(*) from token_families where account_uuid = $1 and revoked_at is null",
+        &carbon.uuid,
+    )
+    .await;
+    assert_eq!(live, 0);
+    assert_status(&call(&ctx, Req::get("/v1/me").bearer(&cli)).await, 401);
+    assert!(events(&ctx, &app, types::ACCOUNT_DELETED).await.is_empty());
+    erase(&ctx, &carbon.uuid).await;
+
     let gone = reload(&ctx, &carbon.uuid).await;
     assert_eq!(gone.status.as_str(), "deleted");
     assert_eq!(gone.handle, None);
@@ -146,7 +172,7 @@ async fn deleting_an_account_removes_it_everywhere() {
         &old_id,
     )
     .await;
-    assert_eq!(reserved, 1, "the id is reserved for 10 days");
+    assert_eq!(reserved, 0, "the ten-day reservation has ended");
     for table in ["account_emails", "account_phones", "identities", "photos"] {
         let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
             "select count(*) from {table} where account_uuid = $1"
@@ -218,7 +244,10 @@ async fn deleting_an_account_removes_it_everywhere() {
         )),
     )
     .await;
-    assert_eq!(r.json["reason"], "reserved");
+    assert_eq!(
+        r.json["available"], true,
+        "the recovery period already held this ID for ten days"
+    );
     let audit: i64 = scalar(
         &ctx,
         "select count(*) from audit_log where account_uuid = $1 and action = 'account.deleted'",
@@ -255,6 +284,7 @@ async fn silicons_waiting_for_a_deleted_carbon_are_released() {
     )
     .await;
     assert_status(&r, 204);
+    erase(&ctx, &carbon.uuid).await;
 
     let released = reload(&ctx, &waiting.uuid).await;
     assert_eq!(released.status.as_str(), "deleted");
@@ -383,6 +413,7 @@ async fn a_transfer_waiting_for_a_deleted_carbon_is_just_cancelled() {
     )
     .await;
     assert_status(&r, 204);
+    erase(&ctx, &leaving.uuid).await;
     let status: String = sqlx::query_scalar("select status from custodian_requests where id = $1")
         .bind(request)
         .fetch_one(&ctx.state.db)
@@ -444,6 +475,16 @@ async fn a_second_delete_in_flight_does_nothing() {
             .is_some_and(|c| c.contains("Max-Age=0")),
         "the cookie request still clears its cookie"
     );
+    let archived: i64 = scalar(
+        &ctx,
+        "select count(*) from audit_log where account_uuid = $1 and action = 'account.archived'",
+        &carbon.uuid,
+    )
+    .await;
+    assert_eq!(archived, 1);
+    let email = format!("{}@example.test", id.trim_start_matches("c:"));
+    assert_eq!(ctx.outbox(&email).await.len(), 1, "one email");
+    erase(&ctx, &carbon.uuid).await;
     assert_eq!(events(&ctx, &app, types::ACCOUNT_DELETED).await.len(), 1);
     let audits: i64 = scalar(
         &ctx,
@@ -534,6 +575,7 @@ async fn deleting_keeps_a_photo_another_account_shows() {
     )
     .await;
     assert_status(&r, 204);
+    erase(&ctx, &leaving.uuid).await;
     let path = |url: &str| url[url.find("/v1/photos/").expect("photo path")..].to_string();
     assert_status(&call(&ctx, Req::get(&path(&given))).await, 200);
     assert_error(
@@ -542,4 +584,85 @@ async fn deleting_keeps_a_photo_another_account_shows() {
         "photo_not_found",
     );
     assert_eq!(reload(&ctx, &silicon.uuid).await.pfp_url, given);
+}
+
+#[tokio::test]
+async fn archived_accounts_wait_ten_days_unless_restored() {
+    let ctx = TestContext::new().await;
+    let staying = ctx.carbon().await;
+    let leaving = ctx.carbon().await;
+    for c in [&staying, &leaving] {
+        let r = call(
+            &ctx,
+            Req::delete("/v1/me")
+                .bearer(&token(&ctx, c).await)
+                .json(json!({ "confirm": c.handle.clone().expect("id") })),
+        )
+        .await;
+        assert_status(&r, 204);
+    }
+    ctx.exec(
+        "update accounts set archived_at = now() - interval '9 days' where status = 'archived'",
+    )
+    .await;
+    let swept = accounts_account::delete_archived_accounts(&ctx.state).await;
+    assert_eq!(swept.expect("sweep"), 0, "not yet");
+
+    let mut conn = ctx.conn().await;
+    let back = accounts::restore_archived(
+        &mut conn,
+        &staying.uuid,
+        time::OffsetDateTime::now_utc(),
+        None,
+    )
+    .await
+    .expect("restore")
+    .expect("it was archived");
+    assert_eq!(back.status.as_str(), "active");
+    assert_eq!(back.handle, staying.handle);
+    let again = accounts::restore_archived(
+        &mut conn,
+        &staying.uuid,
+        time::OffsetDateTime::now_utc(),
+        None,
+    )
+    .await;
+    assert!(
+        again.expect("restore").is_none(),
+        "only an archived account comes back"
+    );
+    drop(conn);
+
+    ctx.exec(
+        "update accounts set archived_at = now() - interval '11 days' where status = 'archived'",
+    )
+    .await;
+    assert!(
+        accounts::restore_archived(
+            &mut *ctx.conn().await,
+            &leaving.uuid,
+            time::OffsetDateTime::now_utc(),
+            None
+        )
+        .await
+        .expect("late restore")
+        .is_none()
+    );
+    let swept = accounts_account::delete_archived_accounts(&ctx.state).await;
+    assert_eq!(swept.expect("sweep"), 1);
+    assert_eq!(reload(&ctx, &staying.uuid).await.status.as_str(), "active");
+    assert_eq!(reload(&ctx, &leaving.uuid).await.status.as_str(), "deleted");
+}
+
+/// The 10 days pass without a sign-in: the sweep deletes the archived account.
+async fn erase(ctx: &TestContext, uuid: &str) {
+    sqlx::query(
+        "update accounts set archived_at = now() - interval '10 days 1 second' where uuid = $1",
+    )
+    .bind(uuid)
+    .execute(&ctx.state.db)
+    .await
+    .expect("time travel");
+    let swept = accounts_account::delete_archived_accounts(&ctx.state).await;
+    assert_eq!(swept.expect("sweep"), 1);
 }

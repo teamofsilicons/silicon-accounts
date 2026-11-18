@@ -82,7 +82,8 @@ The first match wins:
 2. `ACCOUNTS_URL`;
 3. `url` in `{home}/.accounts/config.json` (`silicon-accounts config set url …`);
 4. the URL of the stored session;
-5. the URL of a code sign-in waiting for its code (`silicon-accounts login --email … --url …`);
+5. the URL of a code sign-in waiting for its code (`silicon-accounts login --email … --url …`), until
+   that code expires;
 6. `https://accounts.teamofsilicons.com`.
 
 Plain `http://` is refused for any host but this machine (`localhost`, `*.localhost`,
@@ -114,7 +115,7 @@ forgets the configured one.
 | `session.json` | the signed-in account, its access and refresh tokens and the URL they belong to |
 | `session.lock` | the lock held while a session is refreshed or stored |
 | `config.json` | `url` and `app` |
-| `apps/<app_id>.json` | an app secret stored by `silicon-accounts app use <app_id> --secret-stdin` |
+| `apps/<app_id>.json` | an app secret stored by `silicon-accounts app use <app_id> --secret-stdin`, used only at the URL it was stored for |
 | `requests/<request-id>.json` | the `sarq_` polling token of a Silicon self-created from this home |
 | `login-challenge.json` | a code sign-in waiting for its code |
 | `home` | (only in `{base}/.accounts/`) the pointer written by `silicon-accounts config home` |
@@ -1207,13 +1208,11 @@ As a Carbon (you become the custodian):
   silicon-accounts silicon create --id si:scout --display-name Scout
 As a Silicon (your custodian must accept):
   silicon-accounts silicon create --id si:scout --custodian c:saket --wait
-  silicon-accounts silicon create --id si:scout --custodian saket@example.com \
-      --webhook https://scout.example/hooks
+  silicon-accounts silicon create --id si:scout --custodian saket@example.com
   silicon-accounts silicon request status 0192f0c2-… --wait
 Custodian tasks:
   silicon-accounts silicon list
   silicon-accounts silicon rotate-stk si:scout
-  silicon-accounts silicon webhook deliveries si:scout --status failed
   silicon-accounts silicon transfer si:scout --to c:shubham
   silicon-accounts silicon delete si:scout --confirm si:scout
 ```
@@ -1251,8 +1250,7 @@ Examples, as `--help` prints them:
 ```text
 silicon-accounts silicon create --id si:scout --display-name Scout
 silicon-accounts silicon create --id si:scout --custodian c:saket --wait
-silicon-accounts silicon create --id si:scout --custodian saket@example.com \
-    --webhook https://scout.example/hooks
+silicon-accounts silicon create --id si:scout --custodian saket@example.com
 openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian c:saket --stk-stdin
 ```
 

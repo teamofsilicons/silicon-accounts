@@ -48,11 +48,6 @@ impl PublicKey {
             base64::engine::general_purpose::STANDARD_NO_PAD.encode(digest)
         )
     }
-
-    /// The key as base64url (no padding).
-    pub fn to_base64url(&self) -> String {
-        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(self.0)
-    }
 }
 
 fn bad_key(why: &str) -> String {
@@ -440,10 +435,18 @@ pub async fn sign_in(
     .bind(key.id)
     .execute(&mut *tx)
     .await?;
-    sqlx::query("update silicon_keys set last_used_at = now() where id = $1")
-        .bind(key.id)
-        .execute(&mut *tx)
-        .await?;
+    // Re-checked here: a revoke that committed after the key was read has not seen this session.
+    let live = sqlx::query(
+        "update silicon_keys set last_used_at = now() where id = $1 and revoked_at is null",
+    )
+    .bind(key.id)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected()
+        == 1;
+    if !live {
+        return Err(refuse());
+    }
     audit::signin(
         &mut tx,
         &SigninRecord {

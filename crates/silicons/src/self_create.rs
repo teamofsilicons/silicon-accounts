@@ -3,7 +3,7 @@
 //! - `POST /v1/silicons` (public, IDEMPOTENT): the account starts `pending_custodian`; the named
 //!   Carbon (c:id, or an email that may not have an account yet) gets an email and has 14 days to
 //!   accept. The response carries the STK (when generated), the request and its `sarq_` polling
-//!   token, and the webhook secret (when a webhook was given) — each shown exactly once.
+//!   token — each shown exactly once.
 //! - `GET /v1/silicons/requests/{id}` (`Authorization: Bearer sarq_…`): the request's status, so
 //!   a Silicon (or `silicon-accounts silicon create --wait`) can wait for the custodian's decision.
 //!
@@ -20,7 +20,6 @@
 use accounts_core::crypto::{self, Pepper, prefix};
 use accounts_core::delivery;
 use accounts_core::error::{ApiError, ApiResult, FieldErrors};
-use accounts_core::events;
 use accounts_core::http::{ClientMeta, IdempotencyKey, Json, Path};
 use accounts_core::models::AccountStatus;
 use accounts_core::repo::accounts::{self, NewSilicon};
@@ -69,6 +68,8 @@ pub struct SelfCreateBody {
     pub custodian: String,
     #[serde(default)]
     pub webhook_url: Option<String>,
+    #[serde(default)]
+    pub ting_session_id: Option<String>,
 }
 
 /// The request as hashed for Idempotency-Key matching. A chosen STK is replaced by a keyed hash:
@@ -107,6 +108,9 @@ async fn self_create(
     body: SelfCreateBody,
 ) -> ApiResult<(StatusCode, Value)> {
     let settings = &state.settings;
+    if let Some(id) = &body.ting_session_id {
+        accounts_core::ting::validate_session(id)?;
+    }
     let id = input::silicon_id(&body.id)?;
     let mut fields = FieldErrors::new();
     let display_name = check(
@@ -125,10 +129,10 @@ async fn self_create(
         input::pfp_url(settings, body.pfp_url.as_deref()),
     );
     let chosen_stk = check(&mut fields, "stk", input::chosen_stk(body.stk.as_deref()));
-    let webhook_url = check(
+    check(
         &mut fields,
         "webhook_url",
-        input::webhook_url(settings, body.webhook_url.as_deref()),
+        input::webhook_url(body.webhook_url.as_deref()),
     );
     let target = check(
         &mut fields,
@@ -136,21 +140,8 @@ async fn self_create(
         CarbonTarget::parse(&body.custodian),
     );
     fields.into_result()?;
-    let (
-        Some(display_name),
-        Some(timezone),
-        Some(pfp_url),
-        Some(chosen_stk),
-        Some(webhook_url),
-        Some(target),
-    ) = (
-        display_name,
-        timezone,
-        pfp_url,
-        chosen_stk,
-        webhook_url,
-        target,
-    )
+    let (Some(display_name), Some(timezone), Some(pfp_url), Some(chosen_stk), Some(target)) =
+        (display_name, timezone, pfp_url, chosen_stk, target)
     else {
         return Err(ApiError::internal(
             "validated self-create fields are missing",
@@ -185,10 +176,6 @@ async fn self_create(
     drop(conn);
 
     let new_stk = stk::prepare(state, chosen_stk).await?;
-    let webhook = match &webhook_url {
-        Some(_) => Some(events::new_webhook_secret(&state.keys.keyring)?),
-        None => None,
-    };
     let request_token = crypto::random_token(prefix::SILICON_REQUEST);
 
     let mut tx = state.db.begin().await?;
@@ -213,8 +200,8 @@ async fn self_create(
             status: AccountStatus::PendingCustodian,
             custodian_uuid: None,
             stk_hash: new_stk.hash.clone(),
-            webhook_url: webhook_url.clone(),
-            webhook_secret_enc: webhook.as_ref().map(|(_, enc)| enc.clone()),
+            webhook_url: None,
+            webhook_secret_enc: None,
             actor: "self".into(),
         },
     )
@@ -239,6 +226,16 @@ async fn self_create(
         },
     )
     .await?;
+    if let Some(session_id) = &body.ting_session_id {
+        sqlx::query(
+            "insert into silicon_ting_requests(request_id,session_id,generation) values($1,$2,$3)",
+        )
+        .bind(request.id)
+        .bind(session_id)
+        .bind(uuid::Uuid::new_v4())
+        .execute(&mut *tx)
+        .await?;
+    }
     let info = views::request_info(&mut tx, &request).await?;
     notify::silicon_created(&mut tx, &silicon, Some(&info)).await?;
     let mail =
@@ -251,7 +248,7 @@ async fn self_create(
             &silicon.uuid,
             &silicon.uuid,
             json!({"id": silicon.handle, "request_id": request.id.to_string(), "custodian": info.custodian,
-                   "webhook": webhook_url.is_some(), "stk": if new_stk.generated { "generated" } else { "chosen" }}),
+                   "webhook": false, "stk": if new_stk.generated { "generated" } else { "chosen" }}),
         )
         .await?;
     if let Some(custodian) = recipient.account_uuid() {
@@ -288,7 +285,7 @@ async fn self_create(
             "stk": new_stk.reveal(),
             "request": info,
             "request_token": request_token,
-            "webhook_secret": webhook.map(|(secret, _)| secret),
+            "webhook_secret": Value::Null,
         }),
     ))
 }
@@ -343,7 +340,7 @@ async fn ensure_custodian_has_room(
 }
 
 /// The `sarq_` token from `Authorization: Bearer …`.
-fn request_token(headers: &HeaderMap) -> ApiResult<String> {
+pub(crate) fn request_token(headers: &HeaderMap) -> ApiResult<String> {
     let missing = || {
         ApiError::unauthenticated(
             "request_token_required",

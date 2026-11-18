@@ -1,0 +1,124 @@
+{
+  "verified_at": "2026-11-17T22:33:54.881494+00:00",
+  "release": "030b0ca4071fa445229eb66d17212ccb219b4a51",
+  "previous": "f958508f796d9f5655e1f151bbbff8fbcde34d98",
+  "web_build_id": "4Jv_PBMREYcFaCa_Ums-l",
+  "api_source": "f958508f796d9f5655e1f151bbbff8fbcde34d98",
+  "api_sha256": "5a0fe3e510cb649656a9731e3d65ec682e27f439c43c6ebf1eb6e35d9a262bdc",
+  "developer_source": "4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2",
+  "developer_build_id": "10oUw7Ynw2H9u_4A-paGf",
+  "schema_version": 44,
+  "artifact": {
+    "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-work-portraits/030b0ca4071fa445229eb66d17212ccb219b4a51-bd1338e6efd593.tar.gz",
+    "sha256": "bd1338e6efd5937f98da69d845c2643a7a7dcdc25fa6b8331e6a53698c43aad8",
+    "size": 55245683
+  },
+  "activation_command_id": "7e9e0364-5b4b-4608-bd4b-782a898ba2fc",
+  "activation": {
+    "source": "030b0ca4071fa445229eb66d17212ccb219b4a51",
+    "release": "030b0ca4071fa445229eb66d17212ccb219b4a51",
+    "developer_revision": "4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2",
+    "developer_build": "10oUw7Ynw2H9u_4A-paGf",
+    "previous": "f958508f796d9f5655e1f151bbbff8fbcde34d98",
+    "web_build_id": "4Jv_PBMREYcFaCa_Ums-l",
+    "verified_files": 2704,
+    "static_dirs_made_readable": [
+      "FswF9r13GFv5U2PP28pBT",
+      "lxuISq8XtWBoD8F-ZzFjW"
+    ],
+    "prior_static_files_kept": 41,
+    "loopback_preflight": true,
+    "api_readiness": true,
+    "services_healthy": true,
+    "restarted_units": [
+      "accounts-web"
+    ],
+    "schema_changes": false,
+    "cutover_seconds": 1.1,
+    "activated_at": "2026-11-17T22:33:30.453588+00:00"
+  },
+  "public_http": {
+    "your_accounts": {
+      "http_status": 200
+    },
+    "database": {
+      "http_status": 200
+    },
+    "account guide": {
+      "http_status": 200
+    },
+    "chunks/0k_bcjm94kqfg.css": {
+      "http_status": 200,
+      "sha256": "cdb16fdfe23111b4e4c2120bd072a3e7e1713bdeacc15a7d8a6cb30d11eada89"
+    },
+    "chunks/3-6e_2ql1cto-.js": {
+      "http_status": 200,
+      "sha256": "f40a99f19f7a913b38a9e121f71daf1502945eda21c0212ea93102b978293da6"
+    },
+    "chunks/25m4tar4js3hk.js": {
+      "http_status": 200,
+      "sha256": "0b02bc7b5a1b05052f3ff319ba98fab1322226e2d8a8617e36d4699b82421f55"
+    },
+    "chunks/38dtmfdtzvkik.js": {
+      "http_status": 200,
+      "sha256": "4f3d6d2894ad88d010c60bfafcabae30167682be3bb26dc80fac00c44b3cde83"
+    },
+    "chunks/05t23mb_n52qm.js": {
+      "http_status": 200,
+      "sha256": "404380e64c6553626210c79cd175f015b5f4e6851d3eb1251eeed8e3bef2ba5a"
+    },
+    "chunks/12lh7vm4zj_em.js": {
+      "http_status": 200,
+      "sha256": "fcceb7c6237f20209e30469857ad89cc3f61571f2f1dc755447afb0a2d34f8c9"
+    },
+    "chunks/0ryuerzx6aamy.js": {
+      "http_status": 200,
+      "sha256": "1aa79389bfb97de27e80a24d7e3665b5655e500e9e8cc6a52cfb7ae5b57cce5a"
+    },
+    "chunks/37wkls-rtnx73.js": {
+      "http_status": 200,
+      "sha256": "dfcb0cb8a3af11243aab5c46589320e53ed7c4925c8182ae48942238c0ad1b3e"
+    },
+    "chunks/28f5xsvwmb4i8.js": {
+      "http_status": 200,
+      "sha256": "206c4db680589ebbac33f447180ab5a2c0b4291286705e8e39340b7b13f9eba1"
+    },
+    "chunks/07srue-aeeuwc.js": {
+      "http_status": 200,
+      "sha256": "ced8d70aba60c8374cdb39407be0975ba79c1a0208416e95ffd1162d0130bfa2"
+    }
+  },
+  "browser_verification": {
+    "page": "/linked-accounts",
+    "api_data": "Signed-in fixture responses intercepted in Playwright. Both sites served their own bundles and organization logo.",
+    "widths": [
+      1440,
+      390
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "runs": {
+      "local_chromium": 4,
+      "local_webkit": 4,
+      "production_chromium": 4,
+      "production_webkit": 4
+    },
+    "assertions": [
+      "Two work accounts in one organization each render their own distinct uploaded image and the same organization logo.",
+      "Both images decode and the small logo sits immediately to the left of the organization name.",
+      "A work profile without an uploaded image displays its Carbon avatar. An organization without a logo displays its name."
+    ],
+    "related_smoke": [
+      "Hosted work account picker",
+      "Switching a browser account from Your Accounts opens Home"
+    ]
+  },
+  "web_checks": {
+    "typecheck": true,
+    "lint": true,
+    "unit_tests_passed": 34,
+    "production_build": true
+  }
+}

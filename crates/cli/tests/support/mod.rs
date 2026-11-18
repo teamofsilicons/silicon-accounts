@@ -480,6 +480,14 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
             }
         }
         ("POST", "/v1/oauth/revoke") => (200, json!({})),
+        ("GET", "/v1/me/linked-accounts") if carbon_bearer => (
+            200,
+            json!({ "accounts": [{ "uuid": SILICON_UUID, "id": SILICON_ID }] }),
+        ),
+        ("POST", "/v1/me/linked-accounts/switch") if carbon_bearer => (
+            200,
+            json!({ "tokens": silicon_tokens(&st), "account": silicon_me() }),
+        ),
         ("GET", "/v1/ids/available") => {
             let q = form(&query);
             let id = q.get("id").cloned().unwrap_or_default();
@@ -530,6 +538,18 @@ async fn handle(State(state): State<Arc<Mutex<MockState>>>, request: Request) ->
                 "request_token": "sarq_poll",
                 "webhook_secret": null
             }),
+        ),
+        ("PUT", "/v1/silicons/requests/req-1/ting-session")
+            if auth.as_deref() == Some("Bearer sarq_poll") =>
+        {
+            (
+                200,
+                json!({"request_id":"req-1","session_id":json_body["session_id"],"channel":"ting"}),
+            )
+        }
+        ("POST", "/v1/me/notifications/ting") if silicon_bearer => (
+            200,
+            json!({"enabled":true,"channel":"ting","app_id":"silicon-accounts","account_uuid":SILICON_UUID,"subscription_id":"sub-1"}),
         ),
         ("GET", "/v1/silicons/requests/req-1") if auth.as_deref() == Some("Bearer sarq_poll") => {
             st.request_polls += 1;

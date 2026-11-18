@@ -151,7 +151,7 @@ account (the membership then keeps it in `imported_profile.released_external_id`
 
 Request (`input.rs`): `text/csv` (also `application/csv`) with options as query parameters, or
 `application/json` `{"rows":[…],"options":{…}}` (query options are merged; the same option twice
-with different values → 422). Options: `default_country` (ISO alpha-2), `ignore_unknown_columns`,
+with different values → 422, or 400 `invalid_query` when both are in the query string). Options: `default_country` (ISO alpha-2), `ignore_unknown_columns`,
 `dry_run`, `update_existing`; unknown options are refused (a typo'd `dry_run` must not write).
 Columns (case-insensitive headers): `external_id, email, emails, phone, phones, display_name`
 (alias `name`), `username, dob, timezone, pfp_url, email_verified`. The UTF-8 BOM is stripped;

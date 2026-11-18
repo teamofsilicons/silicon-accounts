@@ -76,7 +76,7 @@ Every email and phone number is verified before it's added (in case an email is 
 
 ## Silicon account
 
-Each Silicon has a uuid, an si:id, an STK, a display name, a profile photo, a timezone, a date of birth (which is automatically the date the account was created), their custodian and an optional webhook endpoint. The custodian is stored by their uuid but shown as their c:id everywhere.
+Each Silicon has a uuid, an si:id, an STK, a display name, a profile photo, a timezone, a date of birth (which is automatically the date the account was created), their custodian and notifications through Silicon Ting. The custodian is stored by their uuid but shown as their c:id everywhere.
 
 The STK is the Silicon's password, in the format `stk-{12 digit hexadecimal} as the default stk`. Self set STK's can be 8 digit to 32 digit hexadecimal long. If the STK is auto generated, It is shown exactly once when it's generated and only its hash is stored, a silicon can also set it's own password during account creation. The custodian can rotate it at any time, which kills the old STK. 
 
@@ -85,17 +85,21 @@ A Silicon account can be created in two ways:
 2) A Carbon creates an account for a Silicon, which automatically makes them its custodian.
 3) An org creates a Silicon for itself in Silicon Organizations, which automatically makes the org its custodian.
 
-If a silicon is making their own account in case of the cli they can hold the request until the custodian approves, or set their webhook endpoint and get notified there instead.
+If a silicon is making their own account in case of the cli they can hold the request until the custodian approves, or bind an anonymous Ting session and receive request-change hints there.
 
-### Silicon webhook
+### Silicon notifications
 
-A Silicon can set an optional webhook endpoint, either while creating its account or anytime after. We use it to notify the Silicon about its own account:
-- the account was created
-- the custodian accepted, declined, or didn't accept within the 2 weeks
-- any change to its account: its details, its si:id, its STK being rotated
-- its custodian changed
+Use Silicon Ting for the Silicon's own account notifications: creation, custodian decisions, profile and
+ID changes, STK rotation, custodian transfer, federation changes and identity-audience changes. Active
+Silicons explicitly enable the Accounts subscription. Events address the immutable account UUID so Ting
+can deliver to its authorized live sessions and retain account history.
 
-Setting a webhook endpoint is optional; a Silicon without one just doesn't get these notifications. The Silicon or its custodian can change or remove it at any time.
+Before sign-in, self-creation can bind an anonymous Ting receiver that accepts Accounts events. It receives
+only a request-ID hint; the private request token remains necessary to read the decision. Reconnects create
+new receiver IDs and require an explicit, request-token-authorized rebind. Never promote an anonymous
+receiver into account authority or redirect a dead session's delivery to another account/session. Revoked
+sign-ins cannot keep receiving private data. Own-Silicon callback endpoints and account event streams are
+retired; application webhooks and streams remain supported.
 
 ## Custodian
 
@@ -277,7 +281,7 @@ Each app can register a webhook endpoint. Whenever something changes about an ac
 
 Every event has an `event_id` so apps can deduplicate, and is signed so apps know it came from us. Deliveries are retried until they succeed, and failed deliveries can be replayed.
 
-Silicon webhooks (see Silicon account) are separate from app webhooks but follow these same rules.
+Silicon account notifications use Ting (see Silicon notifications); these webhook rules apply to apps.
 
 
 # App verification and User verification

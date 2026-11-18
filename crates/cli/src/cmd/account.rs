@@ -787,7 +787,7 @@ pub async fn delete_account(ctx: &Ctx, args: DeleteAccountArgs) -> CliResult<Out
     let confirm = match args.confirm {
         Some(confirm) => confirm,
         None if util::interactive(ctx.global.json) => util::prompt(&format!(
-            "This permanently deletes {} ({}). Type its id to confirm: ",
+            "Request deletion of {} ({})? You’ll be signed out immediately. You have 10 days to recover the account. Type its id to confirm: ",
             session.who(),
             session.kind.title()
         ))?,
@@ -815,7 +815,7 @@ pub async fn delete_account(ctx: &Ctx, args: DeleteAccountArgs) -> CliResult<Out
     Ok(Outcome::new(
         json!({ "deleted": true, "id": session.account.id, "uuid": session.account.uuid }),
         format!(
-            "Deleted {}. Apps you signed into were told; your id is held for 10 days.",
+            "Deletion requested for {}. You’re signed out everywhere. Sign in with a fresh email or phone code within 10 days to recover it.",
             session.who()
         ),
     ))
@@ -884,15 +884,8 @@ pub async fn linked_accounts(
         C::Accept { request_id } => with_session!(ctx, |s| s.accept_link_request(&request_id))?,
         C::Decline { request_id } => with_session!(ctx, |s| s.decline_link_request(&request_id))?,
         C::Link { .. } => {
-            use std::io::Read;
-            let mut token = String::new();
-            std::io::stdin().read_to_string(&mut token).map_err(|e| {
-                CliError::invalid(
-                    e.to_string(),
-                    "Pipe the independently authenticated target token to stdin.",
-                )
-            })?;
-            with_session!(ctx, |s| s.link_account(token.trim(), None))?
+            let token = util::read_secret_stdin("the target account's access token")?;
+            with_session!(ctx, |s| s.link_account(&token, None))?
         }
         C::Switch { account } => {
             let uuid = linked_uuid(ctx, &account).await?;
@@ -908,7 +901,14 @@ pub async fn linked_accounts(
                         "The server did not return the selected account.",
                     )
                 })?;
-            ctx.store_tokens(&tokens, Some(&me), "linked_account")?;
+            // Read after the switch: a refresh during it may have rotated the session.
+            let previous = ctx.load_session()?;
+            let session = ctx.store_tokens(&tokens, Some(&me), "linked_account")?;
+            if let Some(previous) = previous
+                && previous.refresh_token != session.refresh_token
+            {
+                crate::cmd::login::retire_previous(ctx, &previous, &session).await;
+            }
             serde_json::json!({"authenticated":true,"account":value["account"]})
         }
         C::CreatePersonal { id, display_name } => {

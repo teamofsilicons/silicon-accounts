@@ -1,8 +1,6 @@
 "use client";
 
-import NextLink from "next/link";
-import { useParams as useNextParams, useRouter, useSearchParams as useNextSearchParams } from "next/navigation";
-import type { AnchorHTMLAttributes } from "react";
+import { useRouter, useSearchParams as useNextSearchParams } from "next/navigation";
 import { confirmNavigation } from "@/lib/navigation-guard";
 
 export function publishingPath(to: string): string {
@@ -12,9 +10,6 @@ export function publishingPath(to: string): string {
   if (to === "/store" || to.startsWith("/store/")) return `https://apps.teamofsilicons.com${to}`;
   return to;
 }
-export function Link({ to, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) {
-  return <NextLink href={publishingPath(to)} {...props} />;
-}
 export function useNavigate() {
   const router = useRouter();
   return (to: string) => {
@@ -22,7 +17,6 @@ export function useNavigate() {
     void confirmNavigation(href).then(allow => { if (allow) router.push(href); });
   };
 }
-export const useParams = useNextParams;
 export function useSearchParams() {
   const params = useNextSearchParams();
   return [params, (values: Record<string, string>) => {

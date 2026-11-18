@@ -1,0 +1,225 @@
+{
+  "verified_at": "2026-11-17T21:04:37Z",
+  "activated_at": "2026-11-17T20:51:47.782269+00:00",
+  "accounts": "https://accounts.teamofsilicons.com",
+  "developer": "https://developers.teamofsilicons.com",
+  "release": "442f755e148fac92723843d7bf1ee01912a08015",
+  "previous_release": "6f20755067758a2593ed0cfca7074a6fbdc61051",
+  "artifact": {
+    "revision": "442f755e148fac92723843d7bf1ee01912a08015",
+    "release": "442f755e148fac92723843d7bf1ee01912a08015",
+    "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-profiles/442f755e148fac92723843d7bf1ee01912a08015.tar.gz",
+    "sha256": "031747f87e3d88e1ee921f863d7a4a2de7ddc3046848506c624a63d2cbe3e897",
+    "size": 105309528,
+    "files": 4949,
+    "activation_controller": {
+      "key": "releases/accounts-profiles/controller-96a086f7f69539c9ad4b370496cf5b6201e398ea80cbe6f52d94244abc94707d.py",
+      "sha256": "96a086f7f69539c9ad4b370496cf5b6201e398ea80cbe6f52d94244abc94707d"
+    }
+  },
+  "installed": {
+    "next_build_ids": {
+      "web": "FswF9r13GFv5U2PP28pBT",
+      "developer": "XwSCK4_ePjMwa0DNy4luK"
+    },
+    "linux_arm64_sha256": {
+      "accounts-api": "5822b74970251cc709245b663296e8e85bf57706e75b4f515503d1ea046c356f",
+      "accounts-migrate": "597e0c410bf1047026bbdeb4656179858082467057d650da495de655f2ffcbfa"
+    }
+  },
+  "database": {
+    "new_migrations": [
+      39,
+      43,
+      44
+    ],
+    "current_version": 44,
+    "rehearsed_on_restored_production_backup": true,
+    "candidate_sites_served": true,
+    "preserved_counts": [
+      "accounts",
+      "account_emails",
+      "account_phones",
+      "browser_sessions",
+      "token_families"
+    ],
+    "verified_on_restored_copy_and_at_activation": true,
+    "predeployment_backup": {
+      "key": "backups/profiles-predeploy-20261117T205144281578Z.dump",
+      "sha256": "fd87cd432a11ef3c4cb4288be74c7835430473c4f161e9ed72def27929c5fff5",
+      "bytes": 4417595,
+      "checksum_independently_verified": true
+    }
+  },
+  "production": {
+    "services": {
+      "accounts-api": "active",
+      "accounts-web": "active",
+      "accounts-developer": "active",
+      "accounts-caddy": "active",
+      "accounts-backup.timer": "active"
+    },
+    "activation_seconds": 3.5,
+    "ssm_commands": {
+      "rehearsal": "acc7a1ef-5fa0-4cd3-a0a0-ae1ab8b81dfd",
+      "activation": "cc99d8ff-2396-468b-bec8-92f8ca4e2d74",
+      "health": "90c1b6c9-8235-41e4-82c5-9a53da466e3e",
+      "installed_artifacts": "81de4bdc-2422-4c0b-9891-012971f36333"
+    },
+    "http_status": {
+      "readiness": 200,
+      "discovery": 200,
+      "docs": 200,
+      "developer_guide": 200,
+      "markdown": 200,
+      "confirmation": 200,
+      "profile_requires_session": 401,
+      "interface_profile_requires_grant": 401,
+      "unregistered_interface_refused": 404,
+      "openapi": 200,
+      "profile_cors": 204
+    },
+    "public_assets": [
+      {
+        "file": "05t23mb_n52qm.js",
+        "features": [
+          "Add another account",
+          "Loading your accounts"
+        ],
+        "sha256": "404380e64c6553626210c79cd175f015b5f4e6851d3eb1251eeed8e3bef2ba5a"
+      },
+      {
+        "file": "12lh7vm4zj_em.js",
+        "features": [
+          "Add another account"
+        ],
+        "sha256": "fcceb7c6237f20209e30469857ad89cc3f61571f2f1dc755447afb0a2d34f8c9"
+      },
+      {
+        "file": "0ryuerzx6aamy.js",
+        "features": [
+          "Your primary email signs you in"
+        ],
+        "sha256": "1aa79389bfb97de27e80a24d7e3665b5655e500e9e8cc6a52cfb7ae5b57cce5a"
+      },
+      {
+        "file": "37wkls-rtnx73.js",
+        "features": [
+          "Needs you"
+        ],
+        "sha256": "dfcb0cb8a3af11243aab5c46589320e53ed7c4925c8182ae48942238c0ad1b3e"
+      },
+      {
+        "file": "28f5xsvwmb4i8.js",
+        "features": [
+          "Needs you"
+        ],
+        "sha256": "206c4db680589ebbac33f447180ab5a2c0b4291286705e8e39340b7b13f9eba1"
+      },
+      {
+        "file": "07srue-aeeuwc.js",
+        "features": [
+          "Account deletion requested"
+        ],
+        "sha256": "ced8d70aba60c8374cdb39407be0975ba79c1a0208416e95ffd1162d0130bfa2"
+      }
+    ],
+    "separate_accounts_catalog_and_profile_audiences": true,
+    "registered_interface_without_credentials": {
+      "status": 401,
+      "code": "invalid_client"
+    },
+    "browser": {
+      "widths": [
+        1440,
+        390
+      ],
+      "recovery_link_and_fresh_sign_in_verified": true,
+      "interface_guide_verified": true,
+      "uncaught_errors": []
+    },
+    "existing_shared_identity_read_only_access_verified": true,
+    "verification_scope": "Production browser checks opened recovery, sign-in and the public interface guide. Full deletion, code recovery and multi-account switching ran with isolated test accounts. Production email and SMS delivery were not exercised."
+  },
+  "interfaces_listing": {
+    "app_id": "silicon-accounts",
+    "published": true,
+    "documentation": "https://developers.teamofsilicons.com/docs/accounts/start/interface-accounts",
+    "public_api": "https://apps.teamofsilicons.com/v1/apps/silicon-accounts",
+    "editor": "si:saket-agents"
+  },
+  "predeployment_tests": {
+    "workspace_rust_tests": 1070,
+    "web_unit_tests": 34,
+    "developer_unit_tests": 103,
+    "web_and_developer_lint_types_build": "passed",
+    "isolated_browser": {
+      "totals": {
+        "journeys": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 0,
+        "checks": 82,
+        "failed_checks": 0,
+        "problems": 0
+      },
+      "journeys": [
+        "account-site-delete-blocked",
+        "account-site-delete",
+        "account-site-delete-recover",
+        "account-site-identities",
+        "account-site-switch-profiles"
+      ]
+    },
+    "theme_and_viewport_screenshots": 40
+  },
+  "native_cli": {
+    "version": "0.7.1",
+    "source": "2cc4821691da16694b52a7806b7f73e524b6688f",
+    "workflow": "https://github.com/teamofsilicons/silicon-accounts/actions/runs/44171618915",
+    "development_id": "92b71fe8-376d-4fd0-b700-a2b56ec560ed",
+    "production_id": "0e431b13-bdc4-423c-a99c-a90b744e4d03",
+    "published_at": "2026-11-17T20:58:37.794917200+00:00",
+    "targets": {
+      "linux-aarch64": "69b3c2683aecaa8f003db57b26e1d0cf5a2ecf86b598db10e2f72c0ee53fe744",
+      "linux-armv7hf": "df0571bc89c1d0b1dd2aee8af5d00230539ccd9ad36ca44089101ab661740849",
+      "linux-i686": "82c58033b3bd14396f08cf85590735ba3e3da3782c66dbac7342663c6000c63a",
+      "linux-x86_64": "b762369b3444026735cc69947b4aa0d713c76e814523fd2e749c0f9639f5d1ae",
+      "macos-aarch64": "23821f12f636c323f5703a0a97f0dab8ed2302ba56bbce599cfdd4079ef028eb",
+      "macos-x86_64": "44302fe042da0209b60fabecea88d0c107bdcc74e33e85692c798521d6858257",
+      "windows-aarch64": "5cb6fc1c1719f3fd6d5fcccabc0bf23967107026950bdf92e004d66dc7939600",
+      "windows-i686": "d571d5693e050577b967ee8c3bcfce956991cafeba5f0c6e51850cb2729963f1",
+      "windows-x86_64": "75f3ed2156605cb723c1f503e8b35539ebbd370de9beb1ff10f69e36861c46a3"
+    },
+    "all_nine_passed_native_checks_and_public_resolution": true,
+    "downloaded_mac_arm64_version": "silicon-accounts 0.7.1",
+    "downloaded_mac_arm64_deletion_help_verified": true
+  },
+  "rust_registry": {
+    "source": "5e123243741b7c62e6b842a12de3457a63718fc5",
+    "verified_at": "2026-11-17T21:02:18.868604+00:00",
+    "crates": {
+      "silicon-accounts-client": {
+        "version": "0.8.0",
+        "registry_url": "https://crates.io/api/v1/crates/silicon-accounts-client/0.8.0",
+        "sha256": "158e16817b64297d4856ecaa4360830d123adb563f58c01b40535b2519ea7231",
+        "created_at": "2026-11-17T20:59:27.138100Z",
+        "yanked": false
+      },
+      "silicon-accounts-cli": {
+        "version": "0.7.1",
+        "registry_url": "https://crates.io/api/v1/crates/silicon-accounts-cli/0.7.1",
+        "sha256": "a2915a2e95f5f491b6ea03ff7c21e2ef8d3187f85ef01a6c7bdf38a69e5a884b",
+        "created_at": "2026-11-17T20:59:31.634682Z",
+        "yanked": false,
+        "client_dependency": "0.8.0"
+      }
+    },
+    "cargo_install": {
+      "locked": true,
+      "profile": "dev",
+      "binary": "silicon-accounts 0.7.1",
+      "recovery_help_verified": true
+    }
+  }
+}

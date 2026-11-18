@@ -102,7 +102,7 @@ function SignInRoundTrip() {
   const startFlow = (returnTo: string | null, prompt?: FlowPrompt) => {
     const method = METHODS.find(value => value === search.get("method"));
     const intent = search.get("intent") === "signup" ? "signup" : undefined;
-    router.replace(firstPartySignInUrl(returnTo, { prompt, method, intent, link_id: search.get("link_id") ?? undefined }));
+    router.replace(firstPartySignInUrl(returnTo, { prompt, method, intent, link_id: search.get("link_id") ?? undefined, interface_id: search.get("interface_id") ?? undefined, interface_request: search.get("interface_request") ?? undefined }));
   };
 
   const onReady = useEffectEvent(() => {
@@ -112,8 +112,17 @@ function SignInRoundTrip() {
       // A sign-in that ended without signing in stays here to say so.
       if (arrival.error) return;
       left.current = true;
+      // Keep the first-party proof on the Accounts origin, out of URLs sent to the Interface.
+      const returned = new URL(arrival.path, window.location.origin);
+      const proof = search.get("code");
+      const interfaceId = returned.searchParams.get("interface_id");
+      const interfaceState = returned.searchParams.get("state");
+      if (returned.pathname === "/interface-authorize" && proof && interfaceId && interfaceState) {
+        try { sessionStorage.setItem(`silicon-accounts:interface-proof:${interfaceId}:${interfaceState}`, proof); } catch { returned.searchParams.set("proof_error", "storage"); }
+      }
+      const destination = `${returned.pathname}${returned.search}${returned.hash}`;
       // The flow set the session cookie: read the session again, then show the page the Carbon asked for.
-      void refreshSession().finally(() => router.replace(arrival.path));
+      void refreshSession().finally(() => router.replace(destination));
       return;
     }
     if (status === "loading") return;

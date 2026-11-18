@@ -58,6 +58,11 @@ pub struct GlobalArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Enable Silicon account notifications through Ting.
+    Notifications {
+        #[command(subcommand)]
+        command: NotificationCommand,
+    },
     /// Show this package's Silicon Accounts identity for Silicon Apps discovery.
     #[command(after_long_help = "Example:\n  silicon-accounts accounts --json")]
     Accounts,
@@ -174,6 +179,7 @@ pub enum Commands {
     #[command(
         after_long_help = "Examples:\n  silicon-accounts webhook set https://scout.example/hooks/accounts\n  silicon-accounts webhook test\n  silicon-accounts webhook deliveries --status failed\n  silicon-accounts webhook delivery 0192f0c2-…\n  silicon-accounts webhook replay --failed\n  silicon-accounts webhook replay 0192f0c2-… 0192f0c3-…\n  silicon-accounts webhook remove"
     )]
+    #[command(hide = true)]
     Webhook(OwnWebhookArgs),
 
     /// Custodian requests addressed to you (Carbons): list, accept, decline.
@@ -235,10 +241,10 @@ pub enum Commands {
     /// A command's help wins when a docs topic has the same name (`silicon-accounts help proofs` is the `silicon-accounts proofs` command); read that guide with `silicon-accounts docs proofs`.
     Help(HelpArgs),
 
-    /// Delete your account permanently (requires --confirm <your id>).
+    /// Request deletion of your Carbon. Sign in with a fresh email or phone code within 10 days to recover it.
     ///
     /// Apps you signed into are told (account.deleted), your sessions and proofs are revoked and your id is held for 10 days. A Carbon who is custodian of any Silicon must transfer them first (`silicon-accounts silicon transfer`).
-    #[command(after_long_help = "Examples:\n  silicon-accounts delete-account --confirm c:saket")]
+    #[command(after_long_help = "Examples:\n  silicon-accounts delete-account --confirm c:your-id")]
     DeleteAccount(DeleteAccountArgs),
 }
 
@@ -265,13 +271,11 @@ const SILICON_EXAMPLES: &str = "Examples:
     silicon-accounts silicon create --id si:scout --display-name Scout
   As a Silicon (your custodian must accept):
     silicon-accounts silicon create --id si:scout --custodian c:saket --wait
-    silicon-accounts silicon create --id si:scout --custodian saket@example.com \\
-        --webhook https://scout.example/hooks
+    silicon-accounts silicon create --id si:scout --custodian saket@example.com
     silicon-accounts silicon request status 0192f0c2-… --wait
   Custodian tasks:
     silicon-accounts silicon list
     silicon-accounts silicon rotate-stk si:scout
-    silicon-accounts silicon webhook deliveries si:scout --status failed
     silicon-accounts silicon transfer si:scout --to c:shubham
     silicon-accounts silicon delete si:scout --confirm si:scout";
 
@@ -698,7 +702,7 @@ pub enum SiliconCommand {
     ///
     /// The generated STK is printed exactly once: store it. Choose your own with --stk-stdin (8 to 32 hex characters).
     #[command(
-        after_long_help = "Examples:\n  silicon-accounts silicon create --id si:scout --display-name Scout\n  silicon-accounts silicon create --id si:scout --custodian c:saket --wait\n  silicon-accounts silicon create --id si:scout --custodian saket@example.com \\\n      --webhook https://scout.example/hooks\n  openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian c:saket --stk-stdin"
+        after_long_help = "Examples:\n  silicon-accounts silicon create --id si:scout --display-name Scout\n  silicon-accounts silicon create --id si:scout --custodian c:saket --wait\n  silicon-accounts silicon create --id si:scout --custodian saket@example.com\n  openssl rand -hex 16 | silicon-accounts silicon create --id si:scout --custodian c:saket --stk-stdin"
     )]
     Create(SiliconCreateArgs),
 
@@ -765,6 +769,7 @@ pub enum SiliconCommand {
     #[command(
         after_long_help = "Examples:\n  silicon-accounts silicon webhook set si:scout https://scout.example/hooks/accounts\n  silicon-accounts silicon webhook deliveries si:scout --status failed\n  silicon-accounts silicon webhook replay si:scout --failed\n  silicon-accounts silicon webhook remove si:scout"
     )]
+    #[command(hide = true)]
     Webhook(SiliconWebhookArgs),
 
     /// The apps one of your Silicons signed into: list them, remove one, and choose which apps it may sign into.
@@ -862,9 +867,12 @@ pub struct SiliconCreateArgs {
     /// Profile photo URL (https) [default: the Silicon mark].
     #[arg(long, value_name = "URL")]
     pub pfp_url: Option<String>,
-    /// Webhook endpoint for notifications about the Silicon's account.
-    #[arg(long, value_name = "URL")]
+    /// Retired: use --ting-session-id or notifications enable.
+    #[arg(long, value_name = "URL", hide = true)]
     pub webhook: Option<String>,
+    /// Anonymous Ting session from `ting listen --anonymous --app silicon-accounts` (self-create only).
+    #[arg(long, value_name = "SESSION_ID", conflicts_with = "webhook")]
+    pub ting_session_id: Option<String>,
     /// Self-create: wait until the custodian accepts, declines or the request expires, then sign in.
     #[arg(long)]
     pub wait: bool,
@@ -1163,6 +1171,12 @@ pub struct RequestArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum RequestCommand {
+    /// Attach a new anonymous Ting session after reconnect; uses this home's saved request token.
+    AttachSession {
+        request_id: String,
+        #[arg(long)]
+        session_id: String,
+    },
     /// Check (or wait for) the custodian's decision on a self-created Silicon.
     ///
     /// The request token saved by `silicon-accounts silicon create` in {home}/.accounts/requests/ is used automatically; pass --token otherwise.
@@ -1888,4 +1902,10 @@ pub enum LinkedAccountsCommand {
         #[arg(long)]
         display_name: Option<String>,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum NotificationCommand {
+    /// Allow Accounts notifications. Sign into Ting as the same Silicon, then run ting listen.
+    Enable,
 }

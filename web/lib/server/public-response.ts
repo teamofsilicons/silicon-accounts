@@ -45,10 +45,6 @@ export function publicResponse(request: Request, body: string, { type, maxAge = 
   return new Response(request.method === "HEAD" ? null : body, { status, headers: base });
 }
 
-export function jsonResponse(request: Request, value: unknown, options: Omit<PublicResponseOptions, "type"> = {}): Response {
-  return publicResponse(request, `${JSON.stringify(value, null, 2)}\n`, { type: "application/json; charset=utf-8", ...options });
-}
-
 export interface ApiError {
   code: string;
   message: string;

@@ -11,7 +11,7 @@
  *
  * They guard what the e2e walk and the UX audit found on these pages:
  *
- *   privacy-delete    deleting the account on Delete your account (/privacy/delete) lands on Your account is deleted (/goodbye) without calling
+ *   privacy-delete    deleting the account on Delete your account (/privacy/delete) lands on Account deletion requested (/goodbye) without calling
  *                     POST /v1/session/signout (the deletion already ended every session, so it could only answer 401,
  *                     which browsers log as a failed request) or any other /v1 call that fails
  *   silicon-tiles     every word a Silicon tile's button shows is part of its accessible name (WCAG 2.5.3, axe
@@ -207,7 +207,7 @@ const pageWords = (page: Page) => page.evaluate(`(() => {
 
 const checks: Check[] = [
   {
-    name: "privacy-delete: deleting the account lands on Your account is deleted (/goodbye) with no sign-out call and no failing request",
+    name: "privacy-delete: deleting the account lands on Account deletion requested (/goodbye) with no sign-out call and no failing request",
     run: async env => {
       const leaver = await newCarbon(env, "leaver");
       const { page } = leaver;
@@ -230,8 +230,8 @@ const checks: Check[] = [
         const answer = await deleted;
         expect(answer.status() === 204, `DELETE /v1/me answered ${answer.status()}, not 204`);
         await page.waitForURL(`${env.base}/goodbye`, { timeout: 20_000 });
-        const landing = await page.getByRole("heading", { name: "Your account is deleted" }).waitFor({ timeout: 20_000 }).then(() => true, () => false);
-        expect(landing, "after the deletion the browser did not land on Your account is deleted");
+        const landing = await page.getByRole("heading", { name: "Account deletion requested" }).waitFor({ timeout: 20_000 }).then(() => true, () => false);
+        expect(landing, "after the deletion the browser did not land on Account deletion requested");
         // Anything the old page or the landing page still asks for would show up by now.
         await sleep(1_500);
         expect(signouts.length === 0, `the site signed out a session the deletion had already ended: ${signouts.join(", ")}`);

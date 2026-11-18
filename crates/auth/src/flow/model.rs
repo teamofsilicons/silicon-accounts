@@ -62,9 +62,6 @@ impl Step {
             "signup" => Step::Signup,
             "details" => Step::Details,
             "review" => Step::Review,
-            // Flows stored before the details pages replaced these steps continue at the
-            // details pages (`GET /v1/flows/{id}` puts them on the right one).
-            "requirements" | "consent" => Step::Details,
             "complete" => Step::Complete,
             "failed" => Step::Failed,
             _ => return None,
@@ -320,8 +317,20 @@ pub struct LinkIntent {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct FlowExtras {
+    /// Optional Interface whose registered identity brands this Accounts sign-in.
+    #[serde(default)]
+    pub interface_id: Option<String>,
+    #[serde(default)]
+    pub interface_request_binding: Option<String>,
+    #[serde(default)]
+    pub interface_revision: Option<i64>,
+    #[serde(default)]
+    pub interface_scopes: Vec<String>,
     #[serde(default)]
     pub authenticated_account_uuid: Option<String>,
+    /// Independently signed-in accounts offered when this flow may reuse browser proof.
+    #[serde(default)]
+    pub saved_sessions: Vec<Uuid>,
     #[serde(default)]
     pub account_selected: bool,
     #[serde(default)]
@@ -417,10 +426,12 @@ impl FlowRow {
             ))
         })?;
         let extras = match self.provider_state {
-            Some(v) => serde_json::from_value(v).unwrap_or_else(|e| {
-                tracing::error!(flow_id = %self.id, error = %e, "unreadable flow state; using defaults");
-                FlowExtras::default()
-            }),
+            Some(v) => serde_json::from_value(v).map_err(|e| {
+                ApiError::internal(format!(
+                    "sign-in flow {} has unreadable state: {e}",
+                    self.id
+                ))
+            })?,
             None => FlowExtras::default(),
         };
         Ok(Flow {
@@ -572,6 +583,7 @@ impl Flow {
         self.extras.new_account = false;
         self.extras.browser_session_id = None;
         self.extras.authenticated_account_uuid = None;
+        self.extras.saved_sessions.clear();
         self.extras.account_selected = false;
         self.extras.details = DetailsProgress::default();
     }
@@ -721,9 +733,6 @@ mod tests {
             assert_eq!(Step::parse(s.as_str()), Some(s));
         }
         assert!(Step::Complete.is_terminal() && !Step::Review.is_terminal());
-        // Flows stored by the previous version continue at the details pages.
-        assert_eq!(Step::parse("consent"), Some(Step::Details));
-        assert_eq!(Step::parse("requirements"), Some(Step::Details));
     }
 
     #[test]

@@ -216,6 +216,23 @@ impl AccountsClient {
         .await
     }
 
+    /// Bind/rebind a pending creation's minimal Ting hints using its private request token.
+    pub async fn silicon_request_ting_session(
+        &self,
+        request_id: &str,
+        request_token: &str,
+        session_id: &str,
+    ) -> Result<serde_json::Value> {
+        self.send_json(
+            Method::PUT,
+            self.endpoint(&["v1", "silicons", "requests", request_id, "ting-session"]),
+            Auth::Bearer(request_token),
+            &serde_json::json!({"session_id":session_id}),
+            None,
+        )
+        .await
+    }
+
     /// `GET /v1/silicons/requests/{id}`: the status of a self-created Silicon's custodian
     /// request, authenticated with the `sarq_…` request token.
     pub async fn silicon_request_status(
@@ -297,17 +314,8 @@ impl AccountsClient {
         app_id: &str,
         refresh_token: &str,
     ) -> Result<TokenResponse> {
-        let request = Request::new(
-            Method::POST,
-            self.endpoint(&["v1", "oauth", "token"]),
-            Auth::None,
-        )
-        .form(&[
-            ("grant_type", "refresh_token"),
-            ("refresh_token", refresh_token.trim()),
-            ("client_id", app_id.trim()),
-        ]);
-        self.execute(request).await?.json()
+        self.public_refresh(app_id.trim(), refresh_token, None)
+            .await
     }
 
     /// Recoverable refresh of an app's public tool. Persist and share the operation key
@@ -318,6 +326,16 @@ impl AccountsClient {
         refresh_token: &str,
         key: &str,
     ) -> Result<TokenResponse> {
+        self.public_refresh(app_id.trim(), refresh_token, Some(key))
+            .await
+    }
+
+    async fn public_refresh(
+        &self,
+        client_id: &str,
+        refresh_token: &str,
+        key: Option<&str>,
+    ) -> Result<TokenResponse> {
         let request = Request::new(
             Method::POST,
             self.endpoint(&["v1", "oauth", "token"]),
@@ -326,9 +344,9 @@ impl AccountsClient {
         .form(&[
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token.trim()),
-            ("client_id", app_id.trim()),
+            ("client_id", client_id),
         ])
-        .idempotency_key(Some(key))?;
+        .idempotency_key(key)?;
         self.execute(request).await?.json()
     }
 
@@ -461,17 +479,7 @@ impl AccountsClient {
         refresh_token: &str,
     ) -> Result<TokenResponse> {
         check_public_client(client_id)?;
-        let request = Request::new(
-            Method::POST,
-            self.endpoint(&["v1", "oauth", "token"]),
-            Auth::None,
-        )
-        .form(&[
-            ("grant_type", "refresh_token"),
-            ("refresh_token", refresh_token.trim()),
-            ("client_id", client_id),
-        ]);
-        self.execute(request).await?.json()
+        self.public_refresh(client_id, refresh_token, None).await
     }
 
     /// Recoverable refresh for a public client. The same operation key and token must be
@@ -485,18 +493,8 @@ impl AccountsClient {
         key: &str,
     ) -> Result<TokenResponse> {
         check_public_client(client_id)?;
-        let request = Request::new(
-            Method::POST,
-            self.endpoint(&["v1", "oauth", "token"]),
-            Auth::None,
-        )
-        .form(&[
-            ("grant_type", "refresh_token"),
-            ("refresh_token", refresh_token.trim()),
-            ("client_id", client_id),
-        ])
-        .idempotency_key(Some(key))?;
-        self.execute(request).await?.json()
+        self.public_refresh(client_id, refresh_token, Some(key))
+            .await
     }
 
     /// Ends a sign-in of one of Silicon Accounts' public clients ([`FIRST_PARTY_APP_ID`] or

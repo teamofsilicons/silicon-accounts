@@ -55,7 +55,7 @@ printf '%s' '1791340349.{"app_id":"dm","data":{},"event_id":"01a11434-82ea-71e3-
 
 ## Steps
 
-1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `silicon-accounts app webhook set <url>`, or the app's Webhooks tab on developers.teamofsilicons.com. For a Silicon, see [Silicon webhooks](#silicon-webhooks). The first time you set the URL, we generate a `whsec_…` secret and show it once (if you made one first with `POST /v1/apps/{app_id}/webhook/generate-secret`, we keep that one instead). Setting the URL again, the same one or another, keeps that secret (the answer's `secret` is null, and the Webhooks tab says it was saved with the same signing secret) and keeps the updates you picked unless you send `events` (`null` for every update, or a list); a brand-new webhook gets every update. A new secret comes only from a rotation (`POST /v1/apps/{app_id}/webhook/rotate-secret`, `silicon-accounts app webhook rotate`, or Rotate secret on the Webhooks tab), with the first save after you removed the webhook, or from creating the webhook with `POST /v1/apps/{app_id}/subscriptions`, which always makes one ([the reference](../reference/api/apps.md#put-v1appsapp_idwebhook)). `preserve_secret` is still accepted and changes nothing. A retry with the same `Idempotency-Key` within 10 minutes returns the same answer. Silicon Apps (`silicon-apps webhook APP set`, or the publishing step on the developer platform) keeps the secret the same way, and the two write the same webhook. In production the URL must be `https` and reach a public address.
+1. **Set the endpoint and keep the secret.** For an app: `PUT /v1/apps/{app_id}/webhook` (above), `silicon-accounts app webhook set <url>`, or the app's Webhooks tab on developers.teamofsilicons.com. For Silicon account notifications, see [Ting](silicon-notifications.md). The first time you set the URL, we generate a `whsec_…` secret and show it once (if you made one first with `POST /v1/apps/{app_id}/webhook/generate-secret`, we keep that one instead). Setting the URL again, the same one or another, keeps that secret (the answer's `secret` is null, and the Webhooks tab says it was saved with the same signing secret) and keeps the updates you picked unless you send `events` (`null` for every update, or a list); a brand-new webhook gets every update. A new secret comes only from a rotation (`POST /v1/apps/{app_id}/webhook/rotate-secret`, `silicon-accounts app webhook rotate`, or Rotate secret on the Webhooks tab), with the first save after you removed the webhook, or from creating the webhook with `POST /v1/apps/{app_id}/subscriptions`, which always makes one ([the reference](../reference/api/apps.md#put-v1appsapp_idwebhook)). `preserve_secret` is still accepted and changes nothing. A retry with the same `Idempotency-Key` within 10 minutes returns the same answer. Silicon Apps (`silicon-apps webhook APP set`, or the publishing step on the developer platform) keeps the secret the same way, and the two write the same webhook. In production the URL must be `https` and reach a public address.
 2. **Verify every delivery before you trust it:**
    1. Read the raw request body as bytes. Verify those bytes, never JSON you serialized again.
    2. Read `X-Accounts-Timestamp` (unix seconds). Refuse it if it is more than 5 minutes off your clock. Each attempt is signed when it is sent, so a retry or replay three days later still carries a current timestamp.
@@ -355,60 +355,10 @@ curl -s -u "briefcase:$BRIEFCASE_APP_SECRET" -X POST \
 
 You get `200 {"secret":"whsec_…"}`, shown once. A retry with the same `Idempotency-Key` within 10 minutes returns the same secret instead of rotating again (`silicon-accounts app webhook rotate` does the same). The new secret signs every delivery from that moment, retries and replays included, and the old one stops at once. Deploy the new secret right away, and keep accepting the previous one for a few minutes, because an attempt signed just before the rotation can still be on its way. Deliveries refused in the meantime aren't lost; they are retried on the schedule above. `DELETE /v1/apps/{app_id}/webhook` removes the endpoint. Deliveries still pending then become `failed`, ready to replay once you set a URL again.
 
-## Silicon webhooks
+## Silicon account notifications
 
-You as a Silicon can have your own webhook, separate from any app's, for events about your own account: you were created, your custodian decided, your details, si:id or STK changed, or you got a new custodian. Same signature, same retries, same rules.
-
-```bash
-# as the Silicon (its own session)
-silicon-accounts webhook set https://scout.example/hooks/accounts   # prints the whsec_… secret once
-silicon-accounts webhook test                                         # queues a ping
-```
-
-The API is `PUT /v1/me/webhook` `{"url"}` → `{"webhook_url", "webhook_secret"}`, `DELETE /v1/me/webhook`, and `POST /v1/me/webhook/test` → `202 {"event_id", "delivery_id", "type", "url", "superseded_pings"}`. You can queue 10 test pings an hour (then `429`). A new test ping replaces earlier ones still waiting for a retry, so at most one is ever retried. Your custodian manages the same webhook with `PUT|DELETE /v1/me/silicons/{uuid}/webhook` (or `silicon-accounts silicon webhook set <si:id> <url>`), and both ways of creating a Silicon accept `webhook_url` and return `webhook_secret` once. A Silicon's webhook works a little differently from an app's: setting its URL, the same one or another, always makes a new secret and shows it once (an app's keeps its secret), there is no separate rotate endpoint, so you rotate by setting the URL again, and the fields are named `webhook_url` and `webhook_secret` rather than `url` and `secret`. This is how a self-created Silicon hears its custodian's answer, and its webhook keeps receiving even after a decline or expiry releases the account.
-
-The Silicon events and their payloads are in [the Silicon event catalogue](../learn/webhooks.md#silicon-events).
-
-### A Silicon's deliveries and replays
-
-You list and replay your own deliveries the way an app does, signed in as yourself (`$TOKEN` from `POST /v1/silicons/login`):
-
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "https://accounts.teamofsilicons.com/v1/me/webhook/deliveries?status=failed&limit=20"
-```
-
-Each item has the same fields as an app's deliveries above, and `GET /v1/me/webhook/deliveries/{id}` adds every attempt and the exact `payload`. Once your endpoint is back, replay what failed:
-
-```bash
-curl -s -X POST https://accounts.teamofsilicons.com/v1/me/webhook/replay \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" -H "Idempotency-Key: $(uuidgen)" \
-  -d '{"status":"failed"}'
-```
-
-```json
-{"not_replayable": 1, "remaining": 0, "replayed": ["01a11744-e17f-7540-ae01-473546d7b233"], "skipped": [], "url": "https://scout.example/hooks/accounts"}
-```
-
-The body and rules are the same as an app's replay (`delivery_ids` or `status`, 100 per call, call again while `remaining` is above 0, the current URL and secret, a fresh 72 hours), with two differences: nothing is ever withheld, since every event is about you, and test pings are never replayed. Here `not_replayable: 1` is a failed test ping; send a new one with `POST /v1/me/webhook/test` instead. Without a webhook URL a replay answers `409 webhook_not_set`.
-
-With the CLI, signed in as yourself:
-
-```bash
-silicon-accounts webhook deliveries --status failed   # what failed, with the last status
-silicon-accounts webhook delivery <id>                # every attempt and the exact payload
-silicon-accounts webhook replay --failed              # or: silicon-accounts webhook replay <id>…
-```
-
-```text
-DELIVERY                              TYPE             STATUS  ATTEMPTS  LAST  CREATED
-01a1174b-96a7-73ed-aacd-ceb06d764ccb  silicon.updated  failed  2         503   2026-10-04T16:56:33Z
-
-Webhook of si:scout: re-queued 1 deliveries (same event ids, sent to the current URL and signed with the current secret).
-```
-
-Your custodian can do the same for you from their own session: `GET /v1/me/silicons/{uuid}/webhook/deliveries[/{id}]` and `POST /v1/me/silicons/{uuid}/webhook/replay` (`{uuid}` can also be your si:id), or `silicon-accounts silicon webhook deliveries si:scout --status failed` and `silicon-accounts silicon webhook replay si:scout --failed`. Every replay shows up in your history and in the history of the custodian who asked (`silicon.webhook.replayed`). The endpoints are in [Silicon and custodian endpoints](../reference/api/silicons.md#get-v1mewebhookdeliveries).
+Own-Silicon webhooks and account event streams have moved to [Silicon Ting](silicon-notifications.md).
+The webhook setup, signing, retries and replay described above apply to application subscriptions.
 
 ## Errors
 

@@ -437,12 +437,13 @@ async fn a_dry_run_is_not_an_account_lookup() {
             .contains(&target.uuid),
         "{out:?}"
     );
-    let members: i64 =
-        sqlx::query_scalar("select count(*) from memberships where account_uuid = $1")
-            .bind(&target.uuid)
-            .fetch_one(&ctx.state.db)
-            .await
-            .expect("count");
+    let members: i64 = sqlx::query_scalar(
+        "select count(*) from memberships where account_uuid = $1 and app_id <> 'silicon-accounts'",
+    )
+    .bind(&target.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("count");
     assert_eq!(members, 0, "a dry run writes nothing");
 }
 
@@ -609,7 +610,7 @@ async fn rows_per_app_per_day_are_limited() {
     assert_eq!(used, 2);
 }
 
-/// Bodies over 50 MB get a precise 413, whether or not they fit the read buffer's headroom.
+/// Bodies over 50 MB get a precise 413, whether or not they fit the server's read headroom.
 #[tokio::test]
 async fn bodies_over_fifty_megabytes_are_refused() {
     let ctx = TestContext::new().await;

@@ -562,38 +562,29 @@ async fn disabled_app_is_held_and_retried() {
 }
 
 #[tokio::test]
-async fn delivers_to_a_silicons_own_webhook() {
+async fn silicon_events_never_use_a_legacy_callback() {
     let ctx = TestContext::new().await;
     let rx = start_receiver().await;
     let carbon = ctx.carbon().await;
     let (silicon, _) = ctx.silicon(&carbon.uuid).await;
-    let (secret, enc) = events::new_webhook_secret(&ctx.state.keys.keyring).expect("secret");
-    sqlx::query("update accounts set webhook_url = $2, webhook_secret_enc = $3 where uuid = $1")
+    let (_, enc) = events::new_webhook_secret(&ctx.state.keys.keyring).unwrap();
+    sqlx::query("update accounts set webhook_url=$2,webhook_secret_enc=$3 where uuid=$1")
         .bind(&silicon.uuid)
         .bind(rx.url("silicon"))
         .bind(enc)
-        .execute(&mut *ctx.conn().await)
+        .execute(&ctx.state.db)
         .await
-        .expect("set Silicon webhook");
-    let ev = {
-        let mut conn = ctx.conn().await;
-        events::ping_silicon(&mut conn, &silicon.uuid)
-            .await
-            .expect("emit")
-            .expect("has webhook")
-    };
-    let deliverer = WebhookDeliverer::new(&ctx.state).expect("client");
-    assert!(matches!(
-        deliverer.deliver_due(10).await.expect("cycle").as_slice(),
-        [DeliveryOutcome::Delivered { .. }]
-    ));
-    let got = rx.received();
-    assert_eq!(got.len(), 1);
-    assert!(got[0].signature_valid(&secret));
-    let body = got[0].json();
-    assert_eq!(body["silicon"], silicon.uuid.as_str());
-    assert_eq!(body["app_id"], Value::Null);
-    assert_eq!(body["event_id"], ev.event_id.to_string());
+        .unwrap();
+    events::notify_profile_updated(
+        &mut *ctx.conn().await,
+        &silicon,
+        &[accounts_core::models::AccountField::DisplayName],
+    )
+    .await
+    .unwrap();
+    let deliverer = WebhookDeliverer::new(&ctx.state).unwrap();
+    assert!(deliverer.deliver_due(10).await.unwrap().is_empty());
+    assert!(rx.received().is_empty());
 }
 
 #[tokio::test]
@@ -852,7 +843,7 @@ async fn background_loop_delivers_and_stops_on_shutdown() {
 
     let (stop, shutdown) = accounts_worker::Shutdown::channel();
     let handles = accounts_worker::spawn_background_until(ctx.state.clone(), shutdown);
-    assert_eq!(handles.len(), 3);
+    assert_eq!(handles.len(), 4);
     let mut delivered = false;
     for _ in 0..50 {
         if delivery(&ctx, ev.delivery_id).await.status == "delivered" {

@@ -68,7 +68,7 @@ fn json_error(e: serde_path_to_error::Error<serde_json::Error>) -> ApiError {
     }
 }
 
-fn strip_position(m: &str) -> String {
+pub(crate) fn strip_position(m: &str) -> String {
     match m.find(" at line ") {
         Some(i) => m[..i].to_string(),
         None => m.to_string(),

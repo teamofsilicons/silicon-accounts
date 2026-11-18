@@ -47,6 +47,7 @@ async fn only_grants_expired_for_over_a_week_are_purged() {
         purged,
         PurgedGrants {
             refresh_recoveries: 0,
+            exchange_recoveries: 0,
             authorization_codes: 1,
             short_lived_tokens: 1,
             device_authorizations: 1,
@@ -74,4 +75,41 @@ async fn only_grants_expired_for_over_a_week_are_purged() {
         0,
         "nothing left to purge"
     );
+}
+
+#[tokio::test]
+async fn exchange_receipts_expired_for_over_a_week_are_purged() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let (app, secret) = ctx.app("briefcase").await;
+    let redirect = redirect_for(&app.app_id);
+    for key in ["kept", "purged"] {
+        let code = signed_in_code(&ctx, &app.app_id, &carbon, Authorize::default()).await;
+        let form = [
+            ("grant_type", "authorization_code"),
+            ("code", code.as_str()),
+            ("redirect_uri", redirect.as_str()),
+        ];
+        let r = ctx
+            .call(
+                router(),
+                token_req(&app.app_id, &secret, &form).header("Idempotency-Key", key),
+            )
+            .await;
+        assert_tokens(&r);
+    }
+    // Each receipt holds a sealed live refresh token: one expired a day ago (kept), one 8 days.
+    ctx.exec(
+        "update grant_exchange_recoveries set expires_at = now() - interval '1 day'; \
+         update grant_exchange_recoveries set expires_at = now() - interval '8 days' \
+         where key_hash = (select key_hash from grant_exchange_recoveries limit 1)",
+    )
+    .await;
+    let purged = purge_expired_grants(&ctx.state.db).await.expect("purge");
+    assert_eq!(purged.exchange_recoveries, 1);
+    let left: i64 = sqlx::query_scalar("select count(*) from grant_exchange_recoveries")
+        .fetch_one(&mut *ctx.conn().await)
+        .await
+        .expect("count");
+    assert_eq!(left, 1, "the receipt expired a day ago is kept");
 }

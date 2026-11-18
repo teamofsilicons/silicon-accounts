@@ -164,7 +164,7 @@ async fn a_silicon_whose_custodian_has_not_accepted_cannot_sign_in() {
     assert_eq!(outcome, "failed");
     let memberships: i64 = scalar(
         &ctx,
-        "select count(*) from memberships where account_uuid = $1",
+        "select count(*) from memberships where account_uuid = $1 and app_id <> 'silicon-accounts'",
         &silicon.uuid,
     )
     .await;
@@ -249,7 +249,7 @@ async fn a_short_lived_token_minted_before_access_was_removed_is_refused() {
     // The account's decision stands, and the attempt is in its history.
     let status: String = scalar(
         &ctx,
-        "select status from memberships where account_uuid = $1",
+        "select status from memberships where account_uuid = $1 and app_id <> 'silicon-accounts'",
         &silicon.uuid,
     )
     .await;
@@ -294,7 +294,7 @@ async fn a_short_lived_token_minted_before_an_stk_rotation_is_refused() {
     assert_eq!(live_families(&ctx, &silicon.uuid).await, 0);
     let memberships: i64 = scalar(
         &ctx,
-        "select count(*) from memberships where account_uuid = $1",
+        "select count(*) from memberships where account_uuid = $1 and app_id <> 'silicon-accounts'",
         &silicon.uuid,
     )
     .await;

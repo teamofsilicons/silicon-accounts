@@ -429,15 +429,40 @@ impl<'a> AppClient<'a> {
         self.client.get(url, self.auth()).await
     }
 
-    async fn token(&self, what: &str, form: &[(&str, &str)]) -> Result<TokenResponse> {
+    async fn token(
+        &self,
+        what: &str,
+        form: &[(&str, &str)],
+        key: Option<&str>,
+    ) -> Result<TokenResponse> {
         let auth = self.credentials(what)?;
         let request = Request::new(
             Method::POST,
             self.client.endpoint(&["v1", "oauth", "token"]),
             auth,
         )
-        .form(form);
+        .form(form)
+        .idempotency_key(key)?;
         self.client.execute(request).await?.json()
+    }
+
+    async fn code_grant(
+        &self,
+        code: &str,
+        redirect_uri: &str,
+        code_verifier: Option<&str>,
+        key: Option<&str>,
+    ) -> Result<TokenResponse> {
+        let mut form = vec![
+            ("grant_type", "authorization_code"),
+            ("code", code.trim()),
+            ("redirect_uri", redirect_uri),
+        ];
+        if let Some(verifier) = code_verifier {
+            form.push(("code_verifier", verifier));
+        }
+        self.token("Exchanging an authorization code", &form, key)
+            .await
     }
 
     // ---- OAuth ---------------------------------------------------------------------------
@@ -451,25 +476,14 @@ impl<'a> AppClient<'a> {
         redirect_uri: &str,
         code_verifier: Option<&str>,
     ) -> Result<TokenResponse> {
-        let mut form = vec![
-            ("grant_type", "authorization_code"),
-            ("code", code.trim()),
-            ("redirect_uri", redirect_uri),
-        ];
-        if let Some(verifier) = code_verifier {
-            form.push(("code_verifier", verifier));
-        }
-        self.token("Exchanging an authorization code", &form).await
+        self.code_grant(code, redirect_uri, code_verifier, None)
+            .await
     }
 
     /// Exchanges a Silicon's short-lived token (`slt_…`) for its tokens. This is how
     /// Silicons sign into apps: they never see your sign-in page.
     pub async fn exchange_slt(&self, slt: &str) -> Result<TokenResponse> {
-        self.token(
-            "Exchanging a short-lived token",
-            &[("grant_type", SLT_GRANT_TYPE), ("slt", slt.trim())],
-        )
-        .await
+        self.slt_grant(slt, None).await
     }
 
     /// Recover a code exchange after a lost response. Persist the same key and PKCE proof before the first request.
@@ -480,46 +494,27 @@ impl<'a> AppClient<'a> {
         code_verifier: Option<&str>,
         key: &str,
     ) -> Result<TokenResponse> {
-        let mut form = vec![
-            ("grant_type", "authorization_code"),
-            ("code", code.trim()),
-            ("redirect_uri", redirect_uri),
-        ];
-        if let Some(verifier) = code_verifier {
-            form.push(("code_verifier", verifier));
-        }
-        let request = Request::new(
-            Method::POST,
-            self.client.endpoint(&["v1", "oauth", "token"]),
-            self.credentials("Exchanging an authorization code")?,
-        )
-        .form(&form)
-        .idempotency_key(Some(key))?;
-        self.client.execute(request).await?.json()
+        self.code_grant(code, redirect_uri, code_verifier, Some(key))
+            .await
     }
     /// Recover an SLT exchange after a lost response. The key is bound to this app and exact SLT.
     pub async fn exchange_slt_with_key(&self, slt: &str, key: &str) -> Result<TokenResponse> {
-        let request = Request::new(
-            Method::POST,
-            self.client.endpoint(&["v1", "oauth", "token"]),
-            self.credentials("Exchanging a short-lived token")?,
+        self.slt_grant(slt, Some(key)).await
+    }
+
+    async fn slt_grant(&self, slt: &str, key: Option<&str>) -> Result<TokenResponse> {
+        self.token(
+            "Exchanging a short-lived token",
+            &[("grant_type", SLT_GRANT_TYPE), ("slt", slt.trim())],
+            key,
         )
-        .form(&[("grant_type", SLT_GRANT_TYPE), ("slt", slt.trim())])
-        .idempotency_key(Some(key))?;
-        self.client.execute(request).await?.json()
+        .await
     }
 
     /// Rotates a refresh token: store the new refresh token from the response; the old one
     /// is dead (presenting it again revokes the whole family).
     pub async fn refresh(&self, refresh_token: &str) -> Result<TokenResponse> {
-        self.token(
-            "Refreshing tokens",
-            &[
-                ("grant_type", "refresh_token"),
-                ("refresh_token", refresh_token.trim()),
-            ],
-        )
-        .await
+        self.refresh_grant(refresh_token, None).await
     }
 
     /// Recoverable refresh. Persist a random key with the old refresh token before sending;
@@ -527,17 +522,19 @@ impl<'a> AppClient<'a> {
     /// A replay can have `expires_in == 0`: save its successor, then refresh it with a new key.
     /// Requires an Accounts server with refresh recovery support.
     pub async fn refresh_with_key(&self, refresh_token: &str, key: &str) -> Result<TokenResponse> {
-        let request = Request::new(
-            Method::POST,
-            self.client.endpoint(&["v1", "oauth", "token"]),
-            self.credentials("Refreshing tokens")?,
+        self.refresh_grant(refresh_token, Some(key)).await
+    }
+
+    async fn refresh_grant(&self, refresh_token: &str, key: Option<&str>) -> Result<TokenResponse> {
+        self.token(
+            "Refreshing tokens",
+            &[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", refresh_token.trim()),
+            ],
+            key,
         )
-        .form(&[
-            ("grant_type", "refresh_token"),
-            ("refresh_token", refresh_token.trim()),
-        ])
-        .idempotency_key(Some(key))?;
-        self.client.execute(request).await?.json()
+        .await
     }
 
     /// Revokes the token family of an access or refresh token issued to this app (the

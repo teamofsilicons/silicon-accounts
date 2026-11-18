@@ -21,7 +21,7 @@
 //! Its access tokens act for the Carbon they belong to on exactly these routes
 //! ([`developer_audience_allowed`]): `GET /v1/me`, `GET /v1/session`, `GET /v1/me/owned-apps`,
 //! `GET /v1/me/app-verifications`, `GET /v1/apps/{app_id}/proofs/{proof_id}/history`,
-//! and every owner route of an app ([`AppOrOwner`]: `/v1/apps/{app_id}/…` — details, sign-in
+//! GET and POST `/v1/apps/{app_id}/account-verification-request`, and every owner route of an app ([`AppOrOwner`]: `/v1/apps/{app_id}/…` — details, sign-in
 //! setup and its history, user base, imports, webhook and deliveries, proofs). Everywhere else
 //! they are refused with 401 `token_wrong_audience`, so a leaked developer-platform token can't
 //! change the account itself (ids, emails, Silicons, STKs, sessions, apps signed into).
@@ -265,6 +265,14 @@ async fn resolve(
         .hint(format!("Sign in again at {}.", state.settings.public_url)));
     };
     check_origin(&state.settings, &parts.headers, &parts.method)?;
+    if let Some(expected) = parts.headers.get("x-accounts-profile")
+        && expected.as_bytes() != session.account_uuid.as_bytes()
+    {
+        return Err(ApiError::conflict(
+            "browser_account_changed",
+            "The active account changed in another tab. Reload to continue with that account.",
+        ));
+    }
     let account = accounts::get(&mut conn, &session.account_uuid)
         .await?
         .ok_or_else(unauthenticated)?;
@@ -650,7 +658,17 @@ where
                 .bind(auth.uuid())
                 .fetch_one(&mut *conn)
                 .await?;
-                if app.owner_uuid.as_deref() != Some(auth.uuid()) && !coauthor {
+                let organization_allowed = crate::repo::publishing::permitted(
+                    &app_state,
+                    &auth,
+                    &parts.headers,
+                    &app_id,
+                    crate::repo::publishing::Permission::Manage,
+                )
+                .await?;
+                if !organization_allowed
+                    .unwrap_or(app.owner_uuid.as_deref() == Some(auth.uuid()) || coauthor)
+                {
                     return Err(ApiError::forbidden(
                         "not_app_owner",
                         format!(

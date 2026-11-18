@@ -19,6 +19,10 @@ const CELLS: &str = "silicon-cells";
 pub(crate) fn router() -> Router<AppState> {
     Router::new()
         .route("/v1/internal/cells/author", post(author))
+        .route(
+            "/v1/internal/cells/interfaces/{interface}/authorize",
+            post(interface_broker_authorize),
+        )
         .route("/v1/internal/cells/apps/{app}", post(app_info))
         .route(
             "/v1/internal/cells/links/{cell}/{app}",
@@ -37,6 +41,59 @@ pub(crate) fn router() -> Router<AppState> {
             post(introspect),
         )
         .route("/v1/internal/cells/links/{cell}/{app}/revoke", post(revoke))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InterfaceBrokerRequest {
+    cell_id: String,
+    callback_url: String,
+    generation: i64,
+    origin: String,
+    redirect_uri: String,
+}
+
+async fn interface_broker_authorize(
+    State(state): State<AppState>,
+    auth: AppAuth,
+    Path(interface): Path<String>,
+    Json(input): Json<InterfaceBrokerRequest>,
+) -> ApiResult<Response> {
+    service(&auth)?;
+    let mut tx = state.db.begin().await?;
+    let row: Option<(i64, bool, Vec<String>, Vec<String>, Option<Value>)> = sqlx::query_as(
+        "select revision,active,redirect_uris,allowed_origins,cell_broker from interface_auth_clients where interface_id=$1 for share")
+        .bind(&interface).fetch_optional(&mut *tx).await?;
+    let Some((revision, true, redirects, origins, Some(broker))) = row else {
+        return Err(ApiError::forbidden(
+            "cell_broker_denied",
+            "The Cell broker is not authorized.",
+        ));
+    };
+    let matches = input.generation > 0
+        && broker
+            .get("active")
+            .map_or(true, |value| value.as_bool() == Some(true))
+        && broker["generation"].as_i64() == Some(input.generation)
+        && broker["cell_id"].as_str() == Some(input.cell_id.as_str())
+        && broker["callback_url"].as_str() == Some(input.callback_url.as_str())
+        && redirects.contains(&input.callback_url)
+        && origins.contains(&input.origin)
+        && redirects.contains(&input.redirect_uri)
+        && input.redirect_uri != input.callback_url
+        && url::Url::parse(&input.redirect_uri)
+            .ok()
+            .is_some_and(|url| url.path() != "/interface-auth/callback");
+    if !matches {
+        return Err(ApiError::forbidden(
+            "cell_broker_denied",
+            "The Cell broker is not authorized.",
+        ));
+    }
+    tx.commit().await?;
+    Ok(super::respond::no_store(
+        StatusCode::OK,
+        &json!({"authorized":true,"revision":revision}),
+    ))
 }
 fn service(auth: &AppAuth) -> ApiResult<()> {
     if auth.app.app_id != CELLS {
@@ -62,9 +119,17 @@ async fn app_info(
     Json(input): Json<AuthorToken>,
 ) -> ApiResult<Response> {
     service(&auth)?;
-    let (actor, _) = verify_author(&state, &input.access_token).await?;
+    let (actor, _, audience) = verify_author(&state, &input.access_token).await?;
     let mut tx = state.db.begin().await?;
-    let target = require_app_author(&mut tx, &app, &actor).await?;
+    let target = require_app_author(
+        &state,
+        &mut tx,
+        &app,
+        &actor,
+        &input.access_token,
+        &audience,
+    )
+    .await?;
     let authors:Vec<accounts_core::models::Account>=sqlx::query_as("select a.* from accounts a join app_authors au on au.account_uuid=a.uuid where au.app_id=$1 and a.status='active' order by au.joined_at,a.uuid").bind(&app).fetch_all(&mut *tx).await?;
     let mut authors = authors
         .iter()
@@ -81,15 +146,29 @@ async fn app_info(
             accounts_core::views::AccountSummary::from_account(&owner),
         );
     }
+    let organization: Option<(String, Value)> = sqlx::query_as(
+        "SELECT organization_id,access FROM app_organization_publishers WHERE app_id=$1",
+    )
+    .bind(&app)
+    .fetch_optional(&mut *tx)
+    .await?;
+    if organization.is_some() && !authors.iter().any(|a| a.uuid == actor) {
+        if let Some(account) = accounts_core::repo::accounts::get(&mut tx, &actor).await? {
+            authors.push(accounts_core::views::AccountSummary::from_account(&account));
+        }
+    }
     Ok(super::respond::no_store(
         StatusCode::OK,
-        &json!({"app_id":target.app_id,"name":target.name,"authors":authors}),
+        &json!({"app_id":target.app_id,"name":target.name,"authors":authors,"organization_id":organization.as_ref().map(|o|&o.0),"organization_access":organization.as_ref().map(|o|&o.1)}),
     ))
 }
 async fn require_app_author(
+    state: &AppState,
     conn: &mut sqlx::PgConnection,
     app: &str,
     actor: &str,
+    token: &str,
+    audience: &str,
 ) -> ApiResult<accounts_core::models::App> {
     let target = apps::require_active(conn, app).await?;
     if target.is_first_party() {
@@ -97,6 +176,25 @@ async fn require_app_author(
             "first_party_delegation_forbidden",
             "Accounts and Developer cannot delegate their own identity privileges to a cell.",
         ));
+    }
+    if let Some((org, access)) = sqlx::query_as::<_, (String, Value)>(
+        "SELECT organization_id,access FROM app_organization_publishers WHERE app_id=$1",
+    )
+    .bind(app)
+    .fetch_optional(&mut *conn)
+    .await?
+    {
+        use accounts_core::repo::publishing::{self, Permission, ResourceKind, ResourcePolicy};
+        let policy: ResourcePolicy = serde_json::from_value(access)
+            .map_err(|_| ApiError::internal("Invalid organization policy."))?;
+        let context = publishing::token_context(state, token, audience, actor).await?;
+        if !context.allows(&org, ResourceKind::Apps, &policy, Permission::Manage) {
+            return Err(ApiError::forbidden(
+                "organization_permission_required",
+                "Linking Cells requires app management permission.",
+            ));
+        }
+        return Ok(target);
     }
     let coauthor: bool = sqlx::query_scalar(
         "select exists(select 1 from app_authors where app_id=$1 and account_uuid=$2)",
@@ -113,7 +211,7 @@ async fn require_app_author(
     }
     Ok(target)
 }
-async fn verify_author(state: &AppState, token: &str) -> ApiResult<(String, Value)> {
+async fn verify_author(state: &AppState, token: &str) -> ApiResult<(String, Value, String)> {
     let mut conn = state.db.acquire().await?;
     let verified = tokens::verify_access_token(&mut conn, &state.keys, token, None).await?;
     if ![CELLS, accounts_core::DEVELOPER_APP_ID].contains(&verified.family.app_id.as_str())
@@ -129,7 +227,7 @@ async fn verify_author(state: &AppState, token: &str) -> ApiResult<(String, Valu
     // Reuse the standard scoped view and live membership checks. In particular,
     // removing the Cells app's access also ends author access to this bridge.
     let view = super::userinfo::userinfo(state, token).await?;
-    Ok((verified.account.uuid, view))
+    Ok((verified.account.uuid, view, verified.claims.aud))
 }
 async fn author(
     State(state): State<AppState>,
@@ -137,7 +235,7 @@ async fn author(
     Json(input): Json<AuthorToken>,
 ) -> ApiResult<Response> {
     service(&auth)?;
-    let (_, view) = verify_author(&state, &input.access_token).await?;
+    let (_, view, _) = verify_author(&state, &input.access_token).await?;
     Ok(super::respond::no_store(StatusCode::OK, &view))
 }
 #[derive(Deserialize, Serialize)]
@@ -174,13 +272,13 @@ async fn link(
 ) -> ApiResult<Response> {
     service(&auth)?;
     callback(&input.callback_uri)?;
-    let (actor, _) = verify_author(&state, &input.actor_token).await?;
+    let (actor, _, audience) = verify_author(&state, &input.actor_token).await?;
     let mut tx = state.db.begin().await?;
     sqlx::query("select pg_advisory_xact_lock(hashtextextended($1,0))")
         .bind(format!("cells-link:{cell}:{app}"))
         .execute(&mut *tx)
         .await?;
-    require_app_author(&mut tx, &app, &actor).await?;
+    require_app_author(&state, &mut tx, &app, &actor, &input.actor_token, &audience).await?;
     // The cell UUID is globally assigned by the Cells service. The app author
     // cannot silently replace a live cell's callback with an unrelated address.
     if let Some(existing) = sqlx::query_scalar::<_, String>(
@@ -399,13 +497,12 @@ async fn exchange(
             "The authorization code must return to this cell's current registered callback.",
         ));
     }
-    apps::require_active(&mut admission, &app).await?;
+    let target = apps::require_active(&mut admission, &app).await?;
     let scope = format!("cells:{cell}:{app}:token");
     // Seal token responses and replay uncertain network responses without consuming
     // a single-use code/SLT twice or accidentally reusing a rotating refresh token.
-    let mut response = idempotency::run(&state,Some(key.as_str()),&scope,&input,true,||async {
-        let mut tx=state.db.begin().await?;
-        let target=apps::require_active(&mut tx,&app).await?;
+    // Reuses `admission` (the grant takes its own connection) so a burst can't drain the pool.
+    let mut response = idempotency::run(&state,Some(key.as_str()),&scope,&input,true,async ||{
         let params=TokenParams{grant_type:Some(input.grant_type.clone()),code:input.code.clone(),redirect_uri:input.redirect_uri.clone(),code_verifier:input.code_verifier.clone(),slt:input.slt.clone(),refresh_token:input.refresh_token.clone(),..Default::default()};
         let tokens=match input.grant_type.as_str(){
             "authorization_code"=>{
@@ -416,15 +513,14 @@ async fn exchange(
             "slt"|super::token::SLT_GRANT_TYPE=>grants::slt::exchange(&state,&ClientAuth{app:target,public:false},&params,&meta,None).await.map_err(oauth)?,
             "refresh_token"=>{
                 let token=input.refresh_token.as_deref().ok_or_else(||ApiError::invalid_request("refresh_token is required."))?;
-                let family=super::credentials::refresh_token_info(&mut tx,&state.keys.pepper,token).await?.map(|v|v.family_id);
-                bound(&mut tx,cell,&app,family).await?;
+                let family=super::credentials::refresh_token_info(&mut admission,&state.keys.pepper,token).await?.map(|v|v.family_id);
+                bound(&mut admission,cell,&app,family).await?;
                 grants::refresh::exchange(&state,&ClientAuth{app:target,public:false},&params,&meta,None).await.map_err(oauth)?
             },
             _=>return Err(ApiError::invalid_request("Cells delegation supports authorization_code with S256 PKCE, slt, and refresh_token.")),
         };
         let family=state.keys.jwt.verify_access(&tokens.access_token,Some(&app)).map_err(|_|ApiError::internal("Issued token could not be verified."))?.family_id().ok_or_else(||ApiError::internal("Issued token has no family."))?;
-        sqlx::query("insert into cells_token_families(family_id,cell_uuid,app_id) values($1,$2,$3) on conflict(family_id) do nothing").bind(family).bind(cell).bind(&app).execute(&mut *tx).await?;
-        tx.commit().await?;
+        sqlx::query("insert into cells_token_families(family_id,cell_uuid,app_id) values($1,$2,$3) on conflict(family_id) do nothing").bind(family).bind(cell).bind(&app).execute(&state.db).await?;
         Ok((StatusCode::OK,serde_json::to_value(tokens).map_err(|_|ApiError::internal("Could not encode token response."))?))
     }).await?;
     admission.commit().await?;
@@ -520,16 +616,21 @@ async fn revoke(
             .filter(|c| c.aud == app)
             .and_then(|c| c.family_id())
     };
-    if let Ok(family) = bound(&mut tx, cell, &app, family).await
-        && let Some(family) = tokens::revoke_family(&mut tx, family, "cell_sign_out").await?
-    {
-        accounts_core::events::membership_signed_out(
-            &mut tx,
-            &app,
-            &family.account_uuid,
-            "cell_sign_out",
-        )
-        .await?;
+    match bound(&mut tx, cell, &app, family).await {
+        Ok(family) => {
+            if let Some(family) = tokens::revoke_family(&mut tx, family, "cell_sign_out").await? {
+                accounts_core::events::membership_signed_out(
+                    &mut tx,
+                    &app,
+                    &family.account_uuid,
+                    "cell_sign_out",
+                )
+                .await?;
+            }
+        }
+        // A failed lookup aborted the transaction: never report a sign-out that did not happen.
+        Err(e) if e.is_server_error() => return Err(e),
+        Err(_) => {}
     }
     tx.commit().await?;
     Ok(super::respond::no_store(

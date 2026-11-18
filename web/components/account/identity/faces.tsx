@@ -26,6 +26,7 @@ const STATUS: Record<AccountStatus, { label: string; tone: "valid" | "pending" |
   active: { label: "Valid", tone: "valid" },
   pending_custodian: { label: "Waiting for custodian", tone: "pending" },
   unclaimed: { label: "Unclaimed", tone: "pending" },
+  archived: { label: "Being deleted", tone: "ended" },
   deleted: { label: "Deleted", tone: "ended" },
 };
 
@@ -195,7 +196,7 @@ export function BackFace({ me, dobAction, manageLink = false }: BackFaceProps) {
         </Field>
         {silicon ? (
           <>
-            <Field label="Webhook"><span className={styles.contactText}>{silicon.webhook_url ?? "Not set"}</span></Field>
+            <Field label="Notifications"><span className={styles.contactText}>Silicon Ting</span></Field>
             <Field label="STK rotated">{rotated ? formatDate(rotated) : "Never"}</Field>
           </>
         ) : null}

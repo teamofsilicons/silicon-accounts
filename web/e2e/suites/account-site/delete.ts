@@ -1,12 +1,14 @@
 /**
  * Deleting a Carbon's account on Data & privacy (/privacy; /settings redirects). Blocked while the Carbon is custodian of a Silicon (every Silicon always
  * has exactly one): deleting one Silicon or starting a transfer doesn't unblock it, only the last Silicon leaving does.
- * When it goes: every app with access is told (signed), its sessions, tokens and proofs end at once, its emails are
- * free, its c:id stays reserved 10 days (free after, time travel), a Silicon still waiting for it is released, and
- * the same email later signs up a brand-new account (a uuid is never reused).
+ * Deleting archives it for 10 days: its sessions and tokens end at once and its primary email is told, but apps hear
+ * nothing and signing in again with an email code brings it back. After the 10 days (time travel; the API sweeps every
+ * minute) it goes: every app with access is told (signed), its proofs end, its emails are free, its c:id stays reserved
+ * 10 days (free after, time travel), a Silicon still waiting for it is released, and the same email later signs up a
+ * brand-new account (a uuid is never reused).
  */
 import type { Journey } from "../../context";
-import { api, codeFor, developerApi, json, lastSeq, newContext, postJson, shot, signInOnDeveloper, signInOnSite, sleep, sql, tag } from "../../lib";
+import { api, codeFor, developerApi, lastSeq, newContext, postJson, shot, signInOnDeveloper, signInOnSite, sleep, sql, tag } from "../../lib";
 import { DEVELOPER_SESSION_ENDED, appAuth, appRefresh, appUserinfo, call, codeOf, deliveredAfter, getMe, inbox, messageOf, newCarbon, probePage, queuedEvents, requestSent, signInAgain, signIntoApp, timelineRows, until, waitEvent } from "./_helpers";
 
 interface Created {
@@ -108,7 +110,7 @@ const blocked: Journey = {
 
 const deletion: Journey = {
   name: "account-site-delete",
-  title: "deleting the account on Data & privacy (a dialog, the CarbonID typed): apps with access get account.deleted (signed), sessions/CLI/app tokens/proofs end at once, an app whose access was removed hears nothing, the c:id is reserved 10 days then free, a waiting Silicon is released, the email signs up a new account with a new uuid",
+  title: "deleting the account on Data & privacy (a dialog, the CarbonID typed): sessions/CLI/app tokens end at once and the account is archived (emailed, apps not told); 10 days later (time travel) apps with access get account.deleted (signed), proofs end, an app whose access was removed hears nothing, the c:id is free at the end of recovery, a waiting Silicon is released, the email signs up a new account with a new uuid",
   async run(ctx) {
     const { env, results } = ctx;
     const t = tag();
@@ -128,7 +130,7 @@ const deletion: Journey = {
     // for this Carbon, which the deletion must end like every other sign-in.
     const developer = await leaver.context.newPage();
     results.watch(developer, "acct-leaver-developer", [DEVELOPER_SESSION_ENDED]);
-    await signInOnDeveloper(env, developer, null);
+    await signInOnDeveloper(env, developer, null, { returnTo: "/llms.txt" });
     const devBefore = await developerApi<{ uuid?: string }>(env, developer, "/me");
     const after = await lastSeq(env);
     const start = await api<{ challenge_id?: string }>(ctx, "/v1/cli/login/start", { method: "POST", json: { email: leaver.email } });
@@ -136,10 +138,8 @@ const deletion: Journey = {
     const cliTokens = await api<{ access_token?: string }>(ctx, "/v1/cli/login/verify", { method: "POST", json: { challenge_id: start.body.challenge_id, code, client_label: "leaver terminal" } });
     const bearer = { authorization: `Bearer ${cliTokens.body.access_token ?? ""}` };
     // A Silicon that named this Carbon as its custodian and is still waiting for the answer.
-    const hook = `orphan-${t}`;
     const orphanId = `si:orphan-${t}`;
-    const orphan = await api<{ request?: { id: string }; request_token?: string; webhook_secret?: string; silicon?: { uuid: string } }>(ctx, "/v1/silicons", { method: "POST", json: { id: orphanId, display_name: `Orphan ${t}`, custodian: leaver.id, webhook_url: `${env.apps}/hooks/${hook}` } });
-    await postJson(`${env.apps}/hooks/${hook}/_webhook-secret`, { secret: orphan.body.webhook_secret });
+    const orphan = await api<{ request?: { id: string }; request_token?: string; silicon?: { uuid: string } }>(ctx, "/v1/silicons", { method: "POST", json: { id: orphanId, display_name: `Orphan ${t}`, custodian: leaver.id } });
     // Another Carbon is handing a Silicon over to this one, still waiting for the answer.
     const handed = await call<Created>(taker.probe, "/v1/me/silicons", { method: "POST", json: { id: `si:handover-${t}`, display_name: `Handover ${t}` } });
     const handedUuid = handed.body.silicon?.uuid ?? "";
@@ -154,11 +154,11 @@ const deletion: Journey = {
     const section = leaver.page.getByRole("region", { name: "Delete your account" });
     await section.getByText("All done").waitFor({ timeout: 30_000 });
     const shown = (await section.innerText()).replace(/\s+/g, " ");
-    results.check("the page says what goes: the app signs you out and is told, devices signed out, the CarbonID held 10 days", shown.includes("What you’ll lose access to") && shown.includes("Signs you out and is told you’ve left") && shown.includes("All signed out, this one too") && shown.includes(`Your CarbonID ${leaver.id}`) && shown.includes("Held for 10 days, then anyone can take it"), shown.slice(0, 400));
+    results.check("the page says what goes and the 10 days to come back: the app signs you out and is told, devices signed out, the CarbonID kept 10 days", shown.includes("What you’ll lose access to") && shown.includes("Signs you out and is told you’ve left") && shown.includes("All signed out, this one too") && shown.includes(`Your CarbonID ${leaver.id}`) && shown.includes("Kept for you for 10 days") && shown.includes("Changed your mind? You have 10 days."), shown.slice(0, 600));
     await section.getByRole("button", { name: "Delete Account" }).click();
     const dialog = leaver.page.getByRole("dialog", { name: "Delete your account?" });
     const text = (await dialog.innerText({ timeout: 10_000 })).replace(/\s+/g, " ");
-    results.check("the dialog says it can't be undone", text.includes("This can’t be undone.") && text.includes("You lose access to everything on this page."), text.slice(0, 320));
+    results.check("the dialog says signing in within 10 days gets it back", text.includes("Sign in within 10 days to get it back.") && text.includes("You lose access to everything on this page."), text.slice(0, 320));
     const button = dialog.getByRole("button", { name: "Delete Account" });
     const field = dialog.getByLabel(`Type ${leaver.id} to confirm`);
     results.check("…Delete Account stays off until the CarbonID is typed", await button.isDisabled());
@@ -182,13 +182,13 @@ const deletion: Journey = {
     await button.click();
     // The prototype's "gone" page (/goodbye), naming the CarbonID it was handed in session storage.
     await leaver.page.waitForURL(`${env.site}/goodbye`, { timeout: 20_000 });
-    const gone = leaver.page.getByRole("heading", { name: "Your account is deleted" });
+    const gone = leaver.page.getByRole("heading", { name: "Account deletion requested" });
     const landing = await gone.waitFor({ timeout: 20_000 }).then(() => true, () => false);
     const sentAt = await deleteSent;
-    results.metric("delete DELETE sent → Your account is deleted shown", Date.now() - sentAt);
+    results.metric("delete DELETE sent → Account deletion requested shown", Date.now() - sentAt);
     const goneText = (await leaver.page.locator("main").innerText().catch(() => "")).replace(/\s+/g, " ");
-    results.check("…it says every app was told, names the CarbonID held for 10 days, and offers Start Again", goneText.includes("Every app was told and lost access.") && goneText.includes(`${leaver.id} is reserved for 10 days`) && (await leaver.page.getByRole("link", { name: "Start Again" }).getAttribute("href")) === "/", goneText.slice(0, 240));
-    results.check("after Delete Account the browser lands on Your account is deleted", landing);
+    results.check("…it says you're signed out, how to get the CarbonID back within 10 days, and offers Sign in to recover", goneText.includes("You’re signed out everywhere.") && goneText.includes(`within 10 days and ${leaver.id} comes back`) && (await leaver.page.getByRole("link", { name: "Sign in to recover" }).getAttribute("href")) === "/sign-in?prompt=login", goneText.slice(0, 240));
+    results.check("after Delete Account the browser lands on Account deletion requested", landing);
     results.check("deleting makes no failing request, and no sign-out of a session the deletion already ended", failing.length === 0 && signouts.length === 0, `failing: ${failing.join(", ") || "none"}; sign-out requests: ${signouts.length}`);
     await shot(env, leaver.page, "acct-delete-03-gone");
 
@@ -203,11 +203,21 @@ const deletion: Journey = {
     results.check("…and this browser no longer holds a session cookie (the deletion cleared it)", leftCookies.length === 0, leftCookies.join(", ") || "none");
     await second.context.close();
 
+    // Archived for 10 days: kept with its id and emails, the primary email told, apps told nothing yet.
+    const [[archived, keptId, keptEmails, mailed] = []] = await sql(env, `select a.status, a.handle, (select count(*) from account_emails where account_uuid = a.uuid), (select count(*) from outbound_messages where to_address = '${leaver.email}' and purpose = 'account_archived') from accounts a where a.uuid = '${uuid}'`);
+    results.check("the account is archived with its id and emails, and its email is told", archived === "archived" && keptId === leaver.id && keptEmails !== "0" && mailed === "1", `${archived} ${keptId} emails ${keptEmails} mailed ${mailed}`);
+    await sleep(2_000);
+    results.check("…and no app is told yet", (await queuedEvents(env, "briefcase", uuid, "account.deleted")) === 0 && (await queuedEvents(env, "commit", uuid, "account.deleted")) === 0);
+    await sql(env, `update accounts set archived_at = now() - interval '10 days 1 second' where uuid = '${uuid}'`);
+    const travelled = Date.now();
+    const [swept] = await until(async () => (await sql(env, `select status from accounts where uuid = '${uuid}'`))[0] ?? [], row => row[0] === "deleted", 90_000, 1_000);
+    results.check("10 days later (time travel) the sweep deletes it within about a minute", swept === "deleted", `${swept} after ${Math.round((Date.now() - travelled) / 1000)} s`);
+
     // Apps with access are told; their tokens and the proof are dead; the app whose access was removed hears nothing.
     const toBriefcase = await waitEvent(env, "briefcase", "account.deleted", uuid, { after: seq.briefcase });
     const toCommit = await waitEvent(env, "commit", "account.deleted", uuid, { after: seq.commit });
-    results.metric("delete DELETE sent → Briefcase received account.deleted", deliveredAfter(toBriefcase, sentAt));
-    results.metric("delete DELETE sent → Commit received account.deleted", deliveredAfter(toCommit, sentAt));
+    results.metric("sweep → Briefcase received account.deleted", deliveredAfter(toBriefcase, travelled));
+    results.metric("sweep → Commit received account.deleted", deliveredAfter(toCommit, travelled));
     results.check("Briefcase and Commit got account.deleted (signed) with their membership ids", toBriefcase?.payload.data.membership_id === `briefcase:${uuid}` && toCommit?.payload.data.membership_id === `commit:${uuid}`, `${JSON.stringify(toBriefcase?.payload.data ?? null)} ${JSON.stringify(toCommit?.payload.data ?? null)}`);
     results.check("Browser (access removed earlier) is not told", (await queuedEvents(env, "browser", uuid, "account.deleted")) === 0);
     const refresh = await appRefresh(env, "briefcase", uuid);
@@ -219,21 +229,19 @@ const deletion: Journey = {
     const byId = await api(ctx, `/v1/accounts/by-id/${encodeURIComponent(leaver.id)}`, { headers: { authorization: appAuth("briefcase") } });
     results.check("apps can no longer look the account up (404 by uuid and by id)", byUuid.status === 404 && byId.status === 404, `${byUuid.status} ${byId.status}`);
 
-    // What is left in the database: a deleted shell, its id reserved for 10 days.
+    // What is left in the database: a deleted shell after the recovery period.
     const [[status, handle, emails, identities, live] = []] = await sql(env, `select a.status, coalesce(a.handle, 'null'), (select count(*) from account_emails where account_uuid = a.uuid), (select count(*) from identities where account_uuid = a.uuid), (select count(*) from token_families where account_uuid = a.uuid and revoked_at is null) from accounts a where a.uuid = '${uuid}'`);
     results.check("the account is deleted: no id, no emails, no identities, no live tokens", status === "deleted" && handle === "null" && emails === "0" && identities === "0" && live === "0", `${status} ${handle} emails ${emails} identities ${identities} live ${live}`);
-    const [[holder, days] = []] = await sql(env, `select account_uuid, round(extract(epoch from reserved_until - now()) / 86400.0, 2) from handle_reservations where handle = '${leaver.id}'`);
-    results.check("its c:id is reserved for 10 days", holder === uuid && Math.abs(Number(days) - 10) < 0.01, `${holder} ${days}`);
-    const available = await api<{ available: boolean; reason: string | null }>(ctx, `/v1/ids/available?id=${encodeURIComponent(leaver.id)}`);
-    const grab = await call(taker.probe, "/v1/me/id", { method: "POST", json: { id: leaver.id } });
-    results.check("another Carbon can't take the id (reserved; 409 id_reserved)", available.body.available === false && available.body.reason === "reserved" && grab.status === 409 && codeOf(grab.body) === "id_reserved", `${JSON.stringify(available.body)} ${grab.status} ${codeOf(grab.body)}`);
-    await sql(env, `update handle_reservations set reserved_until = now() - interval '1 second' where handle = '${leaver.id}'`);
+    const available = await api<{ available: boolean }>(ctx, `/v1/ids/available?id=${encodeURIComponent(leaver.id)}`);
+    results.check("the CarbonID is available when the recovery period ends", available.body.available === true);
     const taken = await call(taker.probe, "/v1/me/id", { method: "POST", json: { id: leaver.id } });
     results.check("after the 10 days (time travel) another Carbon takes it", taken.status === 200 && (await getMe(taker.probe)).id === leaver.id, `${taken.status} ${codeOf(taken.body)}`);
 
     // The Silicon that was waiting for this Carbon is released and told.
-    const declined = await json<{ payload?: { type?: string; data?: { reason?: string; released?: boolean } } }>(`${env.apps}/hooks/${hook}/_events/wait?type=silicon.custodian.declined&timeout_ms=20000`);
-    results.check("the waiting Silicon is told: silicon.custodian.declined, reason custodian_account_deleted", declined.status === 200 && declined.body.payload?.data?.reason === "custodian_account_deleted" && declined.body.payload?.data?.released === true, JSON.stringify(declined.body.payload?.data ?? declined.body).slice(0, 200));
+    const [[reason, released] = []] = await sql(env, `select e.payload->'data'->>'reason', e.payload->'data'->>'released'
+      from webhook_events e join silicon_tings t on t.event_id = e.event_id
+      where e.target_kind='silicon' and e.target_id='${orphan.body.silicon?.uuid}' and e.type='silicon.custodian.declined'`);
+    results.check("deleting the custodian queues the waiting Silicon's decline notification for Ting", reason === "custodian_account_deleted" && released === "true", `${reason} ${released}`);
     const status2 = await api<{ status?: string; silicon?: { status?: string; id?: string | null } }>(ctx, `/v1/silicons/requests/${orphan.body.request?.id}`, { headers: { authorization: `Bearer ${orphan.body.request_token}` } });
     results.check("its request is closed and the Silicon released", status2.status === 200 && status2.body.status !== "pending" && status2.body.silicon?.status === "deleted", JSON.stringify(status2.body).slice(0, 200));
     const orphanFree = await api<{ available: boolean }>(ctx, `/v1/ids/available?id=${encodeURIComponent(orphanId)}`);
@@ -261,4 +269,28 @@ const deletion: Journey = {
   },
 };
 
-export const journeys: Journey[] = [blocked, deletion];
+const recovery: Journey = {
+  name: "account-site-delete-recover",
+  title: "a Carbon that deleted its account signs in again with an email code within the 10 days: the same account comes back (same uuid and CarbonID, active), and no app was ever told",
+  async run(ctx) {
+    const { env, results } = ctx;
+    const returner = await newCarbon(ctx, "acct-returner");
+    const { uuid } = returner;
+    const account = await signIntoApp(env, returner.page, "briefcase");
+    results.check("setup: signed into briefcase", account?.uuid === uuid);
+    const gone = await call(returner.probe, "/v1/me", { method: "DELETE", json: { confirm: returner.id } });
+    const [[archived] = []] = await sql(env, `select status from accounts where uuid = '${uuid}'`);
+    results.check("DELETE /v1/me archives the account", gone.status === 204 && archived === "archived", `${gone.status} ${archived}`);
+    const context = await newContext(ctx.browser);
+    const page = await context.newPage();
+    results.watch(page, "acct-returner-again");
+    await signInOnSite(env, page, returner.email);
+    const back = await getMe(await probePage(env, context));
+    results.check("signing in with an email code brings the same account back: same uuid and CarbonID, active", back.uuid === uuid && back.id === returner.id && back.status === "active", `${back.uuid} ${back.id} ${back.status}`);
+    results.check("…and Briefcase was never told it was deleted", (await queuedEvents(env, "briefcase", uuid, "account.deleted")) === 0);
+    await context.close();
+    await returner.context.close();
+  },
+};
+
+export const journeys: Journey[] = [blocked, deletion, recovery];

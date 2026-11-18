@@ -920,3 +920,46 @@ fn recovered_access_expiry_is_absolute_even_when_access_has_expired() {
         received + time::Duration::seconds(10)
     );
 }
+
+#[test]
+fn request_debug_hides_secrets() {
+    let stk = Some("stk-0123456789abcdef".to_owned());
+    let printed = format!(
+        "{:?} {:?} {:?} {:?} {:?}",
+        SiliconSelfCreate {
+            stk: stk.clone(),
+            ..Default::default()
+        },
+        CreateSilicon {
+            stk,
+            ..Default::default()
+        },
+        silicon_accounts_client::IssueUserVerification {
+            subject_token: "eyJ.secret3.sig".into(),
+            ..Default::default()
+        },
+        silicon_accounts_client::ProofRef::Token("sap_secret1".into()),
+        silicon_accounts_client::ProofRef::RefreshToken("sapr_secret2".into()),
+    );
+    for secret in ["0123456789abcdef", "secret1", "secret2", "secret3"] {
+        assert!(!printed.contains(secret), "{printed}");
+    }
+}
+
+#[tokio::test]
+async fn redirects_are_not_followed() {
+    let mock = Mock::start().await;
+    let elsewhere = format!("{}/elsewhere", mock.url);
+    mock.on(
+        "POST",
+        "/v1/silicons/login",
+        Reply::empty(308).header("location", &elsewhere),
+    );
+    let err = AccountsClient::new(&mock.url)
+        .unwrap()
+        .silicon_login("si:scout", "stk-0123456789ab", None)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), "http_308");
+    assert!(mock.requests_to("POST", "/elsewhere").is_empty());
+}

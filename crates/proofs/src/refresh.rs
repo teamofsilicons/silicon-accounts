@@ -61,12 +61,6 @@ pub async fn refresh(
         return Err(ApiError::internal("proof token without a family"));
     };
     let family = locked.family;
-    if let Some(uuid) = family.account_uuid.as_deref() {
-        accounts_core::repo::organizations::check(&mut tx, uuid, &family.issuing_app).await?;
-        for app in &family.audiences {
-            accounts_core::repo::organizations::check(&mut tx, uuid, app).await?;
-        }
-    }
     let kind = family.kind();
     let proof_id = family.id.to_string();
     if family.issuing_app != caller.app_id {
@@ -163,6 +157,13 @@ pub async fn refresh(
             reissue_hint(kind)
         ))
         .detail("proof_id", proof_id));
+    }
+    // Only after the issuer, end and reuse checks, so other apps never see the organization.
+    if let Some(uuid) = family.account_uuid.as_deref() {
+        accounts_core::repo::organizations::check(&mut tx, uuid, &family.issuing_app).await?;
+        for app in &family.audiences {
+            accounts_core::repo::organizations::check(&mut tx, uuid, app).await?;
+        }
     }
     let user = match &grant {
         None => None,

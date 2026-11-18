@@ -15,6 +15,7 @@ import { useCopyFeedback } from "@teamofsilicons/silicon-ui/lib/use-copy-feedbac
 import { useCarbonPicture } from "@/lib/carbon-avatar";
 import { usePictureColours } from "@/lib/picture-colours";
 import { useMe, useSession } from "@/lib/query/session";
+import { isValidTimezone } from "@/lib/timezones";
 import styles from "./home-identity.module.css";
 
 /** Makes Home's ring glow for a moment (the picture and the introduction's You card call it). */
@@ -66,7 +67,8 @@ export function HomeIdentity() {
   if (!account) return null;
   const first = account.display_name.trim().split(/\s+/)[0] || account.display_name;
   // GET /v1/me carries when the account was made (in its own time zone); the session's summary does not, so this waits.
-  const since = me.data ? new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: me.data.timezone }).format(new Date(me.data.created_at)) : null;
+  // An older browser may not know the account's (modern) zone name: then the browser's own zone, never a crash.
+  const since = me.data ? new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: isValidTimezone(me.data.timezone) ? me.data.timezone : undefined }).format(new Date(me.data.created_at)) : null;
 
   // data-home: Home is drawn (the screens and checks wait for it; the old Home had it on its column).
   return (

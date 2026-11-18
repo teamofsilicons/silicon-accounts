@@ -58,9 +58,11 @@ export function verifyAccountsWebhook(headers: Headers, rawBody: string, secret:
   const timestamp = headers.get("x-accounts-timestamp") ?? "";
   const signature = headers.get("x-accounts-signature") ?? "";
   // Refuse old deliveries so a captured request can't be replayed (5 minutes here).
-  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+  const ts = Number(timestamp);
+  if (!Number.isInteger(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return false;
   const expected = "v1=" + createHmac("sha256", secret).update(\`\${timestamp}.\${rawBody}\`).digest("hex");
-  return signature.length === expected.length && timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  const given = Buffer.from(signature), wanted = Buffer.from(expected);
+  return given.length === wanted.length && timingSafeEqual(given, wanted);
 }
 
 // Deduplicate on X-Accounts-Event-Id: retries and replays keep the same event_id.`;
@@ -220,8 +222,6 @@ export function WebhooksTab() {
       setFocusUrl(false);
       setUrl("");
       ctx.setApp(current => ({ ...current, webhook: { url: result.url, secret_set: true } }));
-      void ctx.reload();
-      refreshDeliveries();
     } catch (raw) {
       const error = ApiError.from(raw);
       setUrlError(error.fields.url ?? [error.message, error.hint].filter(Boolean).join(" "));
@@ -368,7 +368,7 @@ export function WebhooksTab() {
               content: (
                 <div className={styles.verify}>
                   <p className={styles.paragraph}>Each delivery carries <code>X-Accounts-Event-Id</code>, <code>X-Accounts-Event-Type</code>, <code>X-Accounts-Delivery-Id</code>, <code>X-Accounts-Timestamp</code> (unix seconds) and <code>X-Accounts-Signature: v1=&lt;hex&gt;</code>, the HMAC-SHA256 of <code>{"{timestamp}.{raw body}"}</code> keyed by the whole <code>whsec_</code> secret.</p>
-                  <div className={styles.wrapCode}><CodeBlock filename="Node" language="ts" code={VERIFY_TS} maxLines={14} /></div>
+                  <div className={styles.wrapCode}><CodeBlock filename="Node" language="ts" code={VERIFY_TS} maxLines={16} /></div>
                   <div className={styles.wrapCode}><CodeBlock filename="Rust (silicon-accounts-client)" language="rust" code={VERIFY_RUST} /></div>
                 </div>
               ),

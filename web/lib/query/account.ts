@@ -10,7 +10,7 @@ import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } f
 import { api } from "../api/endpoints";
 import type { ApiError } from "../api/errors";
 import type { EmailView, HistoryKind, Me, PhoneView, ProfileUpdate } from "../api/types";
-import { useIdempotentMutation, useSecretMutation } from "./idempotency";
+import { useIdempotentMutation } from "./idempotency";
 import { queryKeys } from "./keys";
 import { useWholeList } from "./pages";
 import { setMe, useSession } from "./session";
@@ -254,26 +254,4 @@ export function useRevokeMyProof() {
     onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.me.proofs }),
     meta: { errorTitle: "Could not revoke the proof" },
   });
-}
-
-/* ------------------------------------------------------------------------------------------------------------------ */
-/* A Silicon's own webhook (a Silicon signed in to the site)                                                            */
-/* ------------------------------------------------------------------------------------------------------------------ */
-
-/** Sets a Silicon's own webhook; its signing secret comes back once (`run(url)`; see useSecretMutation). */
-export function useSetOwnWebhook() {
-  const client = useQueryClient();
-  return useSecretMutation((url: string) => api.me.webhook.set(url), {
-    onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.me.view }),
-    meta: { errorTitle: "Could not set the webhook" },
-  });
-}
-
-export function useRemoveOwnWebhook() {
-  const client = useQueryClient();
-  return useMutation({ mutationFn: () => api.me.webhook.remove(), onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.me.view }), meta: { errorTitle: "Could not remove the webhook" } });
-}
-
-export function useTestOwnWebhook() {
-  return useMutation({ mutationFn: () => api.me.webhook.test(), meta: { errorTitle: "Could not send the test" } });
 }

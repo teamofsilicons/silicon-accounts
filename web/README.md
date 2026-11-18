@@ -33,6 +33,8 @@ Node 24 or newer. Read the bundled Next docs in `node_modules/next/dist/docs/` b
 breaking changes (`proxy.ts` instead of `middleware.ts`, async `params`/`searchParams`, `PageProps<"/route">` from
 `next typegen`, Turbopack by default).
 
+The signed-in header uses `components/foundation/shell/profile-menu.tsx` for the profile picker. It opens a radio menu on desktop and a bottom drawer below 640px. Each profile shows its name and handle, with a check beside the current account.
+
 ## Topology
 
 The account site uses `silicon-accounts` as its first-party app ID. Existing browser cookies and saved return paths remain valid through the rename.
@@ -61,6 +63,8 @@ The rewrite proxy accepts bodies up to 52 MB and waits up to 5 minutes (`experim
 (`script-src 'self' 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`, …), `X-Frame-Options: DENY`,
 `X-Content-Type-Options: nosniff`, a strict referrer policy. The root layout puts the nonce on the inline theme boot
 script; Next adds it to its own scripts. It skips `/v1`, `/.well-known`, `/_next` and static files.
+
+For a local Interfaces stack, `proxy.ts` also permits images from the loopback origin and port in `INTERFACES_API_URL`, including the equivalent localhost names. Production Interface images use HTTPS and need no exception.
 
 `proxy.ts` also sends every old developer address to the developer site with a `307`: `/developer` to its home and
 `/developer/{app_id}[/{tab}]` to `/apps/{app_id}[/{tab}]` there, query kept. The site's address is `developer_url` from
@@ -138,7 +142,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 
 `app/(app)/layout.tsx` mounts the client providers for everything under it (one query cache across the account pages
 and the hosted pages); the root layout and the public landing load none. `app/(app)/(shell)/layout.tsx` wraps the
-account pages in the account shell (sidebar, ⌘K palette, sign-in gate). The shell is full height (2026-11-17): from 900px there is no top bar, and the sidebar holds the brand and Search at its head and the account menu at its foot; under 900px a top bar shows the brand and a Menu button that opens the sidebar in a bottom sheet. While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
+account pages in the account shell (sidebar, ⌘K palette, sign-in gate). The shell is full height (2026-11-17): from 900px there is no top bar, and the sidebar holds the brand and Search at its head and the account switcher at its foot (`profile-menu.tsx`, 2026-11-18: every account signed in on this browser, Add another account, Your accounts, Sign out; listed in place in the phone sheet); under 900px a top bar shows the brand and a Menu button that opens the sidebar in a bottom sheet. While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
 development only: production answers 404 unless the server runs with `ACCOUNTS_KITCHEN=1`.
 
 ## Conventions
@@ -157,7 +161,7 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   script pins `data-theme="light"` and clears any stored choice; there is no theme switch anywhere (dock, user menu,
   Settings, palette, public header and footer). The dark tokens in `styles/tokens.css` stay for branded subtrees: an
   app's hosted page that forces its dark look still paints dark.
-- **Data.** Never `fetch` the API from components: use the hooks in `lib/query/` (or `api` from `lib/api` inside
+- **Data.** Never `fetch` the API from components: use the hooks in `lib/query/` (or `api` from `lib/api/endpoints` inside
   them). Errors are `ApiError` (`status`, `code`, `message`, `hint`, `requestId`, `retryAfter`, `lockedUntil`,
   `redirectTo`). Failed mutations toast message + hint unless `meta: { toast: false }` (show those inline); failed
   queries render inline. Any 401 marks the session gone and the shell sends the visitor to sign in. The account's own
@@ -170,7 +174,7 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
 - **Secrets shown once** (a generated or chosen STK, a webhook signing secret, a proof token): the action is a
   `useSecretMutation(fn)` (`lib/query/idempotency.ts`): `run(input)` resolves with the answer and resets the mutation,
   and nothing is cached (gcTime 0), so the page that shows the secret holds the only copy. `useCreateSilicon`,
-  `useRotateStk`, `useSetSiliconWebhook`, `useSetOwnWebhook`, `useSetWebhook`, `useRotateWebhookSecret` and
+  `useRotateStk`, `useSetWebhook`, `useRotateWebhookSecret` and
   `useCreateAppVerification` are secret mutations.
 - **Telemetry (off since 2026-10-11).** The site records none and has no setting: `lib/telemetry.ts` sends
   `X-Accounts-Telemetry: off` on every API call from the first request on, and sets the `sa_telemetry=off` cookie for
@@ -899,4 +903,18 @@ Silicon UI local keyboard fix: ConfirmMorph preserves its pointer re-arming dela
 
 The hosted flow renders the server-driven `select_account` step before sharing details. Personal and work identities are grouped, and blocked work identities show the server’s reason. `/linked-accounts` reads the main account and linked work accounts, switches the first-party cookie session, and starts a separate authenticated linking flow. A work-only Carbon main account can create its personal account there. A personal Silicon needs its own Carbon custodian and independent account-link approval. Pending link request IDs survive page reloads; cancelling or finishing clears the saved ID and completion query. The identity and settings pages leave work-handle changes and work-account closure to Organizations. Shared API types, endpoints and query hooks were extended for these flows; no auth token is placed in browser storage.
 
+The account chooser uses Silicon UI avatars to display each personal and work account’s profile picture, with initials when a picture is missing or unavailable. Organization logos appear beside the organization name, separately from the account avatar. The `auth-work-picker` screenshot covers photos, an organization logo, and the missing-logo fallback.
+
+Your Accounts and the top-right profile menu share `components/foundation/avatar/profile-avatar.tsx`. Both display each work profile’s own picture, including its configured Carbon avatar. In Your Accounts, a 16px organization logo sits beside its name. The `account-work-linked` screen covers two profiles in one organization and a third in an organization without a logo.
+
 Work-invitation pages permit form handoff to the exact configured Organizations HTTP origin only when it is loopback; the value comes from trusted API metadata or `ACCOUNTS_ORGANIZATIONS_URL`. Other pages keep their existing form policy. Invitation pages send `Referrer-Policy: strict-origin`: only the Accounts origin reaches Organizations, preserving the Origin check without leaking the invitation ticket path.
+
+## Silicon notification migration
+
+Silicon creation and management use Ting notification setup in place of own webhook URLs and secrets.
+See `../docs/start/silicon-notifications.md` for anonymous approval receivers, authenticated account delivery,
+and migration behavior. App webhook management remains on the developer site.
+
+## Browser profile switching
+
+The header and Your Accounts load the browser’s independently authenticated profiles and their linked work accounts from `GET /v1/session/accounts`. Switching through `POST /v1/session/accounts/switch` opens Home with a fresh page cache. Account-page requests include the UUID rendered by the tab in `X-Accounts-Profile` so an old tab cannot apply a change to a different active account. App logos come from the app record. An empty account keeps the Home introduction visible.

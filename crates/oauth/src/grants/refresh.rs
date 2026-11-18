@@ -56,7 +56,7 @@ pub(crate) async fn exchange(
         if let Some(info) = info.filter(|i| {
             i.app_id == client.app.app_id && i.family_active && (!i.used || key.is_some())
         }) {
-            // Silicon Accounts' own apps (`silicon-accounts`, `developer`) have no memberships.
+            // First-party sessions do not depend on consent-managed memberships.
             if !is_first_party_app_id(&info.app_id)
                 && info.membership_status != Some(MembershipStatus::Active)
             {

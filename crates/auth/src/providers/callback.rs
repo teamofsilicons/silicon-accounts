@@ -398,7 +398,15 @@ async fn process(
     let code = answer.code.clone().unwrap_or_default();
 
     // 2. Exchange the code and verify the id_token (no database locks held meanwhile).
-    let outcome = exchange_and_verify(state, &flow.app_id, provider, &leg, code.trim()).await;
+    let outcome = exchange_and_verify(
+        state,
+        &flow.app_id,
+        flow.extras.interface_id.as_deref(),
+        provider,
+        &leg,
+        code.trim(),
+    )
+    .await;
     let (fa, client, claims) = match outcome {
         Ok(v) => v,
         Err(e) if linking => return finish_link(state, &flow_id, provider, Err(e)).await,
@@ -590,6 +598,17 @@ async fn link_identity(
     }
     let mut email_added = false;
     if let Some(e) = &email {
+        let primary_elsewhere: bool = sqlx::query_scalar("select exists(select 1 from account_emails where email=$1 and account_uuid<>$2 and is_primary and verified_at is not null)")
+            .bind(e).bind(&me.uuid).fetch_one(&mut *conn).await?;
+        if primary_elsewhere {
+            return Ok(Err(FlowError::new(
+                "email_in_use",
+                format!("{e} is the primary email of another account."),
+                format!(
+                    "Connect {name} on its primary account or use a different provider account."
+                ),
+            )));
+        }
         match contacts::add_verified_email(conn, &me.uuid, e, provider.verified_via()).await {
             Ok(outcome) => {
                 email_added = true;
@@ -708,6 +727,7 @@ async fn record_error(
 async fn exchange_and_verify(
     state: &AppState,
     app_id: &str,
+    interface_id: Option<&str>,
     provider: Provider,
     leg: &ProviderLeg,
     code: &str,
@@ -716,9 +736,14 @@ async fn exchange_and_verify(
     let to_flow = |e: ApiError| FlowError::from_api(&e);
     let (fa, client) = {
         let mut conn = state.db.acquire().await.map_err(|e| to_flow(e.into()))?;
-        let fa = FlowApp::load(&mut conn, &state.settings, app_id)
+        let mut fa = FlowApp::load(&mut conn, &state.settings, app_id)
             .await
             .map_err(to_flow)?;
+        if let Some(interface_id) = interface_id {
+            fa.apply_interface(&mut conn, interface_id)
+                .await
+                .map_err(to_flow)?;
+        }
         fa.ensure_active().map_err(to_flow)?;
         let method = match provider {
             Provider::Google => accounts_core::models::Method::Google,
@@ -1051,12 +1076,19 @@ async fn resolve_identity(
             claim_account_uuid: claim,
         })
     };
-    let refuse_inactive = |status: AccountStatus| {
-        FlowError::new(
+    let refuse_inactive = |status: AccountStatus| match status {
+        AccountStatus::Archived => FlowError::new(
+            "account_not_active",
+            format!(
+                "The account of this {name} sign-in was deleted; it's erased 10 days after that."
+            ),
+            "To keep it, sign in with a code sent to its email.",
+        ),
+        _ => FlowError::new(
             "account_not_active",
             format!("The account of this {name} sign-in is {status} and can't sign in."),
             "Use another sign-in method.",
-        )
+        ),
     };
 
     // A known identity signs its account in.
@@ -1131,7 +1163,7 @@ async fn resolve_identity(
         }
     }
 
-    if !fa.config.allow_signup && !fa.first_party() {
+    if !fa.config.allow_signup && !fa.bypass_account_policies() {
         return Ok(Err(FlowError::from_api(&next::signup_not_allowed(fa))));
     }
     Ok(Ok(signup(None)))

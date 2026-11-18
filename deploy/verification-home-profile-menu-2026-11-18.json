@@ -1,0 +1,160 @@
+{
+  "verified_at": "2026-11-17T21:36:10Z",
+  "release": "02e70c10198e202ecd083598478a04de4f3df23a",
+  "web_source": "1c62b57f95bf8d8c6ad0e057c46d02ae04bf6ab4",
+  "previous": "4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2",
+  "previous_web_source": "442f755e148fac92723843d7bf1ee01912a08015",
+  "scope": [
+    "Accounts web"
+  ],
+  "artifact": {
+    "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-picker/1c62b57f95bf8d8c6ad0e057c46d02ae04bf6ab4-571ff51126ad4d.tar.gz",
+    "sha256": "571ff51126ad4da71f9d4cd631ee21ac1ece93d281dcfc1c7c2d1842a64babc9",
+    "bytes": 55238056,
+    "checksum_read_back": true,
+    "activation_controller": {
+      "key": "releases/accounts-picker/compose-080973e83586ac4b7269dfce8721d7507e5bd5ccae3c1a64228aee0bb8e6ea0d.py",
+      "sha256": "080973e83586ac4b7269dfce8721d7507e5bd5ccae3c1a64228aee0bb8e6ea0d",
+      "baseline": "4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2",
+      "release": "02e70c10198e202ecd083598478a04de4f3df23a"
+    }
+  },
+  "activation": {
+    "ssm_command": "d65b5160-f04f-4d1e-99c5-0b0c6c90afdb",
+    "source": "1c62b57f95bf8d8c6ad0e057c46d02ae04bf6ab4",
+    "release": "02e70c10198e202ecd083598478a04de4f3df23a",
+    "developer_revision": "4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2",
+    "developer_build": "10oUw7Ynw2H9u_4A-paGf",
+    "previous": "4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2",
+    "web_build_id": "lxuISq8XtWBoD8F-ZzFjW",
+    "verified_files": 2703,
+    "static_dirs_made_readable": [],
+    "prior_static_files_kept": 28,
+    "loopback_preflight": true,
+    "api_readiness": true,
+    "services_healthy": true,
+    "restarted_units": [
+      "accounts-web"
+    ],
+    "schema_changes": false,
+    "cutover_seconds": 1.1,
+    "activated_at": "2026-11-17T21:32:34.316099+00:00"
+  },
+  "public_http": {
+    "home": {
+      "http_status": 200
+    },
+    "database": {
+      "http_status": 200
+    },
+    "account guide": {
+      "http_status": 200
+    },
+    "chunks/25m4tar4js3hk.js": {
+      "http_status": 200,
+      "sha256": "0b02bc7b5a1b05052f3ff319ba98fab1322226e2d8a8617e36d4699b82421f55"
+    },
+    "chunks/38dtmfdtzvkik.js": {
+      "http_status": 200,
+      "sha256": "4f3d6d2894ad88d010c60bfafcabae30167682be3bb26dc80fac00c44b3cde83"
+    },
+    "chunks/05t23mb_n52qm.js": {
+      "http_status": 200,
+      "sha256": "404380e64c6553626210c79cd175f015b5f4e6851d3eb1251eeed8e3bef2ba5a"
+    },
+    "chunks/12lh7vm4zj_em.js": {
+      "http_status": 200,
+      "sha256": "fcceb7c6237f20209e30469857ad89cc3f61571f2f1dc755447afb0a2d34f8c9"
+    },
+    "chunks/0ryuerzx6aamy.js": {
+      "http_status": 200,
+      "sha256": "1aa79389bfb97de27e80a24d7e3665b5655e500e9e8cc6a52cfb7ae5b57cce5a"
+    },
+    "chunks/37wkls-rtnx73.js": {
+      "http_status": 200,
+      "sha256": "dfcb0cb8a3af11243aab5c46589320e53ed7c4925c8182ae48942238c0ad1b3e"
+    },
+    "chunks/28f5xsvwmb4i8.js": {
+      "http_status": 200,
+      "sha256": "206c4db680589ebbac33f447180ab5a2c0b4291286705e8e39340b7b13f9eba1"
+    },
+    "chunks/07srue-aeeuwc.js": {
+      "http_status": 200,
+      "sha256": "ced8d70aba60c8374cdb39407be0975ba79c1a0208416e95ffd1162d0130bfa2"
+    }
+  },
+  "deployment_composition": "A Developer update went live during staging. The final release uses that exact live revision as its base and updates the Accounts web service.",
+  "preflight_note": "The candidate initially returned 404 for static assets. Before switching traffic, the installer made the retained build directories readable by the web service and verified both new feature chunks and six chunks from the previous release.",
+  "browser_verification": {
+    "viewport_widths": [
+      390,
+      1440
+    ],
+    "color_schemes": [
+      "light",
+      "dark"
+    ],
+    "screenshots": {
+      "Chromium, public frontend": 8,
+      "WebKit, local production build": 8
+    },
+    "profile_menu": [
+      "Current account marked",
+      "Equal-height avatar and two-line name/handle rows",
+      "Keyboard selection and focus return",
+      "Phone account sheet"
+    ],
+    "six_reminders": {
+      "origin": "https://accounts.teamofsilicons.com",
+      "source": "public frontend with synthetic account data",
+      "seen": [
+        {
+          "count": 6,
+          "visibleRows": 1,
+          "lastActiveDays": 9
+        },
+        {
+          "count": 5,
+          "visibleRows": 1,
+          "lastActiveDays": 13
+        },
+        {
+          "count": 4,
+          "visibleRows": 1,
+          "lastActiveDays": 18
+        },
+        {
+          "count": 3,
+          "visibleRows": 1,
+          "lastActiveDays": 26
+        },
+        {
+          "count": 2,
+          "visibleRows": 1,
+          "lastActiveDays": 30
+        },
+        {
+          "count": 1,
+          "visibleRows": 1,
+          "lastActiveDays": 32
+        }
+      ],
+      "emptySectionHidden": true,
+      "keptChoiceSurvivesReload": true
+    },
+    "isolated_sign_in_and_switching": {
+      "journeys": 1,
+      "passed": 1,
+      "checks": 6,
+      "failed_checks": 0,
+      "problems": 0
+    },
+    "scope": "Public browser checks used synthetic account data with production HTML, JavaScript and styles. Desktop and phone switch actions were tested end to end with two signed-in accounts on the isolated Accounts stack."
+  },
+  "web_checks": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "production_build": "passed",
+    "unit_tests": 34
+  }
+}

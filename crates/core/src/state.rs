@@ -150,20 +150,12 @@ impl AppState {
         self.identity_key.get(&self.db, &self.keys.keyring).await
     }
 
-    pub fn settings(&self) -> &Settings {
-        &self.settings
-    }
-
     pub fn pepper(&self) -> &Pepper {
         &self.keys.pepper
     }
 
     pub fn keyring(&self) -> &Keyring {
         &self.keys.keyring
-    }
-
-    pub fn jwt(&self) -> &JwtKeys {
-        &self.keys.jwt
     }
 }
 

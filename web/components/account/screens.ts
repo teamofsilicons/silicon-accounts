@@ -51,6 +51,12 @@ const accountRoutes: MockRoute[] = [
   }],
 ];
 
+/** Two sessions of one Interface across two apps (GET /v1/me/interface-sessions). */
+const interfaceSessions: MockRoute = ["GET /v1/me/interface-sessions", () => ({ json: { sessions: [
+  { session_id: "is_1", interface_id: "potato", name: "Potato", logo_url: null, apps: ["Briefcase", "DM"], created_at: "2026-11-10T09:00:00Z", expires_at: "2026-12-10T09:00:00Z" },
+  { session_id: "is_2", interface_id: "potato", name: "Potato", logo_url: null, apps: ["Briefcase"], created_at: "2026-11-12T09:00:00Z", expires_at: "2026-12-12T09:00:00Z" },
+] } })];
+
 const empty: MockRoute[] = [
   ["GET /v1/me/apps", () => ({ json: data.page([]) })],
   ["GET /v1/me/proofs", () => ({ json: data.page([]) })],
@@ -89,6 +95,37 @@ async function drawerTo(page: Page, heading: string) {
 const card = "#personal-profile";
 
 const shown: ScreenSpec[] = [
+  {
+    name: "account-needs-order", path: "/", waitFor: "[data-home]", element: "#needs-you",
+    routes: [
+      ["GET /v1/me/sessions", () => ({ json: data.page([16, 8].map(days => ({
+        ...data.sessions[0], id: "inactive-" + days, label: "Device " + days, current: false, last_seen_at: fromNow(-days * 1440),
+      }))) })],
+      ["GET /v1/me/custodian-requests", () => ({ json: data.page([{ ...data.custodianRequests[0], created_at: fromNow(-4 * 1440) }]) })],
+    ],
+    prepare: async page => {
+      const needs = page.getByRole("region", { name: "Needs you" });
+      const row = needs.getByRole("listitem");
+      await expect(needs.getByText("3", { exact: true })).toBeVisible();
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText("Device 8");
+      await row.getByRole("button", { name: "Keep" }).click();
+      await expect(needs.getByText("2", { exact: true })).toBeVisible();
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText("Courier");
+      await expect(row.getByRole("link", { name: "Review" })).toBeVisible();
+    },
+  },
+  {
+    name: "account-personal-empty-contacts", path: "/personal", waitFor: card,
+    routes: [["GET /v1/me", () => ({ json: { ...data.carbon, emails: [], phones: [] } })]],
+    prepare: async page => {
+      await expect(page.locator('[data-edit="emails"]')).toContainText("Add an email");
+      await expect(page.locator('[data-edit="phones"]')).toBeVisible();
+      await page.locator('[data-edit="emails"]').click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    },
+  },
   // Home: needs you with a custodian request, then all clear with the introduction dismissed.
   { name: "account-home", path: "/", waitFor: "[data-home]" },
   { name: "account-font-lab", path: "/personal", waitFor: card, fullPage: false, prepare: async page => {
@@ -154,9 +191,9 @@ const shown: ScreenSpec[] = [
     await expect(fonts().last()).toBeDisabled();
     await lab.getByRole("region", { name: "Text" }).getByRole("slider", { name: "Line height" }).scrollIntoViewIfNeeded();
   } },
-  { name: "account-home-review", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => { await click(page, "Review"); await wait(page, 900); } },
-  { name: "account-home-new", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me/apps", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, phones: [], custodian_of: 0 } })]] },
-  { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
+  { name: "account-home-review", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => { await page.getByRole("link", { name: "Review" }).first().click(); await wait(page, 900); } },
+  { name: "account-home-new", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me/apps", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, phones: [], custodian_of: 0 } })]], prepare: async page => { await expect(page.getByText("One Account for Your Silicons & Apps", { exact: true })).toBeVisible(); await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toHaveCount(0); } },
+  { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
   // Identity: the card, its back, the photo menu, the editors and the id dialog with a taken id.
   { name: "account-identity", path: "/personal", waitFor: card },
   { name: "account-identity-name", path: "/personal?edit=name", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
@@ -233,21 +270,24 @@ const shown: ScreenSpec[] = [
     await page.locator('[data-phone-mode="international"]').waitFor();
     await wait(page, 600);
   } },
-  { name: "account-sign-in-methods-add", path: "/sign-in-methods", prepare: async page => {
-    await click(page, "Add an email");
+  { name: "account-sign-in-methods-add", path: "/sign-in-methods?edit=email", prepare: async page => {
+    await click(page, "Add an Email");
     await wait(page);
     await page.getByLabel("Email address").fill("night.shift@example.com");
-    await click(page, "Send code");
+    await click(page, "Send Code");
     await page.getByText("Enter the 6-digit code").waitFor();
     await wait(page, 900);
   } },
-  { name: "account-sign-in-methods-remove", path: "/sign-in-methods", prepare: async page => { await page.getByRole("button", { name: "Remove", exact: true }).nth(1).click(); await wait(page, 600); } },
+  { name: "account-sign-in-methods-remove", path: "/sign-in-methods?edit=email", prepare: async page => { await page.getByRole("button", { name: /^Remove / }).first().click(); await wait(page, 600); } },
 
   // Apps: with access, the remove question, the removed ones.
   { name: "account-apps", path: "/apps" },
   { name: "account-app-page", path: "/apps/briefcase" },
   { name: "account-apps-remove", path: "/apps/briefcase", prepare: async page => { await click(page, "Remove"); await wait(page, 600); } },
-  { name: "account-apps-removed", path: "/apps", prepare: async page => { await click(page, /^Access removed/); await wait(page, 900); } },
+  { name: "account-apps-removed", path: "/apps", prepare: async page => { await page.getByRole("heading", { name: "Access removed", exact: true }).scrollIntoViewIfNeeded(); await wait(page, 400); } },
+  // An Interface that signs you in to apps, and Remove asked first.
+  { name: "account-apps-interfaces", path: "/apps", routes: [interfaceSessions] },
+  { name: "account-apps-interface-remove", path: "/apps", routes: [interfaceSessions], prepare: async page => { await page.getByRole("region", { name: "Interfaces" }).getByRole("button", { name: "Remove" }).click(); await wait(page, 600); } },
 
   // Proofs: the active one with its ring, the revoke question, the ended ones.
   { name: "account-proofs", path: "/proofs", prepare: async page => {
@@ -276,7 +316,7 @@ const shown: ScreenSpec[] = [
   } },
   { name: "account-silicons-drawer", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); } },
   { name: "account-silicons-drawer-stk", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await drawerTo(page, "STK"); } },
-  { name: "account-silicons-drawer-webhook", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await drawerTo(page, "Webhook"); } },
+  { name: "account-silicon-access", path: "/silicons/Qz4", fullPage: false },
   { name: "account-silicons-drawer-transfer", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:head_of_growth"); await drawerTo(page, "Custodian"); } },
   { name: "account-silicons-drawer-delete", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:scout"); await drawerTo(page, "Delete this Silicon"); } },
   { name: "account-silicons-drawer-change-id", path: "/silicons", fullPage: false, prepare: async page => { await openSilicon(page, "si:head_of_growth"); await click(page, "Change its id"); await wait(page, 600); await page.keyboard.type("scout"); await wait(page, 1300); } },

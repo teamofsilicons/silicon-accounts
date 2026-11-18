@@ -100,10 +100,16 @@ async function readBody(response: Response): Promise<unknown> {
   return text;
 }
 
+// Bind account-page requests to the identity this tab rendered. A cookie can change in another tab.
+let renderedProfile: string | undefined;
+
 /** Performs one API call. Resolves with the parsed JSON body (or null for 204); rejects with ApiError. */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? (options.body !== undefined || options.raw !== undefined ? "POST" : "GET");
   const headers: Record<string, string> = { Accept: "application/json", ...Object.fromEntries(globalHeaders), ...options.headers };
+  if (renderedProfile && !options.auth && (path === "/v1/me" || path.startsWith("/v1/me/") || path.startsWith("/v1/session/"))) {
+    headers["X-Accounts-Profile"] = renderedProfile;
+  }
   let body: BodyInit | undefined;
   if (options.raw !== undefined) {
     body = options.raw;
@@ -124,7 +130,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   let response: Response;
   try {
-    response = dev?.fail ? devFailure() : await fetch(url, { method, headers, body, credentials: "include", signal: options.signal, cache: "no-store" });
+    // The NODE_ENV test (not just `dev`) lets production builds drop devFailure and its text.
+    response = process.env.NODE_ENV === "development" && dev?.fail ? devFailure() : await fetch(url, { method, headers, body, credentials: "include", signal: options.signal, cache: "no-store" });
   } catch (error) {
     throw networkError(error, method, path);
   }
@@ -132,8 +139,14 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (dev?.patch && response.ok) parsed = dev.patch(parsed);
   if (!response.ok) {
     const error = errorFromResponse(response, parsed, method, path);
+    if (error.code === "browser_account_changed" && typeof window !== "undefined") window.location.replace("/");
     if (error.status === 401 && !options.quiet401) config.onUnauthenticated?.(error);
     throw error;
+  }
+  if (typeof window !== "undefined" && path === "/v1/session" && !options.auth) {
+    const profile = (parsed as { account?: { uuid?: string } } | null)?.account?.uuid;
+    if (profile && renderedProfile && renderedProfile !== profile) window.location.replace("/");
+    else if (profile) renderedProfile = profile;
   }
   return parsed as T;
 }

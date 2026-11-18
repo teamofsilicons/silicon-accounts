@@ -24,7 +24,7 @@ export type AccountId = string;
 type Open<T extends string> = T | (string & {});
 
 export type AccountKind = "carbon" | "silicon";
-export type AccountStatus = "active" | "unclaimed" | "pending_custodian" | "deleted";
+export type AccountStatus = "active" | "unclaimed" | "pending_custodian" | "archived" | "deleted";
 export type AppStatus = "active" | "disabled";
 export type AppSource = "first_party" | "fake" | "silicon_apps";
 export type MembershipStatus = "active" | "access_removed" | "imported";
@@ -37,7 +37,7 @@ export type SigninMethod = "google" | "apple" | "email" | "phone";
 /** Account details an app can require or optionally ask for. */
 export type ContactField = "email" | "phone" | "dob" | "timezone";
 /** OAuth scopes. `profile` is always granted; `openid` adds an id_token; `offline_access` is accepted and ignored. */
-export type Scope = "profile" | "email" | "phone" | "dob" | "timezone" | "openid" | "offline_access";
+export type Scope = "profile" | "account_profile.write" | "email" | "phone" | "dob" | "timezone" | "openid" | "offline_access";
 export type OtpChannel = "email" | "phone";
 
 /** One page of a list endpoint. Pass `next_cursor` back as `cursor` for the next page; null on the last page. */
@@ -833,13 +833,6 @@ export interface WebhookTestQueued {
   type: "ping";
 }
 
-/** `POST /v1/me/webhook/test` (202), a Silicon's own webhook. */
-export interface SiliconWebhookTestQueued extends WebhookTestQueued {
-  url: string;
-  /** Older pings that were still waiting and were dropped for this one. */
-  superseded_pings: number;
-}
-
 /** The body Silicon Accounts POSTs to a webhook (headers carry X-Accounts-Signature: v1=<hex>). */
 export interface WebhookEvent {
   event_id: string;
@@ -886,6 +879,8 @@ export type FlowIntent = "signin" | "signup";
  */
 export interface FlowCreate {
   link_id?: string;
+  interface_id?: string;
+  interface_request?: string;
   app_id?: string;
   /** Alias of app_id. */
   client_id?: string;
@@ -1258,12 +1253,6 @@ export interface StkRotated {
   rotated_at: Timestamp;
   /** Sessions and token families that were signed out. */
   revoked_sessions: number;
-}
-
-export interface SiliconWebhook {
-  webhook_url: string;
-  /** `whsec_…`, shown once each time the URL is set. */
-  webhook_secret: string;
 }
 
 /** A custodian request as Carbons see it (incoming requests, and a new transfer). */

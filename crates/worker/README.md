@@ -21,7 +21,7 @@ run out and another node retries them: delivery is at-least-once, and webhook re
 ## Webhook delivery (`webhooks`)
 
 - Each attempt uses the target's **current** URL and **current** secret (app webhook in
-  `app_signin_configs`, or a Silicon's own webhook in `silicon-accounts`) and POSTs the stored
+  `app_signin_configs`, or a Cell link's in `cells_app_links`) and POSTs the stored
   `webhook_events.payload` as-is with `Content-Type: application/json`,
   `User-Agent: SiliconAccounts-Webhooks/1`, `X-Accounts-Event-Id`, `X-Accounts-Event-Type`,
   `X-Accounts-Delivery-Id`, `X-Accounts-Timestamp` (unix seconds) and
@@ -78,9 +78,9 @@ CARGO_TARGET_DIR=target/server cargo test -p silicon-accounts-worker   # needs s
 
 They run real deliveries against an axum receiver on 127.0.0.1: signatures, headers, retries on
 500 with time travel, the 72 h window, replay windows, rotated secrets and moved URLs, removed
-webhooks, disabled apps, Silicon webhooks, the SSRF guard (incl. NAT64/6to4/IPv4-compatible
-literals, a `localhost.` name that resolves to loopback and an unresolvable name, with no address
-in the stored text), parallel workers and lease takeover. The loops are run with slow receivers
+webhooks, disabled apps, Silicon events never reaching a legacy callback, the SSRF guard (incl.
+NAT64/6to4/IPv4-compatible literals, a `localhost.` name that resolves to loopback and an
+unresolvable name, with no address in the stored text), parallel workers and lease takeover. The loops are run with slow receivers
 and senders to check that a claim is held only while its row is being sent (never more claims
 than send slots, each send starting right after its claim), that two nodes never send a message
 twice, that work past the claim budget is abandoned and left to its claim, and that a graceful

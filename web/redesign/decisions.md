@@ -562,3 +562,18 @@ Create Account; "Not You?" kept. After deleting an account: /goodbye, "Your acco
   Under 900px the top bar shows the mark, the name and the menu button; Search and the account menu are in the sheet.
   Replaces the 2026-10-30 top bar (brand, search centred, account menu). Anil: "im using a full height content, and
   search and account in sidebar design for apps, can we try that in accounts as well?"
+## 2026-11-14: A deleted account is archived for 10 days, then deleted
+
+Saket: "make it so that it's archived, send them an mail, and after 10 days if they dont log back in it would
+automatically be deleted". DELETE /v1/me now archives the Carbon: signed out everywhere, its primary email told, its
+CarbonID, emails, Google or Apple links and app memberships kept, and no app told yet. Signing in with a code sent to
+one of its emails or phones within 10 days restores it; a Google or Apple sign-in is refused with a hint to use a code.
+After 10 days the API deletes it as before (apps get account.deleted, the CarbonID is released at the end of that recovery period, updated 2026-11-18). This
+replaces the 30 days of 2026-11-12 and answers its open questions. The delete page shows the recovery card with 10
+days (RECOVERY_DAYS) and /goodbye says how to come back. UNDERSTANDING.md doesn't say this yet.
+
+## 2026-11-18. Browser profiles and empty states
+
+The top-right profile menu and Your Accounts list independent sign-ins together with their linked work accounts. The menu shows each name above its handle in an equal-height row, with a check on the current profile. Selecting another opens Home in its session. Needs you shows the newest pending request or inactive device. Its badge counts every pending item. Completing the visible item brings up the next. An empty account keeps its introduction and can configure both contact types from Personal info. Hosted sign-in uses the same circular outline for an avatar and its completion ring.
+
+Each work row in Your Accounts leads with that work profile’s picture. Its organization name carries a small logo when one is available.

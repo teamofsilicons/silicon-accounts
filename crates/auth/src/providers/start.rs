@@ -52,7 +52,7 @@ pub async fn start_provider(
         &[Step::ChooseMethod, Step::VerifyCode],
         &format!("start {} sign-in", provider.display_name()),
     )?;
-    let fa = FlowApp::load(&mut tx, &state.settings, &flow.app_id).await?;
+    let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     fa.ensure_active()?;
     let url = begin_leg(&mut tx, &state, &mut flow, &fa, provider).await?;
     model::save(&mut tx, &flow).await?;

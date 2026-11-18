@@ -1,3 +1,4 @@
+/// <reference types="@webgpu/types" />
 // Surface for HTML-in-canvas additions that aren't in the standard lib yet.
 // See: https://github.com/WICG/html-in-canvas
 

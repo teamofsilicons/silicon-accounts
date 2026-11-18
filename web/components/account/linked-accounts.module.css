@@ -3,8 +3,12 @@
 .lead { margin: var(--space-section) 0 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
 .alert { margin-top: var(--space-section); }
 .skeleton { margin-top: var(--space-section); }
-/* An org's logo leads its work accounts, at the rows' 28px, with the marks' faint edge. */
-.logo { --sq-r: var(--radius-control); --sq-stroke: var(--border-subtle); flex: none; border: 1px solid var(--sq-stroke); object-fit: cover; }
+.accountDetail { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-tight); white-space: normal; overflow-wrap: anywhere; }
+.organization, .relationship { display: inline-flex; min-width: 0; max-width: 100%; align-items: center; gap: var(--space-tight); }
+@media (max-width: 639px) {
+  .accountDetail { flex-direction: column; align-items: flex-start; }
+  .separator { display: none; }
+}
 /* Create your personal account: the form inside the section's box, at the rows' inset. */
 .formRow { padding: var(--space-group); }
 .form { display: grid; max-width: 28rem; gap: var(--space-group); }

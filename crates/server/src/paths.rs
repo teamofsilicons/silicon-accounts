@@ -42,12 +42,31 @@ pub fn is_health_path(path: &str) -> bool {
 pub const DISCOVERY_PATHS: [&str; 3] = ["/openapi.json", "/v1/openapi.json", "/v1/capabilities"];
 
 /// Resources any origin may read (`Access-Control-Allow-Origin: *`): an app's public sign-in
-/// config, the SDK and discovery documents. Everything else sends no CORS headers.
+/// config, Interface public-client token operations, the SDK and discovery documents.
+/// Cookie-bound flows and verified backend credentials never receive CORS headers.
 pub fn is_public_cors_path(path: &str) -> bool {
-    path.starts_with("/sdk/")
+    is_interface_public_token_path(path)
+        || interface_profile_methods(path).is_some()
+        || path.starts_with("/sdk/")
         || path.starts_with("/.well-known/")
         || DISCOVERY_PATHS.contains(&path)
         || is_app_public_config(path)
+}
+
+/// Cross-origin profile operations authenticate only with a delegated app bearer.
+pub fn interface_profile_methods(path: &str) -> Option<&'static str> {
+    match path {
+        "/v1/interface-accounts/me" => Some("GET, HEAD, PATCH, OPTIONS"),
+        "/v1/interface-accounts/me/id" | "/v1/interface-accounts/me/photo" => Some("POST, OPTIONS"),
+        _ => None,
+    }
+}
+
+pub fn is_interface_public_token_path(path: &str) -> bool {
+    matches!(
+        path,
+        "/v1/interface-auth/token" | "/v1/interface-auth/revoke" | "/v1/interface-auth/introspect"
+    )
 }
 
 /// `/v1/apps/{app_id}/public`.
@@ -150,7 +169,7 @@ impl RouteClass {
             return RouteClass::Default;
         }
         match path {
-            "/v1/me/photo" => RouteClass::PhotoUpload,
+            "/v1/me/photo" | "/v1/interface-accounts/me/photo" => RouteClass::PhotoUpload,
             _ if is_scoped_photo_upload(path) => RouteClass::PhotoUpload,
             "/v1/internal/apps/sync" => RouteClass::InternalSync,
             _ if app_route(path).is_some_and(|(_, tail)| tail == "imports") => RouteClass::Import,
@@ -249,6 +268,11 @@ mod tests {
         assert!(is_public_cors_path("/openapi.json"));
         assert!(is_public_cors_path("/v1/openapi.json"));
         assert!(is_public_cors_path("/v1/capabilities"));
+        assert!(is_public_cors_path("/v1/interface-auth/token"));
+        assert!(is_public_cors_path("/v1/interface-auth/revoke"));
+        assert!(is_public_cors_path("/v1/interface-auth/introspect"));
+        assert!(!is_public_cors_path("/v1/verified-interface-auth/start"));
+        assert!(!is_public_cors_path("/v1/interface-auth/flows"));
         assert!(!is_public_cors_path("/v1/events/stream"));
         assert!(!is_public_cors_path("/v1/apps/briefcase"));
         assert!(!is_public_cors_path("/v1/apps//public"));

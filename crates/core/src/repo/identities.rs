@@ -61,16 +61,6 @@ pub async fn link(
     })
 }
 
-/// Records a sign-in with an identity.
-pub async fn touch(conn: &mut PgConnection, provider: Provider, subject: &str) -> ApiResult<()> {
-    sqlx::query("update identities set last_used_at = now() where provider = $1 and subject = $2")
-        .bind(provider)
-        .bind(subject)
-        .execute(&mut *conn)
-        .await?;
-    Ok(())
-}
-
 /// Identities of an account, oldest first.
 pub async fn list_for_account(
     conn: &mut PgConnection,

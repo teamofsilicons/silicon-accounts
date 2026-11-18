@@ -669,6 +669,16 @@ fn silicons_sign_in_with_a_key() {
         .assert()
         .code(2)
         .stderr(predicate::str::contains("already exists"));
+    // A private key passed as --public-key never leaves the machine.
+    let posted = mock.count("POST", "/v1/silicons/si:scout/keys");
+    custodian
+        .cmd()
+        .args(["silicon", "keys", "add", "si:scout", "--public-key"])
+        .arg(&key_file)
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("private key"));
+    assert_eq!(mock.count("POST", "/v1/silicons/si:scout/keys"), posted);
     custodian
         .cmd()
         .args(["silicon", "keys", "list", "si:scout"])
@@ -723,4 +733,37 @@ fn silicons_sign_in_with_a_key() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Revoked the key key-1"));
+}
+
+/// Switching to a linked account ends the session it replaces, as a sign-in does.
+#[test]
+fn switching_to_a_linked_account_revokes_the_previous_session() {
+    let mock = Mock::start();
+    let env = Env::new();
+    carbon_login(&env, &mock);
+    let output = env
+        .cmd()
+        .args(["linked-accounts", "switch", "si:scout", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", stderr(&output));
+    let revoked = mock.requests("POST", "/v1/oauth/revoke");
+    assert!(
+        revoked.iter().any(|(_, body)| body.contains("sar_carbon")),
+        "{revoked:?}"
+    );
+}
+
+/// An empty token on stdin is refused before anything is sent.
+#[test]
+fn linking_with_an_empty_token_sends_nothing() {
+    let mock = Mock::start();
+    let env = Env::new();
+    carbon_login(&env, &mock);
+    env.cmd()
+        .args(["linked-accounts", "link", "--target-token-stdin"])
+        .write_stdin("\n")
+        .assert()
+        .code(2);
+    assert_eq!(mock.count("POST", "/v1/me/linked-accounts/link"), 0);
 }

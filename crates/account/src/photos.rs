@@ -43,7 +43,7 @@ const PHOTO_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 
 /// `POST /v1/me/photo` — the body is the raw image (Content-Type image/png, image/jpeg,
 /// image/webp or image/gif; at most 2 MB). The bytes must really be that format; dimensions
-/// are capped (see [`image`]). Sets the account's `pfp_url` to
+/// are capped (see [`accounts_core::image`]). Sets the account's `pfp_url` to
 /// `{PUBLIC_URL}/v1/photos/{photo_id}` and notifies apps (`account.updated`, field pfp_url).
 /// 201 `{"pfp_url","photo":{…},"me":Me}`. Accepts `Idempotency-Key`.
 pub(crate) async fn upload(
@@ -55,7 +55,6 @@ pub(crate) async fn upload(
     body: Body,
 ) -> Result<Response, ApiError> {
     let upload = photo_upload::read(&headers, body, "/v1/me/photo").await?;
-    let info = upload.info;
     let fingerprint = upload.fingerprint();
     let scope = idem_scope(me.uuid(), "POST", "/v1/me/photo");
     idempotency::run(
@@ -67,40 +66,15 @@ pub(crate) async fn upload(
         || async {
             photo_upload::count_account_upload(&state.db, me.uuid()).await?;
             let mut tx = state.db.begin().await?;
-            // One upload at a time per account, so pruning never races another upload.
-            accounts::lock(&mut tx, me.uuid()).await?;
-            let photo_id = photos::insert_for_account(&mut tx, me.uuid(), &upload).await?;
-            let pfp_url = pfp::photo_url(&state.settings, photo_id);
-            let (account, changed) = accounts::update_profile(
-                &mut tx,
-                me.uuid(),
-                &ProfileUpdate {
-                    pfp_url: Some(pfp_url.clone()),
-                    ..Default::default()
-                },
-            )
-            .await?;
-            events::notify_profile_updated(&mut tx, &account, &changed).await?;
-            photos::prune(&mut tx, &state.settings, me.uuid()).await?;
-            audit_self(
-                &mut tx,
-                me.uuid(),
-                "account.photo.uploaded",
-                None,
-                json!({
-                    "photo_id": photo_id.to_string(), "content_type": info.kind.mime(),
-                    "bytes": upload.bytes.len(), "width": info.width, "height": info.height,
-                }),
-                meta.ip.as_deref(),
-            )
-            .await?;
+            let (account, photo_id) =
+                apply_upload(&mut tx, &state, me.uuid(), &upload, &meta).await?;
             tx.commit().await?;
             let mut conn = state.db.acquire().await?;
             let me_view = views::load_me(&mut conn, &account).await?;
             Ok((
                 StatusCode::CREATED,
                 json!({
-                    "pfp_url": pfp_url,
+                    "pfp_url": account.pfp_url,
                     "photo": upload.view(photo_id),
                     "me": serde_json::to_value(me_view)?,
                 }),
@@ -112,6 +86,55 @@ pub(crate) async fn upload(
 
 /// `DELETE /v1/me/photo` — back to the default Iris photo; uploaded photos are deleted.
 /// Returns Me.
+pub(super) async fn apply_upload(
+    conn: &mut sqlx::PgConnection,
+    state: &AppState,
+    uuid: &str,
+    upload: &photo_upload::UploadedPhoto,
+    meta: &ClientMeta,
+) -> ApiResult<(accounts_core::models::Account, Uuid)> {
+    let info = upload.info;
+    // One upload at a time per account, so pruning never races another upload.
+    if accounts::lock(conn, uuid).await?.is_none_or(|a| {
+        matches!(
+            a.status,
+            accounts_core::models::AccountStatus::Archived
+                | accounts_core::models::AccountStatus::Deleted
+        )
+    }) {
+        return Err(ApiError::forbidden(
+            "account_not_active",
+            "This account cannot upload a photo.",
+        ));
+    }
+    let photo_id = photos::insert_for_account(conn, uuid, upload).await?;
+    let pfp_url = pfp::photo_url(&state.settings, photo_id);
+    let (account, changed) = accounts::update_profile(
+        conn,
+        uuid,
+        &ProfileUpdate {
+            pfp_url: Some(pfp_url.clone()),
+            ..Default::default()
+        },
+    )
+    .await?;
+    events::notify_profile_updated(conn, &account, &changed).await?;
+    photos::prune(conn, &state.settings, uuid).await?;
+    audit_self(
+        conn,
+        uuid,
+        "account.photo.uploaded",
+        None,
+        json!({
+            "photo_id": photo_id.to_string(), "content_type": info.kind.mime(),
+            "bytes": upload.bytes.len(), "width": info.width, "height": info.height,
+        }),
+        meta.ip.as_deref(),
+    )
+    .await?;
+    Ok((account, photo_id))
+}
+
 pub(crate) async fn remove(
     State(state): State<AppState>,
     me: AccountAuth,

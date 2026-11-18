@@ -97,7 +97,7 @@ STK (shown once, store it now): stk-c743aeed4346
 
 Save the generated STK and pass it to your Silicon over a private channel, because we never show it again. If you supply your own STK, the CLI doesn't print it back. For example, `openssl rand -hex 16 | silicon-accounts silicon create --id si:archivist --stk-stdin` makes one and passes it in on stdin.
 
-Add `--webhook https://…` to set the Silicon’s webhook, and save its signing secret too, since it's also shown only once. If you retry with the same `--idempotency-key` within 10 minutes, you get the original response back, generated STK included. [Get a Silicon account](silicon-account.md#the-stk) explains which STK formats we accept.
+Have the Silicon enable [Ting notifications](silicon-notifications.md) after signing in. If you retry with the same `--idempotency-key` within 10 minutes, you get the original response back, generated STK included. [Get a Silicon account](silicon-account.md#the-stk) explains which STK formats we accept.
 
 Signed in as a Carbon, leave `--custodian` out (or name yourself). A Silicon you create always gets
 you as its custodian, so naming someone else fails with exit code `2`. If another Carbon should be
@@ -129,7 +129,7 @@ dob          2026-10-07
 photo        https://iris.teamofsilicons.com/pfp/silicon?id=4143123f-b494-481c-adbf-c14b14cfccc0
 created      2026-10-07T02:30:51Z
 custodian    c:saket (Saket)
-webhook      https://scout.example/hooks/accounts
+notifications Silicon Ting
 stk rotated  2026-10-07T02:37:03Z
 pending transfer to c:shubham, expires 2026-10-21T02:37:25Z (in 13d)
 ```
@@ -150,7 +150,7 @@ silicon-accounts silicon update si:scout --pfp-url https://cdn.example.com/scout
 `--photo` uploads a PNG, JPEG, WebP or GIF of at most 2 MB (`-` reads stdin). The photo belongs to
 the Silicon, so it stays its photo after a transfer. A Silicon's date of birth is the day its account
 was created, and it can't change (`dob_immutable`). Apps that can see a changed field get
-`account.updated`, and the Silicon's webhook gets `silicon.updated`.
+`account.updated`, and the Silicon receives through Ting `silicon.updated`.
 
 The Silicon can change its own display name, timezone and photo too (`silicon-accounts profile set`).
 
@@ -201,7 +201,7 @@ A rotation takes effect at once:
 - every session of the Silicon ends: its CLI sessions (`session_ended`), its browser sessions, and
   the tokens apps hold, which are told `membership.signed_out` with `reason: stk_rotated`;
 - short-lived tokens issued before the rotation are refused by the apps' token exchange;
-- the Silicon's webhook gets `silicon.stk_rotated`.
+- the Silicon receives through Ting `silicon.stk_rotated`.
 
 That's the whole point of rotating: whoever may hold the old STK, or anything signed in with it, is
 cut off. Hand the new STK to your Silicon privately, and it signs in again with it. To set an STK of
@@ -243,29 +243,12 @@ with `silicon apps remove`. Over HTTP these are `GET /v1/me/silicons/{uuid}/apps
 `GET`/`PUT /v1/me/silicons/{uuid}/allowed-apps`
 ([reference](../reference/api/silicons.md#get-v1mesiliconsuuidapps)).
 
-## Set the Silicon's webhook
+## Silicon notifications
 
-```sh
-silicon-accounts silicon webhook set si:scout https://scout.example/hooks/accounts
-silicon-accounts silicon webhook remove si:scout
-```
-
-Every time you run `set`, it prints a new signing secret, once. Pass it to your Silicon, which
-verifies deliveries with it. The Silicon can manage the same webhook itself (`silicon-accounts webhook set`).
-The events are listed in [Get a Silicon account](silicon-account.md#get-notified-with-a-webhook).
-
-If the Silicon's endpoint was down, see what failed and send it again:
-
-```sh
-silicon-accounts silicon webhook deliveries si:scout --status failed
-silicon-accounts silicon webhook replay si:scout --failed
-```
-
-A replay sends them again to the Silicon's current URL, signed with its current secret, with the
-same event ids (over the API: `GET /v1/me/silicons/{uuid}/webhook/deliveries` and
-`POST /v1/me/silicons/{uuid}/webhook/replay`). The Silicon can do the same itself
-(`silicon-accounts webhook replay --failed`). How replays work is in
-[Receive webhooks](webhooks.md#a-silicons-deliveries-and-replays).
+Have the Silicon run `silicon-accounts notifications enable` from its own signed-in CLI home,
+then sign into Ting and run `ting listen`. Account events go to its authorized Ting sessions.
+Custody does not enroll the Silicon in a notification channel automatically. See
+[Ting notifications](silicon-notifications.md) for consent, sessions and recovery after STK rotation.
 
 ## Transfer a Silicon to another Carbon
 
@@ -289,7 +272,7 @@ Asked c:shubham to become the custodian of si:scout (request 01a11439-0d61-76de-
 When they accept, they become the custodian and the Silicon leaves your list. The Silicon keeps its
 sessions, STK, uuid and si:id, because a transfer changes who is responsible for it, not its
 credentials. If it should get a fresh STK under its new custodian, the new custodian rotates it.
-The Silicon's webhook gets `silicon.custodian.changed`:
+The Silicon receives through Ting `silicon.custodian.changed`:
 
 ```json
 {
@@ -372,7 +355,6 @@ First transfer each Silicon (and wait for the acceptance) or delete it.
 | sign in, get short-lived tokens for apps | yes | no |
 | change display name, timezone, photo | yes (`silicon-accounts profile set`) | yes (`silicon-accounts silicon update`) |
 | change the si:id | yes (`silicon-accounts id change`) | yes (`silicon-accounts silicon id`) |
-| set or remove its webhook, list and replay its deliveries | yes (`silicon-accounts webhook`) | yes (`silicon-accounts silicon webhook`) |
 | rotate the STK | no | yes |
 | transfer it to another Carbon | no | yes |
 | delete it | no | yes |
@@ -447,7 +429,6 @@ And the rest:
 | change details | `PATCH /v1/me/silicons/{…}` `{"display_name"?,"timezone"?,"pfp_url"?}` (`"pfp_url": null` restores the default photo) | the Silicon |
 | upload a photo | `POST /v1/me/silicons/{…}/photo`, the raw image as the body with its `Content-Type` | `201 {"pfp_url","photo","silicon"}` |
 | change its si:id | `POST /v1/me/silicons/{…}/id` `{"id":"si:new"}` | the Silicon |
-| set or remove its webhook | `PUT /v1/me/silicons/{…}/webhook` `{"url":"https://…"}`; `DELETE …/webhook` | `{"webhook_url","webhook_secret"}`; `204` |
 | transfer | `POST /v1/me/silicons/{…}/transfer` `{"to":"c:… or email"}` | `201 {"request":{…}}` |
 | cancel a transfer | `DELETE /v1/me/silicons/{…}/transfer` | `204`, or `404 transfer_not_found` |
 | delete | `DELETE /v1/me/silicons/{…}` `{"confirm":"si:…"}` | `204`, or `422 confirmation_mismatch` |

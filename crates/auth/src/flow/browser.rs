@@ -1,12 +1,13 @@
 //! The browser's own Silicon Accounts session (`sa_session`) as the flow sees it.
 
 use accounts_core::http::ClientMeta;
-use accounts_core::http::cookies::{SESSION_COOKIE, read_cookie, session_cookie};
+use accounts_core::http::browser_profiles::BrowserProfiles;
+pub use accounts_core::http::browser_profiles::Selection as SignedIn;
+use accounts_core::http::cookies::{SESSION_COOKIE, read_cookie};
 use accounts_core::models::{Account, AccountKind, AccountStatus};
 use accounts_core::repo::{accounts, sessions};
 use accounts_core::{ApiError, ApiResult, AppState};
 use axum::http::HeaderMap;
-use cookie::Cookie;
 use sqlx::PgConnection;
 use uuid::Uuid;
 
@@ -46,19 +47,7 @@ pub async fn current(
         }))
 }
 
-/// Result of [`sign_in`].
-#[derive(Debug)]
-pub struct SignedIn {
-    pub session_id: Uuid,
-    /// The new `sa_session` cookie (none when the browser already had a session for the account).
-    pub cookie: Option<Cookie<'static>>,
-}
-
-/// Signs the browser in as `account_uuid`, which just proved who it is (a code, Google, Apple, a
-/// finished sign-up): keeps its session when it already belongs to that account (and records the
-/// new authentication on it, `authenticated_at`, the `auth_time` of the codes it completes);
-/// otherwise revokes it (its cookie is about to be replaced, so nobody should hold a live copy of
-/// it) and creates a new one.
+/// Record an independent proof, preserving the browser’s other signed-in accounts.
 pub async fn sign_in(
     conn: &mut PgConnection,
     state: &AppState,
@@ -78,37 +67,17 @@ pub async fn sign_in(
         .await?;
         return Ok(SignedIn {
             session_id: session.id,
-            cookie: None,
+            cookies: Vec::new(),
         });
     }
-    if let Some(token) = read_cookie(headers, &state.settings, SESSION_COOKIE)
-        && let Some(existing) = sessions::lookup(conn, &state.keys.pepper, &token).await?
-    {
-        if existing.account_uuid == account_uuid {
-            sessions::mark_authenticated(conn, existing.id).await?;
-            return Ok(SignedIn {
-                session_id: existing.id,
-                cookie: None,
-            });
-        }
-        sessions::revoke(conn, &existing.account_uuid, existing.id).await?;
-    }
-    let (token, session) = sessions::create(
-        conn,
-        &state.keys.pepper,
-        account_uuid,
-        meta.ip.as_deref(),
-        meta.user_agent.as_deref(),
-    )
-    .await?;
-    Ok(SignedIn {
-        session_id: session.id,
-        cookie: Some(session_cookie(&state.settings, &token)),
-    })
+    BrowserProfiles::load(conn, state, headers)
+        .await?
+        .select(conn, state, meta, account_uuid, true)
+        .await
 }
 
 /// The flow's account, which must still be the browser's signed-in account (steps that act
-/// for the account: requirements and consent).
+/// for the account: details and review).
 ///
 /// Errors: 401 `session_required` (the browser signed out or the session expired), 409
 /// `account_changed` (the browser is now signed in as someone else), 403 `account_not_active`.
@@ -170,4 +139,20 @@ pub fn not_active(account: &Account) -> ApiError {
         ),
     )
     .hint("Sign in with another account.")
+}
+
+/// Build chooser rows from still-live proof, even when a remembered flow is reopened.
+pub async fn choices(
+    conn: &mut PgConnection,
+    anchor: &str,
+    flow: &Flow,
+    app: &str,
+) -> ApiResult<Vec<serde_json::Value>> {
+    let ids: Vec<String> = if flow.extras.saved_sessions.is_empty() {
+        Vec::new()
+    } else {
+        sqlx::query_scalar("select s.account_uuid from browser_sessions s join accounts a on a.uuid=s.account_uuid where s.id=any($1) and s.revoked_at is null and s.expires_at>now() and a.status='active' order by s.last_seen_at desc, s.id")
+            .bind(&flow.extras.saved_sessions).fetch_all(&mut *conn).await?
+    };
+    accounts_core::http::browser_profiles::choices(conn, anchor, &ids, Some(app)).await
 }

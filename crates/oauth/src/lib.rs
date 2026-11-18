@@ -99,8 +99,9 @@ pub fn router() -> Router<AppState> {
         .route("/v1/device/authorize", post(device::authorize))
 }
 
-/// Background tasks of this crate: a sweep that deletes authorization codes, short-lived tokens
-/// and device authorizations that expired more than [`GRANT_RETENTION_DAYS`] days ago.
+/// Background tasks of this crate: a sweep that deletes authorization codes, short-lived tokens,
+/// device authorizations and exchange receipts that expired more than [`GRANT_RETENTION_DAYS`]
+/// days ago.
 #[must_use]
 pub fn spawn_background(state: AppState) -> Vec<JoinHandle<()>> {
     vec![tokio::spawn(sweep::run(state))]

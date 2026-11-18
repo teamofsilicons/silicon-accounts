@@ -11,7 +11,7 @@ import { formatPhone, formatRelative } from "@/lib/format";
 import { sessionName } from "../security/sessions";
 
 /** A device not used for this long is "not used lately" (Anil, 2026-10-30). */
-const STALE_MS = 7 * 86_400_000;
+export const STALE_MS = 7 * 86_400_000;
 
 /** Sessions the Carbon chose to keep although they are not used lately, remembered in this browser. */
 const KEPT_KEY = "accounts.home.kept-sessions";
@@ -51,9 +51,9 @@ export interface Step {
 }
 
 /** A device signed in here but not used lately (7 days), unless the Carbon chose to keep it; undefined while loading. */
-export function staleSession(sessions: SessionInfo[] | undefined, now: number, kept: string): SessionInfo | undefined {
+export function staleSessions(sessions: SessionInfo[] | undefined, now: number, kept: string): SessionInfo[] {
   const keptIds = new Set(kept.split(",").filter(Boolean));
-  return (sessions ?? []).find(item => !item.current && !keptIds.has(item.id) && !!item.last_seen_at && now - Date.parse(item.last_seen_at) > STALE_MS);
+  return (sessions ?? []).filter(item => !item.current && !keptIds.has(item.id) && now - Date.parse(item.last_seen_at ?? item.created_at) > STALE_MS);
 }
 
 /** The prototype's checkup (Security), in its order: a second way in, a verified email, a recovery phone, devices. */
@@ -62,7 +62,7 @@ export function checkupSteps(carbon: CarbonMe, sessions: SessionInfo[] | undefin
   const email = carbon.emails.find(item => item.verified_at && item.is_primary) ?? carbon.emails.find(item => item.verified_at);
   const phone = carbon.phones.find(item => item.is_primary) ?? carbon.phones[0];
   // Until the sessions load, devices count as fine rather than flash a question.
-  const stale = staleSession(sessions, now, kept);
+  const [stale] = staleSessions(sessions, now, kept);
   return [
     { key: "provider", done: providers.length > 0, title: "Sign in with Google or Apple", detail: providers.length ? `${providers.join(" and ")} signs you in` : "A second way in that isn't a code" },
     { key: "email", done: !!email, title: "Verified email", detail: email?.email ?? "Add an email" },

@@ -6,7 +6,6 @@ import { DynamoDBClient, GetItemCommand, PutItemCommand } from "@aws-sdk/client-
 import { awsCredentialsProvider } from "@vercel/oidc-aws-credentials-provider";
 import { seal, unseal } from "./seal";
 import { DEVELOPER_APP_ID } from "./config";
-const serverEnv = () => ({ appId: DEVELOPER_APP_ID });
 
 export interface Entry<T> { version: number; value: T }
 export interface RefreshStore {
@@ -20,7 +19,7 @@ function decode<T>(key: string, payload: string): T {
   if (value === null) throw new Error("Session state could not be opened.");
   return value;
 }
-export const stateKey = (kind: string, id: string) => `${serverEnv().appId}#${kind}#${id}`;
+export const stateKey = (kind: string, id: string) => `${DEVELOPER_APP_ID}#${kind}#${id}`;
 export const legacyKey = (token: string) => stateKey("legacy", createHash("sha256").update(token).digest("hex"));
 
 export function dynamoStore(table: string, region: string): RefreshStore {

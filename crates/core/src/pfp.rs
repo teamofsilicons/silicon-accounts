@@ -88,7 +88,7 @@ pub fn photo_ref(settings: &Settings, url: &str) -> PhotoRef {
 }
 
 /// Shortens echoed input so messages stay readable.
-fn clip(s: &str, max: usize) -> String {
+pub(crate) fn clip(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
         s.to_string()
     } else {

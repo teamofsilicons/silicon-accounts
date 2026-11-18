@@ -46,6 +46,7 @@ pub mod repo;
 pub mod silicon_keys;
 pub mod state;
 pub mod timefmt;
+pub mod ting;
 pub mod uuid_migration;
 pub mod views;
 
@@ -77,6 +78,9 @@ pub fn canonical_first_party_app_id(app_id: &str) -> &str {
 /// signed-in Carbon's identity and manage the apps they own (see `http::auth`).
 pub const DEVELOPER_APP_ID: &str = "developer";
 
+/// Scoped resource for an interface managing an account profile.
+pub const PROFILE_APP_ID: &str = "silicon-account-management";
+
 /// Canonical app identity for the Silicon Apps catalog and CLI.
 pub const SILICON_APPS_APP_ID: &str = "silicon-apps";
 
@@ -84,6 +88,13 @@ pub const SILICON_APPS_APP_ID: &str = "silicon-apps";
 /// membership, and their sign-ins are never reported to app webhooks.
 pub fn is_first_party_app_id(app_id: &str) -> bool {
     app_id == FIRST_PARTY_APP_ID || app_id == DEVELOPER_APP_ID
+}
+
+/// True for the apps whose tokens manage accounts or apps: the first-party apps (and the former
+/// `accounts` id) and Silicon Apps, whose `aud = silicon-apps` tokens act as the owner on
+/// `/v1/apps/*` (see `http::auth`). An Interface may never be granted one of these.
+pub fn is_privileged_app_id(app_id: &str) -> bool {
+    is_first_party_app_id(app_id) || app_id == SILICON_APPS_APP_ID || app_id == "accounts"
 }
 
 /// Product name used in copy, emails and the `Powered by` line.

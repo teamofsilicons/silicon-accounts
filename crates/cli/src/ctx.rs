@@ -267,7 +267,9 @@ impl Ctx {
         // A code sign-in started with --url continues at that URL.
         let pending: Option<StoredChallenge> =
             home::read_json(&self.home()?.file("login-challenge.json"))?;
-        if let Some(pending) = pending {
+        if let Some(pending) =
+            pending.filter(|p| p.expires_at.is_none_or(|t| t > OffsetDateTime::now_utc()))
+        {
             return Ok((normalize_url(&pending.url), UrlSource::PendingLogin));
         }
         Ok((DEFAULT_BASE_URL.to_owned(), UrlSource::Default))
@@ -584,6 +586,7 @@ impl Ctx {
             ));
         };
         let secret = if let Some(secret) = app_secret {
+            self.out.warn("Passing a secret as an argument exposes it to other processes and your shell history; prefer --app-secret-stdin or ACCOUNTS_APP_SECRET.");
             Some((secret.trim().to_owned(), "--app-secret"))
         } else if secret_stdin {
             Some((
@@ -593,7 +596,9 @@ impl Ctx {
         } else if let Some(secret) = env("ACCOUNTS_APP_SECRET") {
             Some((secret, "ACCOUNTS_APP_SECRET"))
         } else {
+            let (url, _) = self.url()?;
             self.load_app(&app_id)?
+                .filter(|s| s.url.as_deref().is_none_or(|u| normalize_url(u) == url))
                 .and_then(|stored| stored.app_secret)
                 .map(|secret| (secret, "stored by silicon-accounts app use"))
         };

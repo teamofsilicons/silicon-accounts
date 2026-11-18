@@ -17,4 +17,3 @@ mod self_create;
 mod slt;
 mod sweep;
 mod transfer;
-mod webhook_deliveries;

@@ -28,6 +28,7 @@ import { ListCap } from "../parts/list-cap";
 import { PageBar } from "../parts/page-bar";
 import { useEveryApp, useEveryProof } from "../parts/queries";
 import { LinkItem, LinkRow, Row, Section, Strong, Tile } from "../parts/rows";
+import { InterfaceAccess } from "./interface-access";
 import styles from "./apps.module.css";
 
 /** An app's page. */
@@ -87,6 +88,7 @@ export function Apps() {
                 <Row lead={<Tile><ShieldCheck size={16} strokeWidth={2} /></Tile>} title="It shows up here" detail="Change what it sees, or remove it, at any time" />
               </Section>
             )}
+            <InterfaceAccess />
             {allProofs.length ? (
               <LinkRow
                 href={paths.proofs}

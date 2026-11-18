@@ -66,6 +66,19 @@ struct Capability {
 /// Everything this deployment supports, by name.
 const CAPABILITIES: &[Capability] = &[
     Capability {
+        name: "interface_account_management",
+        description: "Register a Carbon by verifying an email or phone, or read and edit the consenting user’s profile with an interface app token.",
+        endpoints: &[
+            "POST /v1/interface-accounts/{interface_id}/registrations",
+            "POST /v1/interface-accounts/{interface_id}/registrations/{id}/complete",
+            "GET /v1/interface-accounts/me",
+            "PATCH /v1/interface-accounts/me",
+            "POST /v1/interface-accounts/me/id",
+            "POST /v1/interface-accounts/me/photo",
+        ],
+        docs: "start/interface-accounts",
+    },
+    Capability {
         name: "rest_json",
         description: "A REST API over HTTPS: JSON bodies in and out, RFC 3339 timestamps.",
         endpoints: &["/v1/*"],
@@ -196,9 +209,18 @@ const CAPABILITIES: &[Capability] = &[
     },
     Capability {
         name: "webhooks",
-        description: "Signed webhooks to apps (changes to their users) and to Silicons (their own account), retried for 72 hours.",
-        endpoints: &["PUT /v1/apps/{app_id}/webhook", "PUT /v1/me/webhook"],
+        description: "Signed webhooks to apps about changes to their users, retried for 72 hours.",
+        endpoints: &["PUT /v1/apps/{app_id}/webhook"],
         docs: "learn/webhooks",
+    },
+    Capability {
+        name: "silicon_tings",
+        description: "Silicon account notifications through Ting, with explicit enrollment and request-token-bound anonymous receiver sessions.",
+        endpoints: &[
+            "POST /v1/me/notifications/ting",
+            "PUT /v1/silicons/requests/{id}/ting-session",
+        ],
+        docs: "start/silicon-notifications",
     },
     Capability {
         name: "webhook_signatures",
@@ -217,7 +239,7 @@ const CAPABILITIES: &[Capability] = &[
     },
     Capability {
         name: "sse",
-        description: "Event streaming with Server-Sent Events: the same events and bodies as webhooks, live, with heartbeats.",
+        description: "App event streaming with Server-Sent Events: the same events and bodies as webhooks, live, with heartbeats.",
         endpoints: &["GET /v1/events/stream"],
         docs: "learn/webhooks#streaming-events",
     },
@@ -363,7 +385,7 @@ pub async fn capabilities(
             {"name": "bearer_access_token", "description": "Authorization: Bearer <access token> issued to silicon-accounts (30 minutes). A Silicon gets one from POST /v1/silicons/login with its si:id and STK; a Carbon from the CLI code sign-in or the device flow.", "header": "Authorization"},
             {"name": "app_client_credentials", "description": "Authorization: Basic base64(app_id:app_secret), for apps.", "header": "Authorization"},
             {"name": "stk", "description": "A Silicon's STK, exchanged once for a bearer token at POST /v1/silicons/login; never sent on other requests."},
-            {"name": "request_token", "description": "Authorization: Bearer sarq_..., the token a self-created Silicon got from POST /v1/silicons, for its request status and its event stream while it waits for its custodian.", "header": "Authorization"},
+            {"name": "request_token", "description": "Authorization: Bearer sarq_..., the token a self-created Silicon got from POST /v1/silicons, for its request status while it waits for its custodian.", "header": "Authorization"},
             {"name": "oauth2_authorization_code", "description": "Hosted sign-in for apps: authorization code with PKCE S256 at /authorize and POST /v1/oauth/token."},
             {"name": "federated_token", "description": "A Silicon trusted for an outside OIDC issuer (a CI job's token from GitHub Actions or GitLab) exchanges that token at POST /v1/oauth/token (grant_type urn:ietf:params:oauth:grant-type:token-exchange) for the Silicon's tokens; the sign-in ends when the outside token expires (at least 30 minutes, at most 12 hours). No stored secret."},
             {"name": "session_cookie", "description": "The account site's session cookie (browsers only)."}
@@ -515,9 +537,9 @@ pub async fn agent_card(State(state): State<AppState>) -> Response {
             {
                 "id": "subscribe-account-events",
                 "name": "Subscribe to account events",
-                "description": "Pick which account updates to receive and where: a signed webhook or the Server-Sent Events stream (POST /v1/apps/{app_id}/subscriptions, GET /v1/events/stream). A Silicon streams its own events, like its custodian's decision.",
+                "description": "Pick which account updates to receive and where: a signed webhook or the Server-Sent Events stream (POST /v1/apps/{app_id}/subscriptions, GET /v1/events/stream). A Silicon gets its own account notifications through Silicon Ting instead.",
                 "tags": ["events", "webhooks", "sse", "subscriptions"],
-                "examples": ["Tell me as soon as my custodian accepts.", "Send my app id and photo changes to my stream."]
+                "examples": ["Send my app id and photo changes to my stream."]
             }
         ],
         "links": {

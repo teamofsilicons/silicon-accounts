@@ -111,7 +111,8 @@ impl VerifyOptions {
 }
 
 /// Verifies an access token with a JWKS (from [`crate::AccountsClient::jwks`]): EdDSA
-/// signature by a key in the set, `exp`/`nbf`, `aud` and (optionally) `iss`.
+/// signature by a key in the set, `exp`/`nbf`, `aud` and (optionally) `iss`. OIDC
+/// `id_token`s share the signing key but carry no `fid`/`mid`, so they are refused.
 ///
 /// This cannot see revocation (signed-out accounts, removed access); tokens live at most
 /// 30 minutes. Call `introspect` when you must know about revocation immediately.
@@ -175,6 +176,12 @@ pub fn verify_access_token(jwks: &Jwks, token: &str, options: &VerifyOptions) ->
     validation.set_required_spec_claims(&required);
 
     match decode::<Claims>(token, &key, &validation) {
+        Ok(data) if data.claims.fid.is_none() => {
+            Err(TokenError::MissingClaim("fid".to_owned()).into())
+        }
+        Ok(data) if data.claims.mid.is_none() => {
+            Err(TokenError::MissingClaim("mid".to_owned()).into())
+        }
         Ok(data) => Ok(data.claims),
         Err(e) => Err(match e.kind() {
             ErrorKind::InvalidSignature => TokenError::BadSignature,
@@ -335,5 +342,23 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(err.code(), "invalid_input");
+    }
+
+    #[test]
+    fn rejects_an_id_token() {
+        let (key, jwk) = keypair(7);
+        let jwks = Jwks::new(vec![jwk]);
+        let now = time::OffsetDateTime::now_utc().unix_timestamp();
+        let id_token = token(
+            &key,
+            "k7",
+            &json!({
+                "iss": "http://127.0.0.1:8590", "sub": "a8K", "aud": "remind",
+                "exp": now + 600, "iat": now, "nonce": "n1"
+            }),
+        );
+        let err =
+            verify_access_token(&jwks, &id_token, &VerifyOptions::for_app("remind")).unwrap_err();
+        assert_eq!(err.code(), "token_missing_claim");
     }
 }

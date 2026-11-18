@@ -1,9 +1,7 @@
 "use client";
-/* eslint-disable @next/next/no-img-element -- Private uploaded media uses the sealed-session BFF and retains its author-provided URL. */
 
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { publishingMediaUrl } from "@/lib/apps-media";
-import { Link } from "./navigation";
 import {
   AlertCircle,
   ArrowRight,
@@ -11,49 +9,16 @@ import {
   Box,
   LoaderCircle,
   LockKeyhole,
-  Terminal,
-  Star,
 } from "lucide-react";
 import { ApiError, login } from "./api";
-import type { App } from "./types";
 export { Button } from "@/components/silicon-ui/button/button";
 export { Input } from "@/components/silicon-ui/input/input";
 export { Textarea } from "@/components/silicon-ui/textarea/textarea";
 export { Badge } from "@/components/silicon-ui/badge/badge";
-export { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
-export { Switch } from "@/components/silicon-ui/switch/switch";
-export { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
-export { SearchField } from "@/components/silicon-ui/search-field/search-field";
-export { default as SegmentedControl } from "@/components/silicon-ui/segmented-control/segmented-control";
 import { Button } from "@/components/silicon-ui/button/button";
-import { Badge } from "@/components/silicon-ui/badge/badge";
 import { CopyButton } from "@/components/silicon-ui/copy-button/copy-button";
 import { EmptyState } from "@/components/silicon-ui/empty-state/empty-state";
 import { Dialog, DialogContent } from "@/components/silicon-ui/dialog/dialog";
-export function IconLogo({ size = 28 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M7 9h18M7 16h18M7 23h18"
-        stroke="currentColor"
-        strokeWidth="3.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M12 5v22M20 5v22"
-        stroke="currentColor"
-        strokeWidth="3.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 export function ErrorNotice({
   error,
   retry,
@@ -131,80 +96,6 @@ export function SignIn({ privateView = false }: { privateView?: boolean }) {
         </Button>
       }
     />
-  );
-}
-export function Command({
-  value,
-  label = "Copy command",
-}: {
-  value: string;
-  label?: string;
-}) {
-  return (
-    <div data-sq="surface" className="command">
-      <Terminal size={17} />
-      <code>{value}</code>
-      <CopyButton value={value} label={label} iconOnly variant="plain" />
-    </div>
-  );
-}
-export function AppLogo({
-  app,
-  large = false,
-}: {
-  app: Pick<App, "name" | "logo" | "logo_alt">;
-  large?: boolean;
-}) {
-  const [failed, setFailed] = useState<string>();
-  return (
-    <div data-sq="surface" className={`app-logo ${large ? "large" : ""}`}>
-      {app.logo && failed !== app.logo ? (
-        <img
-          src={safeUrl(app.logo)}
-          alt={app.logo_alt || ""}
-          onError={() => setFailed(app.logo)}
-        />
-      ) : (
-        <span>{app.name.slice(0, 1).toUpperCase()}</span>
-      )}
-    </div>
-  );
-}
-export function AppCard({
-  app,
-  developer = false,
-}: {
-  app: App;
-  developer?: boolean;
-}) {
-  return (
-    <Link
-      to={developer ? `/developer/apps/${app.app_id}` : `/store/${app.app_id}`}
-      className="app-card"
-    >
-      <div className="row between">
-        <AppLogo app={app} />
-        {developer && !app.published ? (
-          <Badge tone="warning">Continue setup</Badge>
-        ) : app.visibility === "private" ? (
-          <Badge icon={<LockKeyhole size={12} />}>Private</Badge>
-        ) : (
-          <ArrowRight size={17} className="card-arrow" />
-        )}
-      </div>
-      <div>
-        <h3>{app.name}</h3>
-        <span className="muted small">{app.app_id}</span>
-      </div>
-      <p>{app.description || "Add a description to introduce your app."}</p>
-      <div className="row between card-meta">
-        <span className="row">
-          <Star size={14} />
-          {app.rating == null ? "No ratings" : app.rating.toFixed(1)}
-        </span>
-        <span>{app.installs.toLocaleString()} installs</span>
-      </div>
-    </Link>
   );
 }
 export function Modal({

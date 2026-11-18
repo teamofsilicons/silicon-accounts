@@ -50,7 +50,7 @@ curl -s "$ACCOUNTS_URL/v1/me" -H "Authorization: Bearer $TOKEN"
 
 **Me** (`GET /v1/me`): `uuid` (permanent), `kind` (`carbon` | `silicon`), `id` (`c:…` / `si:…`,
 null once deleted), `display_name`, `pfp_url`, `dob`, `timezone`, `status` (`active`,
-`unclaimed`, `pending_custodian`, `deleted`), `created_at`, `updated_at` and `version` (it bumps
+`unclaimed`, `pending_custodian`, `archived`, `deleted`), `created_at`, `updated_at` and `version` (it bumps
 on every change apps can see).
 
 - Carbons add `emails` (`email`, `is_primary`, `verified_at`, `verified_via`: `code`, `google`
@@ -146,7 +146,7 @@ curl -s "$ACCOUNTS_URL/v1/accounts/8559a06f-4c3b-4480-ade8-fde4f7428bba" -H "Aut
 }
 ```
 
-An app gets only the public identity, and a Silicon's custodian as `{uuid, id}`, the way apps
+By default, an app gets only the public identity, and a Silicon's custodian as `{uuid, id}`, the way apps
 see a custodian everywhere. A display name and photo are details an account shares by signing in
 to your app, so read them from your [user base](apps.md#get-v1appsapp_idusersuuid):
 
@@ -157,6 +157,15 @@ curl -s "$ACCOUNTS_URL/v1/accounts/8559a06f-4c3b-4480-ade8-fde4f7428bba" -u "$AP
 ```json
 { "uuid": "8559a06f-4c3b-4480-ade8-fde4f7428bba", "kind": "silicon", "id": "si:scout", "status": "active", "custodian": { "uuid": "4143123f-b494-481c-adbf-c14b14cfccc0", "id": "c:ada" } }
 ```
+
+An operator can explicitly authorize a trusted directory app with
+`ACCOUNTS_PROFILE_DIRECTORY_APP_IDS` (empty by default; production enables `silicon-contacts`).
+Its authenticated app lookup also includes `display_name` and `pfp_url` for active accounts
+with an active `silicon-accounts` registration and `profile` scope. The target need not have
+signed into the directory app. This directory permission is separate from an app sign-in
+grant, so removing a Contacts sign-in does not hide the basic directory identity. It grants
+no email, phone, birthday, timezone, sessions, or first-party account authority. Custodians
+still appear only as `{uuid, id}`. Ordinary apps retain the response and consent rules above.
 
 For a self-created Silicon still waiting for its custodian to accept, `custodian` is `null` in
 both views.
@@ -290,8 +299,7 @@ Public. The uploaded image, with `Cache-Control: public, max-age=31536000, immut
 ## Emails and phones
 
 **account (Carbon)**. Silicons have no email or phone (403 `carbon_only`). A Carbon has at most 10
-emails and 10 phone numbers, and any of them signs in to the account. Exactly one of each kind is
-primary, and an address belongs to one account only.
+emails and 10 phone numbers. Each account can choose one primary of each kind. An email can be primary on one account and verified as secondary on others. Email sign-in selects its verified primary account or its sole verified owner. Multiple secondary claims without a verified primary require another sign-in contact. A phone number belongs to one account.
 
 ### `GET /v1/me/emails` and `GET /v1/me/phones`
 
@@ -509,9 +517,13 @@ about a Silicon name it by its current si:id and carry it in `meta.silicon`. Err
 Deletes your account. **account (Carbon).** Send `{"confirm": "c:ada"}` with your current id
 (case and the prefix don't matter). **204**, and a cookie session's cookie is cleared.
 
-It all happens in one step:
+The account is archived first: it becomes `archived`, every session and sign-in is revoked, and
+its primary email is told when it will be deleted. Its id, emails, phones, linked identities and
+memberships stay, and apps are told nothing. Signing in again with an email or phone code
+(`POST /v1/flows/{id}/verify`) within 10 days makes it `active` again. Otherwise, 10 days later,
+it is deleted in one step:
 
-- the account becomes `deleted`, and its id is reserved for 10 days;
+- the account becomes `deleted` and releases the CarbonID held since the deletion request;
 - emails, phones and linked identities are removed;
 - every session, sign-in and User verification proof about it is revoked;
 - the photo goes back to the default;

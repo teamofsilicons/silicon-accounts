@@ -1,11 +1,13 @@
 //! The authenticated Organizations bridge and account-owned linked-account operations.
-use accounts_core::http::cookies::{append_cookie, session_cookie};
+use accounts_core::http::browser_profiles::BrowserProfiles;
+use accounts_core::http::cookies::append_cookie;
 use accounts_core::http::{AccountAuth, AppAuth, ClientMeta, IdempotencyKey, Json};
 use accounts_core::models::{Account, AccountKind, AccountStatus, TokenOrigin};
 use accounts_core::repo::{
     accounts, audit, contacts, idempotency, organizations as orgs, sessions, tokens,
 };
 use accounts_core::{ApiError, ApiResult, AppState};
+use axum::http::HeaderMap;
 use axum::{
     Router,
     extract::{Path, Query, State},
@@ -111,7 +113,7 @@ async fn actor_linked(
     let mut conn = state.db.acquire().await?;
     let mut value = orgs::linked_accounts(&mut conn, &account.uuid, Some(orgs::APP_ID)).await?;
     let main = orgs::main_uuid(&mut conn, &account.uuid).await?;
-    let ids: Vec<String> = sqlx::query_scalar("select distinct i.invite_id from organization_invitations i where i.status='pending' and i.expires_at>now() and (i.account_uuid=$1 or i.account_uuid=$2 or i.account_uuid in(select account_uuid from account_links where main_uuid=$2) or i.email in(select email from account_emails where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in(select account_uuid from account_links where main_uuid=$2)))) order by i.invite_id").bind(&account.uuid).bind(main).fetch_all(&mut *conn).await?;
+    let ids: Vec<String> = sqlx::query_scalar("select distinct i.invite_id from organization_invitations i where i.status='pending' and i.expires_at>now() and (i.account_uuid=$1 or i.account_uuid=$2 or i.account_uuid in(select account_uuid from account_links where main_uuid=$2) or i.email in(select email from account_email_owners where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in(select account_uuid from account_links where main_uuid=$2)))) order by i.invite_id").bind(&account.uuid).bind(main).fetch_all(&mut *conn).await?;
     value["invitation_ids"] = json!(ids);
     Ok(Json(value))
 }
@@ -417,7 +419,7 @@ async fn action(
                 let stable_key=string(notification,"key")?;
                 let main=orgs::main_uuid(&mut tx,&uuid).await?;
                 let recipients:Vec<String>=sqlx::query_scalar("select uuid from accounts where uuid<>$1 and status='active' and (uuid=$2 or uuid in(select account_uuid from account_links where main_uuid=$2) or uuid in(select recipient_uuid from organization_notification_accounts where account_uuid=$1 and expires_at>now())) order by uuid").bind(&uuid).bind(main).fetch_all(&mut *tx).await?;
-                let base=std::env::var("ACCOUNTS_TING_URL").unwrap_or_else(|_|"https://ting.teamofsilicons.com".into());
+                let base=&state.settings.ting_url;
                 for recipient in &recipients{
                     let mut payload=notification.clone();payload["for"]=json!(recipient);payload["key"]=json!(format!("{stable_key}:linked:{recipient}"));
                     let response=state.http.post(format!("{}/v1/tings",base.trim_end_matches('/'))).bearer_auth(proof).json(&payload).send().await.map_err(|_|ApiError::unavailable("ting_unavailable","Ting could not be reached; retry this notification with the same key."))?;
@@ -442,7 +444,7 @@ async fn action(
             },
             "close"=>{accounts::delete_account(&mut tx,&state.settings,&uuid,"organization",true).await?;},
             "profile"=>{let display=body.get("display_name").and_then(Value::as_str);let timezone=body.get("timezone").and_then(Value::as_str);
-                if let Some(v)=display{accounts_core::normalize::validate_display_name(v).map_err(|e|ApiError::unprocessable("invalid_display_name",e))?;}let timezone=timezone.map(accounts_core::normalize::normalize_timezone).transpose().map_err(|e|ApiError::unprocessable("invalid_timezone",e))?;
+                let display=display.map(accounts_core::normalize::validate_display_name).transpose().map_err(|e|ApiError::unprocessable("invalid_display_name",e))?;let timezone=timezone.map(accounts_core::normalize::normalize_timezone).transpose().map_err(|e|ApiError::unprocessable("invalid_timezone",e))?;
                 let photo=match body.get("pfp_url") {None=>None,Some(Value::Null)=>Some(accounts_core::pfp::default_pfp_url(&state.settings.iris_base_url,account.kind,&uuid)),Some(Value::String(url))=>{accounts_core::normalize::validate_https_url(url).map_err(|e|ApiError::unprocessable("invalid_pfp_url",e))?;Some(url.clone())},_=>return Err(ApiError::unprocessable("invalid_pfp_url","Use an HTTPS URL or null to reset the photo."))};
                 sqlx::query("update accounts set display_name=coalesce($2,display_name),timezone=coalesce($3,timezone),pfp_url=coalesce($4,pfp_url),updated_at=now(),version=version+1 where uuid=$1").bind(&uuid).bind(display).bind(timezone).bind(photo).execute(&mut *tx).await?;
                 let a=accounts::require(&mut tx,&uuid).await?;accounts_core::events::notify_profile_updated(&mut tx,&a,&[accounts_core::models::AccountField::DisplayName,accounts_core::models::AccountField::Timezone,accounts_core::models::AccountField::PfpUrl]).await?;
@@ -639,6 +641,7 @@ async fn switched(
     auth: &AccountAuth,
     meta: &ClientMeta,
     target: &Account,
+    headers: &HeaderMap,
 ) -> ApiResult<Response> {
     let mut tx = state.db.begin().await?;
     let target = sqlx::query_as::<_, Account>(concat!(
@@ -663,19 +666,14 @@ async fn switched(
     }
     let view = accounts_core::views::load_me(&mut tx, &target).await?;
     let response = if auth.is_cookie() {
-        let (token, _) = sessions::create(
-            &mut tx,
-            &state.keys.pepper,
-            &target.uuid,
-            meta.ip.as_deref(),
-            meta.user_agent.as_deref(),
-        )
-        .await?;
+        let selection = BrowserProfiles::load(&mut tx, state, headers)
+            .await?
+            .select(&mut tx, state, meta, &target.uuid, false)
+            .await?;
         let mut response = Json(view).into_response();
-        append_cookie(
-            response.headers_mut(),
-            &session_cookie(&state.settings, &token),
-        );
+        for cookie in selection.cookies {
+            append_cookie(response.headers_mut(), &cookie);
+        }
         response
     } else {
         let tokens = tokens::issue_tokens(
@@ -698,6 +696,18 @@ async fn switched(
         .await?;
         Json(json!({"account":view,"tokens":tokens})).into_response()
     };
+    audit::signin(
+        &mut tx,
+        &audit::SigninRecord {
+            account_uuid: Some(&target.uuid),
+            app_id: Some(accounts_core::FIRST_PARTY_APP_ID),
+            method: audit::method::SESSION,
+            outcome: audit::outcome::SUCCESS,
+            ip: meta.ip.as_deref(),
+            user_agent: meta.user_agent.as_deref(),
+        },
+    )
+    .await?;
     tx.commit().await?;
     Ok(response)
 }
@@ -705,17 +715,17 @@ async fn switch(
     State(state): State<AppState>,
     auth: AccountAuth,
     meta: ClientMeta,
+    headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> ApiResult<Response> {
     let mut conn = state.db.acquire().await?;
     let target = accounts::require(&mut conn, string(&body, "account_uuid")?).await?;
     drop(conn);
-    switched(&state, &auth, &meta, &target).await
+    switched(&state, &auth, &meta, &target, &headers).await
 }
 async fn personal(
     State(state): State<AppState>,
     auth: AccountAuth,
-    meta: ClientMeta,
     key: Option<IdempotencyKey>,
     Json(body): Json<Value>,
 ) -> ApiResult<Response> {
@@ -725,7 +735,7 @@ async fn personal(
             "A Silicon personal account must be created with its own Carbon custodian, then linked.",
         ));
     }
-    let response = idempotency::run(
+    idempotency::run(
         &state,
         None,
         &format!("account:{}:personal", auth.uuid()),
@@ -765,14 +775,14 @@ async fn personal(
                 .get("display_name")
                 .and_then(Value::as_str)
                 .unwrap_or(&auth.account.display_name);
-            accounts_core::normalize::validate_display_name(name)
+            let name = accounts_core::normalize::validate_display_name(name)
                 .map_err(|e| ApiError::unprocessable("invalid_display_name", e))?;
             let account = accounts::create_carbon(
                 &mut tx,
                 &state.settings,
                 accounts::NewCarbon {
                     id,
-                    display_name: name.into(),
+                    display_name: name,
                     pfp_url: None,
                     dob: auth.account.dob,
                     timezone: auth.account.timezone.clone(),
@@ -790,10 +800,7 @@ async fn personal(
             Ok((StatusCode::CREATED, result))
         },
     )
-    .await?;
-    // Keep the idempotent operation's response stable; clients switch explicitly using its UUID.
-    let _ = meta;
-    Ok(response)
+    .await
 }
 
 /// Bridge receipts commit with the work they recover, independent of the HTTP replay cache.

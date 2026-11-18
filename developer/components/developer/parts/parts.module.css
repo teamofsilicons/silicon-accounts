@@ -60,7 +60,6 @@
 .tagField [data-tag] > span:first-child { min-width: 0; padding-block: 3px; overflow-wrap: anywhere; line-height: 1.35; }
 .tagMessages { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
 .tagMessages li, .fieldError { margin: 0; color: var(--danger); font-size: var(--text-xs); line-height: var(--leading-body); overflow-wrap: anywhere; }
-.tagCount { color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
 
 /* The floating save bar at the bottom of the window. */
 .saveBar {

@@ -17,7 +17,7 @@ import type {
   UserVerificationRequest, OidcDiscovery, OutboxMessage, OwnedApp, Page, PageQuery, PhoneView, PhotoUploaded, ProfileUpdate,
   ProofRevokeRequest, ProofVerification, ReplayRequest, ReplayResult, ReportReceipt, SessionInfo, ShortLivedToken,
   SigninConfigPatch, SiliconAppsApp, SiliconCreated, SiliconPhotoUploaded, SiliconSelfCreate, SiliconSelfCreated,
-  SiliconWebhook, SiliconWebhookTestQueued, SignupPhoto, SignupSubmit, StkRotated, TokenRequest, TokenResponse,
+  SignupPhoto, SignupSubmit, StkRotated, TokenRequest, TokenResponse,
   TransferRequest, UpdateSilicon, UserInfo, WebhookDelivery, WebhookDeliveryDetail, WebhookTestQueued,
 } from "./types";
 
@@ -237,14 +237,6 @@ export const me = {
   /** `POST /v1/me/short-lived-tokens`: a 2-minute, single-use token an app exchanges for this account's tokens. */
   shortLivedToken: (appId: string) => request<ShortLivedToken>("/v1/me/short-lived-tokens", { method: "POST", body: { app_id: appId } }),
 
-  /** A Silicon's own webhook (session(silicon)). */
-  webhook: {
-    set: (url: string) => request<SiliconWebhook>("/v1/me/webhook", { method: "PUT", body: { url } }),
-    remove: () => request<null>("/v1/me/webhook", { method: "DELETE" }),
-    /** 202. 409 webhook_not_set; 10 per hour. */
-    test: () => request<SiliconWebhookTestQueued>("/v1/me/webhook/test", { method: "POST", body: {} }),
-  },
-
   /** Apps this Carbon owns (the developer site lists them; kept here for tools and docs). */
   ownedApps: (query?: PageQuery) => request<Page<OwnedApp>>("/v1/me/owned-apps", { query: pageQuery(query) }),
 
@@ -260,8 +252,6 @@ export const me = {
     /** `POST /v1/me/silicons/{uuid}/photo` (201): the custodian uploads the Silicon's photo (same rules as /v1/me/photo). */
     uploadPhoto: (uuid: string, file: Blob, options?: CallOptions) =>
       request<SiliconPhotoUploaded>(`/v1/me/silicons/${seg(uuid)}/photo`, { method: "POST", raw: file, contentType: file.type || "application/octet-stream", idempotencyKey: options?.idempotencyKey, signal: options?.signal }),
-    setWebhook: (uuid: string, url: string) => request<SiliconWebhook>(`/v1/me/silicons/${seg(uuid)}/webhook`, { method: "PUT", body: { url } }),
-    removeWebhook: (uuid: string) => request<null>(`/v1/me/silicons/${seg(uuid)}/webhook`, { method: "DELETE" }),
     /** Kills the old STK at once and signs the Silicon out everywhere. Omit `stk` to generate one (shown once). */
     rotateStk: (uuid: string, stk?: string, options?: CallOptions) =>
       request<StkRotated>(`/v1/me/silicons/${seg(uuid)}/stk`, { method: "POST", body: stk ? { stk } : {}, idempotencyKey: options?.idempotencyKey, signal: options?.signal }),
