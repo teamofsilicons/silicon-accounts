@@ -1,0 +1,59 @@
+{
+  "deployed_at": "2026-11-17T21:29:30.516Z",
+  "verified_at": "2026-11-17T21:31:06Z",
+  "site": "https://developers.teamofsilicons.com/apps",
+  "build_id": "10oUw7Ynw2H9u_4A-paGf",
+  "source_revision": "4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2",
+  "region": "us-east-2",
+  "deployment_profile": "silicon-deployment",
+  "release": {
+    "revision": "4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2",
+    "release": "4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2",
+    "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/4e25eb1fa3c4ceff96faf5fc6175119d406b3dd2-developer-filters.tar.gz",
+    "sha256": "208418d7ead2b1f861918fc79e240d040c8a40de7c2c108e4ea5e551266d48af",
+    "size": 34610777,
+    "base_release": "442f755e148fac92723843d7bf1ee01912a08015",
+    "base_archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-profiles/442f755e148fac92723843d7bf1ee01912a08015.tar.gz",
+    "base_sha256": "031747f87e3d88e1ee921f863d7a4a2de7ddc3046848506c624a63d2cbe3e897"
+  },
+  "artifact_version": "Wl_bey3FvObM4SORxYaFper9bsuguopq",
+  "api_revision": "442f755e148fac92723843d7bf1ee01912a08015",
+  "accounts_web_revision": "442f755e148fac92723843d7bf1ee01912a08015",
+  "database_migration": 44,
+  "local_checks": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "production_build": "passed",
+    "unit_tests": 103,
+    "browser_tests": 116,
+    "standalone_routing": "passed"
+  },
+  "production_checks": {
+    "public_sign_in_redirect": {
+      "signInHost": "developers.teamofsilicons.com",
+      "signedOutRedirect": true,
+      "contactRequests": 0
+    },
+    "ready": true,
+    "matched_static_asset_hashes": 27,
+    "browser_identity": "Isolated browser with fixture session and account data loading the publicly deployed HTML, JavaScript, CSS and fonts.",
+    "browser_results": [
+      {
+        "viewport": 1440,
+        "panel_width": 320,
+        "page_errors": [],
+        "filtered": true,
+        "initial_contact_requests": 0
+      },
+      {
+        "viewport": 390,
+        "panel_width": 320,
+        "page_errors": [],
+        "filtered": true,
+        "initial_contact_requests": 0
+      }
+    ]
+  },
+  "deployment_command": "bf0178a9-08d0-44f1-8e95-39514e3b74fb",
+  "verification_command": "d5be1a88-f2a3-4796-acab-14607d7bcc62"
+}
