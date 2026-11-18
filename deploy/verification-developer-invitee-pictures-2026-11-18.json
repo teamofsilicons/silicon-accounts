@@ -1,0 +1,57 @@
+{
+  "verified_at": "2026-11-18T00:50:41+00:00",
+  "portal": "https://developers.teamofsilicons.com",
+  "source": "dbae9dbccaa16fac36eff1f4bf8d533314861e39",
+  "build_id": "ezDmnmvDAEHKCnzqHIKSy",
+  "artifact": {
+    "revision": "dbae9dbccaa16fac36eff1f4bf8d533314861e39",
+    "release": "dbae9dbccaa16fac36eff1f4bf8d533314861e39",
+    "baseline": "030b0ca4071fa445229eb66d17212ccb219b4a51",
+    "base_archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-work-portraits/030b0ca4071fa445229eb66d17212ccb219b4a51-bd1338e6efd593.tar.gz",
+    "base_sha256": "bd1338e6efd5937f98da69d845c2643a7a7dcdc25fa6b8331e6a53698c43aad8",
+    "components": [
+      "developer"
+    ],
+    "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/dbae9dbccaa16fac36eff1f4bf8d533314861e39-developer-invitee-pictures.tar.gz",
+    "version": "tnBDeneRHs.SC.Tw97o9_ak5JqJCqmNX",
+    "sha256": "30984f3434db90b740746f0d75ec210cfb315be70585fecdda908e00fe75da5c",
+    "size": 34605131
+  },
+  "previous": "/opt/accounts/releases/030b0ca4071fa445229eb66d17212ccb219b4a51",
+  "api_revision": "f958508f796d9f5655e1f151bbbff8fbcde34d98",
+  "web_revision": "030b0ca4071fa445229eb66d17212ccb219b4a51",
+  "migration_version": 44,
+  "activation_command": "d7784040-4c2a-419f-9767-c11a4746a311",
+  "local_checks": {
+    "typecheck": true,
+    "lint": true,
+    "production_build": true,
+    "standalone_routing": true,
+    "unit_tests": 103,
+    "browser_tests": 13
+  },
+  "production": {
+    "authenticated_people_endpoints": {
+      "cells": 200,
+      "interfaces": 200,
+      "apps": 200
+    },
+    "browser_scope": "Public Developer build with fixture account, resources, history and photos. The invitation forms were exercised through selection.",
+    "browsers": [
+      {
+        "surface": "Cells",
+        "combinedRanking": true,
+        "fuzzyAndSelection": true,
+        "savedProfilePicture": true,
+        "profilePictureFromLookup": true
+      },
+      {
+        "surface": "Interfaces",
+        "combinedRanking": true,
+        "fuzzyAndSelection": true,
+        "savedProfilePicture": true,
+        "profilePictureFromLookup": true
+      }
+    ]
+  }
+}
