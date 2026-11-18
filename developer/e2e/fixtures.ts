@@ -82,7 +82,7 @@ export async function mock(
     } else if (path === "/apps/test-app/access") {
       app = { ...app, ...body };
       result = app;
-    } else if (path === "/apps/test-app/packages/macos-aarch64") {
+    } else if (path === "/apps/test-app/packages/linux-x86_64") {
       status = 422;
       result = {
         error: {

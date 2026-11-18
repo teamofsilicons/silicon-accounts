@@ -41,7 +41,7 @@ test("failed package validation exposes command, expectation, and exact error", 
   await expect(
     page.getByText("Three commands, on every platform"),
   ).toBeVisible();
-  await page.getByRole("combobox", { name: "Package target" }).selectOption("macos-aarch64");
+  await page.getByRole("combobox", { name: "Package target" }).selectOption("linux-x86_64");
   await page.locator("input[type=file]").setInputFiles({
     name: "test-app.tar.gz",
     mimeType: "application/gzip",
