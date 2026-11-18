@@ -158,5 +158,6 @@
   "HomeProfileMenuVerification": "deploy/verification-home-profile-menu-2026-11-18.json",
   "CatalogRegistryExportVerification": "deploy/verification-catalog-registry-export-2026-11-18.json",
   "WorkAccountPortraitsVerification": "deploy/verification-work-account-portraits-2026-11-18.json",
-  "WebPr25Verification": "deploy/verification-web-pr25-2026-11-18.json"
+  "WebPr25Verification": "deploy/verification-web-pr25-2026-11-18.json",
+  "DeveloperInviteePicturesVerification": "deploy/verification-developer-invitee-pictures-2026-11-18.json"
 }
