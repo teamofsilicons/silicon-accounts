@@ -205,3 +205,7 @@ byte for byte. Schema unchanged at 44; only `accounts-web` restarted (1.1 s), af
 build's 159 static files stay served for open tabs. Rollback: point `current` at `previous-release` and restart
 `accounts-web`. SSM command `261180da-34fa-4afd-811f-a6ef306cffb6`. Receipt:
 [verification-web-pr25-2026-11-18.json](verification-web-pr25-2026-11-18.json).
+
+Later that day main took in those branches (`44ec852`, `dd13197`, `4762132`). Main at `4762132` has the same source
+as every live component (web `dc18dd7`, API `69b0a49`, Developer `9cce3f4`), so a release built from main no longer
+rolls anything back.

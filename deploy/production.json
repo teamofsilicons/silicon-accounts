@@ -160,5 +160,6 @@
   "WorkAccountPortraitsVerification": "deploy/verification-work-account-portraits-2026-11-18.json",
   "WebPr25Verification": "deploy/verification-web-pr25-2026-11-18.json",
   "DeveloperInviteePicturesVerification": "deploy/verification-developer-invitee-pictures-2026-11-18.json",
-  "DeveloperFiltersVerification": "deploy/verification-compact-developer-filters-2026-11-18.json"
+  "DeveloperFiltersVerification": "deploy/verification-compact-developer-filters-2026-11-18.json",
+  "MainMatchesLiveRevision": "4762132a8cb3fd357c210351004d682151ee8d44"
 }
