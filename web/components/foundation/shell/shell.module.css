@@ -29,6 +29,8 @@
    before): Silicon UI's soft button (grey, no border), muted label, a key for the shortcut. Doubled class so the mute
    wins over .soft's ink (muted since 2026-11-12 so "Search" and ⌘K clear 4.5:1). */
 .search.search { width: 100%; max-width: 100%; color: var(--text-muted); cursor: text; }
+/* The sidebar clips outside its box, so the keyboard ring is drawn inside the field. */
+.search.search:focus-visible { --focus-outline-offset: -2px; }
 /* Button centres its contents in nested label spans and has no option to spread them, so this reaches in and lets them
    fill the width; the label (flex: 1) then pushes the key to the end. A tolerated difference
    (redesign/prototype-differences.md); drop it once Silicon UI's Button can. */

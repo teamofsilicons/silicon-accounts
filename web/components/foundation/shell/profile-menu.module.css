@@ -9,6 +9,8 @@
 /* The photo at the row's height less its inset (24px in the 32px row): Avatar's sizes are 20 and 28, so this reaches into
    its xs (a tolerated difference, as the row was with UserMenu). */
 .trigger.trigger [role="img"] { width: calc(var(--control-height-sm) - 2 * var(--space-tight)); height: calc(var(--control-height-sm) - 2 * var(--space-tight)); }
+/* The sidebar scrolls, so it clips anything outside its box: the keyboard ring is drawn inside the row. */
+.trigger.trigger:focus-visible { --focus-outline-offset: -2px; }
 .triggerName { flex: 1; min-width: 0; overflow: hidden; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); text-align: start; text-overflow: ellipsis; white-space: nowrap; }
 .chevron { flex: none; color: var(--text-muted); }
 
