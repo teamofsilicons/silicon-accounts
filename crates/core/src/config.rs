@@ -18,7 +18,10 @@ use url::Url;
 /// DEV ONLY token pepper (base64url 32 bytes). Production refuses to start with it.
 pub const DEV_TOKEN_PEPPER: &str = "MpCAPN8YjuX0SqKr_TERF-YQqhWAYWUuiCf01s2yZT0";
 /// Internal tokens .env.example used to publish; they stay in git history, so production refuses them.
-const PUBLISHED_DEV_INTERNAL_TOKENS: [&str; 2] = ["sa_internal_dev_o-uV-Sg_t0uXiiF6vUWQvqzr4x4bhkmT", "si_internal_dev_Uml0ZWN0SW50ZXJmYWNlcw1234567"];
+const PUBLISHED_DEV_INTERNAL_TOKENS: [&str; 2] = [
+    "sa_internal_dev_o-uV-Sg_t0uXiiF6vUWQvqzr4x4bhkmT",
+    "si_internal_dev_Uml0ZWN0SW50ZXJmYWNlcw1234567",
+];
 /// DEV ONLY AES-256-GCM key, keyring version 1. Production refuses to start with it.
 pub const DEV_ENCRYPTION_KEY: &str = "p08VPTPd6SNsaUqyQXvLNZsCJzmEAfDr4dfTTWiubZM";
 /// DEV ONLY Ed25519 seed for JWT signing (base64url 32 bytes). Production refuses it.
@@ -91,6 +94,7 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_PUBLIC_URL",
     "ACCOUNTS_REPORT_RECIPIENTS",
     "ACCOUNTS_SILICON_APPS_URL",
+    "ACCOUNTS_ORGANIZATIONS_URL",
     "ACCOUNTS_TOKEN_PEPPER",
     "ACCOUNTS_TING_URL",
     "ACCOUNTS_TRUST_FORWARDED_FOR",
@@ -305,6 +309,7 @@ pub struct Settings {
     pub trust_forwarded_for: bool,
     /// ACCOUNTS_SILICON_APPS_URL.
     pub silicon_apps_url: String,
+    pub organizations_url: String,
     /// Ting API origin for Silicon account delivery.
     pub ting_url: String,
     /// ACCOUNTS_DOCS_URL: where the published docs live (`GET /v1/meta` `docs_url`).
@@ -576,6 +581,7 @@ impl Settings {
             ],
             trust_forwarded_for: false,
             silicon_apps_url: "https://apps.teamofsilicons.com".into(),
+            organizations_url: "https://organizations.teamofsilicons.com".into(),
             ting_url: "https://backend.ting.teamofsilicons.com".into(),
             docs_url: DEFAULT_DOCS_URL.into(),
             developer_url: if prod {
@@ -891,6 +897,10 @@ impl Settings {
             .map(|h| h.to_ascii_lowercase())
             .collect();
         s.trust_forwarded_for = r.bool("ACCOUNTS_TRUST_FORWARDED_FOR", false);
+        s.organizations_url = r.http_url(
+            "ACCOUNTS_ORGANIZATIONS_URL",
+            "https://organizations.teamofsilicons.com",
+        );
         s.silicon_apps_url = r.http_url(
             "ACCOUNTS_SILICON_APPS_URL",
             "https://apps.teamofsilicons.com",
@@ -906,14 +916,20 @@ impl Settings {
         s.internal_token = r.secret("ACCOUNTS_INTERNAL_TOKEN");
         for (var, token) in [
             ("ACCOUNTS_INTERNAL_TOKEN", &s.internal_token),
-            ("ACCOUNTS_INTERFACES_INTERNAL_TOKEN", &r.secret("ACCOUNTS_INTERFACES_INTERNAL_TOKEN")),
+            (
+                "ACCOUNTS_INTERFACES_INTERNAL_TOKEN",
+                &r.secret("ACCOUNTS_INTERFACES_INTERNAL_TOKEN"),
+            ),
         ] {
             if prod
                 && token
                     .as_ref()
                     .is_some_and(|t| PUBLISHED_DEV_INTERNAL_TOKENS.contains(&t.expose_secret()))
             {
-                r.problem(var, "is a published development token; set a new random value in production");
+                r.problem(
+                    var,
+                    "is a published development token; set a new random value in production",
+                );
             }
         }
         if let Some(t) = &s.internal_token
@@ -1244,7 +1260,10 @@ mod tests {
             ("ACCOUNTS_WEBHOOK_ALLOW_PRIVATE", "true"),
             ("ACCOUNTS_DEVELOPER_URL", "http://localhost:8600"),
             ("ACCOUNTS_INTERNAL_TOKEN", PUBLISHED_DEV_INTERNAL_TOKENS[0]),
-            ("ACCOUNTS_INTERFACES_INTERNAL_TOKEN", PUBLISHED_DEV_INTERNAL_TOKENS[1]),
+            (
+                "ACCOUNTS_INTERFACES_INTERNAL_TOKEN",
+                PUBLISHED_DEV_INTERNAL_TOKENS[1],
+            ),
         ]))
         .expect_err("must refuse");
         let vars: Vec<_> = err.problems.iter().map(|p| p.var.as_str()).collect();

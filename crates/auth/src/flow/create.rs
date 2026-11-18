@@ -418,7 +418,8 @@ pub async fn create_flow(
         },
     )
     .await?;
-    let current = browser::current(&mut tx, &state, &headers).await?;
+    let mut current = browser::current(&mut tx, &state, &headers).await?;
+    let mut response_cookies = vec![flow_cookie(&state.settings, &binding)];
     if let Some(raw) = body.link_id.as_deref() {
         if app_id != accounts_core::FIRST_PARTY_APP_ID || !prompt.login {
             return Err(ApiError::forbidden(
@@ -471,6 +472,22 @@ pub async fn create_flow(
     flow.extras.intent = intent;
     flow.extras.browser_timezone = clean(&body.timezone).and_then(|t| normalize_timezone(t).ok());
 
+    if fa.config.remember_browser && !prompt.login && flow.extras.link_request_id.is_none() {
+        let profiles =
+            accounts_core::http::browser_profiles::BrowserProfiles::load(&mut tx, &state, &headers)
+                .await?;
+        if current.is_none()
+            && let Some((session, cookie)) = profiles.resume(&state)
+        {
+            current = Some(browser::BrowserAccount {
+                session_id: session.id,
+                account: accounts_core::repo::accounts::require(&mut tx, &session.account_uuid)
+                    .await?,
+            });
+            response_cookies.push(cookie);
+        }
+        flow.extras.saved_sessions = profiles.session_ids();
+    }
     let usable_browser = current
         .as_ref()
         .filter(|b| b.is_active_carbon() && fa.config.remember_browser && !prompt.login);
@@ -480,13 +497,9 @@ pub async fn create_flow(
     } else if let Some(browser) = usable_browser {
         // A proved browser can choose among linked accounts immediately; this does not
         // authorize either identity until the choice is made and checked again.
-        let choices = accounts_core::repo::organizations::linked_accounts(
-            &mut tx,
-            &browser.account.uuid,
-            Some(&fa.app.app_id),
-        )
-        .await?;
-        if choices["accounts"].as_array().is_some_and(|a| a.len() > 1) {
+        let choices =
+            browser::choices(&mut tx, &browser.account.uuid, &flow, &fa.app.app_id).await?;
+        if choices.len() > 1 {
             flow.step = Step::SelectAccount;
             flow.account_uuid = Some(browser.account.uuid.clone());
             flow.extras.authenticated_account_uuid = Some(browser.account.uuid.clone());
@@ -517,7 +530,7 @@ pub async fn create_flow(
     Ok(FlowResponse {
         status: StatusCode::CREATED,
         view,
-        cookies: vec![flow_cookie(&state.settings, &binding)],
+        cookies: response_cookies,
     })
 }
 
@@ -639,13 +652,8 @@ async fn silent_sign_in(
     flow.account_uuid = Some(b.account.uuid.clone());
     flow.extras.auth_method = Some(accounts_core::repo::audit::method::SESSION.to_string());
     flow.extras.browser_session_id = Some(b.session_id);
-    let choices = accounts_core::repo::organizations::linked_accounts(
-        conn,
-        &b.account.uuid,
-        Some(&fa.app.app_id),
-    )
-    .await?;
-    if choices["accounts"].as_array().is_some_and(|a| a.len() > 1) {
+    let choices = browser::choices(conn, &b.account.uuid, &flow, &fa.app.app_id).await?;
+    if choices.len() > 1 {
         return next::fail(
             state,
             flow,

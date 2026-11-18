@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * The account site's frame for signed-in pages, as in the lead designer's prototype (redesign/prototype-map.md): a
- * top bar with the brand (home), search (the ⌘K palette) and the account menu, and the section list (sidebar.tsx)
- * beside the page from 900px, in a bottom sheet opened from the top bar below that. Also the ⌘K palette, number-key
+ * The account site's frame for signed-in pages: from 900px the sidebar (sidebar.tsx) beside the page, the window's full
+ * height, with the brand (home) and search (the ⌘K palette) at its head and the account menu at its foot; below that a
+ * top bar with the brand and a menu button that opens the same sidebar in a bottom sheet (Anil, 2026-11-17). Also the ⌘K palette, number-key
  * shortcuts and page transitions. It also guards the account routes: visitors without a
  * session are sent to sign in and come back to the page they asked for. At "/" a signed-out visitor sees the landing
  * page, rendered bare (without the shell).
@@ -14,23 +14,23 @@
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ViewTransition, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Database, LogOut, Menu, Search, SwatchBook } from "lucide-react";
+import { ViewTransition, useCallback, useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { Database, LogOut, Menu, Search, SwatchBook, UserRound, UserRoundPlus } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
 import { Button } from "@teamofsilicons/silicon-ui/button";
-import { UserMenu, type UserMenuUser } from "@teamofsilicons/silicon-ui/user-menu";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page, SkipLink } from "@/components/foundation/layout/layout";
-import { useCarbonPicture } from "@/lib/carbon-avatar";
 import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
 import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
 import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
-import { beginSignIn, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
+import { browserProfileChanged, useBrowserAccounts, useSwitchBrowserAccount } from "@/lib/query/linked-accounts";
+import { beginSignIn, firstPartySignInUrl, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
 import { PrototypeMark } from "./brand-mark";
 import { CommandMenu } from "./command-menu";
 import { LeaveQuestionHost } from "./leave-question";
+import { ProfileList, ProfileMenu } from "./profile-menu";
 import { Sidebar } from "./sidebar";
 import { SIDEBAR_STEPS, SidebarResize, useSidebarStep } from "./sidebar-resize";
 import styles from "./shell.module.css";
@@ -101,7 +101,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { status, session, error, refetch } = useSession();
   const me = useMe();
-  const { signOut } = useSignOut();
+  const { signOut, pending: signingOut } = useSignOut();
   const paletteOpen = useCommandPaletteOpen();
   const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const isHome = pathname === "/";
@@ -141,6 +141,29 @@ export function AccountShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.getElementById("main")?.scrollTo({ top: 0 });
   }, [pathname]);
+
+  // Another tab switched this browser to another account (Saket, 2026-11-18): this one follows, to Home.
+  useEffect(() => {
+    const onSwitch = (event: StorageEvent) => {
+      if (event.key === browserProfileChanged && event.newValue !== session?.account.uuid) window.location.replace(paths.home);
+    };
+    window.addEventListener("storage", onSwitch);
+    return () => window.removeEventListener("storage", onSwitch);
+  }, [session?.account.uuid]);
+
+  // The accounts signed in on this browser, for the palette's switch commands (the switcher reads the same query).
+  const browserAccounts = useBrowserAccounts(status === "signed_in");
+  const switchAccount = useSwitchBrowserAccount();
+  const switchTo = useCallback(async (uuid: string) => {
+    if (!(await confirmNavigation(paths.home))) return;
+    try {
+      await switchAccount.mutateAsync({ account_uuid: uuid });
+      window.location.assign(paths.home);
+    } catch (failure) {
+      notifyError(failure);
+    }
+  }, [switchAccount]);
+  const otherAccounts = (browserAccounts.data?.accounts ?? []).filter(other => other.uuid !== session?.account.uuid);
 
   // Links in the pages ask too while a guard protects where they go.
   useGuardedLinks(push);
@@ -213,8 +236,26 @@ export function AccountShell({ children }: { children: ReactNode }) {
           { id: "dev.kitchen", label: "Open the style guide", group: "Developer", icon: <SwatchBook size={16} strokeWidth={2} />, keywords: ["kitchen", "components", "arc"], run: () => void go(paths.kitchen) },
         ]
       : []),
+    ...otherAccounts.map(other => ({
+      id: `account.switch.${other.uuid}`,
+      label: `Switch to ${other.display_name}`,
+      description: other.org ? `${other.id ?? other.uuid} · ${other.org.name}` : (other.id ?? other.uuid),
+      group: "Account",
+      icon: <UserRound size={16} strokeWidth={2} />,
+      keywords: ["switch", "account", "profile", other.id ?? "", other.display_name],
+      run: () => void switchTo(other.uuid),
+    })),
+    {
+      id: "account.add",
+      label: "Add another account",
+      description: "Sign in to another account in this browser",
+      group: "Account",
+      icon: <UserRoundPlus size={16} strokeWidth={2} />,
+      keywords: ["add", "account", "sign in", "another", "profile"],
+      run: () => void confirmNavigation(paths.signIn).then(ok => { if (ok) window.location.assign(firstPartySignInUrl(paths.home, { prompt: "login" })); }),
+    },
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={2} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
-  ], [go, doSignOut, developerUrl]);
+  ], [go, doSignOut, developerUrl, otherAccounts.map(other => other.uuid).join(), switchTo]);
 
   // ⌘K toggles the palette; 1 to 7 jump to sections (never while typing or with a layer open).
   useEffect(() => {
@@ -238,18 +279,8 @@ export function AccountShell({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [go, paletteOpen, status]);
 
-  // A Carbon's picture is their photo or their pixel avatar (lib/carbon-avatar.ts).
-  const picture = useCarbonPicture(me.data ?? session?.account);
-  const account = useMemo<UserMenuUser | null>(() => {
-    const summary = session?.account;
-    if (!summary) return null;
-    const full = me.data;
-    return {
-      name: full?.display_name ?? summary.display_name,
-      email: full?.id ?? summary.id ?? summary.uuid,
-      avatarSrc: picture?.src ?? full?.pfp_url ?? summary.pfp_url,
-    };
-  }, [session, me.data, picture?.src]);
+  // The signed-in account: its full record once loaded (the switcher's photo, name and id).
+  const account = session ? me.data ?? session.account : null;
 
   const brand = (
     <Link href={paths.home} aria-label="Team of Silicons Accounts" data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
@@ -262,52 +293,60 @@ export function AccountShell({ children }: { children: ReactNode }) {
     </Link>
   );
   const search = (
-    // Keyed by the layout: Silicon UI's Button measures its label once and keeps that width inline, so after a resize
-    // from wide to narrow it stayed 400px and covered the brand. A new Button measures again.
-    <Button key={narrow ? "narrow" : "wide"} variant="soft" size="sm" className={styles.search} onClick={openCommandPalette} aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"} aria-label={narrow ? "Search your account" : undefined}>
+    // Keyed by the layout: Silicon UI's Button measures its label once and keeps that width inline, so a new Button
+    // measures again when the sidebar moves between the page's side and the phone sheet.
+    <Button
+      key={narrow ? "narrow" : "wide"}
+      variant="soft"
+      size="sm"
+      className={styles.search}
+      onClick={() => {
+        setSheetOpen(false);
+        openCommandPalette();
+      }}
+      aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}
+    >
       <Search size={16} strokeWidth={2.1} aria-hidden="true" />
       <span className={styles.searchLabel}>Search</span>
       <kbd data-sq="surface" className={styles.keys}>{isApple ? "⌘K" : "Ctrl K"}</kbd>
     </Button>
   );
+  // The account switcher at the sidebar's foot (profile-menu.tsx): beside the page a full-width row opening a menu; in
+  // the phone sheet its rows are listed in place.
   const accountMenu = account ? (
-    <UserMenu
-      className={styles.account}
-      user={account}
-      showTheme={false}
-      onSignOut={menuSignOut}
-      align="end"
-    />
+    <ProfileMenu account={account} onManage={() => void go(paths.linkedAccounts)} onSignOut={menuSignOut} signingOut={signingOut} />
+  ) : null;
+  const accountList = account ? (
+    <ProfileList account={account} onManage={() => void go(paths.linkedAccounts)} onSignOut={menuSignOut} signingOut={signingOut} onDone={() => setSheetOpen(false)} />
   ) : null;
 
-  // The panel shell (redesign/decisions.md, 2026-10-30): the top bar (brand, search centred, the account menu), then
-  // the sections and the page in 8px of padding (the sections' width in steps, sidebar-resize.tsx). The page is a white box with an 8px corner and a 1px hairline. Under
-  // 900px the sections move into a bottom sheet from the top bar and the page is full bleed.
+  // The full-height shell (Anil, 2026-11-17, from the Apps store): from 900px no top bar; the sidebar carries the
+  // wordmark and search at its head and the account menu at its foot, and it and the page box run the window's full
+  // height in 8px of padding. Under 900px a top bar with the wordmark and the menu button; the sidebar (search, the
+  // sections, the account menu, the other sites) opens in a bottom sheet, and the page is full bleed. (The top-bar
+  // shell of 2026-10-30 is in git before this change.)
   const chrome = (content: ReactNode) => (
     <div className={styles.shell}>
       <SkipLink href="#main" />
+      {/* Drawn on every width, hidden from 900px by CSS, so a phone has it before the page knows its width. */}
       <header className={styles.top}>
         {brand}
-        {search}
-        <span className={styles.topEnd}>
-          {accountMenu}
-          {narrow ? (
-            <BottomSheet
-              title="Your account"
-              open={sheetOpen}
-              onOpenChange={setSheetOpen}
-              trigger={<Button variant="ghost" size="sm" aria-label="Account sections"><Menu size={18} strokeWidth={2} aria-hidden="true" /></Button>}
-            >
-              <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} />
-            </BottomSheet>
-          ) : null}
-        </span>
+        {narrow ? (
+          <BottomSheet
+            title="Your account"
+            open={sheetOpen}
+            onOpenChange={setSheetOpen}
+            trigger={<Button variant="ghost" size="sm" aria-label="Menu"><Menu size={18} strokeWidth={2} aria-hidden="true" /></Button>}
+          >
+            <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} head={search} account={accountList} />
+          </BottomSheet>
+        ) : null}
       </header>
       <div className={styles.body} style={{ "--sidebar-width": `${SIDEBAR_STEPS[sidebarStep]}px` } as CSSProperties}>
         {narrow ? null : (
           <>
             <aside id="account-sidebar" className={styles.aside}>
-              <Sidebar activeKey={active?.key} developerUrl={developerUrl} />
+              <Sidebar activeKey={active?.key} developerUrl={developerUrl} head={<><div className={styles.brandRow}>{brand}</div>{search}</>} account={accountMenu} />
             </aside>
             <SidebarResize step={sidebarStep} onStep={setSidebarStep} controls="account-sidebar" />
           </>

@@ -102,6 +102,18 @@ pub async fn get_flow(
     let fa = FlowApp::load_for_flow(&mut tx, &state.settings, &flow).await?;
     let browser = browser::current(&mut tx, &state, &headers).await?;
     let mut cookies = Vec::new();
+    if flow.step == Step::SelectAccount
+        && !browser.as_ref().is_some_and(|current| {
+            current.is_active_carbon()
+                && Some(current.session_id) == flow.extras.browser_session_id
+                && Some(current.account.uuid.as_str())
+                    == flow.extras.authenticated_account_uuid.as_deref()
+        })
+    {
+        // A chooser left open in another tab must forget the profiles it used to offer.
+        flow.reset_to_choose_method();
+        model::save(&mut tx, &flow).await?;
+    }
     if flow.extras.pending.is_some() && !flow.step.is_terminal() {
         cookies = claim_pending(&mut tx, &state, &headers, &meta, &mut flow, &fa).await?;
         model::save(&mut tx, &flow).await?;
@@ -203,7 +215,7 @@ pub async fn claim_pending(
             flow.extras.auth_method = Some(provider.as_str().to_string());
             flow.extras.new_account = false;
             next::advance(conn, state, meta, flow, fa, &account).await?;
-            Ok(signed.cookie.into_iter().collect())
+            Ok(signed.cookies)
         }
         Pending::Signup(p) => {
             let (session, cookie) = signup::create_session(
@@ -568,7 +580,8 @@ pub struct CodeBody {
 /// `verification_locked` (`Retry-After`), 410 `code_expired`, 409 `code_already_used`. The
 /// 10-tries lockout counts every code sent to the address, whichever flow sent it
 /// ([`codes`]).
-/// Outcomes: a verified email/phone of an active account signs the browser in and moves on;
+/// Outcomes: a verified email/phone of an active account signs the browser in and moves on (an
+/// archived Carbon, one that deleted its account less than 10 days ago, is restored first);
 /// an imported (unclaimed) account goes to sign-up prefilled with its data; an unknown
 /// email/phone opens a 48-hour sign-up session (403 `signup_not_allowed` when the app takes
 /// no new accounts). An unverified row an import left on another account identifies nobody:
@@ -638,7 +651,34 @@ pub async fn verify_code(
         return persist_failure(tx, &mut flow, e).await;
     }
     // The code proves the address: only a verified email/phone signs into an account.
-    let holder = contacts::after_proof(&mut tx, kind, &destination, meta.ip.as_deref()).await?;
+    let holder =
+        match contacts::after_proof(&mut tx, kind, &destination, meta.ip.as_deref()).await? {
+            // An explicit signup may use another account’s secondary email as the new primary.
+            Holder::Active(a)
+                if kind == ContactKind::Email
+                    && flow.extras.intent == super::model::Intent::Signup
+                    && contacts::primary_email(&mut tx, &a.uuid)
+                        .await?
+                        .is_some_and(|p| p.value != destination) =>
+            {
+                Holder::Free
+            }
+            // A Carbon that deleted its account less than 10 days ago gets it back by signing in.
+            Holder::Unavailable(a) if a.status == AccountStatus::Archived => {
+                match accounts::restore_archived(
+                    &mut tx,
+                    &a.uuid,
+                    challenge.created_at,
+                    meta.ip.as_deref(),
+                )
+                .await?
+                {
+                    Some(restored) => Holder::Active(restored),
+                    None => Holder::Unavailable(a),
+                }
+            }
+            holder => holder,
+        };
     let browser_before = browser::current(&mut tx, &state, &headers).await?;
     let mut cookies = Vec::new();
     // An app with `allowed_email_domains` takes only accounts with a verified email at one of
@@ -670,7 +710,7 @@ pub async fn verify_code(
             flow.extras.auth_method = Some(method.to_string());
             flow.extras.new_account = false;
             next::advance(&mut tx, &state, &meta, &mut flow, &fa, &a).await?;
-            cookies.extend(signed.cookie);
+            cookies.extend(signed.cookies);
         }
         Holder::Unclaimed(a) => {
             // Finishing an import keeps only what this Carbon proved: the import's unproven
@@ -799,12 +839,15 @@ pub async fn select_account(
     if !current.is_active_carbon() {
         return Err(browser::not_active(&current.account));
     }
+    let offered = browser::choices(&mut tx, proved, &flow, &fa.app.app_id).await?;
     if current.account.uuid != proved
-        || !accounts_core::repo::organizations::linked(&mut tx, proved, &body.account_uuid).await?
+        || !offered
+            .iter()
+            .any(|item| item["uuid"].as_str() == Some(&body.account_uuid))
     {
         return Err(ApiError::forbidden(
             "account_not_linked",
-            "This account is not linked to the account you proved.",
+            "Choose an account offered in this sign-in flow.",
         ));
     }
     let account = accounts::require(&mut tx, &body.account_uuid).await?;
@@ -815,35 +858,17 @@ pub async fn select_account(
         ));
     }
     // Choosing an account proves nothing new, so the session keeps its last proof (auth_time).
-    let signed = if account.uuid == current.account.uuid {
-        browser::SignedIn {
-            session_id: current.session_id,
-            cookie: None,
-        }
-    } else {
-        let signed =
-            browser::sign_in(&mut tx, &state, &headers, &meta, &account.uuid, false).await?;
-        sqlx::query("update browser_sessions set authenticated_at=(select authenticated_at from browser_sessions where id=$2) where id=$1")
-            .bind(signed.session_id)
-            .bind(current.session_id)
-            .execute(&mut *tx)
+    let profiles =
+        accounts_core::http::browser_profiles::BrowserProfiles::load(&mut tx, &state, &headers)
             .await?;
-        signed
-    };
+    let signed = profiles
+        .select(&mut tx, &state, &meta, &account.uuid, false)
+        .await?;
     flow.extras.browser_session_id = Some(signed.session_id);
     flow.extras.account_selected = true;
     next::advance(&mut tx, &state, &meta, &mut flow, &fa, &account).await?;
     model::save(&mut tx, &flow).await?;
-    let response = respond(
-        &mut tx,
-        &state,
-        &meta,
-        None,
-        &flow,
-        &fa,
-        signed.cookie.into_iter().collect(),
-    )
-    .await?;
+    let response = respond(&mut tx, &state, &meta, None, &flow, &fa, signed.cookies).await?;
     tx.commit().await?;
     Ok(response)
 }

@@ -61,6 +61,7 @@ export function defaultRoutes(signedIn: boolean): MockRoute[] {
     ["GET /readyz", () => ({ json: { database: "ok" } })],
     ["GET /v1/meta", () => ({ json: data.meta })],
     ["GET /v1/session", auth(() => ({ json: data.session }))],
+    ["GET /v1/session/accounts", auth(() => ({ json: { accounts: [{ ...data.carbonSummary, org: null, is_main: true }] } }))],
     ["POST /v1/session/signout", () => ({ status: 204 })],
     ["GET /v1/me", auth(() => ({ json: data.carbon }))],
     ["PATCH /v1/me", auth(() => ({ json: data.carbon }))],

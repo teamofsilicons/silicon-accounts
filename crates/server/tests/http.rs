@@ -995,7 +995,11 @@ async fn panics_and_timeouts_become_json_errors() {
     let r = call(router.clone(), Req::get(&format!("/v1/test/fail/{SECRET}"))).await;
     assert_eq!(r.status, 502);
 
-    let r = call(router.clone(), Req::get(&format!("/v1/test/panic/{SECRET}"))).await;
+    let r = call(
+        router.clone(),
+        Req::get(&format!("/v1/test/panic/{SECRET}")),
+    )
+    .await;
     assert_eq!(r.status, 500);
     assert_eq!(r.error_code(), Some("internal"));
     let id = header(&r, "x-request-id").expect("request id").to_string();
@@ -1012,9 +1016,18 @@ async fn panics_and_timeouts_become_json_errors() {
     assert_eq!(r.json["error"]["details"]["timeout_seconds"], 0);
 
     let logged = std::fs::read_to_string(log.path()).expect("read logs");
-    assert!(logged.contains("handler exploded"), "logs were captured: {logged}");
-    assert!(logged.contains("upstream failed"), "logs were captured: {logged}");
-    assert!(!logged.contains(SECRET), "a raw path reached the logs: {logged}");
+    assert!(
+        logged.contains("handler exploded"),
+        "logs were captured: {logged}"
+    );
+    assert!(
+        logged.contains("upstream failed"),
+        "logs were captured: {logged}"
+    );
+    assert!(
+        !logged.contains(SECRET),
+        "a raw path reached the logs: {logged}"
+    );
 }
 
 #[tokio::test]
@@ -1413,4 +1426,46 @@ async fn dev_outbox_shows_sealed_codes_after_sending() {
             .as_str()
             .is_some_and(|t| t.starts_with(&code))
     );
+}
+
+#[tokio::test]
+async fn interface_profile_preflight_accepts_bearers_and_keeps_registration_server_side() {
+    let ctx = TestContext::new().await;
+    assert_eq!(
+        accounts_server::paths::RouteClass::of(
+            &axum::http::Method::POST,
+            "/v1/interface-accounts/me/photo"
+        ),
+        accounts_server::paths::RouteClass::PhotoUpload
+    );
+    for (url, method, allowed) in [
+        ("/v1/interface-accounts/me", "PATCH", true),
+        ("/v1/interface-accounts/me/photo", "POST", true),
+        ("/v1/interface-accounts/potato/registrations", "POST", false),
+    ] {
+        let r = accounts_core::test_support::call(
+            accounts_server::build_router(ctx.state.clone()),
+            Req::new(axum::http::Method::OPTIONS, url)
+                .header("origin", "https://potato.example")
+                .header("access-control-request-method", method)
+                .header(
+                    "access-control-request-headers",
+                    "authorization, content-type, idempotency-key",
+                ),
+        )
+        .await;
+        assert_eq!(
+            r.headers.contains_key("access-control-allow-origin"),
+            allowed
+        );
+        if allowed {
+            assert!(
+                r.headers["access-control-allow-methods"]
+                    .to_str()
+                    .unwrap()
+                    .contains(method)
+            );
+            assert!(!r.headers.contains_key("access-control-allow-credentials"));
+        }
+    }
 }

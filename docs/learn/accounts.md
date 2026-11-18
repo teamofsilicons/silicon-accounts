@@ -76,7 +76,7 @@ curl -s -H "Authorization: Bearer $ACCESS_TOKEN" "$ACCOUNTS_URL/v1/me"
 | `pfp_url` | The profile photo. By default a generated image from Iris (`…/pfp/carbon?id=<uuid>` or `…/pfp/silicon?id=<uuid>`). |
 | `dob` | Date of birth, `YYYY-MM-DD`. |
 | `timezone` | An IANA timezone such as `Asia/Kolkata` or `UTC`. |
-| `status` | `active`, `unclaimed`, `pending_custodian` or `deleted` (below). |
+| `status` | `active`, `unclaimed`, `pending_custodian`, `archived` or `deleted` (below). |
 | `created_at`, `updated_at` | RFC 3339 UTC timestamps with milliseconds. |
 | `version` | Goes up with every change to the account, so anyone holding a copy can tell which one is newer. |
 
@@ -89,6 +89,7 @@ Ids have rules of their own (the 10-day hold after a change, reclaiming an old i
 | `active` | A normal account. |
 | `unclaimed` | A Carbon account an app created by [importing](imports.md) its users. Its owner finishes it the first time they sign in with the address it carries; until then nobody can sign in to it. |
 | `pending_custodian` | A Silicon that created its own account and named a custodian who hasn't accepted yet (they have 14 days). It can't sign in. |
+| `archived` | A Carbon that deleted its account less than 10 days ago. It's signed out and can't sign in to apps; signing in with a code sent to one of its emails or phones brings it back. After 10 days it becomes `deleted`. |
 | `deleted` | Deleted. The uuid stays reserved forever; nothing else of the account remains usable. |
 
 ## Carbon accounts
@@ -102,7 +103,7 @@ A Carbon account also has:
 | `identities` | Linked Google and Apple accounts: `{provider, subject, email, created_at, last_used_at}`. |
 | `custodian_of` | How many Silicons this Carbon is custodian of. |
 
-A Carbon signs in with a 6-digit code sent to any email or phone number on their account. They can also use a linked Google or Apple account, if the app offers that method.
+A Carbon signs in with a six-digit code sent to a verified email or phone. For a shared email, sign-in selects its verified primary account. An address with exactly one verified secondary owner can also sign in to that account. They can also use a linked Google or Apple account, if the app offers that method.
 
 When a Carbon signs up, we fill in the setup page with suggestions: a display name from Google or Apple (or from the email address), an available `c:id`, the timezone of their network, a date of birth exactly 18 years ago and the default photo. They can change any of these before continuing.
 
@@ -110,7 +111,7 @@ When a Carbon signs up, we fill in the setup page with suggestions: a display na
 
 ```sh
 silicon-accounts email add dora.work@example.com        # sends a 6-digit code (valid 10 minutes)
-silicon-accounts email verify <challenge-id> <code>     # proves it; now it signs you in too
+silicon-accounts email verify <challenge-id> <code>     # verifies and adds the address
 silicon-accounts email primary dora.work@example.com    # apps with the email scope are told
 silicon-accounts email remove dora@example.com          # any address except the primary
 ```
@@ -128,8 +129,8 @@ Phone numbers work exactly the same way under `silicon-accounts phone`. Give the
 The rules, and why:
 
 - **Every address is verified before it counts.** We send a code to the address, and only the right code adds it. An address Google or Apple vouches for (when the Carbon signs in with them, or connects them on the account site) is added without a code. An address nobody has proven never signs anyone in. The only unverified addresses that exist are the ones an import attached to an account nobody has finished yet.
-- **One address, one account.** You can't add an address that belongs to another account: `409 email_in_use` ("priya@example.com already belongs to another account."). Any address signs you in, so two accounts sharing one would make sign-in ambiguous.
-- **Exactly one primary of each kind.** The first address you add becomes the primary, and you can make any other verified address primary. Apps that may see email or phone see the primary one, and we tell them when it changes (`account.updated`).
+- **An email can be primary on one account.** You can verify the same address as a secondary contact on other accounts. If you entered that address deliberately to create a new account, choose Sign up. When several accounts share only secondary claims, use an unambiguous sign-in contact. Phone numbers belong to one account.
+- **Each account chooses one primary of each kind.** The first address becomes primary. To promote another verified email, it must be available as a primary. Apps with permission see the primary contact and receive `account.updated` when it changes.
 - **The primary can't be removed.** Make another one primary first: `409 cannot_remove_primary` ("dora@example.com is your primary email and the primary can't be removed."). This way every Carbon keeps a way to sign in and every app keeps a current address.
 - **At most 10 of each.** The 11th gets `422 email_limit_reached` ("Your account already has 10 emails, the most it can have.").
 
@@ -144,7 +145,7 @@ These limits stop anyone guessing addresses or sending spam:
 
 | code | status | when |
 |---|---|---|
-| `email_in_use`, `phone_in_use` | 409 | The address belongs to another account. |
+| `email_in_use`, `phone_in_use` | 409 | That email is already primary or reserved elsewhere, or the phone belongs to another account. |
 | `email_already_added`, `phone_already_added` | 409 | It is already on your account. |
 | `email_limit_reached`, `phone_limit_reached` | 422 | You already have 10. |
 | `invalid_email`, `invalid_phone`, `invalid_country` | 422 | The address or the country is not valid; the message says why. |
@@ -230,7 +231,7 @@ silicon-accounts delete-account --confirm c:dora
 ```
 
 ```text
-Deleted c:dora. Apps you signed into were told; your id is held for 10 days.
+Deleted c:dora. You're signed out everywhere; sign in with a code within 10 days to get it back.
 ```
 
 Over HTTP it's `DELETE /v1/me` with `{"confirm": "c:dora"}` (the bare handle works too), which answers `204`. The confirmation must be the account's current id: a wrong one gets `422 confirmation_mismatch` and a missing one gets `422 confirmation_required`.
@@ -250,11 +251,13 @@ Over HTTP it's `DELETE /v1/me` with `{"confirm": "c:dora"}` (the bare handle wor
 
 That's a `409`. Transfer each Silicon (`silicon-accounts silicon transfer`) or delete it (`silicon-accounts silicon delete <si:id> --confirm <si:id>`), then delete the account.
 
-Deleting happens at once, in one step, and can't be undone:
+**First the account is archived for 10 days.** The status becomes `archived`, every session and app sign-in (tokens) is revoked, and we email the primary email saying when the account will be deleted. Everything else stays: the id, emails, phones, Google or Apple links and app memberships. Apps aren't told yet. Signing in again with a new six-digit code sent after the deletion request to one of the account's verified sign-in emails or phones brings the account back as `active` (its old sign-ins stay ended); a Google or Apple sign-in is refused with a hint to use a code.
+
+**After 10 days without that sign-in, the account is deleted**, in one step that can't be undone:
 
 - The status becomes `deleted` and the account can never sign in again.
-- **The id is held for 10 days**, so nobody can take `c:dora` and pass as Dora to the Carbons, Silicons and apps that still know the old id. After that anyone may take it.
-- **The uuid is never reused.** Looking it up answers `404 account_deleted`. Looking up the old id answers `404 account_not_found`, with a hint that it was released recently.
+- **The CarbonID becomes available again.** The ten-day reservation ran from the deletion request.
+- **The uuid is never reused.** Looking it up answers `404 account_deleted`. Looking up the released ID returns `404 account_not_found` until another account takes it.
 - **Every email, phone number and Google or Apple link is removed**, so those addresses are free again, for a new account or to add to another one.
 - We revoke every session, every app sign-in (tokens) and every User verification proof issued about the account.
 - The photo goes back to the default, and we delete uploaded photos that no other account still shows.
@@ -273,7 +276,7 @@ silicon-accounts silicon delete si:dora_helper --confirm si:dora_helper
 Deleted si:dora_helper. Apps it signed into were told; its id is held for 10 days.
 ```
 
-A Silicon that tries to delete itself gets `403 custodian_required` ("A Silicon can't delete its own account: si:ada_scout is deleted by its custodian c:ada."), because its custodian is the one responsible for it. Everything else works as it does for a Carbon: apps receive `account.deleted`, the id is held for 10 days and the uuid is never reused. The Silicon's own webhook is kept, so its last notifications still arrive.
+A Silicon that tries to delete itself gets `403 custodian_required` ("A Silicon can't delete its own account: si:ada_scout is deleted by its custodian c:ada."), because its custodian is the one responsible for it. Apps receive `account.deleted`. A Silicon's ID is held for ten days from its immediate deletion and its UUID is never reused. The Silicon's own webhook is kept, so its last notifications still arrive.
 
 ## Related
 

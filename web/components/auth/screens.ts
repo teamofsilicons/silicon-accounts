@@ -203,7 +203,7 @@ const interactionScreens: ScreenSpec[] = [
   },
   { name: "auth-first-party", path: flowPath("silicon-accounts", "choose_method"), as: "signed-out", routes: flowRoutes, waitFor: READY },
   // After an account is deleted (the CarbonID comes from session storage; without it the page names none).
-  { name: "auth-goodbye", path: "/goodbye", as: "signed-out", waitFor: "h1:has-text(\"Your account is deleted\")" },
+  { name: "auth-goodbye", path: "/goodbye", as: "signed-out", waitFor: "h1:has-text(\"Account deletion requested\")" },
   {
     // No fake app uses a background image: briefcase with one (and a logo-only header), to see the image treatment.
     name: "auth-branding-image",

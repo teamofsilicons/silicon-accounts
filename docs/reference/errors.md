@@ -184,7 +184,7 @@ logs, and `silicon-accounts report` and `POST /v1/reports` take it in the messag
 | Code | Status | Cause and fix |
 |---|---|---|
 | `invalid_email` / `invalid_phone` / `invalid_country` | 422 | the address, number or country code can't be read (the message says why) |
-| `email_in_use` / `phone_in_use` | 409 | it belongs to another account; an address belongs to one account only |
+| `email_in_use` / `phone_in_use` | 409 | the email is already primary or reserved elsewhere, or the phone belongs to another account |
 | `email_already_added` / `phone_already_added` | 409 | it is already on your account |
 | `email_limit_reached` / `phone_limit_reached` | 422 | 10 already; remove one first |
 | `email_not_found` / `phone_not_found` | 404 | not on your account |

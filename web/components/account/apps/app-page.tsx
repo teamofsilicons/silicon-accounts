@@ -27,7 +27,6 @@ import { paths } from "@/lib/navigation";
 import { useMe } from "@/lib/query/session";
 import { timezoneLabel } from "@/lib/timezones";
 import { AppMark } from "../parts/app-mark";
-import { withAppIcon } from "../parts/app-icons";
 import { asCarbon, describeError, useNow } from "../parts/common";
 import { PageBar } from "../parts/page-bar";
 import { useEveryApp, useEveryProof, useRemoveAccess } from "../parts/queries";
@@ -117,7 +116,7 @@ function AppDetails({ item, me, now, proofs }: { item: MyApp; me: Me | undefined
   return (
     <>
       <div className={styles.intro}>
-        <AppMark app={withAppIcon(app)} size={40} className={styles.mark} decorative />
+        <AppMark app={app} size={40} className={styles.mark} decorative />
         <span className={styles.introText}>
           <span className={styles.introTitle}>{place}</span>
           {since ? <span className={styles.introLine}>{since}</span> : null}

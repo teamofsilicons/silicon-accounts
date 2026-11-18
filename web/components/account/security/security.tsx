@@ -34,7 +34,7 @@ import { formatPhone, formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useMe, useMeta } from "@/lib/query/session";
 import { browserLogo, browserOf } from "../parts/browser";
-import { keepSession, readKept, staleSession, subscribeKept } from "../parts/checkup";
+import { keepSession, readKept, staleSessions, subscribeKept } from "../parts/checkup";
 import { asCarbon, asSilicon, describeError, spanText, stkRotatedAt, useNow } from "../parts/common";
 import { useConnectProvider, useEverySession, useEverySilicon, useSignOutSession, useUnlinkProvider } from "../parts/queries";
 import { PageBar } from "../parts/page-bar";
@@ -98,7 +98,7 @@ export function Security() {
                 // With no number yet the dialog opens on the form, so it says what it's for (Anil, 2026-11-10, copy B).
                 title={editing === "email" ? "Email code" : carbon.phones.length === 0 ? "Add a phone number" : "Text code"}
                 description={editing === "email"
-                  ? "A code sent to any of these emails signs you in. Apps that can see your email get the primary one."
+                  ? "Your primary email signs you in and is shared with apps you approve. If you use an email on more than one account, it signs in to the account where it is primary."
                   : carbon.phones.length === 0
                     ? "Once it’s verified, you can sign in with a code texted to it."
                     : "A code texted to any of these numbers signs you in. Apps that can see your phone number get the primary one."}
@@ -130,7 +130,7 @@ function Checkup({ carbon, onAddPhone }: { carbon: CarbonMe; onAddPhone: () => v
   const signOut = useSignOutSession();
   const now = useNow(30_000);
   const kept = useSyncExternalStore(subscribeKept, readKept, () => "");
-  const stale = staleSession(sessions.data?.items, now, kept);
+  const [stale] = staleSessions(sessions.data?.items, now, kept);
   const noPhone = carbon.phones.length === 0;
   const count = Number(noPhone) + Number(!!stale);
   if (!count) return null;

@@ -12,7 +12,6 @@ import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
 import type { MyProof } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
 import { AppMark } from "../parts/app-mark";
-import { withAppIcon } from "../parts/app-icons";
 import { describeError } from "../parts/common";
 import { useRevokeProof } from "../parts/queries";
 import { Row, Strong } from "../parts/rows";
@@ -43,8 +42,8 @@ export function endedBecause(proof: MyProof): string {
 function Pair({ proof, faded }: { proof: MyProof; faded?: boolean }) {
   return (
     <span className={styles.pair} data-faded={faded || undefined} aria-hidden="true">
-      <AppMark app={withAppIcon(proof.issuing_app)} size={28} className={styles.mark} decorative />
-      <AppMark app={withAppIcon(proof.receiving_app)} size={28} className={styles.mark} decorative />
+      <AppMark app={proof.issuing_app} size={28} className={styles.mark} decorative />
+      <AppMark app={proof.receiving_app} size={28} className={styles.mark} decorative />
     </span>
   );
 }
@@ -68,7 +67,7 @@ export function ActiveProofRow({ proof, own }: { proof: MyProof; own?: boolean }
   };
   return (
     <Row
-      lead={own ? <AppMark app={withAppIcon(proof.receiving_app)} size={28} className={styles.mark} decorative /> : <Pair proof={proof} />}
+      lead={own ? <AppMark app={proof.receiving_app} size={28} className={styles.mark} decorative /> : <Pair proof={proof} />}
       title={own ? `In ${receiving}` : `${issuing} in ${receiving}`}
       detail={<>May do {allowed} · ends <Strong>{formatDate(proof.expires_at)}</Strong></>}
     >

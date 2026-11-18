@@ -18,9 +18,6 @@ import { legibleBranding } from "./legible";
 import type { FrameApp } from "./model";
 import styles from "./flow.module.css";
 
-/** The Silicon Accounts mark, for the account site's own sign-in (the first-party app has no logo of its own). */
-const SILICON_ACCOUNTS_MARK = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" rx="44" fill="#E3E3E3"/><circle cx="126.42" cy="99.5" r="29.5" fill="#181818"/><rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="#181818"/></svg>')}`;
-
 /** The paint theme of a branding for this visitor: the app's forced theme, else the visitor's own. */
 export function usePaint(app: FrameApp | null, site: boolean): PaintTheme {
   const { theme } = useTheme();
@@ -33,7 +30,7 @@ export function AppIdentity({ app, paint, hideName, className }: { app: FrameApp
   const branding = normalizeBranding(app?.branding as Partial<Branding> | undefined);
   const own = app ? brandLogo(branding, { logo_url: app.logo_url ?? null, logo_dark_url: app.logo_dark_url ?? null }, paint) : null;
   // Our own first-party apps (the account site, the developer site) wear the Silicon Accounts mark.
-  const logo = own ?? (app?.app_id === "silicon-accounts" || app?.first_party ? SILICON_ACCOUNTS_MARK : null);
+  const logo = own ?? (app?.app_id === "silicon-accounts" || app?.first_party ? "/icon.svg" : null);
   const [broken, setBroken] = useState<string | null>(null);
   if (!app || (!logo && !branding.show_app_name)) return null;
   const showLogo = !!logo && broken !== logo;

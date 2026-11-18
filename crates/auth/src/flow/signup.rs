@@ -672,7 +672,7 @@ pub async fn submit_signup(
     )
     .await?;
     tx.commit().await?;
-    let mut cookies: Vec<Cookie<'static>> = signed.cookie.into_iter().collect();
+    let mut cookies: Vec<Cookie<'static>> = signed.cookies;
     cookies.push(clear_cookie(&state.settings, SIGNUP_COOKIE));
     Ok(FlowResponse::ok(view, cookies))
 }

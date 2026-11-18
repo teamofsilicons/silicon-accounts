@@ -54,7 +54,14 @@ pub async fn response_policy(State(state): State<AppState>, req: Request, next: 
             .headers()
             .contains_key(header::ACCESS_CONTROL_REQUEST_METHOD)
     {
-        let mut response = preflight(req.headers(), paths::is_interface_public_token_path(&path));
+        let methods = paths::interface_profile_methods(&path).unwrap_or_else(|| {
+            if paths::is_interface_public_token_path(&path) {
+                "POST, OPTIONS"
+            } else {
+                "GET, HEAD, OPTIONS"
+            }
+        });
+        let mut response = preflight(req.headers(), methods);
         finish(&mut response, &state.settings, &path, true);
         return response;
     }
@@ -78,16 +85,12 @@ fn retry_after_on_429(response: &mut Response) {
 }
 
 /// `204` answer to a CORS preflight on a public resource.
-fn preflight(request_headers: &HeaderMap, interface_token: bool) -> Response {
+fn preflight(request_headers: &HeaderMap, methods: &'static str) -> Response {
     let mut response = StatusCode::NO_CONTENT.into_response();
     let h = response.headers_mut();
     h.insert(
         header::ACCESS_CONTROL_ALLOW_METHODS,
-        HeaderValue::from_static(if interface_token {
-            "POST, OPTIONS"
-        } else {
-            "GET, HEAD, OPTIONS"
-        }),
+        HeaderValue::from_static(methods),
     );
     h.insert(
         header::ACCESS_CONTROL_MAX_AGE,

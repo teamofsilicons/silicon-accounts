@@ -351,6 +351,8 @@ test("validated packages retain both output streams and releases promote with in
   const packages = [
     pkg,
     { ...pkg, id: "package-newer", sha256: "b".repeat(64) },
+    { ...pkg, id: "package-windows", target: "windows-x86_64", sha256: "c".repeat(64) },
+    { ...pkg, id: "package-linux", target: "linux-x86_64", sha256: "d".repeat(64) },
   ];
   const releases: Release[] = [];
   await page.route("**/api/apps/apps/test-app/packages", (route) =>
@@ -400,6 +402,8 @@ test("validated packages retain both output streams and releases promote with in
   await picker.nth(0).check();
   await picker.nth(1).check();
   await expect(picker.nth(0)).not.toBeChecked();
+  await picker.nth(2).check();
+  await picker.nth(3).check();
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Create release", exact: true })
@@ -407,7 +411,7 @@ test("validated packages retain both output streams and releases promote with in
   await expect(
     page.getByText("Development release 0.3.0 created."),
   ).toBeVisible();
-  expect(releases[0].package_ids).toEqual(["package-newer"]);
+  expect(releases[0].package_ids.toSorted()).toEqual(["package-linux", "package-newer", "package-windows"]);
   await page.getByRole("button", { name: "Promote", exact: true }).click();
   await page.getByLabel("Production version").fill("2.0.0");
   await page.getByRole("button", { name: "Promote release" }).click();
@@ -494,7 +498,7 @@ test("webhook retrieval failure never exposes editable defaults that could overw
 test("online docs include a concrete publishing path and explain state and update behavior", async ({ page }) => {
   await mock(page);
   await page.goto("/docs/apps/start/publish");
-  for (const command of ["apps availability ring", "apps create ring --name Ring", "apps validate ./package", "apps pack ./package --output ./ring.tar.gz", "apps upload ring --target linux-x86_64 ./ring.tar.gz", "apps release ring --version 0.1.0 --package PACKAGE_ID", "apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0", "apps publish ring"])
+  for (const command of ["apps availability ring", "apps create ring --name Ring", "apps validate ./package", "apps pack ./package --output ./ring.tar.gz", "apps upload ring --target linux-x86_64 ./ring.tar.gz", "apps release ring --version 0.1.0 --package LINUX_PACKAGE_ID --package WINDOWS_PACKAGE_ID --package MACOS_PACKAGE_ID", "apps promote ring DEVELOPMENT_RELEASE_ID --version 1.0.0", "apps publish ring"])
     await expect(page.locator("code").filter({ hasText: command }).first()).toBeVisible();
   await page.goto("/docs/apps/learn/releases-and-updates");
   // The docs' own words (docs-apps/, rewritten in the house voice): an exact version is where you start, not a pin.

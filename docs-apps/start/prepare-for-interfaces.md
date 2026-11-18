@@ -25,9 +25,20 @@ Use real endpoints and behavior from your app. Keep the guide current when your 
 
 In [Silicon Developer](https://developers.teamofsilicons.com), open your app's publishing setup and add the URL under **Interface API documentation**. New apps require this HTTPS URL before publishing; a newly published app must retain it. Drafts can be saved without it. Apps that existed before this requirement are not retroactively blocked from publishing or making releases, but adding a guide helps interface creators use them.
 
-The published Silicon Apps CLI 0.3.2 does not yet include the interface metadata setup command. Use the portal or the HTTP API below.
+Apps CLI 0.3.5 can also save the URL with `silicon-apps setup YOUR_APP_ID interface --api-docs https://example.com/openapi.json`.
+
+Silicon Accounts publishes its [registration and profile API for interfaces](/docs/accounts/start/interface-accounts). Include the resource app ID `silicon-account-management` to use it.
 
 ## 2. Verify app access on your API
+
+To embed the **Silicon Apps catalog** itself, add `silicon-apps-catalog` to your
+interface’s app IDs. Use the access token from
+`apps["silicon-apps-catalog"].access_token` in the Accounts sign-in response.
+Send it as `Authorization: Bearer TOKEN` to `https://apps.teamofsilicons.com`.
+The interface can list and search published apps available to the account, get
+an app and its reviews or media, and resolve and download signed releases. Public
+listings are also available anonymously. Publishing, draft access and account
+management require a first-party sign-in. [Catalog API reference](https://apps.teamofsilicons.com/openapi.json)
 
 Accounts issues separate access tokens for the apps authorized through an interface. Your API should receive the token issued for **your app**, check it and apply your own account and resource permissions. An Interface secret, an Interface session capability, an Accounts first-party token or a token issued for another app is not your app's access token. Do not ask an interface creator for their secret or refresh token.
 

@@ -33,6 +33,8 @@ Node 24 or newer. Read the bundled Next docs in `node_modules/next/dist/docs/` b
 breaking changes (`proxy.ts` instead of `middleware.ts`, async `params`/`searchParams`, `PageProps<"/route">` from
 `next typegen`, Turbopack by default).
 
+The signed-in header uses `components/foundation/shell/profile-menu.tsx` for the profile picker. It opens a radio menu on desktop and a bottom drawer below 640px. Each profile shows its name and handle, with a check beside the current account.
+
 ## Topology
 
 The account site uses `silicon-accounts` as its first-party app ID. Existing browser cookies and saved return paths remain valid through the rename.
@@ -140,7 +142,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 
 `app/(app)/layout.tsx` mounts the client providers for everything under it (one query cache across the account pages
 and the hosted pages); the root layout and the public landing load none. `app/(app)/(shell)/layout.tsx` wraps the
-account pages in the account shell (sidebar, ⌘K palette, sign-in gate). While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
+account pages in the account shell (sidebar, ⌘K palette, sign-in gate). The shell is full height (2026-11-17): from 900px there is no top bar, and the sidebar holds the brand and Search at its head and the account switcher at its foot (`profile-menu.tsx`, 2026-11-18: every account signed in on this browser, Add another account, Your accounts, Sign out; listed in place in the phone sheet); under 900px a top bar shows the brand and a Menu button that opens the sidebar in a bottom sheet. While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
 development only: production answers 404 unless the server runs with `ACCOUNTS_KITCHEN=1`.
 
 ## Conventions
@@ -194,6 +196,8 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   --space-section 16, --space-block 24, --space-page 32), and the title roles one step down (display 28, h1 22, h2 18,
   h3 16); text stays at 16. `:root[data-density="comfortable"]` holds the scale before; the dev panel's Look → Density
   sets it, kept in this browser (`accounts.dev.density`), to compare.
+- **Allo on trial** (2026-11-18): `--font-body` (and so `--font-display`) is Allo, self-hosted from
+  `assets/fonts/allo` as `--font-allo` in `app/fonts.ts`, with the system font behind it. The note below is the shipped type.
 - **Typography** (`styles/tokens.css`, `app/fonts.ts`, 2026-11-09): Silicon UI's typography as it ships, in Hanken
   Grotesk for text and titles (preloaded; Silicon UI ships Geist for titles). Its tokens are untouched: `--text-xs` to
   `--text-5xl` (12, 14, 16, 18, 22, 28, 36, 52, 72 px), `--tracking-display` -.03em and `--tracking-body` -.01em,
@@ -848,6 +852,10 @@ in `redesign/api-gaps.md`).
   deck in a dialog) and asks a Carbon with no phone to add one. The attention strip is gone.
 - **Avatars are circles** (Silicon UI's default): the 30% squircle override is gone from `styles/tokens.css`, so the
   account menu's hover, press and loading states match the picture.
+- **Silicon UI 0.6.0** (2026-11-18, teamofsilicons/silicon-ui#42): Allo as its face at roundness 20 (`--font-roundness`),
+  the weight tokens in every component, the nine type roles, `--font-mono` and `--leading-read`, all with this site's
+  values, so `styles/tokens.css` no longer declares them; it keeps `--font-body` (Allo with the system font behind it)
+  and the dev tools' exemption. Segmented control and Billing toggle have Tabs' 2px frame.
 - **Silicon UI 0.5.0** (2026-11-13): the local pnpm patch of 0.4.0 is gone; everything in it shipped in 0.5.0
   (teamofsilicons/silicon-ui#41, issues #28 to #40). The hint-size fallback is 12px upstream, which changes nothing here
   (`tokens.css` sets `--field-hint-size`). `hideHeader`, Button's `link` and Input's `prefix`/`suffix` are experimental
@@ -897,6 +905,8 @@ The hosted flow renders the server-driven `select_account` step before sharing d
 
 The account chooser uses Silicon UI avatars to display each personal and work account’s profile picture, with initials when a picture is missing or unavailable. Organization logos appear beside the organization name, separately from the account avatar. The `auth-work-picker` screenshot covers photos, an organization logo, and the missing-logo fallback.
 
+Your Accounts and the top-right profile menu share `components/foundation/avatar/profile-avatar.tsx`. Both display each work profile’s own picture, including its configured Carbon avatar. In Your Accounts, a 16px organization logo sits beside its name. The `account-work-linked` screen covers two profiles in one organization and a third in an organization without a logo.
+
 Work-invitation pages permit form handoff to the exact configured Organizations HTTP origin only when it is loopback; the value comes from trusted API metadata or `ACCOUNTS_ORGANIZATIONS_URL`. Other pages keep their existing form policy. Invitation pages send `Referrer-Policy: strict-origin`: only the Accounts origin reaches Organizations, preserving the Origin check without leaking the invitation ticket path.
 
 ## Silicon notification migration
@@ -904,3 +914,7 @@ Work-invitation pages permit form handoff to the exact configured Organizations 
 Silicon creation and management use Ting notification setup in place of own webhook URLs and secrets.
 See `../docs/start/silicon-notifications.md` for anonymous approval receivers, authenticated account delivery,
 and migration behavior. App webhook management remains on the developer site.
+
+## Browser profile switching
+
+The header and Your Accounts load the browser’s independently authenticated profiles and their linked work accounts from `GET /v1/session/accounts`. Switching through `POST /v1/session/accounts/switch` opens Home with a fresh page cache. Account-page requests include the UUID rendered by the tab in `X-Accounts-Profile` so an old tab cannot apply a change to a different active account. App logos come from the app record. An empty account keeps the Home introduction visible.

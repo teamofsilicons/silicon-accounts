@@ -2896,7 +2896,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-cli"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "assert_cmd",
  "axum",
@@ -2915,7 +2915,7 @@ dependencies = [
 
 [[package]]
 name = "silicon-accounts-client"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -2972,6 +2972,7 @@ dependencies = [
  "serde_urlencoded",
  "sha2 0.10.9",
  "silicon-accounts-core",
+ "silicon-publishing-policy",
  "sqlx",
  "subtle",
  "thiserror",
@@ -3092,6 +3093,15 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "silicon-publishing-policy"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

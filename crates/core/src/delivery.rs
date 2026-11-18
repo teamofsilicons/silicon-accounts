@@ -716,6 +716,9 @@ pub mod templates {
             (OtpPurpose::Signin, None) | (OtpPurpose::CliLogin, _) => {
                 "Use it to sign in to Silicon Accounts.".into()
             }
+            (OtpPurpose::InterfaceRegistration, _) => {
+                "Use it to create a new Silicon Accounts profile.".into()
+            }
             (OtpPurpose::AddEmail, _) => {
                 "Use it to add this email to your Silicon Accounts account.".into()
             }
@@ -791,6 +794,42 @@ pub mod templates {
         format!(
             "{code} is your Silicon Accounts code{target}. It expires in {minutes} minutes. Don't share it."
         )
+    }
+
+    /// To a Carbon that deleted its account: it is archived until `delete_after`, and signing in
+    /// with a code before then brings it back.
+    pub fn account_archived_email(
+        id: &str,
+        delete_after: OffsetDateTime,
+        site_url: &str,
+    ) -> Rendered {
+        let day = crate::timefmt::format_rfc3339_ms(delete_after);
+        let subject = format!("Deletion requested for {id}");
+        let text = format!(
+            "You requested deletion of your Silicon Accounts account {id}. You're signed out everywhere, and the account \
+             will be deleted for good at {day}.\n\n\
+             Changed your mind? Sign in at {site_url} before then with a fresh code sent to your verified email or phone, and your \
+             account comes back.\n\n\
+             If you didn't delete it, sign in now to keep it.\n"
+        );
+        let html = wrap_html(
+            "Account deletion requested",
+            &format!(
+                "<p>You requested deletion of your Silicon Accounts account <b>{}</b>. You're signed out everywhere, and the \
+                 account will be deleted for good at <b>{}</b>.</p>\
+                 <p>Changed your mind? <a href=\"{}\" style=\"color:#1F5FB8\">Sign in</a> before then with a code \
+                 sent to your verified email or phone, and your account comes back.</p>\
+                 <p style=\"color:#5C6370\">If you didn't delete it, sign in now to keep it.</p>",
+                escape_html(id),
+                escape_html(&day),
+                escape_html(site_url),
+            ),
+        );
+        Rendered {
+            subject,
+            text,
+            html,
+        }
     }
 
     /// To an existing Carbon named as custodian by a Silicon.

@@ -21,7 +21,6 @@ import { ChevronRight, Plus } from "lucide-react";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import { AppMark } from "@/components/account/parts/app-mark";
-import { withAppIcon } from "@/components/account/parts/app-icons";
 import { pairOf, SiliconMark } from "@/components/account/parts/silicon-mark";
 import styles from "./cards-lab.module.css";
 
@@ -246,7 +245,7 @@ function AppSpacing() {
                   <li key={app.id}>
                     <div data-sq="surface" className={styles.homeCard}>
                       <div className={styles.homeTop}>
-                        <AppMark app={withAppIcon({ app_id: app.id, name: app.name, logo_url: null })} size={32} className={styles.homeMark} decorative />
+                        <AppMark app={{ app_id: app.id, name: app.name, logo_url: null }} size={32} className={styles.homeMark} decorative />
                         <span className={styles.homeWords}>
                           <span className={styles.homeName}>{app.name}</span>
                           <span className={styles.homeLine}>{app.line}</span>
@@ -290,7 +289,7 @@ function AppLayouts() {
               <h3 className={styles.spacingName}>{layout === "beside" ? "Beside · the words beside the icon (Home now)" : "Below · the line below the icon (tried)"}</h3>
               <ul className={styles.grid}>
                 {HOME_APPS.map(app => {
-                  const mark = <AppMark app={withAppIcon({ app_id: app.id, name: app.name, logo_url: null })} size={40} className={styles.homeMark} decorative />;
+                  const mark = <AppMark app={{ app_id: app.id, name: app.name, logo_url: null }} size={40} className={styles.homeMark} decorative />;
                   const when = app.joined ? app.fact.replace("Signed in ", "") : null;
                   return (
                     <li key={app.id}>

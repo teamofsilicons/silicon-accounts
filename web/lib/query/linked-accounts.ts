@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { request } from "@/lib/api/http";
-import type { LinkedAccounts, Me } from "@/lib/api/types";
+import type { LinkedAccounts } from "@/lib/api/types";
 import { useIdempotentMutation } from "./idempotency";
 
 export function useLinkedAccounts() {
@@ -20,10 +20,21 @@ export function useLinkedAccountAction<T, V>(action: string) {
   );
 }
 
-export function useSwitchLinkedAccount() {
-  return useLinkedAccountAction<Me, { account_uuid: string }>(
-    "linked-accounts/switch",
-  );
+export function useBrowserAccounts(enabled = true) {
+  return useQuery({
+    queryKey: ["session", "accounts"],
+    queryFn: () => request<Pick<LinkedAccounts, "accounts">>("/v1/session/accounts"),
+    enabled,
+  });
+}
+
+export const browserProfileChanged = "accounts.active-profile";
+
+export function useSwitchBrowserAccount() {
+  return useIdempotentMutation(async (body: { account_uuid: string }) => {
+    await request<void>("/v1/session/accounts/switch", { method: "POST", body });
+    try { localStorage.setItem(browserProfileChanged, body.account_uuid); } catch { /* Storage can be disabled. */ }
+  }, { meta: { toast: false } });
 }
 
 export interface AccountLinkRequest {

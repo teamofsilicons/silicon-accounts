@@ -14,6 +14,7 @@
 //! `Option<AccountAuth>`, `Option<IdempotencyKey>` work for optional auth / keys.
 
 pub mod auth;
+pub mod browser_profiles;
 pub mod cookies;
 pub mod extract;
 pub mod idempotency;

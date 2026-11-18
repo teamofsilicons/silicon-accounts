@@ -31,10 +31,16 @@ export type InterfaceLicense =
   | {kind: "link"; url: string}
   | {kind: "file"; name: string; content: string};
 export type App = {
+  deleted_at?:string|null;restore_until?:string|null;
+  created_by?:string|null; organization_id?: string | null;
+  organization_access?: import("@/components/organizations/api").ResourcePolicy;
+  publisher?: {type:"organization"|"personal";id?:string;name?:string;logo_url?:string};
+  permissions?: {read:boolean;edit:boolean;publish:boolean;manage:boolean};
   user_storage?: import("./storage-schema").StorageSchema | null;
   app_id: string;
   name: string;
   description: string;
+  tagline?: string;
   logo: string;
   logo_alt?: string;
   banner: string;

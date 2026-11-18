@@ -775,6 +775,12 @@ pub async fn verify_access_token(
                 "The account of this access token no longer exists.",
             )
         })?;
+    if account.status == AccountStatus::Archived {
+        return Err(ApiError::unauthenticated(
+            "account_archived",
+            "Recover this account with a new email or phone code.",
+        ));
+    }
     if account.status == AccountStatus::Deleted {
         return Err(ApiError::unauthenticated(
             "account_deleted",

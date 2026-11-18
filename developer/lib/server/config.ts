@@ -115,6 +115,9 @@ export function localIrisImageSource(): string | null {
 export function appsApiUrl(): string {
   return trimSlash(process.env.APPS_API_URL || (isProduction() ? "https://apps.teamofsilicons.com" : "http://127.0.0.1:4310"));
 }
+export function organizationsApiUrl(): string {
+  return trimSlash(process.env.ORGANIZATIONS_API_URL || "https://organizations.teamofsilicons.com");
+}
 /** Cells' author API. Cell-user tokens never pass through this developer BFF. */
 export function cellsApiUrl(): string {
   return trimSlash(process.env.CELLS_API_URL || (isProduction() ? "https://api.cells.teamofsilicons.com" : "http://127.0.0.1:4490"));
@@ -130,3 +133,5 @@ export function interfaceCellsEnabled(): boolean {
   const configured = process.env.DEVELOPER_INTERFACE_CELLS_ENABLED;
   return configured === undefined ? !isProduction() : configured === "true";
 }
+
+export function contactsApiUrl():string{return trimSlash(process.env.CONTACTS_API_URL || "https://contacts.teamofsilicons.com");}

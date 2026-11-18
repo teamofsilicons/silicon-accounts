@@ -328,6 +328,9 @@ pub struct FlowExtras {
     pub interface_scopes: Vec<String>,
     #[serde(default)]
     pub authenticated_account_uuid: Option<String>,
+    /// Independently signed-in accounts offered when this flow may reuse browser proof.
+    #[serde(default)]
+    pub saved_sessions: Vec<Uuid>,
     #[serde(default)]
     pub account_selected: bool,
     #[serde(default)]
@@ -580,6 +583,7 @@ impl Flow {
         self.extras.new_account = false;
         self.extras.browser_session_id = None;
         self.extras.authenticated_account_uuid = None;
+        self.extras.saved_sessions.clear();
         self.extras.account_selected = false;
         self.extras.details = DetailsProgress::default();
     }

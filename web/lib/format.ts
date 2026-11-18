@@ -100,6 +100,7 @@ export function splitId(id: string | null | undefined): { prefix: string; handle
 /** Labels for the what's-shared screen and lists (same words as the server's consent rows). */
 export const SCOPE_LABELS: Record<Scope, string> = {
   profile: "Name, id and profile photo",
+  "account_profile.write": "Edit your account profile",
   email: "Email address",
   phone: "Phone number",
   dob: "Date of birth",
@@ -118,6 +119,7 @@ export const FIELD_LABELS: Record<ContactField, string> = {
 /** Short labels for chips: "Email", "Phone", "Date of birth", "Timezone", "Profile". */
 export const SCOPE_SHORT: Record<Scope, string> = {
   profile: "Profile",
+  "account_profile.write": "Edit profile",
   email: "Email",
   phone: "Phone",
   dob: "Date of birth",

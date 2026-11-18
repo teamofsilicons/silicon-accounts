@@ -109,7 +109,7 @@ async fn email_conflicts_limits_and_bad_codes() {
     };
 
     let r = call(&ctx, add(&other_email.to_uppercase())).await;
-    assert_error(&r, 409, "email_in_use");
+    assert_status(&r, 201);
     let mine = contacts::list_emails(&mut *ctx.conn().await, &carbon.uuid)
         .await
         .expect("emails")[0]
@@ -509,8 +509,18 @@ async fn an_imported_unverified_email_is_verified_in_place() {
 #[tokio::test]
 async fn an_address_claimed_while_the_code_was_in_flight_is_refused() {
     let ctx = TestContext::new().await;
-    let carbon = ctx.carbon().await;
-    let racer = ctx.carbon().await;
+    let carbon = ctx
+        .carbon_with(CarbonSpec {
+            email: Some(String::new()),
+            ..Default::default()
+        })
+        .await;
+    let racer = ctx
+        .carbon_with(CarbonSpec {
+            email: Some(String::new()),
+            ..Default::default()
+        })
+        .await;
     let tok = token(&ctx, &carbon).await;
     let contested = format!("contested-{}@example.test", rand_suffix());
     let r = call(
@@ -542,7 +552,7 @@ async fn an_address_claimed_while_the_code_was_in_flight_is_refused() {
     .await;
     assert_error(&r, 409, "email_in_use");
     let r = call(&ctx, Req::get("/v1/me/emails").bearer(&tok)).await;
-    assert_eq!(emails_of(&r.json).len(), 1);
+    assert_eq!(emails_of(&r.json).len(), 0);
 }
 
 #[tokio::test]
@@ -555,7 +565,12 @@ async fn in_use_answers_use_up_the_add_budget() {
         ..Default::default()
     })
     .await;
-    let prober = ctx.carbon().await;
+    let prober = ctx
+        .carbon_with(CarbonSpec {
+            email: Some(String::new()),
+            ..Default::default()
+        })
+        .await;
     let tok = token(&ctx, &prober).await;
     let add_email = |email: &str| {
         Req::post("/v1/me/emails")
@@ -624,9 +639,33 @@ async fn add_attempts_are_limited_per_network() {
         ..Default::default()
     })
     .await;
-    let first = token(&ctx, &ctx.carbon().await).await;
-    let second = token(&ctx, &ctx.carbon().await).await;
-    let third = token(&ctx, &ctx.carbon().await).await;
+    let first = token(
+        &ctx,
+        &ctx.carbon_with(CarbonSpec {
+            email: Some(String::new()),
+            ..Default::default()
+        })
+        .await,
+    )
+    .await;
+    let second = token(
+        &ctx,
+        &ctx.carbon_with(CarbonSpec {
+            email: Some(String::new()),
+            ..Default::default()
+        })
+        .await,
+    )
+    .await;
+    let third = token(
+        &ctx,
+        &ctx.carbon_with(CarbonSpec {
+            email: Some(String::new()),
+            ..Default::default()
+        })
+        .await,
+    )
+    .await;
     let add = |tok: &str, email: &str, ip: &str| {
         Req::post("/v1/me/emails")
             .bearer(tok)

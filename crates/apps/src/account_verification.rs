@@ -9,7 +9,7 @@ use accounts_core::timefmt::{rfc3339_ms, rfc3339_ms_option};
 use accounts_core::views::AppSummary;
 use accounts_core::{ApiError, ApiResult, AppState, FieldErrors};
 use axum::extract::State;
-use axum::http::{StatusCode, header};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::{Router, routing::get};
 use serde::{Deserialize, Serialize};
@@ -77,21 +77,36 @@ async fn view(conn: &mut PgConnection, row: RequestRow) -> ApiResult<RequestView
     })
 }
 
-async fn managed_app(conn: &mut PgConnection, who: &AccountAuth, app_id: &str) -> ApiResult<App> {
+async fn managed_app(
+    state: &AppState,
+    headers: &HeaderMap,
+    conn: &mut PgConnection,
+    who: &AccountAuth,
+    app_id: &str,
+) -> ApiResult<App> {
     if who.account.status != AccountStatus::Active {
         return Err(ApiError::forbidden(
             "account_not_active",
             "Only an active account can request manual verification.",
         ));
     }
+    let organization = accounts_core::repo::publishing::permitted(
+        state,
+        who,
+        headers,
+        app_id,
+        accounts_core::repo::publishing::Permission::Manage,
+    )
+    .await?;
     sqlx::query_as::<_, App>(concat!(
         "select ",
         accounts_core::app_columns!(),
-        " from apps where app_id=$1 and (owner_uuid=$2 or exists(select 1 from app_authors aa \
-         where aa.app_id=apps.app_id and aa.account_uuid=$2))"
+        " from apps where app_id=$1 and (CASE WHEN $3::boolean IS NULL THEN (owner_uuid=$2 or exists(select 1 from app_authors aa \
+         where aa.app_id=apps.app_id and aa.account_uuid=$2)) ELSE $3 END)"
     ))
     .bind(app_id)
     .bind(who.uuid())
+    .bind(organization)
     .fetch_optional(conn)
     .await?
     .ok_or_else(|| {
@@ -113,10 +128,11 @@ fn no_store(mut response: Response) -> Response {
 async fn status(
     State(state): State<AppState>,
     who: AccountAuth,
+    headers: HeaderMap,
     Path(app_id): Path<String>,
 ) -> ApiResult<Response> {
     let mut conn = state.db.acquire().await?;
-    managed_app(&mut conn, &who, &app_id).await?;
+    managed_app(&state, &headers, &mut conn, &who, &app_id).await?;
     let row=sqlx::query_as::<_,RequestRow>("select * from account_verification_requests where account_uuid=$1 order by submitted_at desc,id desc limit 1")
         .bind(who.uuid()).fetch_optional(&mut *conn).await?;
     let request = match row {
@@ -131,6 +147,7 @@ async fn status(
 async fn submit(
     State(state): State<AppState>,
     who: AccountAuth,
+    headers: HeaderMap,
     Path(app_id): Path<String>,
     key: Option<IdempotencyKey>,
     Json(input): Json<Input>,
@@ -149,7 +166,7 @@ async fn submit(
     errors.into_result()?;
     // Authorization precedes idempotency replay, so removing an author also denies retries.
     let mut conn = state.db.acquire().await?;
-    managed_app(&mut conn, &who, &app_id).await?;
+    managed_app(&state, &headers, &mut conn, &who, &app_id).await?;
     drop(conn);
     let scope = idempotency::scope(
         &format!("account:{}", who.uuid()),
@@ -165,7 +182,7 @@ async fn submit(
         if current_status != AccountStatus::Active {
             return Err(ApiError::forbidden("account_not_active", "Only an active account can request manual verification."));
         }
-        let app=managed_app(&mut tx,&who,&app_id).await?;
+        let app=managed_app(&state,&headers,&mut tx,&who,&app_id).await?;
         let pending=sqlx::query_as::<_,RequestRow>("select * from account_verification_requests where account_uuid=$1 and status='pending'")
             .bind(who.uuid()).fetch_optional(&mut *tx).await?;
         if let Some(row)=pending {

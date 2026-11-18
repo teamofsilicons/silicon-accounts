@@ -2,11 +2,12 @@
 //! raw proof tokens and their hashes are never returned or reconstructed here.
 
 use accounts_core::http::{AccountAuth, Json, PageParams, Path, Query, paginate};
+use accounts_core::repo::publishing;
 use accounts_core::timefmt::{rfc3339_ms, rfc3339_ms_option};
 use accounts_core::views::{AppSummary, Page};
 use accounts_core::{ApiError, AppState};
 use axum::extract::State;
-use axum::http::header::CACHE_CONTROL;
+use axum::http::{HeaderMap, header::CACHE_CONTROL};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -43,6 +44,7 @@ fn hidden() -> ApiError {
 pub async fn list(
     State(state): State<AppState>,
     who: AccountAuth,
+    headers: HeaderMap,
     Query(q): Query<ManagedQuery>,
 ) -> Result<Response, ApiError> {
     let page = PageParams {
@@ -51,8 +53,10 @@ pub async fn list(
     };
     let limit = page.limit();
     let after = store::cursor_bounds(page.cursor()?)?;
+    let organizations = publishing::manageable_apps(&state, &who, &headers).await?;
     let mut conn = state.db.acquire().await?;
     if let Some(app_id) = &q.app_id
+        && !organizations.contains(app_id)
         && !store::manages_app(&mut conn, who.uuid(), app_id).await?
     {
         return Err(hidden());
@@ -61,6 +65,7 @@ pub async fn list(
         &mut conn,
         who.uuid(),
         q.app_id.as_deref(),
+        &organizations,
         &AppProofFilter {
             status: q.status.as_ref().map(ProofStatus::as_str),
             after,
@@ -189,6 +194,7 @@ fn event(row: EventRow) -> VerificationEvent {
 pub async fn history(
     State(state): State<AppState>,
     who: AccountAuth,
+    headers: HeaderMap,
     Path((app_id, proof_id)): Path<(String, Uuid)>,
     Query(q): Query<HistoryQuery>,
 ) -> Result<Response, ApiError> {
@@ -208,15 +214,24 @@ pub async fn history(
         })
         .transpose()?;
     let mut conn = state.db.acquire().await?;
+    let org_allowed = publishing::permitted(
+        &state,
+        &who,
+        &headers,
+        &app_id,
+        publishing::Permission::Manage,
+    )
+    .await?;
     let visible: bool = sqlx::query_scalar(
         "select exists(select 1 from proof_families f join apps a on a.app_id=f.issuing_app \
          where f.id=$1 and f.issuing_app=$2 and f.kind='app_verification' \
-         and (a.owner_uuid=$3 or exists(select 1 from app_authors aa \
-         where aa.app_id=a.app_id and aa.account_uuid=$3)))",
+         and (CASE WHEN $4::boolean IS NULL THEN (a.owner_uuid=$3 or exists(select 1 from app_authors aa \
+         where aa.app_id=a.app_id and aa.account_uuid=$3)) ELSE $4 END))",
     )
     .bind(proof_id)
     .bind(&app_id)
     .bind(who.uuid())
+    .bind(org_allowed)
     .fetch_one(&mut *conn)
     .await?;
     if !visible {
@@ -228,13 +243,13 @@ pub async fn history(
          join apps a on a.app_id=f.issuing_app \
          where e.target_kind='proof' and e.target_id=$1::text and e.app_id=$2 \
          and f.issuing_app=$2 and f.kind='app_verification' \
-         and (a.owner_uuid=$3 or exists(select 1 from app_authors aa \
-         where aa.app_id=a.app_id and aa.account_uuid=$3)) \
+         and (CASE WHEN $7::boolean IS NULL THEN (a.owner_uuid=$3 or exists(select 1 from app_authors aa \
+         where aa.app_id=a.app_id and aa.account_uuid=$3)) ELSE $7 END) \
          and e.action in ('proof.issued','proof.refreshed','proof.revoked','proof.refresh_token_reused') \
          and ($4::timestamptz is null or (e.at,e.id)<($4,$5::bigint)) \
          order by e.at desc,e.id desc limit $6",
     ).bind(proof_id).bind(&app_id).bind(who.uuid()).bind(after.map(|x| x.0))
-        .bind(after.map(|x| x.1)).bind(limit+1).fetch_all(&mut *conn).await?;
+        .bind(after.map(|x| x.1)).bind(limit+1).bind(org_allowed).fetch_all(&mut *conn).await?;
     let page = paginate(rows, limit, |r| {
         ((r.at.unix_timestamp_nanos() / 1_000) as i64, r.id)
     });

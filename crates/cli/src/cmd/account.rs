@@ -787,7 +787,7 @@ pub async fn delete_account(ctx: &Ctx, args: DeleteAccountArgs) -> CliResult<Out
     let confirm = match args.confirm {
         Some(confirm) => confirm,
         None if util::interactive(ctx.global.json) => util::prompt(&format!(
-            "This permanently deletes {} ({}). Type its id to confirm: ",
+            "Request deletion of {} ({})? You’ll be signed out immediately. You have 10 days to recover the account. Type its id to confirm: ",
             session.who(),
             session.kind.title()
         ))?,
@@ -815,7 +815,7 @@ pub async fn delete_account(ctx: &Ctx, args: DeleteAccountArgs) -> CliResult<Out
     Ok(Outcome::new(
         json!({ "deleted": true, "id": session.account.id, "uuid": session.account.uuid }),
         format!(
-            "Deleted {}. Apps you signed into were told; your id is held for 10 days.",
+            "Deletion requested for {}. You’re signed out everywhere. Sign in with a fresh email or phone code within 10 days to recover it.",
             session.who()
         ),
     ))

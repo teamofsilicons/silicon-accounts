@@ -162,13 +162,17 @@ label as detail, never the internal `code:…` marker) or "Signed out of the dev
 (+ cookie cleared for cookie sessions). 422 `confirmation_required` / `confirmation_mismatch`;
 409 `custodian_of_silicons` (`details.silicons`: AccountSummary list) while custodian of any
 non-deleted Silicon; Silicons get 403 `custodian_required` (their custodian deletes them). The
-deletion is core's `accounts::delete_account`, in one transaction: status `deleted`, id reserved
-10 days, emails/phones/identities removed, sessions, token families and User verification proofs revoked,
+account is archived first (core's `accounts::archive_account`): status `archived`, sessions and
+token families (`account_archived`) revoked, an `account_archived` email to the verified primary
+email, everything else kept and no app told. A sign-in code to one of its verified emails or
+phones in the hosted flow restores it (`accounts::restore_archived`, audit `account.restored`).
+After `ARCHIVE_DAYS` (10) the minute sweep (`delete_archived_accounts`, audit `account.deleted`
+by `system`) runs core's `accounts::delete_account`, in one transaction: status `deleted`, CarbonID released at the end of the ten-day recovery period, emails/phones/identities removed, sessions, token families and User verification proofs revoked,
 pending custodian requests cancelled, `pfp_url` reset and the uploads no other account shows
 deleted, the apps' imported personal data about the account dropped (`imported_profile`; their
 `external_id` stays), `account.deleted` to every live member app. A second `DELETE /v1/me`
-already in flight waits for the first and answers 204 without doing anything, so apps hear about
-the deletion once. If the id changed while the request waited, it answers 422
+already in flight waits for the first and answers 204 without doing anything, so the email goes
+out once. If the id changed while the request waited, it answers 422
 `confirmation_mismatch` and nothing is deleted. Self-created Silicons still waiting for this
 Carbon to accept are released (id free at once) and get `silicon.custodian.declined`
 `{uuid,id,request_id,custodian,decided_at,reason:"custodian_account_deleted",released:true}`

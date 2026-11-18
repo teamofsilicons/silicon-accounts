@@ -3,7 +3,8 @@ export function interfacesProxyRoute(raw: string, method: string): string | null
   if (!raw || raw.includes("%") || raw.includes("\\") || raw.split("/").some(part => !part || part === "." || part === "..")) return null;
   const id = "[A-Za-z0-9_-]+";
   const routes: [RegExp, string[]][] = [
-    [/^me$/, ["GET"]],
+    [/^(me|people)$/, ["GET"]],
+    [new RegExp(`^interfaces/${id}/organization-access$`), ["PUT"]],
     [/^interfaces$/, ["GET", "POST"]],
     [new RegExp(`^interfaces/${id}$`), ["GET", "PATCH"]],
     [new RegExp(`^interfaces/${id}/(publish|unpublish|rotate-secret|leave|resume)$`), ["POST"]],

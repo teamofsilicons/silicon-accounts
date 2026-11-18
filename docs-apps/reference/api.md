@@ -149,3 +149,7 @@ Apps signs every release package itself, whether or not its author did. The App 
 - Unknown routes, extra path segments and unsupported mutation methods return 404 before any outside webhook, package runner or media side effect happens.
 
 The capabilities document includes `required_release_targets` and `unsupported_target_reason` (`min_chars`, `max_chars`). Publishing readiness includes `required_targets`, and each incomplete release error includes `missing_targets`.
+
+## Organizations, people and deletion
+
+`GET /v1/organizations` returns current publishing context. `GET /v1/people` returns invitation signals. Creation accepts `organization_id`; app views include `publisher`, `organization_id`, `created_by`, `permissions`, `deleted_at` and `restore_until`. Use `GET/PUT /v1/apps/{id}/organization-access` for resource policy, `DELETE /v1/apps/{id}` to delete, and `POST /v1/apps/{id}/restore` within 30 days. See [Organizations and Contacts](../start/organizations-and-contacts.md) for payloads, current membership checks and private audiences. Organization creation omits server secrets.

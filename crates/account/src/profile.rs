@@ -196,66 +196,86 @@ pub(crate) async fn patch_me(
     key: Option<IdempotencyKey>,
     Json(body): Json<Value>,
 ) -> Result<Response, ApiError> {
-    let patch = parse_patch(&state.settings, &me.account, &body)?;
     let scope = idem_scope(me.uuid(), "PATCH", "/v1/me");
     idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
         let mut tx = state.db.begin().await?;
-        // The row lock comes first: photo uploads and removals prune under it, so a photo
-        // checked below stays in place until this change commits.
-        let current = accounts::lock(&mut tx, me.uuid())
-            .await?
-            .ok_or_else(|| account_not_found(me.uuid()))?;
-        let pfp_url = match &patch.pfp {
-            None => None,
-            Some(PfpChange::Reset) => Some(pfp::default_pfp_url(
-                &state.settings.iris_base_url,
-                me.kind(),
-                me.uuid(),
-            )),
-            Some(PfpChange::Set(url)) => {
-                // Sending back the current pfp_url changes nothing, even when it's a photo the
-                // account didn't upload (such as a Silicon's photo set by its custodian). A new
-                // photo of this service must be one this account uploaded (core's check, under
-                // the row lock taken above, so pruning can't remove it before this commits).
-                if *url != current.pfp_url {
-                    photos::check_usable(&mut tx, &state.settings, url, &[me.uuid()], "you")
-                        .await?;
-                }
-                Some(url.clone())
-            }
-        };
-        let (account, changed) = accounts::update_profile(
-            &mut tx,
-            me.uuid(),
-            &ProfileUpdate {
-                display_name: patch.display_name.clone(),
-                timezone: patch.timezone.clone(),
-                dob: patch.dob,
-                pfp_url,
-            },
-        )
-        .await?;
-        if !changed.is_empty() {
-            events::notify_profile_updated(&mut tx, &account, &changed).await?;
-            if changed.contains(&AccountField::PfpUrl) {
-                photos::prune(&mut tx, &state.settings, me.uuid()).await?;
-            }
-            audit_self(
-                &mut tx,
-                me.uuid(),
-                "account.profile.updated",
-                None,
-                json!({ "changed": changed }),
-                meta.ip.as_deref(),
-            )
-            .await?;
-        }
+        let account = apply_patch(&mut tx, &state, &me.account, &body, &meta).await?;
         tx.commit().await?;
         let mut conn = state.db.acquire().await?;
         let view = views::load_me(&mut conn, &account).await?;
         Ok((StatusCode::OK, serde_json::to_value(view)?))
     })
     .await
+}
+
+pub(super) async fn apply_patch(
+    conn: &mut sqlx::PgConnection,
+    state: &AppState,
+    me: &Account,
+    body: &Value,
+    meta: &ClientMeta,
+) -> ApiResult<Account> {
+    let patch = parse_patch(&state.settings, me, body)?;
+    // The row lock comes first: photo uploads and removals prune under it, so a photo
+    // checked below stays in place until this change commits.
+    let current = accounts::lock(conn, &me.uuid)
+        .await?
+        .ok_or_else(|| account_not_found(&me.uuid))?;
+    if matches!(
+        current.status,
+        accounts_core::models::AccountStatus::Archived
+            | accounts_core::models::AccountStatus::Deleted
+    ) {
+        return Err(ApiError::forbidden(
+            "account_not_active",
+            "This account cannot edit its profile.",
+        ));
+    }
+    let pfp_url = match &patch.pfp {
+        None => None,
+        Some(PfpChange::Reset) => Some(pfp::default_pfp_url(
+            &state.settings.iris_base_url,
+            me.kind,
+            &me.uuid,
+        )),
+        Some(PfpChange::Set(url)) => {
+            // Sending back the current pfp_url changes nothing, even when it's a photo the
+            // account didn't upload (such as a Silicon's photo set by its custodian). A new
+            // photo of this service must be one this account uploaded (core's check, under
+            // the row lock taken above, so pruning can't remove it before this commits).
+            if *url != current.pfp_url {
+                photos::check_usable(conn, &state.settings, url, &[&me.uuid], "you").await?;
+            }
+            Some(url.clone())
+        }
+    };
+    let (account, changed) = accounts::update_profile(
+        conn,
+        &me.uuid,
+        &ProfileUpdate {
+            display_name: patch.display_name.clone(),
+            timezone: patch.timezone.clone(),
+            dob: patch.dob,
+            pfp_url,
+        },
+    )
+    .await?;
+    if !changed.is_empty() {
+        events::notify_profile_updated(conn, &account, &changed).await?;
+        if changed.contains(&AccountField::PfpUrl) {
+            photos::prune(conn, &state.settings, &me.uuid).await?;
+        }
+        audit_self(
+            conn,
+            &me.uuid,
+            "account.profile.updated",
+            None,
+            json!({ "changed": changed }),
+            meta.ip.as_deref(),
+        )
+        .await?;
+    }
+    Ok(account)
 }
 
 fn account_not_found(uuid: &str) -> ApiError {
@@ -290,48 +310,54 @@ pub(crate) async fn change_id(
     key: Option<IdempotencyKey>,
     Json(body): Json<ChangeIdBody>,
 ) -> Result<Response, ApiError> {
-    {
-        let mut conn = state.db.acquire().await?;
-        if accounts_core::repo::organizations::org_id(&mut conn, me.uuid())
-            .await?
-            .is_some()
-        {
-            return Err(ApiError::forbidden(
-                "organization_handle_managed",
-                "Work handles are managed by organization owners and admins in Silicon Organizations.",
-            ));
-        }
-    }
     let scope = idem_scope(me.uuid(), "POST", "/v1/me/id");
     idempotency::run(&state, key.as_deref(), &scope, &body, false, || async {
-        let new_id = AccountId::parse_for_kind(&body.id, me.kind())
-            .map_err(|e| accounts::invalid_id_error(&e))?;
         let mut tx = state.db.begin().await?;
-        // Core counts the change against the 24-hour budget under the account's row lock (429
-        // `rate_limited`); asking for the current id again is a no-op that never counts, and a
-        // deleted account gets 409 `account_deleted`.
-        let change = accounts::change_id(&mut tx, me.uuid(), &new_id, me.uuid()).await?;
-        if change.changed {
-            events::notify_id_changed(&mut tx, &change.account, &change.old_id, &change.new_id)
-                .await?;
-            audit_self(
-                &mut tx,
-                me.uuid(),
-                "account.id.changed",
-                None,
-                json!({
-                    "old_id": change.old_id, "new_id": change.new_id, "reclaimed": change.reclaimed,
-                }),
-                meta.ip.as_deref(),
-            )
-            .await?;
-        }
+        let account = apply_id(&mut tx, &me.account, &body.id, &meta).await?;
         tx.commit().await?;
         let mut conn = state.db.acquire().await?;
-        let view = views::load_me(&mut conn, &change.account).await?;
+        let view = views::load_me(&mut conn, &account).await?;
         Ok((StatusCode::OK, serde_json::to_value(view)?))
     })
     .await
+}
+
+pub(super) async fn apply_id(
+    conn: &mut sqlx::PgConnection,
+    me: &Account,
+    id: &str,
+    meta: &ClientMeta,
+) -> ApiResult<Account> {
+    if accounts_core::repo::organizations::org_id(conn, &me.uuid)
+        .await?
+        .is_some()
+    {
+        return Err(ApiError::forbidden(
+            "organization_handle_managed",
+            "Work handles are managed by organization owners and admins in Silicon Organizations.",
+        ));
+    }
+    let new_id =
+        AccountId::parse_for_kind(id, me.kind).map_err(|e| accounts::invalid_id_error(&e))?;
+    // Core counts the change against the 24-hour budget under the account's row lock (429
+    // `rate_limited`); asking for the current id again is a no-op that never counts, and a
+    // deleted account gets 409 `account_deleted`.
+    let change = accounts::change_id(conn, &me.uuid, &new_id, &me.uuid).await?;
+    if change.changed {
+        events::notify_id_changed(conn, &change.account, &change.old_id, &change.new_id).await?;
+        audit_self(
+            conn,
+            &me.uuid,
+            "account.id.changed",
+            None,
+            json!({
+                "old_id": change.old_id, "new_id": change.new_id, "reclaimed": change.reclaimed,
+            }),
+            meta.ip.as_deref(),
+        )
+        .await?;
+    }
+    Ok(change.account)
 }
 
 #[cfg(test)]

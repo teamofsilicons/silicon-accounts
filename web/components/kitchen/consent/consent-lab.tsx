@@ -14,6 +14,7 @@ import type { FrameApp } from "@/components/auth/flow/model";
 import { OneListConsent, TwoSectionsConsent } from "@/components/auth/steps/consent-aligned";
 import { BandConsent, CardConsent, OneTapConsent, SentenceConsent } from "@/components/auth/steps/consent-v2";
 import { ChecklistConsent, HandshakeConsent, PreviewConsent, type ConsentField } from "@/components/auth/steps/consent-designs";
+import { usePublicApps } from "@/lib/query/account";
 import type { Branding } from "@/lib/api/types";
 import styles from "./consent-lab.module.css";
 
@@ -32,8 +33,8 @@ const ROUND_TWO = ["sentence", "card", "onetap", "band"];
 
 const APPS: Record<string, { label: string; frame: FrameApp; domain: string; site?: boolean }> = {
   /* The account site's own tokens (HostedFrame site): how the step looks in today's Silicon Accounts design. */
-  site: { label: "Account site look", domain: "briefcase.teamofsilicons.com", site: true, frame: { app_id: "briefcase", name: "Briefcase", logo_url: "/icons/briefcase/web/icon-192.png" } },
-  briefcase: { label: "Default branding", domain: "briefcase.teamofsilicons.com", frame: { app_id: "briefcase", name: "Briefcase", logo_url: "/icons/briefcase/web/icon-192.png" } },
+  site: { label: "Account site look", domain: "briefcase.teamofsilicons.com", site: true, frame: { app_id: "briefcase", name: "Briefcase", logo_url: null } },
+  briefcase: { label: "Default branding", domain: "briefcase.teamofsilicons.com", frame: { app_id: "briefcase", name: "Briefcase", logo_url: null } },
   northwind: {
     label: "Own colours", domain: "app.northwind.test",
     frame: { app_id: "northwind", name: "Northwind", branding: { show_app_name: true, light: { primary: "#1E6B4F", primary_foreground: "#FFFFFF", background: "#F1F5F2", surface: "#FFFFFF", foreground: "#14231C", muted: "#5B6B62", border: "#D5DED8", danger: "#B42318" } } as Partial<Branding> },
@@ -68,6 +69,8 @@ export function ConsentLab() {
   const [shared, setShared] = useState<string[] | null>(null);
   const { View } = DESIGNS[design];
   const chosen = APPS[app];
+  const [briefcase] = usePublicApps(chosen.frame.app_id === "briefcase" ? ["briefcase"] : []);
+  const frame = { ...chosen.frame, logo_url: briefcase?.data?.logo_url ?? chosen.frame.logo_url };
   const option = ([value, entry]: [string, { label: string }]) => ({ value, label: entry.label });
   return (
     <>
@@ -79,8 +82,8 @@ export function ConsentLab() {
         <SegmentedControl size="sm" label="Case" options={Object.entries(CASES).map(option)} value={state} onValueChange={value => { setState(value); setShared(null); }} />
         {shared ? <span className={styles.said} role="status">Would share: profile{shared.length ? `, ${shared.join(", ")}` : ""}</span> : null}
       </div>
-      <HostedFrame key={`${design}-${app}-${state}`} app={chosen.frame} site={chosen.site} title={`Sign in to ${chosen.frame.name}`} hideName plain={design === "handshake" || design === "band"}>
-        <View app={{ name: chosen.frame.name, logo: chosen.frame.logo_url ?? null, domain: chosen.domain }} account={ACCOUNT} fields={CASES[state].fields} onShare={setShared} />
+      <HostedFrame key={`${design}-${app}-${state}`} app={frame} site={chosen.site} title={`Sign in to ${chosen.frame.name}`} hideName plain={design === "handshake" || design === "band"}>
+        <View app={{ name: chosen.frame.name, logo: frame.logo_url ?? null, domain: chosen.domain }} account={ACCOUNT} fields={CASES[state].fields} onShare={setShared} />
       </HostedFrame>
     </>
   );

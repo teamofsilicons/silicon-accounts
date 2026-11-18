@@ -61,15 +61,16 @@ export function HomeCards() {
   const account = me.data ?? session?.account;
   const silicons = useEverySilicon();
   const apps = useEveryApp();
-  if (dismissed || !account) return null;
+  if (!account) return null;
   // Only while it's useful (Anil, 2026-11-11): gone once the account has a Silicon and signs in to an app, the two
   // things it introduces. Hidden until both lists are read, so it never shows and then vanishes.
   if (!silicons.data || !apps.data) return null;
   const hasSilicon = silicons.data.items.length > 0;
   const usesAnApp = apps.data.items.some(item => item.status === "active");
-  if (hasSilicon && usesAnApp) return null;
+  const canDismiss = hasSilicon || usesAnApp;
+  if ((hasSilicon && usesAnApp) || (canDismiss && dismissed)) return null;
   return (
-    <PictureCards className={styles.place} title="One Account for Your Silicons & Apps" onDismiss={dismiss} cards={[
+    <PictureCards className={styles.place} title="One Account for Your Silicons & Apps" onDismiss={canDismiss ? dismiss : undefined} cards={[
       { id: "you", picture: { src: "/banner/bg-110.webp" }, title: "You", line: account.id ? `Your CarbonID across apps: ${account.id}` : "Your CarbonID across apps.", onSelect: glowYou },
       { id: "silicons", picture: { src: "/banner/bg-102.webp", focus: "right center" }, title: "Silicons", line: "Give an AI agent its own account.", href: hasSilicon ? paths.silicons : `${paths.silicons}/new` },
       { id: "apps", picture: { src: "/banner/bg-127.webp", focus: "center 70%" }, title: "Apps", line: "Apps for delightful agent creation and interaction.", href: paths.apps },

@@ -4,8 +4,8 @@
  * The account site's section list, as in the lead designer's prototype: Silicon UI's NavList with every section (lib/navigation.ts
  * SECTIONS), a count where something waits for the Carbon, and the other sites at the foot as small grey chips (Anil, 2026-10-30). The
  * shell shows it beside the page from 900px and inside a bottom sheet on narrower screens; both read this one list.
- * Beside the page (the inset shell) it also carries what a top bar would: `head` (the brand and search) above the
- * list and `account` (the account menu) at its foot.
+ * It also carries what the top bar used to (Anil, 2026-11-17): `head` (the brand beside the page, and search) above
+ * the list and `account` (the account menu) at its foot, over the other sites.
  */
 import type { ReactNode } from "react";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
@@ -21,9 +21,9 @@ export interface SidebarProps {
   developerUrl: string;
   /** Called when a row is chosen (closes the phone sheet). */
   onNavigate?: () => void;
-  /** Above the list, beside the page only: the brand and search. */
+  /** Above the list: search (and beside the page the brand). */
   head?: ReactNode;
-  /** At the foot, beside the page only: the account menu. */
+  /** At the foot, over the other sites: the account menu. */
   account?: ReactNode;
 }
 
@@ -52,6 +52,8 @@ export function Sidebar({ activeKey, developerUrl, onNavigate, head, account }: 
           );
         })}
       </NavList>
+      {/* The account menu, then the other sites under a hairline, at the foot (as the Apps store's sidebar). */}
+      {account ? <div className={styles.account}>{account}</div> : null}
       <nav className={styles.foot} aria-label="Other sites">
         {ELSEWHERE.map(site => (
           <ButtonLink key={site.key} href={site.href(developerUrl)} variant="soft" size="xs" onClick={onNavigate}>
@@ -59,7 +61,6 @@ export function Sidebar({ activeKey, developerUrl, onNavigate, head, account }: 
           </ButtonLink>
         ))}
       </nav>
-      {account ? <div className={styles.account}>{account}</div> : null}
     </div>
   );
 }

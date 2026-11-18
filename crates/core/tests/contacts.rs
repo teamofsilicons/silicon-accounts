@@ -83,37 +83,49 @@ async fn up_to_ten_emails_with_one_primary() {
 }
 
 #[tokio::test]
-async fn an_email_belongs_to_one_account_only() {
+async fn a_verified_email_can_be_secondary_here_and_primary_elsewhere() {
     let ctx = TestContext::new().await;
-    let a = ctx
-        .carbon_with(CarbonSpec {
-            email: Some("a@example.test".into()),
-            ..Default::default()
-        })
-        .await;
+    let a = ctx.carbon().await;
     let b = ctx.carbon().await;
+    let email = "another@example.test";
     let mut conn = ctx.conn().await;
-    let err = contacts::check_can_add(&mut conn, ContactKind::Email, &b.uuid, "a@example.test")
-        .await
-        .expect_err("in use");
-    assert_eq!(err.code, "email_in_use");
-    assert_eq!(err.status.as_u16(), 409);
-    // "An email", never "A email" (the account site shows this hint as typed).
-    assert_eq!(
-        err.hint.as_deref(),
-        Some(
-            "An email can only belong to one account. Sign in with it to use that account, or add a different email."
-        )
-    );
-    let err =
-        contacts::add_verified_email(&mut conn, &b.uuid, "a@example.test", VerifiedVia::Google)
+    for uuid in [&a.uuid, &b.uuid] {
+        contacts::add_verified_email(&mut conn, uuid, email, VerifiedVia::Code)
             .await
-            .expect_err("in use");
-    assert_eq!(err.code, "email_in_use");
-    let err = contacts::check_can_add(&mut conn, ContactKind::Email, &a.uuid, "a@example.test")
+            .expect("verified secondary");
+    }
+    assert!(matches!(
+        contacts::lookup(&mut conn, ContactKind::Email, email)
+            .await
+            .unwrap(),
+        contacts::Holder::Free
+    ));
+    contacts::set_primary_email(&mut conn, &b.uuid, email)
         .await
-        .expect_err("already");
-    assert_eq!(err.code, "email_already_added");
+        .expect("primary");
+    assert_eq!(
+        contacts::owner(&mut conn, ContactKind::Email, email)
+            .await
+            .unwrap(),
+        Some((b.uuid.clone(), true))
+    );
+    assert!(
+        contacts::list_emails(&mut conn, &a.uuid)
+            .await
+            .unwrap()
+            .iter()
+            .any(|e| e.email == email && !e.is_primary)
+    );
+    let err = contacts::set_primary_email(&mut conn, &a.uuid, email)
+        .await
+        .expect_err("one primary owner");
+    assert_eq!(err.code, "email_in_use");
+    assert!(
+        contacts::primary_email(&mut conn, &a.uuid)
+            .await
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[tokio::test]

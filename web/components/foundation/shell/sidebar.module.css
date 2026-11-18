@@ -1,12 +1,12 @@
-/* The section list and, at its foot, the other sites; beside the page also the brand and search above it and the
-   account menu below. Placement only: rows are NavList's. */
+/* The sidebar (Anil, 2026-11-17, from the Apps store): the brand and search at the head, the section list, then at the
+   foot the account menu over a hairline and the other sites. Placement only: rows are NavList's. */
 .sidebar { display: flex; min-height: 100%; flex-direction: column; gap: var(--space-block); }
-.foot { display: flex; flex-wrap: wrap; gap: var(--space-tight); margin-top: auto; padding-block: var(--space-group); border-top: 1px solid var(--border-subtle); }
-/* The inset shell's head and foot: the brand and search over the list, the account menu under the other sites.
-   Width follows the aside's padding (no extra inset here), so search matches the nav. The account menu stays
-   Silicon UI's compact trigger — do not stretch it. */
-.head { display: grid; gap: var(--space-inset); padding-top: var(--space-related); }
-.account { display: flex; padding-top: var(--space-group); border-top: 1px solid var(--border-subtle); }
+.head { display: grid; gap: var(--space-inset); }
+/* The account menu sits a group's room over the hairline (the sidebar's own gap is a block) and pushes to the foot. */
+.account { display: flex; min-width: 0; margin-top: auto; margin-bottom: calc(var(--space-group) - var(--space-block)); }
+/* The switcher's row (or, in the phone sheet, its list) takes the sidebar's width. */
+.account > * { flex: 1; min-width: 0; }
+.foot { display: flex; flex-wrap: wrap; gap: var(--space-tight); padding-block: var(--space-group); border-top: 1px solid var(--border-subtle); }
 /* Anil, 2026-10-30: the section icons at 18px, not NavList's 16px. NavList has no size option yet, so this reaches into
    its rows (a tolerated difference, redesign/prototype-differences.md); drop it once Silicon UI has one. */
 .sidebar nav[aria-label="Account sections"] svg { width: 18px; height: 18px; }

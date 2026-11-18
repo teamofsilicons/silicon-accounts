@@ -548,3 +548,32 @@ Create Account; "Not You?" kept. After deleting an account: /goodbye, "Your acco
 - The top bar's Search label and ⌘K take muted too (they were lighter than muted, 2026-10-30), so all three of the
   bar's quiet words ("Accounts", "Search", ⌘K) pass.
 - The account site stays light only (lib/theme.ts); the audit now expects light for a dark-preferring visitor.
+
+## Tabs (2026-11-14)
+
+- A control that switches what the page shows is Silicon UI Tabs (thin frame, 0.5.0): a Silicon's page (Access,
+  Settings) and Activity's filters. A control that picks a value (the avatar editor's Eyes and Facing) stays a
+  SegmentedControl (Anil: "use the new updated tab design everywhere in the accounts").
+
+## The full-height shell (2026-11-17)
+
+- From 900px there is no top bar: the sidebar carries the wordmark and Search at its head and the account menu at its
+  foot (full width, with the name), and it and the page box run the window's full height, as the Apps store does.
+  Under 900px the top bar shows the mark, the name and the menu button; Search and the account menu are in the sheet.
+  Replaces the 2026-10-30 top bar (brand, search centred, account menu). Anil: "im using a full height content, and
+  search and account in sidebar design for apps, can we try that in accounts as well?"
+## 2026-11-14: A deleted account is archived for 10 days, then deleted
+
+Saket: "make it so that it's archived, send them an mail, and after 10 days if they dont log back in it would
+automatically be deleted". DELETE /v1/me now archives the Carbon: signed out everywhere, its primary email told, its
+CarbonID, emails, Google or Apple links and app memberships kept, and no app told yet. Signing in with a code sent to
+one of its emails or phones within 10 days restores it; a Google or Apple sign-in is refused with a hint to use a code.
+After 10 days the API deletes it as before (apps get account.deleted, the CarbonID is released at the end of that recovery period, updated 2026-11-18). This
+replaces the 30 days of 2026-11-12 and answers its open questions. The delete page shows the recovery card with 10
+days (RECOVERY_DAYS) and /goodbye says how to come back. UNDERSTANDING.md doesn't say this yet.
+
+## 2026-11-18. Browser profiles and empty states
+
+The top-right profile menu and Your Accounts list independent sign-ins together with their linked work accounts. The menu shows each name above its handle in an equal-height row, with a check on the current profile. Selecting another opens Home in its session. Needs you shows the newest pending request or inactive device. Its badge counts every pending item. Completing the visible item brings up the next. An empty account keeps its introduction and can configure both contact types from Personal info. Hosted sign-in uses the same circular outline for an avatar and its completion ring.
+
+Each work row in Your Accounts leads with that work profile’s picture. Its organization name carries a small logo when one is available.

@@ -271,6 +271,34 @@ pub async fn verify(
     expect: &Expect<'_>,
     attempt: Option<Attempt<'_>>,
 ) -> ApiResult<OtpChallenge> {
+    let mut tx = pool.begin().await?;
+    let result = verify_in_transaction(
+        &mut tx,
+        pepper,
+        settings,
+        challenge_id,
+        code,
+        expect,
+        attempt,
+    )
+    .await;
+    if result.is_ok() || result.as_ref().is_err_and(|e| e.code == "invalid_code") {
+        tx.commit().await?;
+    }
+    result
+}
+
+/// Verify inside the caller's transaction so a successful code and its operation commit
+/// together. Commit an `invalid_code` error to retain its attempt count.
+pub async fn verify_in_transaction(
+    conn: &mut PgConnection,
+    pepper: &Pepper,
+    settings: &Settings,
+    challenge_id: Uuid,
+    code: &str,
+    expect: &Expect<'_>,
+    attempt: Option<Attempt<'_>>,
+) -> ApiResult<OtpChallenge> {
     let code = code.trim();
     if code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()) {
         return Err(ApiError::unprocessable(
@@ -282,11 +310,10 @@ pub async fn verify(
         )
         .hint("Type the 6-digit code from the message."));
     }
-    let mut tx = pool.begin().await?;
     let (destination, now): (Option<String>, OffsetDateTime) =
         sqlx::query_as("select (select destination from otp_challenges where id = $1), now()")
             .bind(challenge_id)
-            .fetch_one(&mut *tx)
+            .fetch_one(&mut *conn)
             .await?;
     let Some(destination) = destination else {
         return Err(not_found(challenge_id));
@@ -302,7 +329,7 @@ pub async fn verify(
     ))
     .bind(&destination)
     .bind(challenge_id)
-    .fetch_all(&mut *tx)
+    .fetch_all(&mut *conn)
     .await?;
     let Some(c) = rows.iter().find(|r| r.id == challenge_id).cloned() else {
         return Err(not_found(challenge_id));
@@ -344,7 +371,7 @@ pub async fn verify(
             challenge_columns!()
         ))
         .bind(c.id)
-        .fetch_one(&mut *tx)
+        .fetch_one(&mut *conn)
         .await?;
         // A right code ends the streak for the whole address.
         sqlx::query(
@@ -353,9 +380,8 @@ pub async fn verify(
         )
         .bind(&destination)
         .bind(c.id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
-        tx.commit().await?;
         return Ok(done);
     }
 
@@ -365,14 +391,14 @@ pub async fn verify(
          where id = $1",
     )
     .bind(c.id)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?;
     let streak: i64 = sqlx::query_scalar(
         "select coalesce(sum(failed_streak), 0)::bigint from otp_challenges \
          where destination = $1 and consumed_at is null and expires_at > now()",
     )
     .bind(&destination)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *conn)
     .await?;
     let lock_seconds = settings.otp_lock_seconds;
     let max = i64::from(MAX_FAILED_STREAK);
@@ -385,19 +411,18 @@ pub async fn verify(
         )
         .bind(&destination)
         .bind(lock_seconds as f64)
-        .fetch_all(&mut *tx)
+        .fetch_all(&mut *conn)
         .await?;
         let until = locked.into_iter().flatten().max();
         if let Some(attempt) = attempt
             && matches!(c.purpose, OtpPurpose::Signin | OtpPurpose::CliLogin)
         {
-            record_lock(&mut tx, &c, attempt, until).await?;
+            record_lock(conn, &c, attempt, until).await?;
         }
         until
     } else {
         None
     };
-    tx.commit().await?;
 
     Err(match until {
         Some(until) => {

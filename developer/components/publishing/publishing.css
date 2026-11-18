@@ -1031,3 +1031,5 @@
 .publishing-panel .section { box-shadow: none; }
 
 .publishing-panel .setup-sidebar nav { margin-right: 0; }
+
+.permission-fields { border:0; padding:0; margin:0; min-width:0; }

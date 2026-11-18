@@ -18,7 +18,6 @@ import { Plus } from "lucide-react";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import { AppMark } from "@/components/account/parts/app-mark";
-import { withAppIcon } from "@/components/account/parts/app-icons";
 import { SiliconMark } from "@/components/account/parts/silicon-mark";
 import { LADDERS, NOW, type Ladder } from "@/lib/text-ladders";
 import styles from "./text-lab.module.css";
@@ -114,7 +113,7 @@ function Column({ ladder }: { ladder: Ladder }) {
             {APPS.map(app => (
               <li key={app.id} data-sq="surface" className={styles.card}>
                 <div className={styles.cardTop}>
-                  <AppMark app={withAppIcon({ app_id: app.id, name: app.name, logo_url: null })} size={32} className={styles.mark} decorative />
+                  <AppMark app={{ app_id: app.id, name: app.name, logo_url: null }} size={32} className={styles.mark} decorative />
                   <span className={styles.words}><span className={styles.name}>{app.name}</span><span className={styles.line}>{app.line}</span></span>
                 </div>
                 <div className={styles.cardFooter}>

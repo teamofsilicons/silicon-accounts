@@ -1,4 +1,6 @@
 "use client";
+import {useResourceFilter} from "@/components/people/resource-filters";
+import {DeletedApps} from "@/components/publishing/Lifecycle";
 
 /** One app registry, with Accounts configuration and Apps publishing in the same workspace. */
 import Link from "next/link";
@@ -82,6 +84,7 @@ function TileSkeletons() {
 }
 
 export function DeveloperHome() {
+  const filter=useResourceFilter();
   const router = useRouter();
   const owned = useOwnedApps();
   const { status: sessionStatus } = useSession();
@@ -91,7 +94,8 @@ export function DeveloperHome() {
     return { items: page.items, next_cursor: page.next_offset == null ? null : String(page.next_offset) };
   }, sessionStatus === "signed_in");
   const [newApp, setNewApp] = useState(false);
-  const apps = owned.data || publishing.data ? mergeAppCatalog(owned.data?.items ?? [], publishing.data?.items ?? []) : undefined;
+  const listings = new Map(publishing.data?.items.map(item => [item.app_id, item]));
+  const apps = owned.data || publishing.data ? mergeAppCatalog(owned.data?.items ?? [], publishing.data?.items ?? []).filter(app=>filter.matches(listings.get(app.app_id) ?? app)) : undefined;
 
   useRegisterCommands(() => [
     ...[{
@@ -124,6 +128,8 @@ export function DeveloperHome() {
     );
   } else if (!apps) {
     content = <TileSkeletons />;
+  } else if (!apps.length && filter.count) {
+    content = filter.empty("apps");
   } else if (!apps.length) {
     content = (
       <Surface padding="none">
@@ -138,7 +144,7 @@ export function DeveloperHome() {
   } else {
     content = (
       <ul className={styles.grid} role="list" aria-label="Your apps">
-        {apps.map(app => <li key={app.app_id}><AppTile app={app} publishing={publishing.data?.items.find(item => item.app_id === app.app_id)} /></li>)}
+        {apps.map(app => <li key={app.app_id}><AppTile app={app} publishing={listings.get(app.app_id)} /></li>)}
         <li><NewAppTile onOpen={() => setNewApp(true)} /></li>
       </ul>
     );
@@ -153,7 +159,7 @@ export function DeveloperHome() {
       <PageHeader
         title="Your apps"
         description="Manage sign-in with Silicon Accounts and publish with Silicon Apps."
-        actions={<Button variant="secondary" onClick={() => setNewApp(true)}><Plus size={16} strokeWidth={1.75} aria-hidden="true" />New app</Button>}
+        actions={<>{filter.controls([...(owned.data?.items ?? []), ...(publishing.data?.items ?? [])])}<Button variant="secondary" onClick={() => setNewApp(true)}><Plus size={16} strokeWidth={1.75} aria-hidden="true" />New app</Button></>}
       />
       {publishingError ? (
         <Alert tone="warning" title="Publishing details could not be loaded" className={styles.notice}>
@@ -162,6 +168,7 @@ export function DeveloperHome() {
         </Alert>
       ) : null}
       {content}
+      <DeletedApps/>
       <CreateApp open={newApp} close={() => { setNewApp(false); void owned.refetch(); void publishing.refetch(); }} />
     </Page>
   );

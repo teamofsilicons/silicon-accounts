@@ -1,8 +1,7 @@
 "use client";
 
 /**
- * Home's Needs you, under the greeting (Anil, 2026-10-31): what is waiting on the Carbon, one row each, shown only when
- * something waits:
+ * Home's Needs you, under the greeting (Anil, 2026-10-31): the newest item waiting on the Carbon, with the total in the badge:
  *
  * - a Silicon asking them to be its custodian, with Review (Accept and Decline are in the review);
  * - a Carbon handing them a Silicon, with Review;
@@ -11,8 +10,7 @@
  * Nothing shows when nothing waits. The compact boxed design (Anil, 2026-11-11, picked from /__needs): one white list
  * with a clear border; each row a 28px mark (a Silicon's, or the browser's logo), the title over one line (a request's
  * time left, grey over a week, amber from a week, red under 3 days, "Ends today" under a day; or the device's last use),
- * and at most one outlined button, so nothing in the list is filled; the device also has Keep, a soft grey button (Anil, 2026-11-11). Soonest first,
- * the device last; the count is a neutral badge.
+ * and at most one outlined button, so nothing in the list is filled; the device also has Keep, a soft grey button (Anil, 2026-11-11). The next item appears when the current one is handled.
  */
 import Image from "next/image";
 import { useSyncExternalStore, type ReactNode } from "react";
@@ -24,7 +22,7 @@ import type { CustodianRequest, SessionInfo } from "@/lib/api/types";
 import { useMe } from "@/lib/query/session";
 import { NEEDS_YOU_ID } from "./parts/anchors";
 import { browserLogo, browserOf } from "./parts/browser";
-import { keepSession, readKept, staleSession, subscribeKept } from "./parts/checkup";
+import { keepSession, readKept, staleSessions, STALE_MS, subscribeKept } from "./parts/checkup";
 import { asCarbon, describeError, msUntil, personLabel, spanText, useNow } from "./parts/common";
 import { useEveryCustodianRequest, useEverySession, useSignOutSession } from "./parts/queries";
 import { SiliconMark } from "./parts/silicon-mark";
@@ -47,14 +45,14 @@ export function HomeNeeds() {
   if (!requests.data && !requests.error) return null;
   const waiting = requests.data?.items ?? [];
   const failed = !!requests.error && !requests.data;
-  const stale = staleSession(sessions.data?.items, now, kept);
+  const stale = staleSessions(sessions.data?.items, now, kept);
 
   // Nothing waiting: nothing to show (no "You're all set", Anil 2026-10-31).
-  if (!waiting.length && !failed && !stale) return null;
+  if (!waiting.length && !failed && !stale.length) return null;
 
   return (
     <div id={NEEDS_YOU_ID} className={styles.group} tabIndex={-1}>
-      <Requests id={NEEDS_YOU_ID} title="Needs you" waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={stale} now={now} />
+      <Requests id={NEEDS_YOU_ID} title="Needs you" limit={1} waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={stale} now={now} />
     </div>
   );
 }
@@ -71,7 +69,7 @@ export function SiliconRequests() {
   const waiting = requests.data?.items ?? [];
   const failed = !!requests.error && !requests.data;
   if (!waiting.length && !failed) return null;
-  return <Requests id="silicon-requests" title="Waiting for you" waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={undefined} now={now} />;
+  return <Requests id="silicon-requests" title="Waiting for you" waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={[]} now={now} />;
 }
 
 /** How long a request has left, in the tone its row shows it: grey over a week, amber from a week, red under 3 days. */
@@ -84,25 +82,36 @@ function timeLeft(request: CustodianRequest, now: number): { text: string; tone:
   return { text: `${spanText(left)} left`, tone: left < 3 * DAY ? "danger" : left <= 7 * DAY ? "warning" : "neutral", used };
 }
 
-function Requests({ id, title, waiting, failed, error, retry, stale, now }: { id: string; title: string; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo | undefined; now: number }) {
+function Requests({ id, title, limit, waiting, failed, error, retry, stale, now }: { id: string; title: string; limit?: number; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo[]; now: number }) {
   const signOut = useSignOutSession();
-  const count = waiting.length + (failed ? 1 : 0) + (stale ? 1 : 0);
-  // The soonest to run out first; a device has no deadline, so it comes last.
-  const byDeadline = [...waiting].sort((a, b) => Date.parse(a.expires_at) - Date.parse(b.expires_at));
+  const items = [
+    ...waiting.map(request => ({ kind: "request" as const, id: request.id, date: Date.parse(request.created_at), request })),
+    ...stale.map(session => ({ kind: "device" as const, id: session.id, date: Date.parse(session.last_seen_at ?? session.created_at) + STALE_MS, session })),
+  ].sort((a, b) => b.date - a.date || a.id.localeCompare(b.id));
 
   return (
     <section className={styles.section} aria-labelledby={`${id}-title`}>
       <div className={styles.head}>
         <h2 id={`${id}-title`} className={styles.title}>{title}</h2>
-        <Badge size="sm" tone="neutral">{count}</Badge>
+        {items.length > 0 ? <Badge size="sm" tone="neutral">{items.length}</Badge> : null}
       </div>
       <ul data-sq="surface" className={styles.rows}>
-        {failed ? (
+        {failed && items.length === 0 ? (
           <Row lead={<span data-sq="surface" className={`${styles.icon} ${styles.iconDanger}`} aria-hidden="true"><TriangleAlert size={16} strokeWidth={2} /></span>} title="Requests waiting for you did not load" detail={describeError(error)}>
             <Button variant="secondary" size="sm" onClick={retry}>Try Again</Button>
           </Row>
         ) : null}
-        {byDeadline.map(request => {
+        {items.slice(0, limit).map(item => {
+          if (item.kind === "device") {
+            const session = item.session;
+            return (
+              <Row key={`device-${session.id}`} lead={<DeviceIcon session={session} />} title={`Still using ${sessionName(session)}?`} detail={`Last active ${spanText(now - Date.parse(session.last_seen_at ?? session.created_at))} ago`}>
+                <Button variant="soft" size="sm" onClick={() => keepSession(session.id)}>Keep</Button>
+                <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => void signOut.mutateAsync(session.id).catch(() => undefined)}>Sign Out</Button>
+              </Row>
+            );
+          }
+          const request = item.request;
           const time = timeLeft(request, now);
           const transfer = request.kind === "transfer";
           return (
@@ -113,12 +122,6 @@ function Requests({ id, title, waiting, failed, error, retry, stale, now }: { id
             </Row>
           );
         })}
-        {stale ? (
-          <Row lead={<DeviceIcon session={stale} />} title={`Still using ${sessionName(stale)}?`} detail={`Last active ${spanText(now - Date.parse(stale.last_seen_at ?? stale.created_at))} ago`}>
-            <Button variant="soft" size="sm" onClick={() => keepSession(stale.id)}>Keep</Button>
-            <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => void signOut.mutateAsync(stale.id).catch(() => undefined)}>Sign Out</Button>
-          </Row>
-        ) : null}
       </ul>
     </section>
   );

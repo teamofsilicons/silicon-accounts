@@ -92,10 +92,14 @@ pub async fn start(
         OtpChannel::Phone => ContactKind::Phone,
     };
     // Only a verified email/phone of an active Carbon signs in.
-    let Holder::Active(account) = contacts::lookup(&mut tx, kind, &destination).await? else {
-        // Commit the rate-limit hit: lookups of unknown addresses count too.
-        tx.commit().await?;
-        return Err(account_not_found(&destination, &state.settings));
+    let account = match contacts::lookup(&mut tx, kind, &destination).await? {
+        Holder::Active(a) => a,
+        Holder::Unavailable(a) if a.status == accounts_core::models::AccountStatus::Archived => a,
+        _ => {
+            // Commit the rate-limit hit: lookups of unknown addresses count too.
+            tx.commit().await?;
+            return Err(account_not_found(&destination, &state.settings));
+        }
     };
     let created = otp::send(
         &mut tx,
@@ -186,6 +190,19 @@ pub async fn verify(
     // removed, or the account deleted, since the code was sent).
     let account = match contacts::lookup(&mut tx, kind, &challenge.destination).await? {
         Holder::Active(a) if a.uuid == account_uuid => a,
+        Holder::Unavailable(a)
+            if a.uuid == account_uuid
+                && a.status == accounts_core::models::AccountStatus::Archived =>
+        {
+            accounts_core::repo::accounts::restore_archived(
+                &mut tx,
+                &a.uuid,
+                challenge.created_at,
+                meta.ip.as_deref(),
+            )
+            .await?
+            .ok_or_else(|| account_not_found(&challenge.destination, &state.settings))?
+        }
         _ => {
             return Err(ApiError::not_found(
                 "account_not_found",

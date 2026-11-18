@@ -20,12 +20,14 @@ marked "check" is a first guess, to be confirmed against Silicon UI's code befor
 | Sidebar width | Fixed | Steps 200 / 248 / 296 px by a handle on the page box's left edge (a grip on hover, no line), remembered per browser; the site's own handle, as ResizablePanels has no steps (sidebar-resize.tsx; Anil, 2026-10-30) | kept (Anil) |
 | Sidebar foot | Developers, Help, Privacy · Terms as muted text links, stacked | Developers and Docs as soft xs ButtonLink chips in a row, no arrow (Anil, 2026-10-30) | kept (Anil) |
 | Activity navigation | Activity is reached from Security | Activity has its own sidebar entry below Security and no Security breadcrumb (Anil, 2026-11-13) | kept (Anil) |
-| Account photo | — | 36 px in a 44 px circle, over UserMenu's fixed 32 in 40 (Anil, 2026-10-30) | kept (Anil) |
+| Account photo | — | 24 px in a 32 px row (Search's height, --control-height-sm), no resting fill, over UserMenu's fixed 32 in 40 (Anil, 2026-11-17; 36 in 44 since 2026-10-30) | kept (Anil) |
+| Account menu | Name, id and email over Manage your account, Add another account (soon) and Sign out | The account switcher (2026-11-18, on Saket's browser profiles): every account signed in on this browser and their linked work accounts as radio rows (photo, name, id, a work account's org), then Add another account, Your accounts and Sign out; built from DropdownMenu because UserMenu lists one account (tolerated; UserMenu `accounts` requested upstream). The phone sheet lists the same rows in place | kept (Anil) |
 | Home identity | Greeting row: ringed round photo, "Welcome back, <first>", id chip with a copy button | At the column's top left: 88 px squircle picture in one ring wrapper (border = 4 px band in the picture's colours, turning; padding = 3 px gap; Avatar hairline and fill removed); to its right "Welcome, <first>" 36 px, the id as a soft xs chip that copies on click, and "Member since <month year>" (not in the prototype) 14 px muted (Anil, 2026-10-30) | kept (Anil) |
 | Home introduction | A dismissible card with a soft Silicon gradient; three columns, picture over label over line | A dismissible grey tile of three 140 px gradient cards (You: the pixel avatar on its own palette; Silicons: the spark; Apps: the grid), 22 px title over a 12 px line, no actions (Anil, 2026-10-31) | kept (Anil) |
 | Home Silicons and apps | Your Silicons: 2 tiles + New Silicon; Your apps: 4 tiles with who uses each | As drawn, plus a "Create your first Silicon" banner when there are none (its own forest-to-sand gradient and grain, off the brand palette, with local colours; Geist Serif heading, the site's only serif). Your apps leads with the popular apps (Briefcase, DM, Ting) as simple white cards (an ink Phosphor icon beside the name and again as a faint watermark: the site's only use of Phosphor) with Try or Open (the site's secondary button), then other apps as small tiles; no "You + N" (no API for it) (Anil, 2026-10-31) | kept (Anil) |
 | Search trigger | A 40 px white pill field (up to 560 px, hairline, shadow), placeholder at the start, no shortcut key | Soft Button 400 px, label at the start and ⌘K at the end, by reaching into Button's label spans (it centres them, with no option) (Anil, 2026-10-30) | kept (Anil) |
 | Top bar | 64 px; the mark (11 px square and circle) and "Team of Silicons **Accounts**" | 56 px: 8 px on top, then a 48 px row (Anil, 2026-10-30); the prototype's mark and name, name hidden under 900 px (the prototype: 820 px) | kept (Anil) |
+| Shell | A top bar (brand, search, account) over the sidebar and page | No top bar from 900 px: the sidebar carries the wordmark and search at its head and the account menu (full width, photo, name, chevron; a reach into UserMenu, which has no full-width option and hides the name under 640 px) at its foot, with the nav rows' corners and a rounded-square photo (Silicon UI's --avatar-radius); sidebar and page the window's full height. Under 900 px a top bar with the mark, the name and the menu button; search and the account menu in the sheet (Anil, 2026-11-17, from the Apps store) | kept (Anil) |
 | Blocks | White cards, hairline border, title inside | Cards on Home (2026-10-30); other pages still old | open |
 
 ## Made up, not in the prototype: remove
@@ -175,6 +177,9 @@ Silicon's activity, automation, cloud services, per-field sharing.
   history files them under its security kind; only CarbonID changes have a kind of their own).
 - **Rows show the actor's mark only for apps**; changes you made show the kind's icon, not your photo. Category: kept
   simple until the history says who acted.
+- **The filters are Silicon UI Tabs** (the thin-frame Tabs of 0.5.0), not the prototype's chips. Category: Anil's
+  choice (2026-11-14: "use the new updated tab design everywhere"); the same Tabs as a Silicon's page. On a phone the
+  five tabs scroll sideways with Tabs' own scroll buttons.
 
 ## Data & privacy and Delete your account (2026-11-12)
 
@@ -204,3 +209,9 @@ Silicon's activity, automation, cloud services, per-field sharing.
   gets there, with Browse Silicon Apps (Anil, 2026-11-13, /__apps-empty C). Category: Anil's choice.
 - **Home's introduction cards act** (You lights the photo's ring, Silicons and Apps are links); the prototype's cards
   don't. Category: Anil's choice (2026-11-13).
+
+## Browser profiles and Home, 2026-11-18
+
+The profile menu adds independent personal accounts and their linked work accounts. Home shows one pending item at a time with the full count, and keeps the introduction visible while both Apps and Silicons are empty. Personal info shows both contact editors even before an address has been added. These changes follow the requested behavior.
+
+The requested Your Accounts layout gives the person and organization distinct places in each work row. The account picture leads the row and the organization logo accompanies its name.

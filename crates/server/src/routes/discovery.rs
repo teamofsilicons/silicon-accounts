@@ -66,6 +66,19 @@ struct Capability {
 /// Everything this deployment supports, by name.
 const CAPABILITIES: &[Capability] = &[
     Capability {
+        name: "interface_account_management",
+        description: "Register a Carbon by verifying an email or phone, or read and edit the consenting user’s profile with an interface app token.",
+        endpoints: &[
+            "POST /v1/interface-accounts/{interface_id}/registrations",
+            "POST /v1/interface-accounts/{interface_id}/registrations/{id}/complete",
+            "GET /v1/interface-accounts/me",
+            "PATCH /v1/interface-accounts/me",
+            "POST /v1/interface-accounts/me/id",
+            "POST /v1/interface-accounts/me/photo",
+        ],
+        docs: "start/interface-accounts",
+    },
+    Capability {
         name: "rest_json",
         description: "A REST API over HTTPS: JSON bodies in and out, RFC 3339 timestamps.",
         endpoints: &["/v1/*"],

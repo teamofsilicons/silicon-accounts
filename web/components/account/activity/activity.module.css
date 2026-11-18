@@ -1,8 +1,7 @@
 /* /activity (activity.tsx, Anil 2026-11-12): the line under the page bar, the filters, then a section per day on the
    account pages' rows (parts/rows.module.css), the time at each row's end. */
 .lead { margin: var(--space-section) 0 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
-.toolbar { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: var(--space-group); margin-top: var(--space-inset); }
-.toolbar > * { max-width: 100%; }
+.tabs { margin-top: var(--space-inset); }
 .alertAction { display: block; margin-top: var(--space-group); }
 .skeleton { margin-top: var(--space-section); }
 .empty { padding: var(--space-block) 0; }

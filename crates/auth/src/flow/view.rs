@@ -157,15 +157,7 @@ pub async fn build(
 
     let choices = if flow.step == Step::SelectAccount {
         match flow.extras.authenticated_account_uuid.as_deref() {
-            Some(uuid) => accounts_core::repo::organizations::linked_accounts(
-                conn,
-                uuid,
-                Some(&fa.app.app_id),
-            )
-            .await?["accounts"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default(),
+            Some(uuid) => super::browser::choices(conn, uuid, flow, &fa.app.app_id).await?,
             None => vec![],
         }
     } else {

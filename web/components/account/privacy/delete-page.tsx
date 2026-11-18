@@ -10,11 +10,11 @@
  *   What you'll lose access to    each app, permissions between apps, devices, emails, phones and Google or Apple
  *                                 links, and the CarbonID
  *   (an inset line)
- *   the 30 days to change your mind (only once the API keeps deleted accounts: RECOVERY_DAYS), then how many checks
- *   are left beside Delete Account, which asks for the CarbonID typed.
+ *   the days to change your mind (RECOVERY_DAYS), then how many checks are left beside Delete Account, which asks
+ *   for the CarbonID typed.
  *
- * Deleting is immediate and final until the API ships recovery (redesign/api-gaps.md #11, decisions.md 2026-11-12), so
- * with RECOVERY_DAYS null the page says what is true today: no recovery card, and the CarbonID held for 10 days.
+ * DELETE /v1/me archives the account for 10 days (decisions.md 2026-11-14): signing in with an email or phone code
+ * before then brings it back; after that the API deletes it.
  */
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,7 +35,6 @@ import { paths } from "@/lib/navigation";
 import { useDeleteAccount } from "@/lib/query/account";
 import { useMe } from "@/lib/query/session";
 import { AppMark } from "../parts/app-mark";
-import { withAppIcon } from "../parts/app-icons";
 import { asCarbon, asSilicon, describeError, msUntil, personLabel, spanText, useNow } from "../parts/common";
 import { recipient } from "../parts/handover";
 import { PageBar } from "../parts/page-bar";
@@ -56,11 +55,8 @@ import { SiliconMark } from "../parts/silicon-mark";
 import { requestHref } from "../silicons/request-page";
 import styles from "./delete-page.module.css";
 
-/**
- * Days a deleted account can still be brought back by signing in. null until the API keeps deleted accounts (today
- * DELETE /v1/me is final); then 30, and the page shows the card and holds the CarbonID for as long.
- */
-const RECOVERY_DAYS: number | null = null;
+/** Days a deleted account can still be brought back by signing in (the API's ARCHIVE_DAYS); null hides the card. */
+const RECOVERY_DAYS: number | null = 10;
 /** How long a CarbonID is held after deletion today (UNDERSTANDING.md: an old id stays reserved for 10 days). */
 const ID_HELD_DAYS = 10;
 
@@ -163,7 +159,7 @@ function DeleteChecks({ carbon, silicons, apps, devices, proofs, requests }: { c
         </div>
         <ul className={styles.list} aria-labelledby="delete-lose">
           {apps.map(item => (
-            <Row key={item.membership_id} lead={<AppMark app={withAppIcon(item.app)} size={28} className={styles.mark} decorative />} title={item.app.name} detail={"Signs you out and is told you’ve left"} />
+            <Row key={item.membership_id} lead={<AppMark app={item.app} size={28} className={styles.mark} decorative />} title={item.app.name} detail={"Signs you out and is told you’ve left"} />
           ))}
           {proofs ? <Row lead={<Tile><Link2 size={16} strokeWidth={2} /></Tile>} title={`${plural(proofs, "permission")} between apps`} detail="End, so no app can act for you" /> : null}
           <Row lead={<Tile><Laptop size={16} strokeWidth={2} /></Tile>} title={plural(devices, "signed-in device")} detail="All signed out, this one too" />

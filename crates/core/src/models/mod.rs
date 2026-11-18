@@ -150,6 +150,9 @@ text_enum! {
         Unclaimed = "unclaimed",
         /// Self-created Silicon waiting for its custodian to accept.
         PendingCustodian = "pending_custodian",
+        /// A Carbon that deleted its account: signed out, kept for `ARCHIVE_DAYS`. A sign-in code
+        /// restores it; otherwise the sweep deletes it.
+        Archived = "archived",
         /// Deleted (or a released Silicon whose custodian declined / never accepted).
         Deleted = "deleted",
     }
@@ -280,6 +283,7 @@ text_enum! {
     /// `offline_access` is accepted and ignored (refresh tokens are always issued).
     pub enum Scope {
         Profile = "profile",
+        ProfileWrite = "account_profile.write",
         Email = "email",
         Phone = "phone",
         Dob = "dob",
@@ -343,6 +347,7 @@ impl Scope {
     pub fn label(&self) -> &'static str {
         match self {
             Scope::Profile => "Name, id and profile photo",
+            Scope::ProfileWrite => "Edit your account profile",
             Scope::Email => "Email address",
             Scope::Phone => "Phone number",
             Scope::Dob => "Date of birth",
@@ -388,6 +393,7 @@ text_enum! {
         AddPhone = "add_phone",
         Requirement = "requirement",
         CliLogin = "cli_login",
+        InterfaceRegistration = "interface_registration",
         DeleteAccount = "delete_account",
     }
 }

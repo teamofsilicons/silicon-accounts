@@ -239,7 +239,7 @@
             "name": "require",
             "in": "query",
             "required": false,
-            "description": "Comma-separated capability names that must be supported, like `sse,subscriptions,webhooks`. Known names: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, silicon_tings, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt. Aliases are accepted too, such as `event_stream`, `event_streaming`, `events_stream`, `server_sent_events` and `streaming` for `sse`.",
+            "description": "Comma-separated capability names that must be supported, like `sse,subscriptions,webhooks`. Known names: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, silicon_tings, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt, interface_account_management. Aliases are accepted too, such as `event_stream`, `event_streaming`, `events_stream`, `server_sent_events` and `streaming` for `sse`.",
             "schema": {
               "type": "string"
             }
@@ -3133,7 +3133,7 @@
             ]
           },
           "409": {
-            "description": "Conflict.\n\n- `detail_not_on_page`: `details/add` for a detail that isn't on the page on screen\n- `email_in_use`: it belongs to another account; an address belongs to one account only\n- `phone_in_use`: it belongs to another account; an address belongs to one account only\n- `account_changed`: the browser is now signed in as a different account than the flow's",
+            "description": "Conflict.\n\n- `detail_not_on_page`: `details/add` for a detail that isn't on the page on screen\n- `email_in_use`: the email is already primary or reserved elsewhere, or the phone belongs to another account\n- `phone_in_use`: the email is already primary or reserved elsewhere, or the phone belongs to another account\n- `account_changed`: the browser is now signed in as a different account than the flow's",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -3324,7 +3324,7 @@
             ]
           },
           "409": {
-            "description": "Conflict.\n\n- `no_code_sent`: a resend (or a requirement verify) before any code was sent in this flow\n- `code_already_used`: this code was already accepted\n- `email_in_use`: it belongs to another account; an address belongs to one account only\n- `phone_in_use`: it belongs to another account; an address belongs to one account only\n- `flow_changed`: the flow moved on in another tab while this request ran, or the app changed its flow and the details page is gone: `GET /v1/flows/{id}` shows where it is now\n- `account_changed`: the browser is now signed in as a different account than the flow's",
+            "description": "Conflict.\n\n- `no_code_sent`: a resend (or a requirement verify) before any code was sent in this flow\n- `code_already_used`: this code was already accepted\n- `email_in_use`: the email is already primary or reserved elsewhere, or the phone belongs to another account\n- `phone_in_use`: the email is already primary or reserved elsewhere, or the phone belongs to another account\n- `flow_changed`: the flow moved on in another tab while this request ran, or the app changed its flow and the details page is gone: `GET /v1/flows/{id}` shows where it is now\n- `account_changed`: the browser is now signed in as a different account than the flow's",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -4638,7 +4638,7 @@
         ],
         "operationId": "signOutSession",
         "summary": "Sign this browser out",
-        "description": "Revokes the browser session and clears `sa_session` and `sa_signup`. Other browsers and CLI sign-ins stay signed in.",
+        "description": "Signs out the active browser account and its linked group on this browser. Other independently signed-in accounts remain available. A remaining profile becomes active automatically.",
         "security": [
           {
             "sessionCookie": []
@@ -4660,7 +4660,7 @@
                 "$ref": "#/components/headers/AccountsVersion"
               },
               "Set-Cookie": {
-                "description": "`sa_session=; Max-Age=0`.",
+                "description": "Updates or clears the active and saved browser session cookies.",
                 "schema": {
                   "type": "string"
                 }
@@ -8576,7 +8576,7 @@
         ],
         "operationId": "deleteMe",
         "summary": "Delete your account",
-        "description": "Carbons only (a Silicon's custodian deletes it). In one step: the account becomes deleted, its id is reserved for 10 days, contacts and linked identities are removed, every session, sign-in and proof about it ends, and every app it signed into gets `account.deleted`.",
+        "description": "Archive a personal Carbon, revoke its sessions and notify its verified primary email of the deadline. A fresh code sent to a verified sign-in email or phone can restore the account during the next ten days. After that deadline the purge releases the CarbonID and notifies connected apps.",
         "security": [
           {
             "bearerAuth": []
@@ -9348,7 +9348,7 @@
             "$ref": "#/components/responses/CarbonOnly"
           },
           "409": {
-            "description": "Conflict.\n\n- `email_in_use`: it belongs to another account; an address belongs to one account only\n- `email_already_added`: it is already on your account\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
+            "description": "Conflict.\n\n- `email_in_use`: the email is already primary or reserved elsewhere, or the phone belongs to another account\n- `email_already_added`: it is already on your account\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -9530,7 +9530,7 @@
             ]
           },
           "409": {
-            "description": "Conflict.\n\n- `code_already_used`: this code was already accepted\n- `email_in_use`: it belongs to another account; an address belongs to one account only\n- `account_deleted`: the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
+            "description": "Conflict.\n\n- `code_already_used`: this code was already accepted\n- `email_in_use`: the email is already primary or reserved elsewhere, or the phone belongs to another account\n- `account_deleted`: the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -10031,7 +10031,7 @@
             "$ref": "#/components/responses/CarbonOnly"
           },
           "409": {
-            "description": "Conflict.\n\n- `phone_in_use`: it belongs to another account; an address belongs to one account only\n- `phone_already_added`: it is already on your account\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
+            "description": "Conflict.\n\n- `phone_in_use`: the email is already primary or reserved elsewhere, or the phone belongs to another account\n- `phone_already_added`: it is already on your account\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -10214,7 +10214,7 @@
             ]
           },
           "409": {
-            "description": "Conflict.\n\n- `code_already_used`: this code was already accepted\n- `phone_in_use`: it belongs to another account; an address belongs to one account only\n- `account_deleted`: the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
+            "description": "Conflict.\n\n- `code_already_used`: this code was already accepted\n- `phone_in_use`: the email is already primary or reserved elsewhere, or the phone belongs to another account\n- `account_deleted`: the account was deleted: 401 for its own tokens, 403 at Silicon sign-in, 404 at lookups, 409 when it happened during the request\n- `idempotency_key_reused`: the key was used for a different body on this endpoint; use a new key for a new request\n- `idempotency_in_progress`: a request with this key is still running; retry in a few seconds\n- `idempotency_result_unavailable`: the stored secret-bearing result can no longer be decrypted, so it isn't run again; check the current state (e.g. list your Silicons) before retrying with a new key",
             "headers": {
               "X-Request-Id": {
                 "$ref": "#/components/headers/RequestId"
@@ -28964,6 +28964,726 @@
           }
         }
       }
+    },
+    "/v1/interface-accounts/{interface_id}/registrations": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "startInterfaceRegistration",
+        "summary": "Start a Carbon registration",
+        "description": "Send a code to one email or phone from an interface configured for silicon-account-management.",
+        "security": [
+          {
+            "interfaceSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "interface_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "1 to 200 visible ASCII characters (a UUID works well). The same key, caller, endpoint and body replays the first answer with `Idempotent-Replayed: true`; another body is 409 `idempotency_key_reused`; while the first request runs, 409 `idempotency_in_progress`. Failures are not stored. Answers are kept 24 hours, or 10 minutes when they carry a new secret.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7E]{1,200}$"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Registration started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "registration_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "destination": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "registration_id",
+                    "destination",
+                    "expires_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "display_name": {
+                    "type": "string"
+                  },
+                  "timezone": {
+                    "type": "string"
+                  },
+                  "dob": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "required": [],
+                "additionalProperties": false,
+                "oneOf": [
+                  {
+                    "required": [
+                      "email"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "phone"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/interface-accounts/{interface_id}/registrations/{id}/complete": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "completeInterfaceRegistration",
+        "summary": "Complete a Carbon registration",
+        "description": "Verify the code and create a new account. Retry with the same key and code to receive the original account summary.",
+        "security": [
+          {
+            "interfaceSecret": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "interface_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "1 to 200 visible ASCII characters (a UUID works well). The same key, caller, endpoint and body replays the first answer with `Idempotent-Replayed: true`; another body is 409 `idempotency_key_reused`; while the first request runs, 409 `idempotency_in_progress`. Failures are not stored. Answers are kept 24 hours, or 10 minutes when they carry a new secret.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7E]{1,200}$"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Account created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "$ref": "#/components/schemas/AccountSummary"
+                    }
+                  },
+                  "required": [
+                    "account"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Previously completed registration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "$ref": "#/components/schemas/AccountSummary"
+                    }
+                  },
+                  "required": [
+                    "account"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Code expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Verification locked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[0-9]{6}$"
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/interface-accounts/me": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "getInterfaceAccountProfile",
+        "summary": "Read the authorized account profile",
+        "description": "Use the interface app access token for silicon-account-management. The profile includes only details in the active grant.",
+        "security": [
+          {
+            "appAccessToken": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Scoped account profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountForApp"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "patchInterfaceAccountProfile",
+        "summary": "Edit the authorized account profile",
+        "description": "Requires account_profile.write. Date of birth and timezone additionally require their own field grants.",
+        "security": [
+          {
+            "appAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "1 to 200 visible ASCII characters (a UUID works well). The same key, caller, endpoint and body replays the first answer with `Idempotent-Replayed: true`; another body is 409 `idempotency_key_reused`; while the first request runs, 409 `idempotency_in_progress`. Failures are not stored. Answers are kept 24 hours, or 10 minutes when they carry a new secret.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7E]{1,200}$"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Profile updated."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MeUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/interface-accounts/me/id": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "changeInterfaceAccountId",
+        "summary": "Change the authorized personal CarbonID",
+        "description": "Requires account_profile.write. Organization-managed IDs follow organization policy.",
+        "security": [
+          {
+            "appAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "1 to 200 visible ASCII characters (a UUID works well). The same key, caller, endpoint and body replays the first answer with `Idempotent-Replayed: true`; another body is 409 `idempotency_key_reused`; while the first request runs, 409 `idempotency_in_progress`. Failures are not stored. Answers are kept 24 hours, or 10 minutes when they carry a new secret.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7E]{1,200}$"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "ID updated."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/interface-accounts/me/photo": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "uploadInterfaceAccountPhoto",
+        "summary": "Upload an account photo",
+        "description": "Requires account_profile.write. Send raw image bytes, up to 2 MiB.",
+        "security": [
+          {
+            "appAccessToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "1 to 200 visible ASCII characters (a UUID works well). The same key, caller, endpoint and body replays the first answer with `Idempotent-Replayed: true`; another body is 409 `idempotency_key_reused`; while the first request runs, 409 `idempotency_in_progress`. Failures are not stored. Answers are kept 24 hours, or 10 minutes when they carry a new secret.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7E]{1,200}$"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Updated photo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pfp_url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "pfp_url"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Image exceeds the limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/gif": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/session/accounts": {
+      "get": {
+        "tags": [
+          "Sign-in"
+        ],
+        "operationId": "getBrowserAccounts",
+        "summary": "List accounts signed in on this browser",
+        "description": "Returns independently authenticated accounts and their active linked accounts. Requires a browser session.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Accounts available on this browser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accounts": {
+                      "type": "array",
+                      "description": "Active accounts only, the personal account first.",
+                      "items": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/AccountSummary"
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "org",
+                              "is_main",
+                              "allowed",
+                              "reason"
+                            ],
+                            "properties": {
+                              "org": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "required": [
+                                      "org_id",
+                                      "name",
+                                      "logo_url"
+                                    ],
+                                    "properties": {
+                                      "org_id": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "logo_url": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The work account's organization; null for a personal account."
+                              },
+                              "is_main": {
+                                "type": "boolean"
+                              },
+                              "allowed": {
+                                "type": "boolean",
+                                "description": "Always true in these answers."
+                              },
+                              "reason": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "description": "Null in these answers."
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "accounts"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/session/accounts/switch": {
+      "post": {
+        "tags": [
+          "Sign-in"
+        ],
+        "operationId": "switchBrowserAccount",
+        "summary": "Switch the active browser account",
+        "description": "Requires a current browser proof for this account or a linked account. Existing profile sessions remain accessible.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Active session selected."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "account_uuid": {
+                    "$ref": "#/components/schemas/AccountUuid"
+                  }
+                },
+                "required": [
+                  "account_uuid"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -29076,9 +29796,10 @@
           "active",
           "unclaimed",
           "pending_custodian",
+          "archived",
           "deleted"
         ],
-        "description": "`unclaimed`: created by an app import, not finished yet. `pending_custodian`: a self-created Silicon waiting for its custodian."
+        "description": "`unclaimed`: created by an app import, not finished yet. `pending_custodian`: a self-created Silicon waiting for its custodian. `archived`: a Carbon that deleted its account less than 10 days ago; signing in with a code restores it."
       },
       "AppId": {
         "type": "string",
@@ -35350,7 +36071,7 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/Capability"
             },
-            "description": "Keyed by capability name: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, silicon_tings, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt."
+            "description": "Keyed by capability name: rest_json, openapi, structured_errors, rate_limit_headers, idempotency_keys, pagination, version_negotiation, capability_negotiation, bearer_tokens, client_credentials, oauth2, openid_connect, device_flow, short_lived_tokens, workload_identity_federation, identity_tokens, proofs, webhooks, silicon_tings, webhook_signatures, webhook_replay, sse, stream_resume, subscriptions, imports, agent_card, llms_txt, interface_account_management."
           },
           "auth_methods": {
             "type": "array",
@@ -36543,6 +37264,11 @@
         "type": "http",
         "scheme": "bearer",
         "description": "`ACCOUNTS_INTERNAL_TOKEN` for Silicon Apps (`/v1/internal/apps`, `/v1/internal/apps/sync`, `/v1/internal/apps/mail`), or `ACCOUNTS_INTERFACES_INTERNAL_TOKEN` for the Interface registry (`/v1/internal/interfaces/*`)."
+      },
+      "interfaceSecret": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Registered Interface secret, sent from its backend."
       }
     }
   }

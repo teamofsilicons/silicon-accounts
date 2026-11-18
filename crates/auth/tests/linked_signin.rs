@@ -293,3 +293,104 @@ async fn choosing_an_identity_keeps_the_remembered_auth_time() {
         assert!(old, "choosing an account is not a new proof");
     }
 }
+
+#[tokio::test]
+async fn independently_authenticated_profiles_switch_without_linking_and_sign_out_separately() {
+    let ctx = TestContext::new().await;
+    let (first, work) = linked_pair(&ctx).await;
+    let second = ctx.carbon().await;
+    let stranger = ctx.carbon().await;
+    let mut browser = Browser::new(&ctx);
+    remember(&ctx, &mut browser, &first).await;
+    let add = new_flow(
+        &ctx,
+        &mut browser,
+        "silicon-accounts",
+        json!({"prompt":"login"}),
+    )
+    .await;
+    let email = format!("{}@example.test", second.id().trim_start_matches("c:"));
+    let signed = email_and_verify(&ctx, &mut browser, &id_of(&add), &email).await;
+    assert_eq!(signed.status, 200, "{}", signed.json);
+    let list = browser.get(&ctx, "/v1/session/accounts").await;
+    let ids: Vec<_> = list.json["accounts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| a["uuid"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids.len(), 3);
+    for id in [&first.uuid, &work.uuid, &second.uuid] {
+        assert!(ids.contains(&id.as_str()));
+    }
+    assert!(
+        !organizations::linked(&mut *ctx.conn().await, &first.uuid, &second.uuid)
+            .await
+            .unwrap()
+    );
+    let chooser = new_flow(&ctx, &mut browser, "silicon-accounts", json!({})).await;
+    assert_eq!(chooser["accounts"].as_array().unwrap().len(), 3);
+    let selected = select(&ctx, &mut browser, &chooser, &work.uuid).await;
+    assert_eq!(selected.status, 200, "{}", selected.json);
+    assert_eq!(
+        browser.get(&ctx, "/v1/session").await.json["account"]["uuid"],
+        work.uuid
+    );
+    let denied = browser
+        .post(
+            &ctx,
+            "/v1/session/accounts/switch",
+            json!({"account_uuid":stranger.uuid}),
+        )
+        .await;
+    assert_eq!(denied.status, 403);
+    let selected = browser
+        .post(
+            &ctx,
+            "/v1/session/accounts/switch",
+            json!({"account_uuid":second.uuid}),
+        )
+        .await;
+    assert_eq!(selected.status, 204, "{}", selected.json);
+    let old_chooser = new_flow(&ctx, &mut browser, "silicon-accounts", json!({})).await;
+    let mut stale_cookies = browser.clone();
+    let mut stale_chooser = browser.clone();
+    let stale_tab = browser
+        .call(
+            &ctx,
+            accounts_core::test_support::Req::post("/v1/session/signout")
+                .header("x-accounts-profile", &first.uuid),
+        )
+        .await;
+    assert_eq!(stale_tab.status, 409, "{}", stale_tab.json);
+    assert_eq!(
+        browser
+            .post(&ctx, "/v1/session/signout", json!({}))
+            .await
+            .status,
+        204
+    );
+    assert_eq!(
+        browser.get(&ctx, "/v1/session").await.json["account"]["uuid"],
+        first.uuid
+    );
+    assert_eq!(
+        browser.get(&ctx, "/v1/session/accounts").await.json["accounts"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        stale_cookies.get(&ctx, "/v1/session").await.json["account"]["uuid"],
+        first.uuid
+    );
+    let old_chooser = stale_chooser
+        .get(&ctx, &format!("/v1/flows/{}", id_of(&old_chooser)))
+        .await;
+    assert_eq!(old_chooser.status, 200, "{}", old_chooser.json);
+    assert_eq!(old_chooser.json["flow"]["step"], "choose_method");
+    assert_eq!(old_chooser.json["flow"]["accounts"], json!([]));
+    let recovered = new_flow(&ctx, &mut stale_chooser, "silicon-accounts", json!({})).await;
+    assert_choices(&recovered, &first, &work);
+}

@@ -1,11 +1,13 @@
 //! The authenticated Organizations bridge and account-owned linked-account operations.
-use accounts_core::http::cookies::{append_cookie, session_cookie};
+use accounts_core::http::browser_profiles::BrowserProfiles;
+use accounts_core::http::cookies::append_cookie;
 use accounts_core::http::{AccountAuth, AppAuth, ClientMeta, IdempotencyKey, Json};
 use accounts_core::models::{Account, AccountKind, AccountStatus, TokenOrigin};
 use accounts_core::repo::{
     accounts, audit, contacts, idempotency, organizations as orgs, sessions, tokens,
 };
 use accounts_core::{ApiError, ApiResult, AppState};
+use axum::http::HeaderMap;
 use axum::{
     Router,
     extract::{Path, Query, State},
@@ -111,7 +113,7 @@ async fn actor_linked(
     let mut conn = state.db.acquire().await?;
     let mut value = orgs::linked_accounts(&mut conn, &account.uuid, Some(orgs::APP_ID)).await?;
     let main = orgs::main_uuid(&mut conn, &account.uuid).await?;
-    let ids: Vec<String> = sqlx::query_scalar("select distinct i.invite_id from organization_invitations i where i.status='pending' and i.expires_at>now() and (i.account_uuid=$1 or i.account_uuid=$2 or i.account_uuid in(select account_uuid from account_links where main_uuid=$2) or i.email in(select email from account_emails where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in(select account_uuid from account_links where main_uuid=$2)))) order by i.invite_id").bind(&account.uuid).bind(main).fetch_all(&mut *conn).await?;
+    let ids: Vec<String> = sqlx::query_scalar("select distinct i.invite_id from organization_invitations i where i.status='pending' and i.expires_at>now() and (i.account_uuid=$1 or i.account_uuid=$2 or i.account_uuid in(select account_uuid from account_links where main_uuid=$2) or i.email in(select email from account_email_owners where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in(select account_uuid from account_links where main_uuid=$2)))) order by i.invite_id").bind(&account.uuid).bind(main).fetch_all(&mut *conn).await?;
     value["invitation_ids"] = json!(ids);
     Ok(Json(value))
 }
@@ -639,6 +641,7 @@ async fn switched(
     auth: &AccountAuth,
     meta: &ClientMeta,
     target: &Account,
+    headers: &HeaderMap,
 ) -> ApiResult<Response> {
     let mut tx = state.db.begin().await?;
     let target = sqlx::query_as::<_, Account>(concat!(
@@ -663,19 +666,14 @@ async fn switched(
     }
     let view = accounts_core::views::load_me(&mut tx, &target).await?;
     let response = if auth.is_cookie() {
-        let (token, _) = sessions::create(
-            &mut tx,
-            &state.keys.pepper,
-            &target.uuid,
-            meta.ip.as_deref(),
-            meta.user_agent.as_deref(),
-        )
-        .await?;
+        let selection = BrowserProfiles::load(&mut tx, state, headers)
+            .await?
+            .select(&mut tx, state, meta, &target.uuid, false)
+            .await?;
         let mut response = Json(view).into_response();
-        append_cookie(
-            response.headers_mut(),
-            &session_cookie(&state.settings, &token),
-        );
+        for cookie in selection.cookies {
+            append_cookie(response.headers_mut(), &cookie);
+        }
         response
     } else {
         let tokens = tokens::issue_tokens(
@@ -717,12 +715,13 @@ async fn switch(
     State(state): State<AppState>,
     auth: AccountAuth,
     meta: ClientMeta,
+    headers: HeaderMap,
     Json(body): Json<Value>,
 ) -> ApiResult<Response> {
     let mut conn = state.db.acquire().await?;
     let target = accounts::require(&mut conn, string(&body, "account_uuid")?).await?;
     drop(conn);
-    switched(&state, &auth, &meta, &target).await
+    switched(&state, &auth, &meta, &target, &headers).await
 }
 async fn personal(
     State(state): State<AppState>,

@@ -21,7 +21,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@teamofsilicons/silico
 import { Activity } from "@/components/account/activity/activity";
 import { siliconOf, type DetailContext } from "@/components/account/activity/history-details";
 import { AppMark } from "@/components/account/parts/app-mark";
-import { withAppIcon } from "@/components/account/parts/app-icons";
 import { asCarbon, readableTimes } from "@/components/account/parts/common";
 import { useEverySilicon } from "@/components/account/parts/queries";
 import { Tile } from "@/components/account/parts/rows";
@@ -50,7 +49,7 @@ function actorOf(item: HistoryItem, ctx: DetailContext): Actor {
 const worthALook = (item: HistoryItem) => /^Failed sign-in/i.test(item.title) || / got a proof to act for you at /.test(item.title);
 
 function ActorMark({ actor, me, size = 28 }: { actor: Actor; me: Me | undefined; size?: number }) {
-  if (actor.kind === "app") return <AppMark app={withAppIcon(actor.app)} size={size} className={styles.mark} decorative />;
+  if (actor.kind === "app") return <AppMark app={actor.app} size={size} className={styles.mark} decorative />;
   if (actor.kind === "silicon") return <SiliconMark seed={actor.uuid} size={size} />;
   return <Avatar name={me?.display_name ?? "You"} src={me?.pfp_url} size="sm" />;
 }

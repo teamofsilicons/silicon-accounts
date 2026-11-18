@@ -89,7 +89,7 @@ pub async fn by_email(conn: &mut PgConnection, email: &str) -> ApiResult<Option<
     Ok(sqlx::query_as::<_, Account>(concat!(
         "select ",
         crate::account_columns!(),
-        " from accounts where uuid = (select account_uuid from account_emails where email = $1)"
+        " from accounts where uuid = (select account_uuid from account_email_owners where email = $1)"
     ))
     .bind(email)
     .fetch_optional(&mut *conn)
@@ -245,7 +245,7 @@ pub async fn create_carbon(
     let full = new.id.to_string();
     lock_handles(&mut tx, &[&full]).await?;
     ensure_claimable(&mut tx, &new.id, None).await?;
-    for e in &new.emails {
+    if let Some(e) = new.emails.first() {
         ensure_contact_free(&mut tx, "email", &e.value).await?;
     }
     for p in &new.phones {
@@ -587,6 +587,12 @@ pub async fn change_id(
         return Err(ApiError::conflict(
             "account_deleted",
             format!("{old} is deleted; its id can't change."),
+        ));
+    }
+    if account.status == AccountStatus::Archived {
+        return Err(ApiError::forbidden(
+            "account_not_active",
+            "Recover this account before changing its ID.",
         ));
     }
     if new_id.kind() != account.kind {
@@ -1044,6 +1050,126 @@ pub async fn finish_claim(
     Ok(ClaimFinished { account, changed })
 }
 
+/// Days a Carbon that deleted its account stays archived before the sweep deletes it.
+pub const ARCHIVE_DAYS: i64 = 10;
+
+/// What [`archive_account`] did.
+#[derive(Debug, Clone)]
+pub struct ArchivedAccount {
+    pub revoked_families: u64,
+    /// When the sweep deletes it unless it signs in again.
+    pub delete_after: OffsetDateTime,
+    /// The email telling the Carbon, when it has a verified one (send it after the commit).
+    pub message_id: Option<Uuid>,
+}
+
+/// A Carbon deletes its own account (`DELETE /v1/me`): it is archived for [`ARCHIVE_DAYS`]
+/// first. Status `archived`, `version` bumps, browser sessions and token families
+/// (`account_archived`) are revoked, and its primary email (when verified) is told. Its id,
+/// emails, phones, Google/Apple links and app memberships stay, and apps are told nothing yet:
+/// signing in with an email or phone code brings it back ([`restore_archived`]); otherwise the
+/// sweep runs [`delete_account`] on it.
+///
+/// `carbon` must be row-locked by the caller, after the pending custodian requests addressed to
+/// it ([`delete_account`]'s lock order). 409 `custodian_of_silicons` while it still has Silicons
+/// in custody.
+pub async fn archive_account(
+    conn: &mut PgConnection,
+    settings: &Settings,
+    carbon: &Account,
+) -> ApiResult<ArchivedAccount> {
+    let silicons = list_silicons_in_custody(conn, &carbon.uuid).await?;
+    if !silicons.is_empty() {
+        return Err(custodian_of_silicons(carbon, &silicons));
+    }
+    let delete_after: OffsetDateTime = sqlx::query_scalar(
+        "update accounts set status = 'archived', archived_at = now(), updated_at = now(), \
+         version = version + 1 where uuid = $1 returning archived_at + make_interval(days => $2)",
+    )
+    .bind(&carbon.uuid)
+    .bind(ARCHIVE_DAYS as i32)
+    .fetch_one(&mut *conn)
+    .await?;
+    sqlx::query("update browser_sessions set revoked_at = now() where account_uuid = $1 and revoked_at is null")
+        .bind(&carbon.uuid)
+        .execute(&mut *conn)
+        .await?;
+    let revoked_families = sqlx::query(
+        "update token_families set revoked_at = now(), revoke_reason = 'account_archived' \
+         where account_uuid = $1 and revoked_at is null",
+    )
+    .bind(&carbon.uuid)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    sqlx::query("update interface_sessions set revoked_at=now(),revoke_reason='account_archived' where account_uuid=$1 and revoked_at is null")
+        .bind(&carbon.uuid).execute(&mut *conn).await?;
+    sqlx::query("update authorization_codes set consumed_at=now() where account_uuid=$1 and consumed_at is null")
+        .bind(&carbon.uuid).execute(&mut *conn).await?;
+    sqlx::query("update interface_login_flows set expires_at=now(),code_expires_at=now() where account_uuid=$1 and expires_at>now()")
+        .bind(&carbon.uuid).execute(&mut *conn).await?;
+    let message_id = match contacts::primary_email(conn, &carbon.uuid).await? {
+        Some(email) if email.verified => {
+            let r = crate::delivery::templates::account_archived_email(
+                &carbon.display_id(),
+                delete_after,
+                &settings.public_url,
+            );
+            let msg = crate::delivery::NewMessage {
+                channel: crate::models::MessageChannel::Email,
+                to: email.value,
+                subject: Some(r.subject),
+                text_body: r.text,
+                html_body: Some(r.html),
+                purpose: "account_archived".into(),
+            };
+            Some(crate::delivery::enqueue(conn, settings, &msg).await?)
+        }
+        _ => None,
+    };
+    Ok(ArchivedAccount {
+        revoked_families,
+        delete_after,
+        message_id,
+    })
+}
+
+/// Brings back an archived Carbon that just proved one of its verified emails or phones with a
+/// sign-in code: status `active` again with everything it had, except the sign-ins archiving
+/// ended. `None` when it isn't archived (any more: the sweep deleted it meanwhile).
+pub async fn restore_archived(
+    conn: &mut PgConnection,
+    account_uuid: &str,
+    code_sent_at: OffsetDateTime,
+    ip: Option<&str>,
+) -> ApiResult<Option<Account>> {
+    let restored = sqlx::query_as::<_, Account>(concat!(
+        "update accounts set status = 'active', archived_at = null, updated_at = now(), \
+         version = version + 1 where uuid = $1 and status = 'archived' \
+         and archived_at <= $2 and archived_at > clock_timestamp() - make_interval(days => $3) returning ",
+        crate::account_columns!()
+    ))
+    .bind(account_uuid)
+    .bind(code_sent_at)
+    .bind(ARCHIVE_DAYS as i32)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if restored.is_some() {
+        audit::record(
+            conn,
+            &audit::AuditEntry {
+                target_kind: Some("account"),
+                target_id: Some(account_uuid),
+                account_uuid: Some(account_uuid),
+                ip,
+                ..audit::AuditEntry::new(ActorKind::Account, Some(account_uuid), "account.restored")
+            },
+        )
+        .await?;
+    }
+    Ok(restored)
+}
+
 /// A self-created Silicon released by [`delete_account`] because the Carbon it named as its
 /// custodian was deleted before accepting.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1212,7 +1338,7 @@ pub async fn delete_account(
         .is_some()
     {
         let main = crate::repo::organizations::main_uuid(&mut tx, account_uuid).await?;
-        sqlx::query("insert into organization_notification_contacts(account_uuid,email) select $1,email from account_emails where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in(select account_uuid from account_links where main_uuid=$2)) on conflict(account_uuid,email) do update set expires_at='infinity'").bind(account_uuid).bind(&main).execute(&mut *tx).await?;
+        sqlx::query("insert into organization_notification_contacts(account_uuid,email) select distinct $1,email from account_email_owners where verified_at is not null and (account_uuid=$1 or account_uuid=$2 or account_uuid in(select account_uuid from account_links where main_uuid=$2)) on conflict(account_uuid,email) do update set expires_at='infinity'").bind(account_uuid).bind(&main).execute(&mut *tx).await?;
         sqlx::query("insert into organization_notification_accounts(account_uuid,recipient_uuid) select $1,uuid from accounts where uuid<>$1 and status='active' and (uuid=$2 or uuid in(select account_uuid from account_links where main_uuid=$2)) on conflict(account_uuid,recipient_uuid) do update set expires_at='infinity'").bind(account_uuid).bind(main).execute(&mut *tx).await?;
     }
     crate::repo::organizations::detach_deleted(&mut tx, account_uuid).await?;
@@ -1552,7 +1678,7 @@ async fn reserve_handle(conn: &mut PgConnection, full: &str, account_uuid: &str)
 
 async fn ensure_contact_free(conn: &mut PgConnection, kind: &str, value: &str) -> ApiResult<()> {
     let sql = if kind == "email" {
-        "select exists (select 1 from account_emails where email = $1)"
+        "select exists (select 1 from account_emails e join accounts a on a.uuid=e.account_uuid where e.email=$1 and (e.is_primary or a.status in ('archived','unclaimed')))"
     } else {
         "select exists (select 1 from account_phones where phone = $1)"
     };
@@ -1569,7 +1695,7 @@ async fn ensure_contact_free(conn: &mut PgConnection, kind: &str, value: &str) -
 fn contact_in_use(kind: &str, value: &str) -> ApiError {
     if kind == "email" {
         ApiError::conflict("email_in_use", format!("{value} already belongs to another account."))
-            .hint("An email can only belong to one account. Sign in with it instead, or use another email.")
+            .hint("An email can be primary on one account. Sign in with it or choose another primary email.")
     } else {
         ApiError::conflict("phone_in_use", format!("{value} already belongs to another account."))
             .hint("A phone number can only belong to one account. Sign in with it instead, or use another number.")
