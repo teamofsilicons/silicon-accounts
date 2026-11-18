@@ -34,7 +34,6 @@ import { paths } from "@/lib/navigation";
 import { useDeleteAccount } from "@/lib/query/account";
 import { useMe } from "@/lib/query/session";
 import { AppMark } from "../parts/app-mark";
-import { withAppIcon } from "../parts/app-icons";
 import { asCarbon, asSilicon, describeError, msUntil, personLabel, spanText, useNow } from "../parts/common";
 import { recipient } from "../parts/handover";
 import { PageBar } from "../parts/page-bar";
@@ -162,7 +161,7 @@ function DeleteChecks({ carbon, silicons, apps, devices, proofs, requests }: { c
         </div>
         <ul className={styles.list} aria-labelledby="delete-lose">
           {apps.map(item => (
-            <Row key={item.membership_id} lead={<AppMark app={withAppIcon(item.app)} size={28} className={styles.mark} decorative />} title={item.app.name} detail={"Signs you out and is told you’ve left"} />
+            <Row key={item.membership_id} lead={<AppMark app={item.app} size={28} className={styles.mark} decorative />} title={item.app.name} detail={"Signs you out and is told you’ve left"} />
           ))}
           {proofs ? <Row lead={<Tile><Link2 size={16} strokeWidth={2} /></Tile>} title={`${plural(proofs, "permission")} between apps`} detail="End, so no app can act for you" /> : null}
           <Row lead={<Tile><Laptop size={16} strokeWidth={2} /></Tile>} title={plural(devices, "signed-in device")} detail="All signed out, this one too" />

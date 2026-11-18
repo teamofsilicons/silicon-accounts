@@ -14,7 +14,6 @@ import { LayoutGrid, LogIn, MousePointerClick, ShieldCheck } from "lucide-react"
 import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { AppMark } from "@/components/account/parts/app-mark";
-import { withAppIcon } from "@/components/account/parts/app-icons";
 import { PageBar } from "@/components/account/parts/page-bar";
 import { LinkItem, Row, Section, Tile } from "@/components/account/parts/rows";
 import styles from "./apps-empty-lab.module.css";
@@ -52,7 +51,7 @@ const VERSIONS: Array<{ key: string; name: string; note: string; body: ReactNode
         <p className={styles.lead}>Apps appear here after you or your Silicons sign in.</p>
         <Section id="lab-ours" title="Apps to try">
           {OURS.map(app => (
-            <LinkItem key={app.app_id} href={`${APPS_URL}/apps/${app.app_id}`} lead={<AppMark app={withAppIcon({ ...app, logo_url: null })} size={28} decorative />} title={app.name} detail="On Silicon Apps" />
+            <LinkItem key={app.app_id} href={`${APPS_URL}/apps/${app.app_id}`} lead={<AppMark app={{ ...app, logo_url: null }} size={28} decorative />} title={app.name} detail="On Silicon Apps" />
           ))}
         </Section>
       </>

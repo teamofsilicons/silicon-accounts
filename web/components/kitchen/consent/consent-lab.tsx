@@ -32,8 +32,8 @@ const ROUND_TWO = ["sentence", "card", "onetap", "band"];
 
 const APPS: Record<string, { label: string; frame: FrameApp; domain: string; site?: boolean }> = {
   /* The account site's own tokens (HostedFrame site): how the step looks in today's Silicon Accounts design. */
-  site: { label: "Account site look", domain: "briefcase.teamofsilicons.com", site: true, frame: { app_id: "briefcase", name: "Briefcase", logo_url: "/icons/briefcase/web/icon-192.png" } },
-  briefcase: { label: "Default branding", domain: "briefcase.teamofsilicons.com", frame: { app_id: "briefcase", name: "Briefcase", logo_url: "/icons/briefcase/web/icon-192.png" } },
+  site: { label: "Account site look", domain: "briefcase.teamofsilicons.com", site: true, frame: { app_id: "briefcase", name: "Briefcase", logo_url: null } },
+  briefcase: { label: "Default branding", domain: "briefcase.teamofsilicons.com", frame: { app_id: "briefcase", name: "Briefcase", logo_url: null } },
   northwind: {
     label: "Own colours", domain: "app.northwind.test",
     frame: { app_id: "northwind", name: "Northwind", branding: { show_app_name: true, light: { primary: "#1E6B4F", primary_foreground: "#FFFFFF", background: "#F1F5F2", surface: "#FFFFFF", foreground: "#14231C", muted: "#5B6B62", border: "#D5DED8", danger: "#B42318" } } as Partial<Branding> },

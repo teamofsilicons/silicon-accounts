@@ -38,7 +38,6 @@ import SegmentedControl from "@teamofsilicons/silicon-ui/segmented-control";
 import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@teamofsilicons/silicon-ui/tabs";
 import { ButtonLink } from "@/components/foundation/button-link";
-import { withAppIcon } from "@/components/account/parts/app-icons";
 import { AppMark } from "@/components/account/parts/app-mark";
 import { asCarbon, msUntil, personLabel, spanText } from "@/components/account/parts/common";
 import { useEveryApp, useEveryCustodianRequest, useEveryProof, useEverySession, useEverySilicon } from "@/components/account/parts/queries";
@@ -265,7 +264,7 @@ function WhatEnds({ facts }: { facts: Facts }) {
         </Row>
       ) : null}
       <Row
-        lead={facts.apps.length ? <AvatarGroup size="sm" max={3} label="Your apps" members={facts.apps.map(item => ({ name: item.app.name, src: withAppIcon(item.app).logo_url ?? undefined }))} /> : <Tile><LayoutGrid size={16} strokeWidth={2} /></Tile>}
+        lead={facts.apps.length ? <AvatarGroup size="sm" max={3} label="Your apps" members={facts.apps.map(item => ({ name: item.app.name, src: item.app.logo_url ?? undefined }))} /> : <Tile><LayoutGrid size={16} strokeWidth={2} /></Tile>}
         title={facts.apps.length ? `${plural(facts.apps.length, "app")} told, and lose access` : "No app has access"}
         detail={facts.apps.length ? listJoin(facts.apps.map(item => item.app.name)) : undefined}
       />
@@ -383,7 +382,7 @@ function Checks({ facts, boxed, airy, footed }: { facts: Facts; boxed?: boolean;
   const loseRows = (
     <>
       {facts.apps.map(item => (
-        <Row key={item.membership_id} lead={<AppMark app={withAppIcon(item.app)} size={28} className={styles.mark} decorative />} title={item.app.name} detail={footed ? "Signs you out and is told you\u2019ve left" : "You\u2019re signed out, and it\u2019s told your account is gone"} />
+        <Row key={item.membership_id} lead={<AppMark app={item.app} size={28} className={styles.mark} decorative />} title={item.app.name} detail={footed ? "Signs you out and is told you\u2019ve left" : "You\u2019re signed out, and it\u2019s told your account is gone"} />
       ))}
       {facts.proofs ? <Row lead={<Tile><Link2 size={16} strokeWidth={2} /></Tile>} title={`${plural(facts.proofs, "permission")} between apps`} detail={footed ? "End, so no app can act for you" : "They end, and the apps can no longer act for you"} /> : null}
       <Row lead={<Tile><Laptop size={16} strokeWidth={2} /></Tile>} title={plural(facts.devices, "signed-in device")} detail={footed ? "All signed out, this one too" : "Every one is signed out, this one too"} />
@@ -458,7 +457,7 @@ function Compact({ facts }: { facts: Facts }) {
   const links = facts.carbon.identities.length;
   const lose: Array<{ icon: ReactNode; text: ReactNode }> = [
     {
-      icon: facts.apps.length ? <AvatarGroup size="sm" max={3} label="Your apps" members={facts.apps.map(item => ({ name: item.app.name, src: withAppIcon(item.app).logo_url ?? undefined }))} /> : <LayoutGrid size={14} strokeWidth={2} />,
+      icon: facts.apps.length ? <AvatarGroup size="sm" max={3} label="Your apps" members={facts.apps.map(item => ({ name: item.app.name, src: item.app.logo_url ?? undefined }))} /> : <LayoutGrid size={14} strokeWidth={2} />,
       text: facts.apps.length ? plural(facts.apps.length, "app") : "No apps",
     },
     ...(facts.proofs ? [{ icon: <Link2 size={14} strokeWidth={2} />, text: `${plural(facts.proofs, "permission")} between apps` }] : []),
