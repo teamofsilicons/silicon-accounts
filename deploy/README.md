@@ -194,3 +194,18 @@ the account site are release `accounts-sui05-fb03b11`'s exact files. Schema unch
 verified backup `backups/predeploy-redesign-20261113T200453Z.dump` first; SSM command `d18a3d81-ce23-4071-9815-df7a2b04e777`. Checked live:
 `/api/apps/apps/dm` answers 401 signed_out like any other id, no longer 404 not_proxied.
 
+
+## Account switcher and Silicon UI 0.6.0 (PR 25) — 2026-11-18
+
+Release `dc18dd7` changes only the account site: the account switcher at the sidebar's foot, the full-height shell,
+Allo and Silicon UI 0.6.0 (teamofsilicons/silicon-accounts#25), and the phone rule that keeps the sidebar hidden until
+the sheet swaps in. It is a web overlay on the live release `9cce3f4`, whose API (`69b0a49`, organization authors) and
+Developer (`9cce3f4`, invitee profile pictures) come from `codex/*` branches not yet merged to main; both were copied
+byte for byte. Schema unchanged at 44; only `accounts-web` restarted (1.1 s), after a loopback preflight. The previous
+build's 159 static files stay served for open tabs. Rollback: point `current` at `previous-release` and restart
+`accounts-web`. SSM command `261180da-34fa-4afd-811f-a6ef306cffb6`. Receipt:
+[verification-web-pr25-2026-11-18.json](verification-web-pr25-2026-11-18.json).
+
+Later that day main took in those branches (`44ec852`, `dd13197`, `4762132`). Main at `4762132` has the same source
+as every live component (web `dc18dd7`, API `69b0a49`, Developer `9cce3f4`), so a release built from main no longer
+rolls anything back.

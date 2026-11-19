@@ -517,7 +517,7 @@ async fn sync(
             ));
         }
     }
-    if !input.cell_broker_cleanup {
+    if input.active && !input.cell_broker_cleanup {
         for app_id in &input.app_ids {
             apps::require_active(&mut tx, app_id).await?;
         }

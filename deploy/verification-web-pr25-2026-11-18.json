@@ -1,0 +1,121 @@
+{
+  "verified_at": "2026-11-18T11:52:08.217800+00:00",
+  "release": "dc18dd7b0a79fbbfb60a879c2160df5f7e328233",
+  "previous": "9cce3f446bf98160d2ffb6329b640312dc45f52e",
+  "web_build_id": "b2AopTYbW77fdYJx6cPIq",
+  "contents": "teamofsilicons/silicon-accounts#25 (account switcher, full-height shell, Allo, Silicon UI 0.6.0) and dc18dd7 (phone sidebar hidden until the sheet swaps in)",
+  "api_source": "69b0a49f5eb207f3a60a50471430f1ae01342cf8",
+  "api_sha256": "6defd0282b1aadcb22028c50cb5ef7ef28940d01872627ca3108f274393a9cea",
+  "developer_source": "9cce3f446bf98160d2ffb6329b640312dc45f52e",
+  "developer_build_id": "ccCJ17NjwYvzqoiM-keAF",
+  "schema_version": 44,
+  "baseline_note": "Live release 9cce3f4 was the baseline: its API (69b0a49) and Developer (9cce3f4) come from codex branches not yet on main; both were copied byte for byte.",
+  "artifact": {
+    "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-web-pr25/dc18dd7b0a79fbbfb60a879c2160df5f7e328233-03baf045113482.tar.gz",
+    "sha256": "03baf0451134827dfa78b26ca5846717ea47cbf6799fb8916b79eb1369d85336",
+    "size": 55742733
+  },
+  "activation_command_id": "261180da-34fa-4afd-811f-a6ef306cffb6",
+  "activation": {
+    "source": "dc18dd7b0a79fbbfb60a879c2160df5f7e328233",
+    "release": "dc18dd7b0a79fbbfb60a879c2160df5f7e328233",
+    "developer_revision": "9cce3f446bf98160d2ffb6329b640312dc45f52e",
+    "developer_build": "ccCJ17NjwYvzqoiM-keAF",
+    "previous": "9cce3f446bf98160d2ffb6329b640312dc45f52e",
+    "web_build_id": "b2AopTYbW77fdYJx6cPIq",
+    "verified_files": 2710,
+    "static_dirs_made_readable": [
+      "4Jv_PBMREYcFaCa_Ums-l",
+      "FswF9r13GFv5U2PP28pBT",
+      "lxuISq8XtWBoD8F-ZzFjW"
+    ],
+    "prior_static_files_kept": 159,
+    "loopback_preflight": true,
+    "api_readiness": true,
+    "services_healthy": true,
+    "restarted_units": [
+      "accounts-web"
+    ],
+    "schema_changes": false,
+    "cutover_seconds": 1.1,
+    "activated_at": "2026-11-18T11:51:55.449764+00:00"
+  },
+  "public_http": {
+    "your_accounts": {
+      "http_status": 200
+    },
+    "database": {
+      "http_status": 200
+    },
+    "account guide": {
+      "http_status": 200
+    },
+    "chunks/0bfpi6zl3tkmu.css": {
+      "http_status": 200,
+      "sha256": "85d738d9b58e9141bbcc3c2da8489066424ce39c1c2802c33c31172e22d46a8b"
+    },
+    "chunks/21r31oa5cd3bl.js": {
+      "http_status": 200,
+      "sha256": "6c24fee393b99a4e551778679931064d30f57694cd6eb4cbe818b1888ec78d2f"
+    },
+    "chunks/0k_bcjm94kqfg.css": {
+      "http_status": 200,
+      "sha256": "cdb16fdfe23111b4e4c2120bd072a3e7e1713bdeacc15a7d8a6cb30d11eada89"
+    },
+    "chunks/3-6e_2ql1cto-.js": {
+      "http_status": 200,
+      "sha256": "f40a99f19f7a913b38a9e121f71daf1502945eda21c0212ea93102b978293da6"
+    },
+    "chunks/25m4tar4js3hk.js": {
+      "http_status": 200,
+      "sha256": "0b02bc7b5a1b05052f3ff319ba98fab1322226e2d8a8617e36d4699b82421f55"
+    },
+    "chunks/38dtmfdtzvkik.js": {
+      "http_status": 200,
+      "sha256": "4f3d6d2894ad88d010c60bfafcabae30167682be3bb26dc80fac00c44b3cde83"
+    },
+    "chunks/05t23mb_n52qm.js": {
+      "http_status": 200,
+      "sha256": "404380e64c6553626210c79cd175f015b5f4e6851d3eb1251eeed8e3bef2ba5a"
+    },
+    "chunks/12lh7vm4zj_em.js": {
+      "http_status": 200,
+      "sha256": "fcceb7c6237f20209e30469857ad89cc3f61571f2f1dc755447afb0a2d34f8c9"
+    },
+    "chunks/0ryuerzx6aamy.js": {
+      "http_status": 200,
+      "sha256": "1aa79389bfb97de27e80a24d7e3665b5655e500e9e8cc6a52cfb7ae5b57cce5a"
+    },
+    "chunks/37wkls-rtnx73.js": {
+      "http_status": 200,
+      "sha256": "dfcb0cb8a3af11243aab5c46589320e53ed7c4925c8182ae48942238c0ad1b3e"
+    },
+    "chunks/28f5xsvwmb4i8.js": {
+      "http_status": 200,
+      "sha256": "206c4db680589ebbac33f447180ab5a2c0b4291286705e8e39340b7b13f9eba1"
+    },
+    "chunks/07srue-aeeuwc.js": {
+      "http_status": 200,
+      "sha256": "ced8d70aba60c8374cdb39407be0975ba79c1a0208416e95ffd1162d0130bfa2"
+    }
+  },
+  "browser_verification": {
+    "browser": "Chrome, signed-in production session",
+    "checked": [
+      "Home at 1485px: full-height sidebar with Search at its head and the account row at its foot; body font Allo; no console errors",
+      "Account switcher lists both accounts on the browser, then Add another account, Your accounts, Sign out",
+      "Activity uses Tabs",
+      "Live stylesheet 0bfpi6zl3tkmu.css has (max-width: 899px) { .aside, .resize { display: none } }"
+    ],
+    "not_checked": [
+      "Phone width in a real browser (window could not be resized)",
+      "Switching between two accounts"
+    ]
+  },
+  "web_checks": {
+    "typecheck": true,
+    "lint": true,
+    "unit_tests_passed": 34,
+    "production_build": true
+  }
+}

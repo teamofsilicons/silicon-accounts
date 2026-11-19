@@ -1,10 +1,12 @@
 "use client";
+import {OrganizationAuthors} from "@/components/organizations/organization-authors";
 import {PersonField, SavedPerson} from "@/components/people/person-field";
 import {ResourceAccessEditor} from "@/components/organizations/policy-editor";
 import {emptyResourcePolicy} from "@/components/organizations/api";
 import {cellsRequest} from "@/lib/cells/api";
 import {useState} from "react";
 import {useRouter} from "next/navigation";
+import {useSession} from "@/lib/query/session";
 import {Section,Surface,Stack,Cluster} from "@/components/foundation/layout/layout";
 import {Button} from "@/components/silicon-ui/button/button";
 import {Input} from "@/components/silicon-ui/input/input";
@@ -22,11 +24,16 @@ import {CellIdInput} from "./cell-id-input";
 import styles from "./cells.module.css";
 interface Author {account:{uuid:string;id:string;display_name:string};joined_at:string}
 interface Key {id:string;name:string;kind:string;prefix:string;publishable_key:string|null;revoked_at:string|null}
-export function CellAuthors({cellId,active}:{cellId:string;active:boolean}){
-  const query=useCellData<{authors:Author[]}>(cellId,"/authors"),invite=useCellAction(cellId),remove=useCellAction(cellId);
+export function CellAuthors({cellId,active,canManage,personal,hasOrganizationAuthors}:{cellId:string;active:boolean;canManage:boolean;personal:boolean;hasOrganizationAuthors:boolean}){
+  const query=useCellData<{authors:Author[];organizations?:string[]}>(cellId,"/authors"),invite=useCellAction(cellId),remove=useCellAction(cellId);
   const [target,setTarget]=useState(""),[sent,setSent]=useState(""),[selected,setSelected]=useState<Author|null>(null);
-  return <Stack gap={8}><Section title="Authors" description="Authors share control of this cell."><Stack><Failure error={query.error}/>{query.isPending?<p role="status">Loading authors…</p>:query.data?.authors.map(a=><Surface key={a.account.uuid}><Cluster justify="between"><div><SavedPerson person={a.account}/><p className={styles.muted}>{a.account.id} · Joined {date(a.joined_at)}</p></div>{active&&<Button variant="ghost" onClick={()=>setSelected(a)}>Remove</Button>}</Cluster></Surface>)}</Stack></Section>
-    {active&&<Section title="Invite an author"><form onSubmit={async e=>{e.preventDefault();if(await invite.run("/authors","POST",{target})){setSent(target);setTarget("");}}}><Stack><Failure error={invite.error}/><PersonField label="Carbon or Silicon ID, or email" value={target} onChange={setTarget} placeholder="si:your-agent" disabled={invite.busy}/>{sent&&<p role="status">Invitation created for {sent}. They can accept it in Cells.</p>}<Button type="submit" loading={invite.busy}>Invite author</Button></Stack></form></Section>}
+  const {me}=useSession();
+  const orgAction=useCellAction(cellId);
+  const canInvitePeople=canManage||(personal&&(!hasOrganizationAuthors||query.data?.authors.some(a=>a.account.uuid===me?.uuid)));
+  return <Stack gap={8}><OrganizationAuthors organizations={query.data?.organizations??[]} canManage={active&&canManage}
+    invite={org=>orgAction.request("/authors","POST",{target:`org:${org}`})}
+    remove={org=>orgAction.request(`/organization-authors/${org}`,"DELETE")}/><Section title="Authors" description="Authors share control of this cell."><Stack><Failure error={query.error}/>{query.isPending?<p role="status">Loading authors…</p>:query.data?.authors.map(a=><Surface key={a.account.uuid}><Cluster justify="between"><div><SavedPerson person={a.account}/><p className={styles.muted}>{a.account.id} · Joined {date(a.joined_at)}</p></div>{active&&(canManage||a.account.uuid===me?.uuid)&&<Button variant="ghost" onClick={()=>setSelected(a)}>Remove</Button>}</Cluster></Surface>)}</Stack></Section>
+    {active&&canInvitePeople&&<Section title="Invite an author"><form onSubmit={async e=>{e.preventDefault();if(await invite.run("/authors","POST",{target})){setSent(target);setTarget("");}}}><Stack><Failure error={invite.error}/><PersonField label="Carbon or Silicon ID, or email" value={target} onChange={setTarget} placeholder="si:your-agent" disabled={invite.busy}/>{sent&&<p role="status">Invitation created for {sent}. They can accept it in Cells.</p>}<Button type="submit" loading={invite.busy}>Invite author</Button></Stack></form></Section>}
     <Dialog open={!!selected} onOpenChange={value=>{if(!value&&!remove.busy)setSelected(null);}}><DialogContent title="Remove author?" description={`${selected?.account.id??"This author"} will lose access to manage this cell.`}><Stack><Failure error={remove.error}/><Button variant="danger" loading={remove.busy} onClick={async()=>{if(selected&&await remove.run(`/authors/${selected.account.uuid}`,"DELETE"))setSelected(null);}}>Remove author</Button></Stack></DialogContent></Dialog>
   </Stack>;
 }
@@ -35,7 +42,7 @@ export function CellHistory({cellId}:{cellId:string}){
   return <Stack gap={8}><CellNotifications cellId={cellId}/><Section title="History" description="The latest 200 changes to this cell."><Stack><Failure error={query.error}/>{query.isPending?<p role="status">Loading history…</p>:query.data?.history.map(item=><Surface key={item.id}><details><summary>{item.action} · {date(item.occurred_at)}</summary><p className={styles.muted}>{item.actor_uuid?`Author: ${item.actor_uuid}`:"System"}</p><pre className={styles.pre}>{JSON.stringify(item.details,null,2)}</pre></details></Surface>)}</Stack></Section></Stack>;
 }
 export function CellSettings({cell}:{cell:Cell}){
-  return <Stack gap={8}>{cell.organization_id&&<ResourceAccessEditor org={cell.organization_id} value={cell.organization_access??emptyResourcePolicy()} canManage={cell.permissions?.manage??false} onSave={async access=>{await cellsRequest(`/cells/${cell.cell_id}/organization-access`,{method:"PUT",body:access,key:crypto.randomUUID()});}}/>}{cell.status==="active"&&(!cell.organization_id||cell.permissions?.manage)&&<><CellIdSettings cell={cell}/><OriginSettings key={JSON.stringify(cell.settings)} cell={cell}/><Keys cellId={cell.cell_id}/><Secrets cellId={cell.cell_id}/></>}{cell.status==="deleted"&&<StorageLocations cellId={cell.cell_id}/>}<Lifecycle cell={cell}/></Stack>;
+  return <Stack gap={8}>{cell.organization_id&&<ResourceAccessEditor org={cell.organization_id} value={cell.organization_access??emptyResourcePolicy()} canManage={cell.permissions?.manage??false} onSave={async access=>{await cellsRequest(`/cells/${cell.cell_id}/organization-access`,{method:"PUT",body:access,key:crypto.randomUUID()});}}/>}{cell.status==="active"&&(cell.permissions?.manage??!cell.organization_id)&&<><CellIdSettings cell={cell}/><OriginSettings key={JSON.stringify(cell.settings)} cell={cell}/><Keys cellId={cell.cell_id}/><Secrets cellId={cell.cell_id}/></>}{cell.status==="deleted"&&<StorageLocations cellId={cell.cell_id}/>}<Lifecycle cell={cell}/></Stack>;
 }
 function CellIdSettings({cell}:{cell:Cell}){
   const router=useRouter(),action=useCellAction(cell.cell_id),[id,setId]=useState("");

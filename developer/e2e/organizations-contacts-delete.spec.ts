@@ -53,11 +53,40 @@ test('delete requires app ID and supports restore in the workspace',async({page}
   return route.fallback();
  });
  await page.goto('/apps/test-app/authors');
+ await page.getByRole('tab',{name:'Settings',exact:true}).click();
  const remove=page.getByRole('button',{name:'Delete app',exact:true});await expect(remove).toBeDisabled();
  await page.getByLabel('Type test-app to confirm deletion').fill('test-app');await remove.click();
  await expect(page).toHaveURL(/\/apps$/);await expect(page.getByRole('heading',{name:'Deleted apps'})).toBeVisible();
  await page.getByRole('button',{name:'Restore app'}).click();await expect(page.getByRole('heading',{name:'Deleted apps'})).toHaveCount(0);expect(restored).toBe(true);
 });
+for (const service of ['cells', 'interfaces'] as const) {
+ test(`${service} invites show the resolved profile picture of a past invitee`, async ({page}) => {
+  await platform(page);
+  const profile = {uuid: other, id: 'c:recent', display_name: 'Recent Person', pfp_url: '/api/contacts/photos/public-portrait'};
+  await page.route('**/api/contacts/lookup?*', route => route.fulfill({json: profile}));
+  const resource = service === 'cells'
+    ? {cell: {cell_id: 'sample', name: 'Sample', status: 'active', settings: {allowed_origins: [], redirect_urls: []}}}
+    : {interface: {interface_id: 'sample', name: 'Sample', kind: 'unverified', revision: 1, app_ids: [], creators: [], releases: [], links: [], platforms: [], images: []}};
+  await page.route(`**/api/${service}/**`, route => {
+   const path = new URL(route.request().url()).pathname;
+   if (path.endsWith('/people')) return route.fallback();
+   if (path.endsWith('/sample')) return route.fulfill({json: resource});
+   const section = path.split('/').at(-1)!;
+   const data = section === 'readiness' ? {ready: false, missing: []} : section === 'history' ? {events: []} : {[section]: []};
+   return route.fulfill({json: data});
+  });
+  await page.goto(service === 'cells' ? '/cells/sample/authors' : '/interfaces/sample#interface-creators');
+  const field = page.getByRole('combobox', {name: /Carbon or Silicon ID/});
+  await field.fill('rcnt');
+  await page.getByRole('option', {name: /Recent Person/}).click();
+  await expect(field).toHaveValue(profile.id);
+  await expect(page.getByRole('listbox', {name: 'People suggestions'})).toBeHidden();
+  const photo = page.locator('img[src="/api/contacts/photos/public-portrait"]');
+  await expect(photo).toBeVisible();
+  await expect.poll(() => photo.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+ });
+}
+
 test('organization cell creation preserves publisher and omits credential reveal on mobile',async({page})=>{
  await page.setViewportSize({width:390,height:844});await platform(page);let body:Record<string,unknown>|undefined;
  await page.route('**/api/cells/**',async route=>{const req=route.request(),url=new URL(req.url());
@@ -212,10 +241,151 @@ test('an invite can use saved contacts without leaving the form', async ({ page 
   await expect(input).toBeVisible();
   await expect(page.getByRole('button', {name:'Use saved contacts'})).toHaveCount(0);
   await input.focus();
-  await page.getByRole('button', {name:'Use saved contacts'}).click();
+  const connect = page.getByRole('button', {name:'Use saved contacts'});
+  await expect(connect).toBeVisible();
+  await input.press('Tab');
+  await expect(connect).toBeFocused();
+  await connect.press('Enter');
   await page.getByRole('dialog', {name:'Use your saved contacts?'}).getByRole('button', {name:'Allow access'}).click();
   await input.fill('assistnt');
   await page.getByRole('option', {name:/Saved Assistant/}).click();
   await expect(input).toHaveValue('si:assistant');
   await expect(page.locator('img[src="/api/contacts/photos/portrait"]').first()).toBeVisible();
+});
+
+test('work publisher is selected on each creation form and organization settings follow the account role', async ({page}) => {
+  await platform(page);
+  await page.route('**/api/accounts/me', route=>route.fulfill({json:{...account,id:'c:maker.studio',kind:'carbon',emails:[],phones:[]}}));
+  let admin=true;
+  await page.route('**/api/organizations/publishing',route=>route.fulfill({json:{account_uuid:account.uuid,
+    organizations:['other','studio'].map(org_id=>({org_id,name:org_id==='studio'?'Home Studio':'Other studio',admin:org_id==='studio'&&admin,permissions:{apps:['create'],interfaces:['create'],cells:['create']}}))}}));
+  await page.route('**/api/interfaces/**',route=>route.fulfill({json:route.request().url().endsWith('/me')?{invites:[],eligibility:{}}:{interfaces:[]}}));
+  await page.route('**/api/cells/**',route=>route.fulfill({json:{cells:[],invitations:[]}}));
+  for(const [area,button] of [['apps','New app'],['interfaces','Create interface'],['cells','Create cell']]) {
+    await page.goto('/'+area);
+    await expect(page.getByRole('navigation',{name:'Developer site'}).getByRole('link',{name:'Organization',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:button,exact:true}).first().click();
+    const picker=page.getByRole('combobox',{name:'Publisher',exact:true});
+    await expect(picker).toContainText('Home Studio');
+    await picker.click();await page.getByRole('option',{name:'Personal account',exact:true}).click();
+    await expect(picker).toContainText('Personal account');
+  }
+  await page.setViewportSize({width:390,height:844});await page.goto('/apps');
+  await expect(page.getByRole('link',{name:'Organization',exact:true})).toBeVisible();
+  await page.getByRole('link',{name:'Organization',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Organization publishing'})).toBeVisible();
+  admin=false;await page.goto('/apps');
+  await expect(page.getByRole('button',{name:'New app',exact:true})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Organization',exact:true})).toHaveCount(0);
+});
+
+test('organization invitations use the organization ID in each resource workspace',async({page})=>{
+  await platform(page);
+  const targets:string[]=[];
+  const item={interface_id:'demo',name:'Demo',kind:'unverified',revision:1,creators:[account],app_ids:['dm'],permissions:{read:true,edit:true,publish:true,manage:true},description:'',releases:[]};
+  await page.route('**/api/apps/apps/test-app/invites',route=>{
+    if(route.request().method()==='POST')targets.push(route.request().postDataJSON().to);
+    return route.fulfill({json:{items:[]}});
+  });
+  await page.route('**/api/interfaces/**',route=>{
+    const path=new URL(route.request().url()).pathname;
+    if(path.endsWith('/demo/invites')&&route.request().method()==='POST')targets.push(route.request().postDataJSON().target);
+    return route.fulfill({json:path.endsWith('/interfaces/demo')?{interface:item}:{invites:[],uploads:[],events:[],requests:[],eligibility:{},ready:false,missing:[]}});
+  });
+  await page.route('**/api/cells/**',route=>{
+    const path=new URL(route.request().url()).pathname;
+    if(path.endsWith('/authors')&&route.request().method()==='POST')targets.push(route.request().postDataJSON().target);
+    return route.fulfill({json:path.endsWith('/cells/demo')?{cell:{uuid:'example',cell_id:'demo',name:'Demo',status:'active',url:'https://demo.cells.example',settings:{},permissions:item.permissions}}:{authors:[],organizations:[],invitations:[]}});
+  });
+  for(const url of ['/apps/test-app/authors','/interfaces/demo#interface-creators','/cells/demo/authors']) {
+    await page.goto(url);
+    if (url.startsWith('/apps/')) await page.getByRole('button', {name:'Organization', exact:true}).click();
+    await page.getByLabel('Organization ID',{exact:true}).fill('org:guest-studio');
+    await page.getByRole('button',{name:'Invite organization',exact:true}).click();
+    await expect(page.getByText('Invitation sent to guest-studio.')).toBeVisible();
+  }
+  expect(targets).toEqual(['org:guest-studio','org:guest-studio','org:guest-studio']);
+});
+
+for (const width of [1440, 390]) {
+  test(`people suggestions stay anchored without moving the invitation form at ${width}px`, async ({page}) => {
+    await page.setViewportSize({width, height: 800});
+    await page.emulateMedia({reducedMotion: 'reduce'});
+    await platform(page);
+    await page.route('**/api/apps/apps/test-app/authors', route => route.fulfill({
+      json: {items: [...makeApp().authors, {uuid:other, id:'c:recent', display_name:'Recent Person'}]},
+    }));
+    await page.goto('/apps/test-app/authors');
+    const field = page.getByRole('combobox', {name: 'Invite an author'});
+    const send = page.getByRole('button', {name: 'Send invitation'});
+    const pending = page.getByRole('heading', {name: 'Pending invitations'});
+    const top = (element: Element) => element.getBoundingClientRect().top + window.scrollY;
+    await field.evaluate(element => element.scrollIntoView({block: 'center'}));
+    const originalSend = await send.evaluate(top);
+    const originalPending = await pending.evaluate(top);
+    await field.focus();
+    const list = page.getByRole('listbox', {name:'People suggestions'});
+    await expect(list.getByRole('option').first()).toBeVisible();
+    await expect(list.getByRole('option', {name:/Recent Person/})).toHaveCount(0);
+    expect(Math.abs(await send.evaluate(top) - originalSend)).toBeLessThanOrEqual(1);
+    expect(Math.abs(await pending.evaluate(top) - originalPending)).toBeLessThanOrEqual(1);
+    const menu = (await list.boundingBox())!;
+    expect(menu.x).toBeGreaterThanOrEqual(0);
+    expect(menu.x + menu.width).toBeLessThanOrEqual(width);
+    expect(menu.y).toBeGreaterThanOrEqual(0);
+    expect(menu.y + menu.height).toBeLessThanOrEqual(800);
+    await field.press('ArrowDown');
+    await field.press('Enter');
+    await expect(field).toHaveValue('si:assistant');
+    await expect(list).toBeHidden();
+    expect(Math.abs(await send.evaluate(top) - originalSend)).toBeLessThanOrEqual(1);
+    await field.click();
+    await expect(list).toBeVisible();
+    await field.press('Escape');
+    await expect(list).toBeHidden();
+    await page.getByRole('button', {name:'Organization', exact:true}).click();
+    await page.getByLabel('Organization ID', {exact:true}).fill('studio');
+    await expect(page.getByRole('button', {name:'Invite organization', exact:true})).toBeEnabled();
+    await expect(list).toBeHidden();
+  });
+}
+
+test('organization members without app management cannot send invitations', async ({page}) => {
+  const changes = await mock(page, true, {
+    is_admin: false, is_author: true, organization_id: 'studio',
+    permissions: {read:true,edit:true,publish:false,manage:false},
+  });
+  await page.goto('/apps/test-app/authors');
+  await page.getByRole('button', {name:'Organization', exact:true}).click();
+  await expect(page.getByLabel('Organization ID', {exact:true})).toBeDisabled();
+  await expect(page.getByRole('button', {name:'Invite organization', exact:true})).toBeDisabled();
+  await expect(page.getByText('An app manager can send author invitations.')).toBeVisible();
+  expect(changes.filter(change => change.path.endsWith('/invites'))).toHaveLength(0);
+});
+
+test('interface Settings checks management permission, confirms the ID and restores the deleted item',async({page})=>{
+  await platform(page);
+  let manage=false,deleted=false,restored=false;
+  const item={interface_id:'demo',name:'Demo',kind:'unverified',revision:7,creators:[account],app_ids:['dm'],description:'',releases:[]};
+  await page.route('**/api/interfaces/**',route=>{
+    const req=route.request(),url=new URL(req.url()),p=url.pathname;
+    if(req.method()==='DELETE'){
+      expect(req.postDataJSON()).toEqual({revision:7,interface_id:'demo'});deleted=true;return route.fulfill({json:{interface:item}});
+    }
+    if(p.endsWith('/restore')){expect(req.postDataJSON()).toEqual({revision:8});restored=true;deleted=false;return route.fulfill({json:{interface:item}});}
+    if(p.endsWith('/interfaces/demo'))return route.fulfill({json:{interface:{...item,permissions:{read:true,edit:false,publish:false,manage}}}});
+    const details=url.searchParams.get('deleted')==='true'&&deleted?[{...item,revision:8,restore_until:4070908800}]:[];
+    return route.fulfill({json:{interfaces:details,invites:[],uploads:[],requests:[],events:[],missing:[],eligibility:{}}});
+  });
+  await page.goto('/interfaces/demo');await page.getByRole('tab',{name:'Settings',exact:true}).click();
+  await expect(page.getByText('Deleting this interface requires management permission.')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Delete interface',exact:true})).toHaveCount(0);
+  manage=true;await page.reload();
+  const remove=page.getByRole('button',{name:'Delete interface',exact:true});
+  await expect(remove).toBeDisabled();
+  await page.getByLabel('Type demo to confirm deletion').fill('demo');await remove.click();
+  await expect(page).toHaveURL(/\/interfaces$/);
+  await page.getByRole('button',{name:'Restore interface',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Deleted interfaces'})).toHaveCount(0);
+  expect(restored).toBe(true);
 });

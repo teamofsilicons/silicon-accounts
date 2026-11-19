@@ -5,6 +5,7 @@
 const APP = "[a-z0-9_-]{1,30}";
 const RESOURCE = "[A-Za-z0-9_-]+";
 const routes: [string, RegExp][] = [
+  ["DELETE", new RegExp(`^apps/${APP}/organization-authors/[a-z0-9_-]{3,30}$`)],
   ["GET HEAD", /^(me|people)$/],
   ["GET HEAD", /^organizations$/],
   ["GET HEAD", /^targets$/],

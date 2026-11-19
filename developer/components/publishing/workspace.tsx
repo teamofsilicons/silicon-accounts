@@ -13,7 +13,7 @@ import { STEPS, type App, type Readiness } from "./types";
 import { Badge, Button, Empty, ErrorNotice, Loading } from "./ui";
 import "./publishing.css";
 
-export type PublishingSection = "publishing" | "releases" | "authors" | "history";
+export type PublishingSection = "publishing" | "releases" | "authors" | "history" | "settings";
 
 export function PublishingWorkspace({ appId, section }: { appId: string; section: PublishingSection }) {
   const resource = useResource<App>(`/apps/${appId}`);
@@ -43,8 +43,7 @@ export function PublishingWorkspace({ appId, section }: { appId: string; section
     <ErrorNotice error={resource.error} retry={resource.reload} />
     <ErrorNotice error={navigationError} />
     {app.organization_id&&<p className="muted">Published by {app.publisher?.name||app.organization_id}. Your permissions: {Object.entries(app.permissions??{}).filter(([,allowed])=>allowed).map(([name])=>name).join(", ")}.</p>}
-    {section === "authors" && <AppLifecycle app={app}/>}
-    {section === "releases" ? <Releases app={app} refresh={resource.reload} /> : section === "authors" ? <Authors app={app} refresh={resource.reload} /> : section === "history" ? <AppHistory app={app} /> : <div className="setup-layout">
+    {section === "settings" ? <AppLifecycle app={app}/> : section === "releases" ? <Releases app={app} refresh={resource.reload} /> : section === "authors" ? <Authors app={app} refresh={resource.reload} /> : section === "history" ? <AppHistory app={app} /> : <div className="setup-layout">
       <aside className="setup-sidebar"><nav aria-label="Publishing steps">{STEPS.map((label, index) => <button key={label} type="button" data-sq="surface" className={`step-link ${step === index + 1 ? "active" : ""}`} aria-current={step === index + 1 ? "step" : undefined} onClick={() => void go(index + 1)}><span data-sq="surface" className="step-number">{index + 1}</span><span>{label}{(index < 3 || (index === 3 && interfaceDocsRequired)) && <small>Required</small>}</span>{step === index + 1 && <ChevronRight size={15} />}</button>)}</nav><p className="small muted">Move freely between steps. Your progress is saved as you go.</p></aside>
       <div data-sq="surface" className="setup-main"><Setup key={`${appId}-${step}`} app={app} step={step} refresh={resource.reload} go={go} />{step < 7 && <div className="setup-footer"><Button variant="secondary" disabled={step === 1} onClick={() => void go(step - 1)}>Back</Button><Button onClick={() => void go(step + 1)}>Continue <ArrowRight size={16} /></Button></div>}</div>
     </div>}
@@ -56,5 +55,6 @@ function Workspace({ section }: { section: PublishingSection }) {
 }
 export const PublishingTab = () => <Workspace section="publishing" />;
 export const ReleasesTab = () => <Workspace section="releases" />;
+export const SettingsTab = () => <Workspace section="settings" />;
 export const AuthorsTab = () => <Workspace section="authors" />;
 export const HistoryTab = () => <Workspace section="history" />;

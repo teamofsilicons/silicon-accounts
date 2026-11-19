@@ -1,4 +1,6 @@
 "use client";
+import {InterfaceSettings} from "./lifecycle";
+import {OrganizationAuthors} from "@/components/organizations/organization-authors";
 import {PersonField, SavedPerson} from "@/components/people/person-field";
 import {ResourceAccessEditor} from "@/components/organizations/policy-editor";
 import {emptyResourcePolicy} from "@/components/organizations/api";
@@ -33,6 +35,7 @@ const sections = [
   {value:"uploads", label:"Uploads", hash:"#interface-uploads"},
   {value:"creators", label:"Creators", hash:"#interface-creators"},
   {value:"history", label:"History", hash:"#interface-history"},
+  {value:"settings", label:"Settings", hash:"#interface-settings"},
   {value:"sign-in", label:"Sign-in", hash:"#interface-sign-in"},
   {value:"cell", label:"Cell", hash:"#interface-cell"},
   {value:"verification", label:"Verification", hash:"#interface-access"},
@@ -52,7 +55,7 @@ export function InterfaceWorkspace({interfaceId,cellsEnabled}:{interfaceId:strin
   const requests=useQuery({queryKey:["interface",interfaceId,"requests"],queryFn:()=>request<{requests:AccessRequest[]}>(`${prefix}/requests`)});
   const history=useQuery({queryKey:["interface",interfaceId,"history"],queryFn:()=>request<{events:History[]}>(`${prefix}/history`)});
   const me=useQuery({queryKey:["interfaces","me"],queryFn:()=>request<Me>("me")});
-  const invitations=useQuery({queryKey:["interface",interfaceId,"invitations"],queryFn:()=>request<{invites:{id:string;target:{uuid:string;id:string;display_name:string;pfp_url?:string};status:string;created_at:string}[]}>(`${prefix}/invites`)});
+  const invitations=useQuery({queryKey:["interface",interfaceId,"invitations"],queryFn:()=>request<{invites:{id:string;target:{uuid:string;id:string;display_name:string;pfp_url?:string;organization_id?:string};status:string;created_at:string}[]}>(`${prefix}/invites`)});
   const [tab,setTab]=useState<InterfaceTab>("overview");
   useEffect(()=>{
     const sync=()=>setTab(tabForHash(window.location.hash));
@@ -124,10 +127,10 @@ export function InterfaceWorkspace({interfaceId,cellsEnabled}:{interfaceId:strin
     <Failure error={error??detail.error}/>
     {secret && <SecretReveal title="Your interface secret" description="Keep this secure. It will not be shown again." secrets={[{label:"Interface secret",value:secret}]} onDone={()=>setSecret("")}/>}
     {pendingOperation && <Section title="Finish the pending save" description="A previous change is waiting for Accounts. Finish it before making another change."><Surface><Stack><p>Operation: {pendingOperation.action.replaceAll("_"," ")}</p>{pendingOperation.can_resume?<Button loading={busy} onClick={()=>void run(async()=>{const result=await request<{interface:Interface;interface_secret?:string}>(`${prefix}/resume`,{method:"POST",body:{}});if(result.interface_secret)setSecret(result.interface_secret);cache.setQueryData(["interface",interfaceId],{interface:result.interface});setDirty(false);})}>Resume pending save</Button>:<p>The creator who started this change can resume it.</p>}</Stack></Surface></Section>}
-    <fieldset disabled={!!pendingOperation||(!!draft.organization_id&&!(tab==="publishing"||tab==="releases"?draft.permissions?.publish:tab==="creators"||tab==="history"?true:tab==="verification"||tab==="cell"?draft.permissions?.manage:draft.permissions?.edit))} className={styles.editor}>
     <Tabs value={tab} onValueChange={openTab} activationMode="manual" className={appStyles.tabs}>
       <TabsList aria-label={`${draft.name} sections`}>{sections.map(section=><TabsTrigger key={section.value} value={section.value}>{section.label}</TabsTrigger>)}</TabsList>
       <TabsContent value={tab} forceMount className={`${appStyles.panel} ${styles.tabPanel}`}>
+    <fieldset disabled={!!pendingOperation||(!!(draft.permissions || draft.organization_id)&&!(tab==="publishing"||tab==="releases"?draft.permissions?.publish:tab==="creators"||tab==="history"?true:tab==="verification"||tab==="cell"||tab==="settings"?draft.permissions?.manage:draft.permissions?.edit))} className={styles.editor}>
     <div hidden={tab!=="overview"}>
     <Section id="interface-details" title="Details" description="Describe your interface and how people can find it."><Surface><fieldset disabled={busy} className={styles.editor}><Stack>
       <Link href="/docs/interfaces#interface-sign-in">Read the interface sign-in guide →</Link>
@@ -189,11 +192,15 @@ export function InterfaceWorkspace({interfaceId,cellsEnabled}:{interfaceId:strin
       <Failure error={readiness.error}/>{readiness.data && <div><strong>{readiness.data.ready?"Ready to publish":"Before publishing"}</strong>{readiness.data.missing?.map(item=><p key={item}>{item}</p>)}</div>}
       <Button disabled={dirty||(!draft.published&&!readiness.data?.ready)} loading={busy} onClick={()=>void mutation(draft.published?"unpublish":"publish")}>{draft.published?"Unpublish":"Publish interface"}</Button>
     </Stack></Surface></Section>
-    </div><div hidden={tab!=="creators"}><Section id="interface-creators" title="Creators" description="Invite another Carbon or Silicon to help manage this interface."><Surface><Stack>
+    </div><div hidden={tab!=="settings"}><InterfaceSettings item={draft} disabled={busy||dirty||!!pendingOperation}/>
+    </div><div hidden={tab!=="creators"}><Section id="interface-creators" title="Creators" description="Invite people or organizations to contribute to this interface."><Surface><Stack>
+      <OrganizationAuthors organizations={draft.author_organizations??[]} canManage={draft.permissions?.manage===true}
+        invite={async org=>{await request(`${prefix}/invites`,{method:"POST",body:{target:`org:${org}`}});await refresh();}}
+        remove={async org=>{await request(`${prefix}/organization-authors/${org}`,{method:"DELETE",body:{revision:draft.revision}});await refresh();}}/>
       {(draft.creators??[]).map(creator=><p key={creator.uuid}><SavedPerson person={creator}/></p>)}
-      <Failure error={invitations.error}/>{invitations.data?.invites.map(invite=><p key={invite.id}><SavedPerson person={invite.target}/> · {invite.status}</p>)}
-      <PersonField label="Carbon or Silicon ID" value={target} onChange={setTarget} disabled={!!draft.organization_id&&!draft.permissions?.manage}/>{draft.organization_id&&<ResourceAccessEditor org={draft.organization_id} value={draft.organization_access??emptyResourcePolicy()} canManage={draft.permissions?.manage??false} onSave={async access=>{await request(`${prefix}/organization-access`,{method:"PUT",body:{revision:draft.revision,access}});await cache.invalidateQueries({queryKey:["interface",interfaceId]});}}/>}
-      <Button disabled={!target.trim()||dirty||!!draft.organization_id&&!draft.permissions?.manage} loading={busy} onClick={()=>void run(async()=>{await request(`${prefix}/invites`,{method:"POST",body:{target:target.trim()}});setTarget("");})}>Invite creator</Button>
+      <Failure error={invitations.error}/>{invitations.data?.invites.map(invite=><p key={invite.id}>{invite.target.organization_id ? <strong>{invite.target.display_name} · {invite.target.id}</strong> : <SavedPerson person={invite.target}/>} · {invite.status}</p>)}
+      <PersonField label="Carbon or Silicon ID" value={target} onChange={setTarget} disabled={(draft.permissions?.manage ?? !draft.organization_id)===false}/>{draft.organization_id&&<ResourceAccessEditor org={draft.organization_id} value={draft.organization_access??emptyResourcePolicy()} canManage={draft.permissions?.manage??false} onSave={async access=>{await request(`${prefix}/organization-access`,{method:"PUT",body:{revision:draft.revision,access}});await cache.invalidateQueries({queryKey:["interface",interfaceId]});}}/>}
+      <Button disabled={!target.trim()||dirty||(draft.permissions?.manage ?? !draft.organization_id)===false} loading={busy} onClick={()=>void run(async()=>{await request(`${prefix}/invites`,{method:"POST",body:{target:target.trim()}});setTarget("");})}>Invite creator</Button>
       <Button variant="secondary" disabled={dirty} loading={busy} onClick={()=>{if(window.confirm("Leave this interface? You may need another creator to invite you again."))void run(async()=>{await request(`${prefix}/leave`,{method:"POST",body:{revision:draft.revision}});router.push("/interfaces");});}}>Leave interface</Button>
     </Stack></Surface></Section>
     </div><div hidden={tab!=="verification"}><Section id="interface-access" title="Verification and trust" description="Request eligibility to create a verified or trusted interface. Requests are reviewed."><Surface><Stack>
@@ -204,12 +211,12 @@ export function InterfaceWorkspace({interfaceId,cellsEnabled}:{interfaceId:strin
       <Failure error={requests.error}/>{requests.data?.requests.map(item=><p key={item.id}>{item.kind} · {item.status} · {item.created_at}</p>)}
     </Stack></Surface></Section>
     </div><div hidden={tab!=="history"}><Section id="interface-history" title="Secret and history"><Surface><Stack>
-      <Button variant="secondary" disabled={dirty||!!draft.organization_id&&!draft.permissions?.manage} loading={busy} onClick={()=>{if(window.confirm("Rotate the interface secret? Update your server to use the new secret."))void run(async()=>{const result=await request<{interface_secret:string}>(`${prefix}/rotate-secret`,{method:"POST",body:{revision:draft.revision}});setSecret(result.interface_secret);});}}>Rotate secret</Button>
+      <Button variant="secondary" disabled={dirty||(draft.permissions?.manage ?? !draft.organization_id)===false} loading={busy} onClick={()=>{if(window.confirm("Rotate the interface secret? Update your server to use the new secret."))void run(async()=>{const result=await request<{interface_secret:string}>(`${prefix}/rotate-secret`,{method:"POST",body:{revision:draft.revision}});setSecret(result.interface_secret);});}}>Rotate secret</Button>
       <Failure error={history.error}/>{history.data?.events.map(item=><div key={item.id} className={styles.upload}><strong>{item.action}</strong><span>{item.actor_uuid} · {item.created_at}</span><span>{typeof item.detail==="string"?item.detail:JSON.stringify(item.detail)}</span></div>)}
     </Stack></Surface></Section></div>
+    </fieldset>
       </TabsContent>
     </Tabs>
     {dirty && <div className={styles.saveBar} data-sq="surface" role="status"><span>Unsaved changes</span><Button disabled={busy} loading={busy} onClick={()=>void save()}>Save changes</Button></div>}
-    </fieldset>
   </Page>;
 }

@@ -388,3 +388,39 @@ async fn interface_custom_pages_validate_and_provider_secrets_are_refused() {
     body["signin_config"]["google"] = json!({"client_secret":"fixture-secret"});
     assert_eq!(call(&ctx, request(body, "custom-2")).await.status, 400);
 }
+
+#[tokio::test]
+async fn an_interface_can_be_deleted_after_a_target_app_is_disabled() {
+    let mut settings = Settings::for_tests();
+    settings.interfaces_internal_token = Some(SecretString::from(TOKEN));
+    let ctx = TestContext::with_settings(settings).await;
+    let actor = ctx.carbon().await;
+    let (app, _) = ctx.app_owned("lifecycle-target", Some(&actor.uuid)).await;
+    let mut body = json!({"interface_id":"lifecycle","actor_uuid":actor.uuid,"revision":1,"name":"Lifecycle","kind":"unverified","app_ids":[app.app_id],"redirect_uris":[],"allowed_origins":[],"branding":{},"app_descriptions":{},"active":true});
+    let created = call(&ctx, request(body.clone(), "create")).await;
+    assert_eq!(created.status, 200, "{}", created.json);
+    sqlx::query("UPDATE apps SET status='disabled' WHERE app_id=$1")
+        .bind(&app.app_id)
+        .execute(&ctx.db.pool)
+        .await
+        .unwrap();
+    body["active"] = json!(false);
+    body["revision"] = json!(2);
+    let deleted = call(&ctx, request(body.clone(), "delete")).await;
+    assert_eq!(deleted.status, 200, "{}", deleted.json);
+    body["active"] = json!(true);
+    body["revision"] = json!(3);
+    assert_ne!(
+        call(&ctx, request(body.clone(), "restore-disabled"))
+            .await
+            .status,
+        200
+    );
+    sqlx::query("UPDATE apps SET status='active' WHERE app_id=$1")
+        .bind(&app.app_id)
+        .execute(&ctx.db.pool)
+        .await
+        .unwrap();
+    let restored = call(&ctx, request(body, "restore")).await;
+    assert_eq!(restored.status, 200, "{}", restored.json);
+}
