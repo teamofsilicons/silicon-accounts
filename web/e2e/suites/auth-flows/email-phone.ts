@@ -26,7 +26,7 @@ const email: Journey = {
     await field.waitFor({ timeout: 30_000 });
     results.check("the hosted link lands on /authorize/flow/{id}", /\/authorize\/flow\/[A-Za-z0-9_-]+$/.test(new URL(page.url()).pathname), page.url());
     const heading = await hostedTitle(page);
-    results.check("the methods page is the sign-in version: \"Sign in to Briefcase\"", heading === "Sign in to Briefcase", heading);
+    results.check("the methods page is the sign-in version: \"Sign in\"", heading === "Sign in", heading);
     let after = await lastSeq(env);
     await field.fill(`  Ada.Lovelace.${t.toUpperCase()}@Example.TEST `);
     await page.getByRole("button", { name: "Send Me a Code", exact: true }).click();

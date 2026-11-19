@@ -11,3 +11,6 @@ dist-server/
 /testkit/.state/
 playwright-report/
 test-results/
+
+# Other companies' screens (redesign research): kept locally, not published
+/web/redesign/research/images/

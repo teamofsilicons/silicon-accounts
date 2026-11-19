@@ -65,9 +65,16 @@ opening PhoneField. "Not You?" stays on the sign-up: the verified address is som
 
 ## The v2 pages (UNDERSTANDING.md "What's shared with the app", "Flows", "Adding sign-in to an app")
 
+- **The methods page in sections** (2026-11-19, Anil, /__signin D): the app (its icon as the account site's AppMark, its
+  name, its `copy.subtitle` in the muted grey; in the split layout the side beside the form shows it, and the frame's own
+  header steps aside on this page), then "Sign in with your Team of Silicons account" over the ways in: soft Google and
+  Apple buttons, "or get a code", "Email or phone", Send Me a Code; or, for a browser already signed in, the account,
+  Continue as and Use Another Account. 40 between the sections, 16 inside the sign-in, 32 to the small print. The app's
+  `copy.title` / `copy.signup_title` is the browser tab's title and the split layout's large text. No "No passwords"
+  note.
 - **Intents.** `FlowView.intent` (`signin` default, `signup`) picks the sign-in or the sign-up version of the methods page:
-  "Sign in to Briefcase" / "Create your Briefcase account" (the app's `copy.title` / `copy.signup_title`, with
-  `copy.subtitle` / `copy.signup_subtitle`), "Other ways to sign in/up", the split layout's "Sign in"/"Sign up" label.
+  "Sign in with your Team of Silicons account" / "Sign up with your Team of Silicons account" (the app's `copy.title` /
+  `copy.signup_title` in the tab), "Other ways to sign in/up", the split layout's "Sign in"/"Sign up" label.
   The account logic does not change: a first visit is a sign-up either way.
 - **Direct buttons** (`FlowView.method_hint`). `email`/`phone` open on that method's empty field (nothing is ever
   prefilled; there is no login_hint), with "Other ways to sign in". `google`/`apple` first show the **Opening page**

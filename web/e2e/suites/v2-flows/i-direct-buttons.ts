@@ -53,7 +53,7 @@ export const journey: Journey = {
     results.check("Continue with email asks method=email, and the flow keeps it as method_hint", emailHref.searchParams.get("method") === "email" && flow.method_hint === "email", `${emailHref.searchParams.get("method")} → ${flow.method_hint}`);
     results.check("…the page opens on the email field alone, empty: no Google or Apple buttons, no Email or phone field", seen.email === "" && seen.phone === null && !seen.google && !seen.apple && !seen.choice, JSON.stringify(seen));
     results.check("…with \"Other ways to sign in\"", seen.otherWays, JSON.stringify(seen));
-    results.check("…under briefcase's usual title", (await hostedTitle(page)) === "Sign in to Briefcase", await hostedTitle(page));
+    results.check("…under the account heading, \"Sign in\"", (await hostedTitle(page)) === "Sign in", await hostedTitle(page));
     await settle(page);
     await shot(env, page, "v2f-i-01-direct-email");
     await page.getByRole("button", { name: "Other ways to sign in" }).click();

@@ -122,7 +122,19 @@
 .segments { width: 100%; }
 .segments > div { flex: 1 1 auto; }
 .segments button { flex: 1 1 0; }
-.continueAs { display: grid; gap: var(--space-3); }
+/* choose_method in sections (Anil, 2026-11-19, /__signin D): the app, then the sign-in with the Team of Silicons
+   account; 40 between them, 16 inside the sign-in. */
+.chooseSections { display: grid; min-width: 0; gap: var(--space-10); }
+.appSection { display: flex; min-width: 0; align-items: center; gap: var(--space-3); }
+/* Every app icon the same hairline, so a light icon keeps its edge. */
+.appMark { box-shadow: 0 0 0 1px var(--border-subtle); }
+.appText { display: grid; min-width: 0; }
+.appName { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); overflow-wrap: anywhere; }
+.appTagline { margin: 0; color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); text-wrap: pretty; }
+.signinGroup { display: grid; min-width: 0; gap: var(--space-4); }
+.sectionTitle { margin: 0; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); text-wrap: pretty; outline: none; }
+.continueAs { display: grid; gap: var(--space-4); }
+.choices { display: grid; gap: var(--space-2); }
 
 .divider { display: flex; align-items: center; gap: var(--space-3); color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); }
 .divider::before, .divider::after { flex: 1; height: 1px; background: var(--border); content: ""; }
@@ -436,6 +448,8 @@ label.shareText[data-disabled] { cursor: default; }
 
 /* ------------------------------------------------------------------------------------------------ footer + states */
 .footer { display: grid; gap: var(--space-1); }
+/* Under choose_method's sections: 32 from the sign-in (the panel's 16 and 16 more). */
+.footer[data-step="choose_method"] { padding-top: var(--space-4); }
 .footer a { color: inherit; transition: color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
 /* Keyboard focus: the link takes the text colour, a full underline and a soft fill (no rings on these pages). */
 .footer a:focus-visible { background: var(--surface-muted); color: var(--foreground); text-decoration-color: currentColor; box-shadow: 0 0 0 2px var(--surface-muted); }
@@ -477,3 +491,37 @@ label.shareText[data-disabled] { cursor: default; }
 /* Sign-up: the photo inside a ring of the Silicon colours (the prototype's .ring), above the welcome. */
 .welcomeRing { display: inline-grid; justify-self: start; aspect-ratio: 1; padding: var(--space-tight); border-radius: 50%; corner-shape: round; background: conic-gradient(from 200deg, var(--silicon-mark-1-from), var(--silicon-mark-1-to), var(--silicon-mark-2-to), var(--silicon-mark-2-from), var(--silicon-mark-3-from), var(--silicon-mark-1-from)); }
 .welcomeRing > * { box-shadow: 0 0 0 var(--space-hair) var(--surface); }
+
+/* ------------------------------------------------------------------------------------------------ Team of Silicons' card */
+/*
+ * An app in the default look (hosted-frame.tsx, useTosFrame; Anil, 2026-11-19, /__accounts-signin Default, vertical,
+ * Painted): the cloud painting behind a 30rem card, the bar "Sign in with Team of Silicons" across its top, the step
+ * under it with 48 around, headings centred; Help, Privacy and Terms under the card. On phones the page is all card:
+ * no painting, no corners, no shadow. The spacing is the lab's: 40 from the heading to the form, 24 between blocks.
+ */
+.hosted[data-frame="tos"] .scope { background: var(--canvas) url("/banner/bg-110.webp") center / cover no-repeat; }
+.tosColumn { display: grid; justify-items: center; gap: var(--space-3); width: min(100%, 30rem); }
+.panel[data-frame="tos"] { --brand-gap: var(--space-6); width: 100%; gap: 0; padding: 0; overflow: hidden; border-color: transparent; box-shadow: var(--shadow-floating); }
+.tosBar { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--border-subtle); color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+.tosGlyph { display: grid; place-items: center; }
+.tosGlyph svg { width: auto; height: 10px; }
+.tosBody { display: grid; min-width: 0; gap: var(--space-6); padding: var(--space-12); }
+.panel[data-frame="tos"] .heading { justify-items: center; text-align: center; }
+.panel[data-frame="tos"] .title { font-size: var(--text-2xl); }
+.tosHead { display: grid; justify-items: center; gap: var(--space-3); text-align: center; }
+.tosLine { margin: 0; color: var(--text-secondary); font: var(--body); letter-spacing: var(--body-tracking); }
+.tosLine strong { color: var(--foreground); font-weight: var(--weight-medium); }
+.tosLinks { display: flex; justify-self: end; gap: var(--space-1); }
+.tosLinks a { padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); background: color-mix(in oklab, var(--surface) 70%, transparent); color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); text-decoration: none; backdrop-filter: blur(8px); }
+.tosLinks a:hover { background: var(--surface); color: var(--foreground); }
+.tosLinks a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+@container hosted (max-width: 640px) {
+  .hosted[data-frame="tos"] .scope { background: var(--surface); }
+  .hosted[data-frame="tos"] :global(.sa-brand-stage) { place-items: start stretch; padding: 0 0 var(--space-16); }
+  .tosColumn { width: 100%; }
+  .panel[data-frame="tos"] { --sq-r: 0; box-shadow: none; }
+  .tosBody { padding: var(--space-8) var(--space-6); }
+  .tosLinks { justify-self: center; }
+  .tosLinks a { background: none; backdrop-filter: none; }
+}

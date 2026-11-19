@@ -10,7 +10,8 @@
  * fonts and the visitor's theme (isSiliconLook): its pages look like Silicon Accounts' own, with its logo, its layout
  * and "Powered by" (Anil, 2026-11-18: "two very different designs, we need to make this uniform").
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AccountsGlyph } from "@/components/foundation/shell/brand-mark";
 import { BrandAside, BrandPanel, BrandStage, BrandingScope, PoweredBy } from "@/components/foundation/branding/branding";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import type { BrandLayout, Branding } from "@/lib/api/types";
@@ -19,6 +20,20 @@ import { isSiliconLook, normalizeBranding } from "@/lib/branding/defaults";
 import { legibleBranding } from "./legible";
 import type { FrameApp } from "./model";
 import styles from "./flow.module.css";
+
+/**
+ * Team of Silicons' default sign-in (Anil, 2026-11-19, /__accounts-signin, Default style, vertical, Painted): an app
+ * that kept the default look signs in on a narrow card headed "Sign in with Team of Silicons", over the cloud painting,
+ * with Team of Silicons' Help, Privacy and Terms under the card and Powered by at the foot. Steps read it to head
+ * themselves the card's way (choose_method: "Sign in" and "to continue to {app}").
+ */
+const TosFrameContext = createContext(false);
+export const useTosFrame = () => useContext(TosFrameContext);
+const TOS_LINKS = [
+  { label: "Help", href: "https://teamofsilicons.com/help" },
+  { label: "Privacy", href: "https://teamofsilicons.com/legal/privacy" },
+  { label: "Terms", href: "https://teamofsilicons.com/legal/terms" },
+];
 
 /** The paint theme of a branding for this visitor: the app's forced theme, else the visitor's own. */
 export function usePaint(app: FrameApp | null, site: boolean): PaintTheme {
@@ -117,8 +132,38 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
 
   // Silicon Accounts' own pages are cards; an app in the default look keeps its own layout, background and density.
   const own = !!siteProp || !app;
-  const layout = own ? "card" : branding.layout;
-  const stage = (
+  // An app in the default look: Team of Silicons' own sign-in card (TosFrameContext).
+  const tos = defaultLook && !own;
+  const layout = own || tos ? "card" : branding.layout;
+  const panel = (
+    <BrandPanel as="main" className={styles.panel} aria-busy={busy || undefined} data-fonts={fontsReady ? "ready" : "loading"} data-frame={tos ? "tos" : undefined}>
+      {tos ? (
+        <div className={styles.tosBar}>
+          <span className={styles.tosGlyph} aria-hidden="true"><AccountsGlyph /></span>
+          Sign in with Team of Silicons
+        </div>
+      ) : null}
+      {tos ? (
+        <div className={styles.tosBody}>{children}{footer}</div>
+      ) : (
+        <>
+          {plain ? null : <AppIdentity app={app} paint={paint} hideName={hideName} />}
+          {children}
+          {footer}
+        </>
+      )}
+    </BrandPanel>
+  );
+  const stage = tos ? (
+    <BrandStage>
+      <div className={styles.tosColumn}>
+        {panel}
+        <nav className={styles.tosLinks} aria-label="Help and policies">
+          {TOS_LINKS.map(link => <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer">{link.label}</a>)}
+        </nav>
+      </div>
+    </BrandStage>
+  ) : (
     <BrandStage>
       <BrandAside>
         <AppIdentity app={app} paint={paint} />
@@ -127,16 +172,13 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
           {subtitle ? <p className="sa-brand-subtitle">{subtitle}</p> : null}
         </div>
       </BrandAside>
-      <BrandPanel as="main" className={styles.panel} aria-busy={busy || undefined} data-fonts={fontsReady ? "ready" : "loading"}>
-        {plain ? null : <AppIdentity app={app} paint={paint} hideName={hideName} />}
-        {children}
-        {footer}
-      </BrandPanel>
+      {panel}
     </BrandStage>
   );
 
   return (
-    <div className={styles.hosted} data-paint={paint} data-layout={layout} data-site={site || undefined}>
+    <TosFrameContext.Provider value={tos}>
+    <div className={styles.hosted} data-paint={paint} data-layout={layout} data-site={site || undefined} data-frame={tos ? "tos" : undefined}>
       {site ? (
         // The site's own brand tokens (styles/tokens.css): Silicon Accounts itself in the card layout, an app in the
         // default look in its own.
@@ -148,5 +190,6 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
       )}
       {poweredBy ? <PoweredBy theme={paint} overlay className={styles.powered} /> : null}
     </div>
+    </TosFrameContext.Provider>
   );
 }

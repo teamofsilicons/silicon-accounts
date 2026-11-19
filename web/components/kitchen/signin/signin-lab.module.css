@@ -1,0 +1,68 @@
+/* /__signin (signin-lab.tsx): the switches in a strip above the hosted page, as /__consent does; the versions' own
+   placements (the prototype's head row, its foot). */
+.bar { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-related) var(--space-group); padding: var(--space-related) var(--space-group); border-bottom: 1px solid var(--border); background: var(--surface); }
+
+/* A: the logo beside the title and the line under it (prototype .apphead). */
+.rowHead { display: flex; align-items: center; gap: var(--space-4); }
+.rowLogo { flex: none; }
+
+/* B: the small print as one block, then the Team of Silicons line (prototype .secured). */
+.foot { display: grid; gap: var(--space-4); }
+.small { display: grid; gap: var(--space-1); }
+.secured { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); }
+.mark { display: inline-grid; place-items: center; color: var(--foreground); }
+.mark svg { width: auto; height: 8px; }
+
+/* C: the panel in sections (the app; signing in with the Team of Silicons account), hairlines between them and above
+   the small print. */
+.sections { display: grid; gap: var(--space-6); }
+.appSection { display: flex; align-items: center; gap: var(--space-3); padding-bottom: var(--space-6); border-bottom: 1px solid var(--border-subtle); }
+.appLogo { flex: none; }
+.appText { display: grid; min-width: 0; gap: var(--space-1); }
+.appName { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); overflow-wrap: anywhere; }
+.appLine { margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-wrap: pretty; }
+.signinSection { display: grid; gap: var(--space-5); }
+.signinHead { display: grid; gap: var(--space-1); }
+.signinTitle { margin: 0; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); text-wrap: balance; }
+.cFoot { padding-top: var(--space-5); border-top: 1px solid var(--border-subtle); }
+/* The terms, privacy and help links: the underline further from the text (Anil, 2026-11-19). */
+.cFoot :global(.sa-brand-legal) a { text-underline-offset: .28em; }
+
+/* D and E: the app and the account drawn alike, a mark beside a name and its line. */
+.markRow { display: flex; align-items: center; gap: var(--space-3); }
+.accountTitle { margin: 0; color: var(--foreground); font: var(--h3); letter-spacing: var(--h3-tracking); text-wrap: pretty; }
+/* Every icon gets the same hairline, so a grey icon still has an edge on a grey panel. */
+.ringed { box-shadow: 0 0 0 1px var(--border-subtle); }
+/* D: the methods sit close under the account row, one group. */
+.signinGroup { display: grid; gap: var(--space-4); }
+/* E: the app alone on the card, then the sign-in in one soft panel. */
+.appOnly { display: block; }
+.signinPanel { --sq-r: var(--radius-container); --sq-fill: var(--canvas); display: grid; gap: var(--space-4); padding: var(--space-4); background: var(--sq-fill); }
+
+/* D and E, round two: the app's name and its line close together (.markText), no dividers, the small print muted with
+   its underline closer to the text and broken around descenders (y, g, p). */
+.markText { display: grid; min-width: 0; gap: 0; }
+/* 40 between the app and the sign-in, 32 between the sign-in and the small print (Anil; 32 / 24 tried and taken back):
+   the panel's own gap (16) plus 16. */
+.sectionsD { display: grid; gap: var(--space-10); }
+.dFoot { padding-top: var(--space-4); }
+.dFoot :global(.sa-brand-legal) { color: var(--text-muted); }
+.dFoot :global(.sa-brand-legal) a { text-underline-offset: .12em; text-decoration-skip-ink: auto; }
+/* D and E: the app's tagline in the muted grey (Anil). */
+.markLine { margin: 0; color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); text-wrap: pretty; }
+
+/* F: less asking for attention. The account heading is a caption; Google and Apple share a row when each gets 12rem. */
+.accountQuiet { margin: 0; color: var(--text-secondary); font: var(--label); letter-spacing: var(--label-tracking); }
+.providersRow { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-2); }
+/* D, signed in already: the sign-in group's rhythm (16 between the account and its choices, 8 between the choices),
+   not the step's 12. */
+.continueAs { display: grid; gap: var(--space-4); }
+.choices { display: grid; gap: var(--space-2); }
+/* D, several accounts: 16 between the groups and the last button, 8 between a group's name and its accounts. */
+.accountChoices { display: grid; gap: var(--space-4); }
+.accountList { display: grid; gap: var(--space-2); }
+.groupName { margin: 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); }
+/* D, share your details: 16 between the account, the two groups and the buttons; the rows as Connected Apps draws them,
+   one bordered list per group. */
+.shareDetails { display: grid; gap: var(--space-4); }
+.detailRows { --sq-r: var(--radius-panel); display: grid; overflow: hidden; border: 1px solid var(--border-subtle); }

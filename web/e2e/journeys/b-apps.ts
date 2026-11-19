@@ -1,5 +1,5 @@
 import type { Journey } from "../context";
-import { appAccount, completeDetails, hostedTitle, methodButton, newContext, shot, signInWithCode, sleep, startAtApp, tag } from "../lib";
+import { appAccount, completeDetails, methodButton, newContext, shot, signInWithCode, sleep, startAtApp, tag } from "../lib";
 
 const rowsOf = (rows: Array<{ field: string; mode: string; missing: boolean; ticked: boolean | null }>) =>
   rows.map(row => `${row.field}:${row.mode}${row.missing ? ":missing" : ""}${row.ticked === null ? "" : row.ticked ? ":ticked" : ":unticked"}`).join(" ");
@@ -22,7 +22,7 @@ export const journey: Journey = {
     await page.getByRole("textbox", { name: /^(Email or phone|Email)$/ }).waitFor({ timeout: 30_000 });
     await sleep(500);
     await shot(env, page, "b-01-briefcase-methods");
-    results.check("the sign-in page uses briefcase's own title", (await hostedTitle(page)) === "Sign in to Briefcase", await hostedTitle(page));
+    results.check("the sign-in page uses briefcase's own title in the tab", (await page.title()).startsWith("Sign in to Briefcase"), await page.title());
     results.check("briefcase offers Google and Apple", (await methodButton(page, "google").count()) === 1 && (await methodButton(page, "apple").count()) === 1);
     await signInWithCode(env, page, { email });
     const create = page.getByRole("button", { name: /^Create account$/i });

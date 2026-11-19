@@ -355,7 +355,7 @@ const hostedChecks: MockCheck[] = [
       await expect(alert).not.toContainText("flow '");
       await expect(page.getByRole("button", { name: "Share and continue" })).toBeDisabled();
       await alert.getByRole("button", { name: "Sign in again" }).click();
-      await expect(heading(page, "Sign in to Briefcase")).toBeVisible();
+      await expect(heading(page, "Sign in")).toBeVisible();
       expect(requests.some(request => request.method === "POST" && request.path.endsWith("/switch"))).toBe(true);
     },
   },
@@ -648,7 +648,7 @@ const hostedChecks: MockCheck[] = [
     run: async ({ page, requests }) => {
       await expect(heading(page, "Set up your account")).toBeVisible();
       await page.getByRole("button", { name: "Not you? Use another account" }).click();
-      await expect(heading(page, "Sign in to Briefcase")).toBeVisible();
+      await expect(heading(page, "Sign in")).toBeVisible();
       const posts = requests.filter(request => request.method === "POST").map(request => request.path);
       expect(posts).toEqual(["/v1/flows/briefcase~signup/switch"]);
     },
@@ -1499,7 +1499,7 @@ const liveChecks: LiveCheck[] = [
       const { context, page } = await env.open();
       const email = `webauth+${rand()}@example.test`;
       await page.goto(env.authorize("briefcase", { state: "st-live-1", scope: "email" }));
-      await expect(heading(page, "Sign in to Briefcase")).toBeVisible();
+      await expect(heading(page, "Sign in")).toBeVisible();
       await expect(page).toHaveURL(/\/authorize\/flow\//);
       await expect(page.locator("[data-powered-by] a")).toHaveAttribute("href", "https://accounts.teamofsilicons.com");
       const sentAt = Date.now() - 2000;
@@ -1640,7 +1640,7 @@ const liveChecks: LiveCheck[] = [
       await expect(alert).toContainText("You were signed out");
       await expect(alert).not.toContainText("/v1/");
       await alert.getByRole("button", { name: "Sign in again" }).click();
-      await expect(heading(page, "Sign in to Briefcase")).toBeVisible();
+      await expect(heading(page, "Sign in")).toBeVisible();
       await expect(page.getByRole("textbox", { name: "Email" })).toBeVisible();
       await context.close();
     },
@@ -1658,7 +1658,7 @@ const liveChecks: LiveCheck[] = [
       await page.keyboard.type(await env.code(email, sentAt));
       await expect(heading(page, "Set up your account")).toBeVisible();
       await page.getByRole("button", { name: "Not you? Use another account" }).click();
-      await expect(heading(page, "Sign in to Briefcase")).toBeVisible();
+      await expect(heading(page, "Sign in")).toBeVisible();
       await page.goto(env.authorize("commit"));
       await expect(heading(page, "Sign in to Commit")).toBeVisible();
       await expect(page.getByText(email)).toHaveCount(0);
@@ -1720,13 +1720,13 @@ const liveChecks: LiveCheck[] = [
       }
       const { context, page } = await env.open();
       await page.goto(env.authorize("briefcase", { state: "st-exp" }));
-      await expect(heading(page, "Sign in to Briefcase")).toBeVisible();
+      await expect(heading(page, "Sign in")).toBeVisible();
       const id = flowIdOf(page);
       env.sql(`update signin_flows set expires_at = now() - interval '1 minute' where id = '${id.replace(/'/g, "")}'`);
       await page.reload();
       await expect(heading(page, "This sign-in expired")).toBeVisible();
       await page.getByRole("button", { name: "Start again" }).click();
-      await expect(heading(page, "Sign in to Briefcase")).toBeVisible();
+      await expect(heading(page, "Sign in")).toBeVisible();
       expect(flowIdOf(page)).not.toBe(id);
       await context.close();
     },

@@ -130,7 +130,7 @@ const intents: Journey = {
     // The sign-in version, and an app without its own sign-up copy (the default words).
     await startAtApp(env, page, "briefcase", { intent: "signup", extra: { intent: "signin" } });
     await page.getByRole("button", { name: "Use another account" }).waitFor({ timeout: 30_000 }).catch(() => undefined);
-    results.check("intent=signin: \"Sign in to Briefcase\"", (await hostedTitle(page)) === "Sign in to Briefcase", await hostedTitle(page));
+    results.check("intent=signin: \"Sign in\"", (await hostedTitle(page)) === "Sign in", await hostedTitle(page));
     const fresh = await newContext(browser);
     const p2 = await fresh.newPage();
     results.watch(p2, "intents-default");

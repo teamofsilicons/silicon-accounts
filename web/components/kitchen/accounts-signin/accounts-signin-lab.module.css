@@ -1,0 +1,162 @@
+/* /__accounts-signin (accounts-signin-lab.tsx): /__google-signin's structure in the site's tokens and type roles. The
+   card and the chip are squircles (data-sq with --sq-r / --sq-fill).
+
+   One spacing rhythm in every state and layout (Anil, 2026-11-19: "more spacious, and consistent spacing across the
+   screens"): the card's padding 48 (the bar 16/24); the head block 12 inside; 24 between the form's blocks; 8 inside a
+   group (two buttons, a field and its link); 32 before the actions; 12 from the card to the links under it. */
+.lab { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; padding: var(--space-related) var(--space-group); border-bottom: 1px solid var(--border); background: var(--surface); }
+.page { min-height: calc(100dvh - var(--space-16)); background: var(--canvas); color: var(--foreground); }
+
+.stage { display: grid; justify-items: center; align-content: center; gap: var(--space-3); min-height: calc(100dvh - var(--space-16)); padding: var(--space-12) var(--space-6); }
+.card { --sq-r: var(--radius-surface); --sq-fill: var(--surface); width: min(100%, 52.5rem); overflow: hidden; background: var(--sq-fill); box-shadow: 0 0 0 1px var(--border-subtle); }
+.bar { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--border-subtle); font: var(--label); letter-spacing: var(--label-tracking); }
+.glyph { display: grid; place-items: center; color: var(--foreground); }
+.glyph svg { width: auto; height: 10px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--space-16); padding: var(--space-12); }
+.left { display: grid; align-content: start; justify-items: start; gap: var(--space-3); }
+.right { display: grid; align-content: start; gap: var(--space-6); }
+.title { margin: 0; font: var(--display); font-size: var(--text-3xl); letter-spacing: var(--display-tracking); text-wrap: balance; }
+.line { margin: 0; color: var(--text-secondary); font: var(--body); letter-spacing: var(--body-tracking); }
+.app { color: var(--foreground); font-weight: var(--weight-medium); }
+.text { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.text strong { color: var(--foreground); font-weight: var(--weight-medium); }
+.note { margin: 0; color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); }
+.note a { color: inherit; text-underline-offset: .12em; }
+
+.chip { --sq-r: var(--radius-pill); --sq-stroke: var(--border); display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1); box-shadow: inset 0 0 0 1px var(--sq-stroke); font: var(--label); letter-spacing: var(--label-tracking); }
+.chip svg { color: var(--text-muted); }
+
+.stack { display: grid; gap: var(--space-2); }
+.wide { width: 100%; }
+.provider { display: inline-flex; align-items: center; gap: var(--space-3); }
+/* A group: things that belong together, 8 apart (a field and its link). */
+.group { display: grid; justify-items: start; gap: var(--space-2); }
+.group > :first-child { justify-self: stretch; }
+/* 32 before the actions: the form's 24 and 8 more. */
+.actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+
+/* Choose an account: the site's boxed list (rows.tsx) filling the form's width. */
+.list { display: grid; }
+/* The page's section margin is the account pages' rhythm; here the form's 24 already spaces it. */
+.list > section { margin-top: 0; }
+.blocked { color: var(--danger); }
+
+.accounts { display: grid; margin: 0; padding: 0; border-top: 1px solid var(--border-subtle); list-style: none; }
+.account { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--border-subtle); }
+.account[data-blocked] { opacity: .6; }
+.account[data-blocked] .who span { color: var(--danger); }
+.who { display: grid; flex: 1; min-width: 0; }
+.who strong { font: var(--label); letter-spacing: var(--label-tracking); }
+.who span { color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); }
+.addIcon, .shareIcon { display: grid; flex: none; place-items: center; width: 28px; height: 28px; color: var(--text-secondary); }
+
+.shares { display: grid; margin: 0; padding: 0; border-top: 1px solid var(--border-subtle); list-style: none; }
+.shares li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--border-subtle); }
+
+/* Sign-up: the verified address with "Not You?", the photo row, free CarbonIDs to pick. */
+.verified { --sq-r: var(--radius-container); --sq-stroke: var(--border-subtle); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); box-shadow: inset 0 0 0 1px var(--sq-stroke); }
+.photoRow { display: flex; align-items: center; gap: var(--space-4); }
+.suggestions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Done: centred, as the real "Signed in" page's success mark. */
+.doneBlock { display: grid; justify-items: center; gap: var(--space-3); text-align: center; }
+.doneWho { display: grid; }
+.doneWho strong { font: var(--h3); letter-spacing: var(--h3-tracking); }
+.doneWho span { color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); }
+.mono { font-family: var(--font-mono); font-size: .93em; }
+
+.under { display: flex; width: min(100%, 52.5rem); justify-content: flex-end; gap: var(--space-1); }
+.under a { padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); text-decoration: none; }
+.under a:hover { background: var(--surface-muted); }
+
+/* Vertical: one column in a narrower card, the heading block centred over the form. */
+.stage[data-layout="vertical"] .card, .stage[data-layout="vertical"] .under { width: min(100%, 30rem); }
+.stage[data-layout="vertical"] .cols { grid-template-columns: 1fr; gap: var(--space-10); padding: var(--space-12); }
+.stage[data-layout="vertical"] .left { justify-items: center; gap: var(--space-3); text-align: center; }
+.stage[data-layout="vertical"] .title { font-size: var(--text-2xl); }
+
+/* ------------------------------------------------------------ Looks: a backdrop under the stage, the card on top. */
+.stage { position: relative; isolation: isolate; }
+.backdrop { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+
+/* Sky: the hour's sky fading to the canvas, a frosted card, the links in the sky's ink. */
+.backdrop[data-look="sky"] { background: linear-gradient(to bottom, var(--sky) 0%, color-mix(in oklab, var(--sky) 55%, var(--canvas)) 55%, var(--canvas) 100%); }
+.stage[data-look="sky"] .card { --sq-fill: color-mix(in oklab, var(--surface) 82%, transparent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--surface) 60%, transparent), var(--shadow-floating); backdrop-filter: blur(24px) saturate(1.2); }
+.stage[data-look="sky"] .bar { border-bottom-color: color-mix(in oklab, var(--foreground) 8%, transparent); }
+
+/* Painted: the cloud painting, a lifted white card, the links on a soft pill so they read on the paint. */
+.backdrop[data-look="painted"] { background: var(--canvas) url("/banner/bg-110.webp") center / cover no-repeat; }
+.stage[data-look="painted"] .card { box-shadow: var(--shadow-floating); }
+.stage[data-look="painted"] .under a, .stage[data-look="sky"] .under a { background: color-mix(in oklab, var(--surface) 70%, transparent); backdrop-filter: blur(8px); }
+
+/* App colour: the app's own icon, huge and blurred, washes the page; the bar pairs the app's icon with ours. */
+.backdrop[data-look="app"] { background: var(--canvas); }
+.washIcon { position: absolute; top: 50%; left: 50%; width: 140vmax; height: 140vmax; max-width: none; opacity: .42; filter: blur(120px) saturate(1.4); transform: translate(-50%, -50%); }
+.stage[data-look="app"] .card { box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 6%, transparent), var(--shadow-floating); }
+.pairMark { display: inline-flex; align-items: center; gap: var(--space-2); }
+.pairSep { color: var(--text-muted); }
+
+/* Columns: the landing's backdrop behind the card. */
+.backdrop[data-look="columns"] { background: var(--canvas); }
+.columns { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage[data-look="columns"] .card { box-shadow: var(--shadow-floating); }
+
+/* Watercolour: a new painting each visit (watercolour-shader.ts) on the paper's white, a lifted card on top. */
+.backdrop[data-look="watercolour"] { background: var(--canvas); }
+.stage[data-look="watercolour"] .card { box-shadow: var(--shadow-floating); }
+.stage[data-look="watercolour"] .under a { background: color-mix(in oklab, var(--surface) 70%, transparent); backdrop-filter: blur(8px); }
+
+@media (max-width: 640px) {
+  /* A phone is all card, as Google's is: no grey page around it. */
+  .page { background: var(--surface); }
+  .backdrop { display: none; }
+  .stage[data-look] .card { --sq-fill: var(--surface); backdrop-filter: none; box-shadow: none; }
+  .stage { align-content: start; padding: 0; }
+  .card { --sq-r: 0; width: 100%; box-shadow: none; }
+  .cols, .stage[data-layout="vertical"] .cols { grid-template-columns: 1fr; gap: var(--space-10); padding: var(--space-8) var(--space-6); }
+  .stage[data-layout="vertical"] .card, .stage[data-layout="vertical"] .under { width: 100%; }
+  .title { font-size: var(--text-2xl); }
+  .under { padding: 0 var(--space-3) var(--space-6); }
+}
+
+/* ------------------------------------------------------------ Style: whose look the pages wear. */
+/* The positioned page that "Powered by Silicon Accounts" pins to (outside the app's styling); the stage keeps room for it. */
+.hosted { position: relative; }
+.hosted .stage { padding-bottom: var(--space-16); }
+/* The app's own: Acme's split layout in its dark theme, painted by BrandingScope (its fonts, colours, radius, grain).
+   Its side: logo and name at the top, its own words at the foot, on its surface with a glow of its primary. The form
+   stands on the page, no card, at most 24rem wide. */
+.scope { min-height: calc(100dvh - var(--space-16)); }
+.split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); min-height: calc(100dvh - var(--space-16)); }
+.splitAside { position: relative; display: flex; overflow: hidden; flex-direction: column; justify-content: space-between; gap: var(--space-12); padding: var(--space-12); background: radial-gradient(120% 70% at 0% 100%, color-mix(in oklab, var(--primary) 34%, transparent), transparent 70%), var(--surface); border-right: 1px solid var(--border-subtle); }
+.splitBrand { display: inline-flex; align-items: center; gap: var(--space-3); font: var(--h3); letter-spacing: var(--h3-tracking); }
+.splitLogo { display: block; width: var(--space-10); height: var(--space-10); }
+.splitHero { display: grid; gap: var(--space-4); max-width: 26rem; }
+.splitTitle { margin: 0; font: var(--display); font-size: var(--text-4xl); letter-spacing: var(--display-tracking); line-height: 1.05; text-wrap: balance; }
+.splitLine { margin: 0; color: var(--text-secondary); font: var(--body); font-size: var(--text-lg); letter-spacing: var(--body-tracking); }
+.splitMain { display: grid; grid-template-rows: 1fr auto; justify-items: center; padding: var(--space-12) var(--space-8) var(--space-16); }
+.splitForm { display: grid; align-content: center; gap: var(--space-8); width: min(100%, 24rem); }
+.splitHead { display: grid; justify-items: start; gap: var(--space-2); }
+.splitHead .title { font-size: var(--text-2xl); }
+.split .under { width: min(100%, 24rem); justify-content: center; }
+.split .under a:hover { background: var(--surface-muted); }
+
+@media (max-width: 860px) {
+  .split { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .splitAside { gap: var(--space-6); padding: var(--space-6); border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+  .splitTitle { font-size: var(--text-3xl); }
+  .splitLine { font-size: var(--text-base); }
+  .splitMain { padding: var(--space-8) var(--space-6) var(--space-16); }
+}
+
+/* Choose an account, the app's own: separate options in its radius and colours, the blocked one a quiet line. */
+.ownChoose { display: grid; gap: var(--space-4); }
+.ownAccounts { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.ownAccount { --sq-r: var(--radius-control); --sq-fill: var(--surface); --sq-stroke: var(--border); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3); background: var(--sq-fill); box-shadow: inset 0 0 0 1px var(--sq-stroke); color: var(--foreground); text-decoration: none; transition: background-color .15s, box-shadow .15s; }
+.ownAccount:hover { --sq-fill: var(--surface-muted); --sq-stroke: var(--accent-line); }
+.ownAccount:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ownWho { display: grid; flex: 1; min-width: 0; }
+.ownWho strong { font: var(--label); letter-spacing: var(--label-tracking); }
+.ownWho span { overflow: hidden; color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
+.ownChevron { flex: none; color: var(--text-muted); }
+.ownBlocked { display: flex; align-items: flex-start; gap: var(--space-2); margin: 0; color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); }
+.ownBlocked svg { flex: none; margin-top: var(--space-hair); }

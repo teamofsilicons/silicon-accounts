@@ -53,13 +53,13 @@ export const journey: Journey = {
     let flow = await waitForFlow(page, f => f.step === "choose_method", "briefcase's methods page");
     let seen = await methodsPage(page);
     results.check("briefcase's sign-in link carries no intent and the flow says intent signin", !signinHref.searchParams.has("intent") && flow.intent === "signin", `${signinHref.search.slice(0, 80)} → ${flow.intent}`);
-    results.check("the sign-in page: \"Sign in to Briefcase\", briefcase's subtitle, \"Sign in with\"", seen.title === "Sign in to Briefcase" && seen.subtitle === "Your files, for every Carbon and Silicon." && seen.group === "Email or phone", JSON.stringify(seen));
+    results.check("the sign-in page: \"Sign in\" on Team of Silicons' card, and briefcase's own title \"Sign in to Briefcase\" in the tab (2026-11-19)", seen.title === "Sign in" && seen.tab.startsWith("Sign in to Briefcase") && seen.group === "Email or phone", JSON.stringify(seen));
     results.check("…and the browser tab says \"Sign in to Briefcase · Silicon Accounts\" (flow-page.tsx sets it from the app's title)", seen.tab === "Sign in to Briefcase · Silicon Accounts", `tab: "${seen.tab}"`);
     const signupHref = await startAtApp(env, page, "briefcase", { intent: "signup" });
     flow = await waitForFlow(page, f => f.step === "choose_method", "briefcase's sign-up page");
     seen = await methodsPage(page);
     results.check("briefcase's \"Create an account\" link asks intent=signup and the flow says so", signupHref.searchParams.get("intent") === "signup" && flow.intent === "signup", `${signupHref.searchParams.get("intent")} → ${flow.intent}`);
-    results.check("the sign-up page: briefcase's own sign-up title \"Create your Briefcase account\", \"Sign up with\"", seen.title === "Create your Briefcase account" && seen.group === "Email or phone", JSON.stringify(seen));
+    results.check("the sign-up page: \"Sign up\", and briefcase's own sign-up title \"Create your Briefcase account\" in the tab", seen.title === "Sign up" && seen.tab.startsWith("Create your Briefcase account") && seen.group === "Email or phone", JSON.stringify(seen));
     results.check("…and the browser tab says \"Create your Briefcase account · Silicon Accounts\" (not the sign-in tab)", seen.tab === "Create your Briefcase account · Silicon Accounts", `tab: "${seen.tab}"`);
     await page.reload();
     await waitForFlow(page, f => f.step === "choose_method", "briefcase's sign-up page, reloaded");
@@ -73,7 +73,7 @@ export const journey: Journey = {
     await startAtApp(env, page, "commit", { intent: "signup" });
     await waitForFlow(page, f => f.step === "choose_method", "commit's sign-up page");
     seen = await methodsPage(page);
-    results.check("commit without its own sign-up title: \"Create your Commit account\"", seen.title === "Create your Commit account" && seen.group === null, JSON.stringify(seen));
+    results.check("commit without its own sign-up title: \"Create your Commit account\"", seen.tab.startsWith("Create your Commit account") && seen.group === null, JSON.stringify(seen));
 
     // acme-notes, split layout: the label beside the form and the hero follow the intent.
     await startAtApp(env, page, "acme-notes");
@@ -102,7 +102,7 @@ export const journey: Journey = {
     flow = await waitForFlow(page, f => f.step === "choose_method", "briefcase's email sign-up page");
     seen = await methodsPage(page);
     const fields = await live(page, "main input").evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).name || input.getAttribute("aria-label") || (input as HTMLInputElement).type));
-    results.check("method=email&intent=signup: the sign-up title over the email field alone, with \"Other ways to sign up\"", flow.method_hint === "email" && flow.intent === "signup" && seen.title === "Create your Briefcase account" && seen.otherWays?.toLowerCase() === "other ways to sign up" && (await page.getByRole("button", { name: "Continue with Google", exact: true }).count()) === 0, `${JSON.stringify(seen)} inputs ${JSON.stringify(fields)}`);
+    results.check("method=email&intent=signup: the sign-up title over the email field alone, with \"Other ways to sign up\"", flow.method_hint === "email" && flow.intent === "signup" && seen.title === "Sign up" && seen.tab.startsWith("Create your Briefcase account") && seen.otherWays?.toLowerCase() === "other ways to sign up" && (await page.getByRole("button", { name: "Continue with Google", exact: true }).count()) === 0, `${JSON.stringify(seen)} inputs ${JSON.stringify(fields)}`);
 
     // The account site's own sign-in has a sign-up version too.
     await page.goto(`${env.site}/sign-in?intent=signup`);

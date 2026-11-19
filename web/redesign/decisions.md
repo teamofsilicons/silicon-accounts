@@ -10,6 +10,17 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   for tools and other sites, dock for account destinations only. Why: Anil asked for these three. (2026-10-17)
 
 ## Design
+- **The hosted sign-in page in sections (Anil, 2026-11-19, from /__signin D).** The app first (its icon in the account
+  site's app mark: one size, one corner, a hairline; its name; its own tagline in the muted grey), then "Sign in with
+  your Team of Silicons account" ("Sign up with…" for intent=signup) over the ways in: Google and Apple as Silicon UI's
+  soft buttons, "or get a code", the field, Send Me a Code. A browser already signed in shows the account, Continue as
+  and Use Another Account (soft) there. No dividers, only space: 40 between the sections, 16 inside the sign-in (8
+  between paired buttons and between a label and its field), 32 to the small print, which is muted with its underline
+  close and broken around descenders. The app's own title stays the tab's title and the split layout's large text (my
+  suggestion; Anil asked what I'd suggest). The "No passwords" note is gone. Why: Anil wanted the page to say it signs in
+  with the Team of Silicons account, the app and the sign-in as two sections, and less asking for attention ("everything's
+  mostly primary color").
+- **The landing in the account site's look is an experiment, in /__landing (2026-11-19, pending Anil).** The signed-out page drawn with Allo, the site's tokens, Silicon UI buttons and the sidebar (NavList) as a tour of real screens; "/" keeps the landing framework's Columns page until Anil picks. Why: Anil wants to see the landing in the redesigned app's design, with screenshots of the app ("we're just experimenting").
 - **An app that kept the default look signs in with Silicon Accounts' own look (Anil, 2026-11-18).** Its hosted pages
   wear the site's tokens (neutral ink buttons, Allo), as Silicon Accounts' own sign-in does, with the app's logo, its
   layout and "Powered by Silicon Accounts". "Kept the default look" is isSiliconLook (the stored default colours and
@@ -583,3 +594,7 @@ days (RECOVERY_DAYS) and /goodbye says how to come back. UNDERSTANDING.md doesn'
 The top-right profile menu and Your Accounts list independent sign-ins together with their linked work accounts. The menu shows each name above its handle in an equal-height row, with a check on the current profile. Selecting another opens Home in its session. Needs you shows the newest pending request or inactive device. Its badge counts every pending item. Completing the visible item brings up the next. An empty account keeps its introduction and can configure both contact types from Personal info. Hosted sign-in uses the same circular outline for an avatar and its completion ring.
 
 Each work row in Your Accounts leads with that work profile’s picture. Its organization name carries a small logo when one is available.
+
+## 2026-11-19: Team of Silicons' default sign-in card ships
+- An app that kept the default look signs in on Team of Silicons' card: vertical (one column, 30rem), the bar "Sign in with Team of Silicons" across its top, over the cloud painting (Painted; Anil confirms the licence), Help, Privacy and Terms under it, Powered by at the foot. Why: Anil chose /__accounts-signin's Default style ("let's ship the default"; vertical, but the playground keeps horizontal). (2026-11-19)
+- Companies keep their own design: an app with its own branding keeps its colours, fonts, logo, layout and background (UNDERSTANDING.md "Making the pages your own"); /__accounts-signin's "App's own" style shows Acme Notes' split, dark page as the example. Why: the contract; Anil, 2026-11-19. (2026-11-19)
