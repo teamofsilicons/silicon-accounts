@@ -1,0 +1,244 @@
+<!doctype html>
+<!--
+  The hosted sign-in drawn as Google's current sign-in (Anil, 2026-11-19: "we're very similar to google here, so let's use
+  their designs… copy them exactly, without our design system"; then "use our typeface").
+
+  Measured from accounts.google.com on 2026-11-19 (signed out, its own OAuth sign-in for a public app): page #f0f4f9; card
+  white, radius 28, 840 wide, a provider bar on top; two columns, the heading 36/44 400 #1f1f1f with a 16/24 line on the
+  left, the form on the right; outlined field 56 tall, radius 4, #747775, floating label 16 #444746; links and the filled
+  button #0b57d0, 14/500; buttons 40 tall, radius 20, padding 0 24 (filled) / 0 16 (text); body 14/20 #1f1f1f; footer 12,
+  links padded 8/12 radius 8. Under 600px: one column, no card.
+
+  Ours, not Google's: our name and mark in the bar ("Sign in with Team of Silicons"), never Google's logo or name; Allo,
+  our typeface, in place of Google Sans. Standalone on purpose: it isn't built with Silicon UI. Sample data only.
+  States: #signin, #code, #choose, #share, #create (the bar at the very top switches them by the address's #state, in CSS; it isn't part of the design).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in – Team of Silicons</title>
+<style>
+  @font-face { font-family: "Allo"; src: url("../../../assets/fonts/allo/AlloVariable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root {
+    --page: #f0f4f9; --card: #ffffff; --ink: #1f1f1f; --soft: #444746; --line: #dadce0; --field: #747775;
+    --blue: #0b57d0; --blue-hover: #0a4fbf; --blue-wash: #e8f0fe; --hover: rgba(31,31,31,.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--page); color: var(--ink); font: 400 14px/20px "Allo", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--blue); font-weight: 500; text-decoration: none; border-radius: 4px; }
+  a:hover { text-decoration: underline; }
+  button { font: inherit; cursor: pointer; }
+
+  /* The lab bar (not part of the design). */
+  .lab { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 8px; background: #fff; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .lab a { padding: 4px 10px; border-radius: 999px; color: var(--soft); font-weight: 500; }
+
+  /* Page and card. */
+  /* One state at a time, by the address's #state (CSS only: the app's CSP allows no inline script). */
+  .screen { display: none; min-height: calc(100vh - 46px); padding: 48px 0; flex-direction: column; align-items: center; justify-content: center; }
+  .screen:target, body:not(:has(.screen:target)) #signin { display: flex; }
+  body:not(:has(.screen:target)) .lab a[href="#signin"], body:has(#signin:target) .lab a[href="#signin"], body:has(#code:target) .lab a[href="#code"],
+  body:has(#choose:target) .lab a[href="#choose"], body:has(#share:target) .lab a[href="#share"], body:has(#create:target) .lab a[href="#create"] { background: var(--blue-wash); color: var(--blue); }
+  .card { width: min(840px, calc(100% - 48px)); overflow: hidden; border-radius: 28px; background: var(--card); }
+  .bar { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 24px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 14px; font-weight: 500; }
+  .bar svg { flex: none; width: 19px; height: 10px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 48px; padding: 60px 36px 36px; }
+  .left { display: grid; align-content: start; gap: 16px; }
+  h1 { margin: 0; font-size: 36px; line-height: 44px; font-weight: 400; letter-spacing: -.01em; }
+  .line { margin: 0; font-size: 16px; line-height: 24px; }
+  .line a { font-weight: 500; }
+  .right { display: grid; align-content: start; gap: 0; }
+
+  /* Account chip (Google's: a pill with the photo, the address and a chevron). */
+  .chip { display: inline-flex; align-items: center; justify-self: start; gap: 8px; height: 32px; padding: 0 12px 0 4px; border: 1px solid var(--field); border-radius: 16px; color: var(--ink); font-size: 14px; font-weight: 500; }
+  .chip .av { width: 24px; height: 24px; font-size: 11px; }
+  .chip svg { width: 18px; height: 18px; color: var(--soft); }
+  .av { display: inline-grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #a8c7fa; color: #062e6f; font-size: 12px; font-weight: 500; }
+
+  /* Outlined field with a floating label. */
+  .field { position: relative; margin-top: 8px; }
+  .field input { width: 100%; height: 56px; padding: 13px 15px; border: 1px solid var(--field); border-radius: 4px; outline: none; background: transparent; color: var(--ink); font: 400 16px/24px "Allo", system-ui, sans-serif; }
+  .field input:focus { padding: 12px 14px; border: 2px solid var(--blue); }
+  .field label { position: absolute; top: 18px; left: 9px; padding: 0 6px; background: var(--card); color: var(--soft); font-size: 16px; line-height: 20px; pointer-events: none; transition: transform .15s cubic-bezier(.4,0,.2,1), font-size .15s, color .15s; transform-origin: left top; }
+  .field input:focus + label, .field input:not(:placeholder-shown) + label { transform: translateY(-26px); font-size: 12px; }
+  .field input:focus + label { color: var(--blue); }
+  .help { margin: 4px 0 0 16px; color: var(--soft); font-size: 12px; line-height: 16px; }
+  .link { justify-self: start; margin-top: 12px; padding: 0; border: 0; background: none; color: var(--blue); font-size: 14px; font-weight: 500; }
+  .para { margin: 40px 0 0; color: var(--ink); font-size: 14px; line-height: 20px; }
+  .para + .para { margin-top: 16px; }
+  .soft { color: var(--soft); }
+
+  /* Buttons. */
+  .actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 32px; }
+  .btn { height: 40px; padding: 0 24px; border: 0; border-radius: 20px; font-size: 14px; font-weight: 500; letter-spacing: .01em; }
+  .filled { background: var(--blue); color: #fff; }
+  .filled:hover { background: var(--blue-hover); box-shadow: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px 1px rgba(0,0,0,.15); }
+  .text { padding: 0 16px; background: none; color: var(--blue); }
+  .text:hover { background: var(--blue-wash); }
+  .outlined { display: flex; width: 100%; align-items: center; justify-content: center; gap: 10px; height: 40px; border: 1px solid var(--field); border-radius: 20px; background: none; color: var(--ink); font-size: 14px; font-weight: 500; }
+  .outlined:hover { background: var(--hover); }
+  .outlined svg { width: 18px; height: 18px; }
+  .or { display: flex; align-items: center; gap: 12px; margin: 24px 0 16px; color: var(--soft); font-size: 12px; }
+  .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .stack { display: grid; gap: 8px; }
+
+  /* Account list (Google's chooser). */
+  .accounts { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+  .accounts li { border-bottom: 1px solid var(--line); }
+  .accounts button { display: flex; width: 100%; align-items: center; gap: 12px; padding: 12px 8px; border: 0; background: none; text-align: left; }
+  .accounts button:hover { background: var(--hover); }
+  .who { display: grid; }
+  .who b { font-size: 14px; line-height: 20px; font-weight: 500; }
+  .who span { color: var(--soft); font-size: 12px; line-height: 16px; }
+  .accounts .add svg { width: 28px; height: 20px; color: var(--soft); }
+  .org { display: inline-flex; align-items: center; gap: 4px; }
+
+  /* What's shared. */
+  .shares { display: grid; gap: 0; margin: 16px 0 0; padding: 0; list-style: none; }
+  .shares li { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .shares li:first-child { border-top: 1px solid var(--line); }
+  .shares .icon { display: grid; place-items: center; width: 28px; height: 28px; color: var(--soft); }
+  .shares .icon svg { width: 20px; height: 20px; }
+  .shares .grow { flex: 1; }
+  .shares input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--blue); }
+
+  /* Below the card. */
+  .under { display: flex; width: min(840px, calc(100% - 48px)); justify-content: space-between; align-items: center; margin-top: 8px; font-size: 12px; line-height: 16px; }
+  .lang { display: inline-flex; white-space: nowrap; align-items: center; gap: 8px; height: 32px; padding: 0 8px 0 16px; border: 0; border-radius: 8px; background: none; color: var(--ink); font-size: 14px; }
+  .lang svg { width: 20px; height: 20px; }
+  .under nav { display: flex; }
+  .under nav a { padding: 8px 12px; border-radius: 8px; color: var(--ink); font-weight: 400; }
+  .under nav a:hover { background: var(--hover); text-decoration: none; }
+
+  /* Phones: one column, no card. */
+  @media (max-width: 600px) {
+    body { background: var(--card); }
+    .screen { padding: 0; min-height: 0; }
+    .screen { justify-content: flex-start; }
+    .card { width: 100%; border-radius: 0; }
+    .cols { grid-template-columns: 1fr; gap: 32px; padding: 24px 24px 24px; }
+    h1 { font-size: 28px; line-height: 36px; }
+    .para { margin-top: 32px; }
+    .under { width: 100%; flex-wrap: wrap; gap: 4px; padding: 0 12px 24px; }
+    .lang { padding-left: 12px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<nav class="lab" aria-label="States">
+  <a href="#signin">Sign in</a><a href="#code">Enter the code</a><a href="#choose">Choose an account</a><a href="#share">Share your details</a><a href="#create">Create your account</a>
+</nav>
+
+<!-- 1 Sign in ------------------------------------------------------------------------------------------------------ -->
+<section class="screen" id="signin">
+  <div class="card">
+    <div class="bar"><svg viewBox="45 70 110.92 59" aria-hidden="true"><rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="currentColor"/><circle cx="126.42" cy="99.5" r="29.5" fill="currentColor"/></svg>Sign in with Team of Silicons</div>
+    <div class="cols">
+      <div class="left">
+        <h1>Sign in</h1>
+        <p class="line">to continue to <a href="#">Silicon Briefcase</a></p>
+      </div>
+      <div class="right">
+        <div class="field"><input id="id1" type="text" placeholder=" " autocomplete="username"><label for="id1">Email or phone</label></div>
+        <p class="help">We'll send you a 6-digit code. New here? Signing in makes your account.</p>
+        <div class="or">or</div>
+        <div class="stack">
+          <button class="outlined" type="button"><svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continue with Google</button>
+          <button class="outlined" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.37 12.6c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.1-2.01-3.77-2.04-1.6-.16-3.13.94-3.94.94-.82 0-2.07-.92-3.4-.89-1.75.03-3.37 1.02-4.27 2.58-1.82 3.16-.47 7.83 1.31 10.4.87 1.25 1.9 2.66 3.26 2.61 1.31-.05 1.8-.85 3.38-.85 1.58 0 2.02.85 3.4.82 1.41-.03 2.3-1.27 3.16-2.53.99-1.45 1.4-2.86 1.43-2.93-.03-.01-2.74-1.05-2.77-4.2zM13.78 4.96c.72-.88 1.21-2.1 1.08-3.31-1.04.04-2.3.69-3.05 1.57-.67.77-1.26 2.01-1.1 3.2 1.16.09 2.35-.59 3.07-1.46z"/></svg>Continue with Apple</button>
+        </div>
+        <div class="actions"><button class="btn filled" type="button">Next</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="under"><button class="lang" type="button">English (United States)<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></button><nav><a href="#">Help</a><a href="#">Privacy</a><a href="#">Terms</a></nav></div>
+</section>
+
+<!-- 2 Enter the code ----------------------------------------------------------------------------------------------- -->
+<section class="screen" id="code">
+  <div class="card">
+    <div class="bar"><svg viewBox="45 70 110.92 59" aria-hidden="true"><rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="currentColor"/><circle cx="126.42" cy="99.5" r="29.5" fill="currentColor"/></svg>Sign in with Team of Silicons</div>
+    <div class="cols">
+      <div class="left">
+        <h1>Check your email</h1>
+        <span class="chip"><span class="av">SD</span>s***@gmail.com<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></span>
+      </div>
+      <div class="right">
+        <p class="line" style="font-size:14px;line-height:20px">A 6-digit code was sent to <b style="font-weight:500">s***@gmail.com</b>. It works for 10 minutes.</p>
+        <div class="field" style="margin-top:24px"><input id="code1" type="text" inputmode="numeric" maxlength="6" placeholder=" " autocomplete="one-time-code"><label for="code1">Enter code</label></div>
+        <button class="link" type="button">Send a new code</button>
+        <div class="actions"><button class="btn text" type="button">Try another way</button><button class="btn filled" type="button">Next</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="under"><button class="lang" type="button">English (United States)<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></button><nav><a href="#">Help</a><a href="#">Privacy</a><a href="#">Terms</a></nav></div>
+</section>
+
+<!-- 3 Choose an account -------------------------------------------------------------------------------------------- -->
+<section class="screen" id="choose">
+  <div class="card">
+    <div class="bar"><svg viewBox="45 70 110.92 59" aria-hidden="true"><rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="currentColor"/><circle cx="126.42" cy="99.5" r="29.5" fill="currentColor"/></svg>Sign in with Team of Silicons</div>
+    <div class="cols">
+      <div class="left">
+        <h1>Choose an account</h1>
+        <p class="line">to continue to <a href="#">Silicon Briefcase</a></p>
+      </div>
+      <div class="right">
+        <ul class="accounts">
+          <li><button type="button"><span class="av">SD</span><span class="who"><b>Saket Dev</b><span>c:saket</span></span></button></li>
+          <li><button type="button"><span class="av" style="background:#c4eed0;color:#0d652d">SD</span><span class="who"><b>Saket Dev</b><span>c:saket.studio · The Design Studio</span></span></button></li>
+          <li><button type="button" disabled style="opacity:.6;cursor:default"><span class="av" style="background:#e3e3e3;color:#444746">SD</span><span class="who"><b>Saket Dev</b><span>c:saket.research · Research Collective doesn't allow this app</span></span></button></li>
+          <li><button class="add" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg><span class="who"><b>Use another account</b></span></button></li>
+        </ul>
+        <p class="para">To continue, Team of Silicons will share your name, photo and CarbonID with Silicon Briefcase.</p>
+      </div>
+    </div>
+  </div>
+  <div class="under"><button class="lang" type="button">English (United States)<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></button><nav><a href="#">Help</a><a href="#">Privacy</a><a href="#">Terms</a></nav></div>
+</section>
+
+<!-- 4 Share your details (first sign-in to an app) ---------------------------------------------------------------- -->
+<section class="screen" id="share">
+  <div class="card">
+    <div class="bar"><svg viewBox="45 70 110.92 59" aria-hidden="true"><rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="currentColor"/><circle cx="126.42" cy="99.5" r="29.5" fill="currentColor"/></svg>Sign in with Team of Silicons</div>
+    <div class="cols">
+      <div class="left">
+        <h1>Sign in to Silicon Briefcase</h1>
+        <span class="chip"><span class="av">SD</span>c:saket<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></span>
+      </div>
+      <div class="right">
+        <p class="line" style="font-size:14px;line-height:20px">Team of Silicons will share this with Silicon Briefcase:</p>
+        <ul class="shares">
+          <li><span class="icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></span><span class="who grow"><b>Name, photo and CarbonID</b><span>Saket Dev · c:saket</span></span></li>
+        </ul>
+        <p class="para">Make sure you trust Silicon Briefcase. You can see or remove its access any time in <a href="#">Connected Apps</a>.</p>
+        <div class="actions"><button class="btn text" type="button">Cancel</button><button class="btn filled" type="button">Continue</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="under"><button class="lang" type="button">English (United States)<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></button><nav><a href="#">Help</a><a href="#">Privacy</a><a href="#">Terms</a></nav></div>
+</section>
+
+<!-- 5 Create your account (a first sign-in with no account yet) ---------------------------------------------------- -->
+<section class="screen" id="create">
+  <div class="card">
+    <div class="bar"><svg viewBox="45 70 110.92 59" aria-hidden="true"><rect x="45" y="74.72" width="49.56" height="49.56" rx="4.72" fill="currentColor"/><circle cx="126.42" cy="99.5" r="29.5" fill="currentColor"/></svg>Sign in with Team of Silicons</div>
+    <div class="cols">
+      <div class="left">
+        <h1>Create your account</h1>
+        <p class="line">Enter your name and choose your CarbonID</p>
+      </div>
+      <div class="right">
+        <div class="field"><input id="name1" type="text" placeholder=" " autocomplete="name"><label for="name1">Name</label></div>
+        <div class="field" style="margin-top:24px"><input id="cid1" type="text" placeholder=" " value="c:saket"><label for="cid1">CarbonID</label></div>
+        <p class="help">Others type this to find you. You can change it later.</p>
+        <div class="actions"><button class="btn filled" type="button">Next</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="under"><button class="lang" type="button">English (United States)<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg></button><nav><a href="#">Help</a><a href="#">Privacy</a><a href="#">Terms</a></nav></div>
+</section>
+
+</body>
+</html>

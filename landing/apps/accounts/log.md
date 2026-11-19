@@ -355,3 +355,11 @@ One block per round, newest at the bottom.
 - Anil: cook the next section. That is `93:322`, the step list and sticky stage already under the Columns hero in prototype `93:329`.
 - The page scrolls one viewport per step. The stage sticks, and the open step follows the scroll. Clicking a step jumps to it.
 - Copy, vignettes, and the stage shader are the frame's (Columns, clear centred, intensity 0.85). The heading is GT Alpina Trial Light at the frame's 32/40.
+
+## Lab — the landing in the account site's own look (2026-11-19, exploring)
+- Anil, through the parent session: try the landing in the redesigned account site's design (Silicon UI tokens, Allo, the sidebar shell) with real screens of the account app; "we're just experimenting". Built in code as a lab page, /__landing (web/components/kitchen/landing/), not in Figma, so "/" and the Figma page stay as they are.
+- What it is: the site's top row (glyph and "Team of Silicons Accounts", Sign In, Create Account); the shipped hero words in Allo at 36; then the tour, the account shell itself: Silicon UI NavList (Home, Silicons, Connected Apps, Security) on the canvas grey, each opening its real screen in a white panel, the sidebar's one-line description under the list, and the account switcher at the list's foot; then How it works with copy.md's three steps over the hosted sign-in, the consent step and an app's page with Remove; then the two buttons again.
+- Departs from the framework on purpose (to compare, not decided): Allo instead of GT Alpina and Hanken; neutral ink buttons instead of brand blue; no Columns backdrop; no TOS nav.
+- Screens: web/public/landing-lab/, from web/scripts/landing-shots.ts on the mock API at 2x (sample people Saket Dev, Scout; sample values you@example.com, briefcase.example).
+- Screenshots: rounds/lab-account-look-1440.png, rounds/lab-account-look-390.png.
+- Outcome: _pending Anil_.

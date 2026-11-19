@@ -103,6 +103,15 @@ const LIGHT: Palette = { primary: "#1F5FB8", primary_foreground: "#FFFFFF", back
  * (5.8:1); accent-coloured text uses the lighter ink below (`--ink`).
  */
 const DARK: Palette = { primary: "#1F5FB8", primary_foreground: "#F7F8FA", background: "#02040A", surface: "#0B0F18", foreground: "#F7F8FA", muted: "#9BA4B4", border: "#1F2635", danger: "#FF8A80" };
+/**
+ * What an app that kept the default look paints with: the account site's own tokens (styles/tokens.css), as its hosted
+ * pages do since 2026-11-18 (flow/hosted-frame.tsx): an ink button under white in light, the reverse in dark, neutral
+ * greys. `hover` is the site's --primary-hover. Keep these in step with tokens.css.
+ */
+const SITE: Record<"light" | "dark", Palette & { hover: string }> = {
+  light: { primary: "#181818", primary_foreground: "#FFFFFF", background: "#FCFCFC", surface: "#FFFFFF", foreground: "#1B1B1B", muted: "#6B6B6B", border: "#E9E9E9", danger: "#B42318", hover: "#2E2E2E" },
+  dark: { primary: "#F2F2F2", primary_foreground: "#141414", background: "#141414", surface: "#191919", foreground: "#F2F2F2", muted: "#8C8C8C", border: "#2B2B2B", danger: "#F4968C", hover: "#FFFFFF" },
+};
 const KEYS: Array<keyof Palette> = ["primary", "primary_foreground", "background", "surface", "foreground", "muted", "border", "danger"];
 /** The older default palettes apps made before the new look still store (lib/branding/defaults.ts LEGACY_*): painted in the new look. */
 const LEGACY = {
@@ -517,11 +526,12 @@ function paint(root: HTMLElement, host: Element, app: PublicApp | null, requeste
   const branding = app?.branding ?? {};
   const forced = requested === "light" || requested === "dark" ? requested : branding.theme === "light" || branding.theme === "dark" ? branding.theme : null;
   const theme = forced ?? backdrop(host, media);
-  const p = paletteFor(app, theme);
+  const site = siliconLook(app) && (branding.theme ?? "auto") === "auto";
+  const p = site ? SITE[theme] : paletteFor(app, theme);
   const mix = (a: string, percent: number, b: string) => `color-mix(in oklab,${a} ${percent}%,${b})`;
   const vars: Record<string, string> = {
     "--pr": p.primary,
-    "--prh": mix(p.primary, 90, p.foreground),
+    "--prh": site ? SITE[theme].hover : mix(p.primary, 90, p.foreground),
     "--pf": p.primary_foreground,
     // Accent-coloured text on dark needs a lighter ink than a fill (the hosted pages' --accent-ink: 5.5:1 for the
     // default blue on the dark card).

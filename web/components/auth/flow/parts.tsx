@@ -46,10 +46,12 @@ export interface StepHeadingProps {
   appTitle?: boolean;
   /** What heads the form instead in the split layout ("Sign in", or "Sign up" on the sign-up page). */
   splitLabel?: string;
+  /** A section's heading inside the step (the h3 role), as choose_method's "Sign in with your Team of Silicons account". */
+  section?: boolean;
 }
 
 /** The step's h1. When a step arrives after the first, focus moves here so screen readers hear the new step. */
-export function StepHeading({ title, description, noFocus, appTitle, splitLabel = "Sign in" }: StepHeadingProps) {
+export function StepHeading({ title, description, noFocus, appTitle, splitLabel = "Sign in", section }: StepHeadingProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const arrivalRef = useContext(ArrivalContext);
   const skipFocus = useRef(noFocus);
@@ -66,7 +68,7 @@ export function StepHeading({ title, description, noFocus, appTitle, splitLabel 
   return (
     <div className={[styles.heading, appTitle ? styles.appTitle : ""].filter(Boolean).join(" ")}>
       {appTitle ? <p className={styles.splitLabel} aria-hidden="true">{splitLabel}</p> : null}
-      <h1 ref={heading} tabIndex={-1} className={styles.title}>{title}</h1>
+      <h1 ref={heading} tabIndex={-1} className={section ? styles.sectionTitle : styles.title}>{title}</h1>
       {description ? <p className={styles.description}>{description}</p> : null}
     </div>
   );
@@ -288,9 +290,9 @@ export function AppleMark({ size = 16 }: { size?: number }) {
 }
 
 /** "Continue with Google" / "Continue with Apple": neutral buttons with the provider's mark. */
-export function ProviderButton({ provider, loading, disabled, onClick }: { provider: "google" | "apple"; loading?: boolean; disabled?: boolean; onClick: () => void }) {
+export function ProviderButton({ provider, loading, disabled, onClick, variant = "secondary" }: { provider: "google" | "apple"; loading?: boolean; disabled?: boolean; onClick: () => void; variant?: "secondary" | "soft" }) {
   return (
-    <Button type="button" variant="secondary" className={styles.wide} loading={loading} disabled={disabled} data-provider={provider} onClick={onClick}>
+    <Button type="button" variant={variant} className={styles.wide} loading={loading} disabled={disabled} data-provider={provider} onClick={onClick}>
       <span className={styles.providerLabel}>
         {provider === "google" ? <GoogleMark /> : <AppleMark />}
         Continue with {provider === "google" ? "Google" : "Apple"}
@@ -676,7 +678,6 @@ export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, su
           autoComplete="email"
           autoCapitalize="off"
           spellCheck={false}
-          placeholder="name@example.com"
           value={email}
           onChange={event => {
             setEmail(event.currentTarget.value);

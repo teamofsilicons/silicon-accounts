@@ -163,9 +163,9 @@ function FlowPage({ id }: { id: string }) {
   const frameApp = flow?.app ?? (look ? { app_id: look.app_id, name: look.name, branding: look.branding } : null);
   const site = flow ? flow.app.first_party : !look;
   const hero = flow ? heroCopy(flow, { firstVisit }) : { title: look ? `Sign in to ${look.name}` : "Signing in", subtitle: null };
-  // The heading already names the app ("Sign in to Briefcase"): the header shows the logo alone, so the name isn't said
-  // twice (Anil, 2026-11-13).
-  const hideName = !!flow && view.startsWith("choose_method") && appTitle(flow).trim().toLowerCase().includes(flow.app.name.trim().toLowerCase());
+  // choose_method draws the app as its own section (logo, name, tagline), so the frame's header steps aside there; the
+  // page that sends the code somewhere else keeps it (Anil, 2026-11-19, /__signin D).
+  const ownHeader = view === "choose_method" || view === "choose_method:account";
   // A flow page may choose its own layout; every other page follows the branding's.
   const layout = flow?.step === "details" ? flow.details?.layout ?? null : null;
 
@@ -179,7 +179,7 @@ function FlowPage({ id }: { id: string }) {
         busy={ctl.loading}
         // "Powered by Silicon Accounts" says nothing on Silicon Accounts' own sign-in (the developer site keeps it).
         poweredBy={flow?.app.app_id !== "silicon-accounts"}
-        hideName={hideName}
+        plain={ownHeader}
         layout={layout}
         footer={flow ? <FlowFooter flow={flow} step={view} /> : null}
       >
@@ -190,13 +190,13 @@ function FlowPage({ id }: { id: string }) {
 }
 
 /** Terms and privacy where the Carbon commits (methods, sign-up, sharing details), and the app's support address. */
-function FlowFooter({ flow, step }: { flow: HostedFlow; step: string }) {
+export function FlowFooter({ flow, step }: { flow: HostedFlow; step: string }) {
   const copy = flow.app.copy;
   const base = step.split(":")[0] ?? "";
   const legal = ["opening", "choose_method", "signup", "select_account", "details", "review"].includes(base) && !!(copy.terms_url || copy.privacy_url);
   if (!legal && !copy.support_email) return null;
   return (
-    <div className={styles.footer}>
+    <div className={styles.footer} data-step={base}>
       {legal ? (
         <p className="sa-brand-legal">
           By continuing, you agree to the{" "}

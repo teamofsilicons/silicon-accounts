@@ -1,0 +1,117 @@
+/* /__share (share-lab.tsx): four directions for "Share your details", each with its own page and look. Silicon UI tokens
+   only; custom surfaces are squircles (data-sq with --sq-r / --sq-fill / --sq-stroke). */
+.bar { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-related) var(--space-group); padding: var(--space-related) var(--space-group); border-bottom: 1px solid var(--border); background: var(--surface); }
+.page { min-height: calc(100dvh - var(--space-16)); background: var(--canvas); color: var(--foreground); }
+
+.ring { box-shadow: 0 0 0 1px var(--border-subtle); }
+.muted { color: var(--text-muted); font: var(--small); letter-spacing: var(--small-tracking); }
+.mono { font-family: var(--font-mono); font-size: var(--text-sm); }
+.accent { color: var(--accent-ink); }
+.wide { width: 100%; }
+
+/* ------------------------------------------------------------ 1 Provider sheet: a bordered sheet with the provider's bar */
+.stage1 { display: grid; justify-items: center; gap: var(--space-3); padding: var(--space-16) var(--space-4); }
+.sheet1 { --sq-r: var(--radius-surface); --sq-fill: var(--surface); --sq-stroke: var(--border); width: min(100%, 28rem); overflow: hidden; background: var(--sq-fill); box-shadow: 0 0 0 1px var(--sq-stroke); }
+.providerBar { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--border); color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.glyph { display: grid; place-items: center; color: var(--foreground); }
+.glyph svg { width: auto; height: 10px; }
+.sheet1Body { display: grid; gap: var(--space-8); padding: var(--space-8) var(--space-8) var(--space-6); }
+.center { display: grid; justify-items: center; gap: var(--space-3); text-align: center; }
+.title1 { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); text-wrap: balance; }
+.chip1 { --sq-r: var(--radius-pill); display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1); border: 1px solid var(--border); border-radius: var(--radius-pill); font: var(--small); letter-spacing: var(--small-tracking); }
+.block1 { display: grid; gap: var(--space-3); }
+.label1 { margin: 0; font: var(--label); letter-spacing: var(--label-tracking); }
+.plainList { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.plainList li { display: flex; align-items: flex-start; gap: var(--space-3); color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.plainList li > svg { flex: none; margin-top: var(--space-hair); color: var(--text-muted); }
+.plainList strong { display: block; color: var(--foreground); font-weight: var(--weight-medium); }
+.selectAll { padding: var(--space-3) var(--space-4); border-radius: var(--radius-pill); background: var(--surface-muted); }
+.checks { display: grid; gap: var(--space-4); padding-inline: var(--space-4); }
+/* Lines up with the checkbox labels above it (the box and its gap). */
+.missingRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-inline-start: var(--space-8); font: var(--small); }
+.missingRow > span { display: grid; }
+.trust1 { display: grid; gap: var(--space-2); }
+.trust1 p { margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.trust1 a, .foot2 a, .foot3 a { color: var(--accent-ink); text-underline-offset: .12em; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.under1 { display: flex; width: min(100%, 28rem); justify-content: space-between; margin: 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); }
+
+/* ------------------------------------------------------------ 1b Cut: the same sheet, only what it must say */
+.cutBody { display: grid; gap: var(--space-6); padding: var(--space-8); }
+.cutLine { margin: 0; color: var(--text-secondary); font: var(--body); letter-spacing: var(--body-tracking); text-align: center; text-wrap: balance; }
+.cutChecks { display: grid; gap: var(--space-3); }
+.cutFoot { margin: calc(var(--space-2) * -1) 0 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); text-align: center; }
+.cutFoot a { color: inherit; text-underline-offset: .12em; }
+
+/* ------------------------------------------------------------ 2 Handshake: centred, two marks, one big action */
+.stage2 { display: grid; place-items: center; padding: var(--space-16) var(--space-4); }
+.card2 { --sq-r: var(--radius-overlay, var(--radius-surface)); --sq-fill: var(--surface); display: grid; width: min(100%, 26rem); justify-items: center; gap: var(--space-5); padding: var(--space-10) var(--space-8) var(--space-8); background: var(--sq-fill); box-shadow: var(--shadow-floating); text-align: center; }
+.pairMarks { display: flex; align-items: center; gap: var(--space-4); color: var(--text-muted); }
+.title2 { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); text-wrap: balance; }
+.lead2 { margin: calc(var(--space-2) * -1) 0 0; color: var(--text-secondary); font: var(--body); letter-spacing: var(--body-tracking); text-wrap: balance; }
+.signedIn { --sq-r: var(--radius-container); --sq-stroke: var(--border); display: flex; width: 100%; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); box-shadow: inset 0 0 0 1px var(--sq-stroke); text-align: left; }
+.signedText { display: grid; flex: 1; min-width: 0; font: var(--body); }
+.also { display: grid; width: 100%; justify-items: start; gap: var(--space-2); text-align: left; }
+.alsoLabel { margin: 0; font: var(--label); letter-spacing: var(--label-tracking); }
+.stack2 { display: grid; width: 100%; gap: var(--space-1); }
+.foot2 { margin: 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); }
+
+/* ------------------------------------------------------------ 3 Your card: a sheet with a live preview card */
+.stage3 { display: grid; place-items: center; padding: var(--space-16) var(--space-4); }
+.sheet3 { --sq-r: var(--radius-surface); --sq-fill: var(--surface-muted); display: grid; width: min(100%, 25rem); gap: var(--space-4); padding: var(--space-4); background: var(--sq-fill); box-shadow: var(--shadow-raised); }
+.sheet3Head { display: flex; align-items: center; justify-content: space-between; }
+.sheet3Title { font: var(--h3); letter-spacing: var(--h3-tracking); }
+.intro3 { display: flex; align-items: center; gap: var(--space-3); }
+.title3 { margin: 0; font: var(--small); letter-spacing: var(--small-tracking); font-weight: var(--weight-regular); }
+.idCard { --sq-r: var(--radius-container); --sq-fill: var(--surface); display: grid; gap: var(--space-4); margin: 0; padding: var(--space-5); background: var(--sq-fill); box-shadow: 0 0 0 1px var(--border-subtle), var(--shadow-resting); }
+.idTop { display: flex; align-items: center; gap: var(--space-3); }
+.idName { display: grid; flex: 1; min-width: 0; }
+.idFor { align-self: flex-start; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); }
+.idFields { display: grid; gap: var(--space-2); margin: 0; padding-top: var(--space-3); border-top: 1px dashed var(--border); }
+.idField { display: flex; justify-content: space-between; gap: var(--space-3); font: var(--small); letter-spacing: var(--small-tracking); }
+.idField dt { color: var(--text-muted); }
+.idField dd { margin: 0; text-align: right; }
+.toggles { --sq-r: var(--radius-container); --sq-fill: var(--surface); display: grid; overflow: hidden; background: var(--sq-fill); }
+.toggleRow { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); cursor: pointer; }
+.toggleRow + .toggleRow { border-top: 1px solid var(--border-subtle); }
+.toggleIcon { display: grid; flex: none; place-items: center; color: var(--text-muted); }
+.toggleText { display: grid; flex: 1; min-width: 0; font: var(--small); }
+.foot3 { margin: 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); text-align: center; }
+
+/* ------------------------------------------------------------ 4 Permissions: a wide document with tables and a facts strip */
+.stage4 { display: grid; justify-items: center; gap: var(--space-3); padding: var(--space-12) var(--space-4); }
+.card4 { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; width: min(100%, 36rem); gap: var(--space-6); padding: var(--space-6); background: var(--sq-fill); box-shadow: 0 0 0 1px var(--sq-stroke); }
+.head4 { display: flex; align-items: center; gap: var(--space-4); padding-bottom: var(--space-5); border-bottom: 1px solid var(--border-subtle); }
+.head4Text { display: grid; flex: 1; min-width: 0; }
+.title4 { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.by { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-secondary); font: var(--small); }
+.by svg { color: var(--accent-ink); }
+.who { display: inline-flex; align-items: center; gap: var(--space-2); }
+.can4 { display: grid; gap: var(--space-3); }
+.label4 { display: flex; align-items: baseline; gap: var(--space-2); margin: 0 0 var(--space-3); font: var(--label); letter-spacing: var(--label-tracking); }
+.can4 .label4 { margin: 0; }
+.canList { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.canList li { display: flex; align-items: flex-start; gap: var(--space-3); }
+.canList li > svg { flex: none; margin-top: var(--space-hair); color: var(--text-secondary); }
+.canList li > span { display: grid; }
+.table4 { width: 100%; border-collapse: collapse; font: var(--small); letter-spacing: var(--small-tracking); }
+.table4 th { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); color: var(--text-muted); font: var(--caption); text-align: left; }
+.table4 td { padding: var(--space-3); border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+.table4 th:first-child, .table4 td:first-child { width: 3.5rem; }
+.actions4 { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.redirect { margin: calc(var(--space-4) * -1) 0 0; color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); text-align: right; }
+.redirect strong { color: var(--text-secondary); font-weight: var(--weight-medium); }
+.facts { --sq-r: var(--radius-container); --sq-fill: var(--surface-muted); display: grid; width: min(100%, 36rem); grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--space-3); margin: 0; padding: var(--space-4); background: var(--sq-fill); list-style: none; }
+.facts li { display: flex; align-items: flex-start; gap: var(--space-2); color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); }
+.facts li > svg { flex: none; color: var(--text-muted); }
+.facts li > span { min-width: 0; overflow-wrap: anywhere; }
+.facts strong { display: block; color: var(--foreground); font-weight: var(--weight-medium); }
+.proposal { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--text-muted); font: var(--caption); }
+
+@media (max-width: 640px) {
+  .sheet1Body { padding: var(--space-6) var(--space-5) var(--space-5); }
+  .card2 { padding: var(--space-8) var(--space-5) var(--space-6); }
+  .head4 { flex-wrap: wrap; }
+  .actions4 { display: grid; grid-template-columns: 1fr 1fr; }
+  .redirect { text-align: left; }
+}

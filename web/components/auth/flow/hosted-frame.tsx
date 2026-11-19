@@ -6,17 +6,34 @@
  * outside the branded subtree so no branding can restyle or hide it.
  *
  * Silicon Accounts' own pages (device approval, the account site's sign-in, problems with no app, the first-party
- * flow) wear the site's brand tokens instead of an app's branding.
+ * flow) wear the site's brand tokens instead of an app's branding. So does an app that kept the default colours and
+ * fonts and the visitor's theme (isSiliconLook): its pages look like Silicon Accounts' own, with its logo, its layout
+ * and "Powered by" (Anil, 2026-11-18: "two very different designs, we need to make this uniform").
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AccountsGlyph } from "@/components/foundation/shell/brand-mark";
 import { BrandAside, BrandPanel, BrandStage, BrandingScope, PoweredBy } from "@/components/foundation/branding/branding";
 import { useTheme } from "@/components/foundation/theme/use-theme";
 import type { BrandLayout, Branding } from "@/lib/api/types";
 import { brandLogo, resolveBrandTheme, type PaintTheme } from "@/lib/branding/apply";
-import { normalizeBranding } from "@/lib/branding/defaults";
+import { isSiliconLook, normalizeBranding } from "@/lib/branding/defaults";
 import { legibleBranding } from "./legible";
 import type { FrameApp } from "./model";
 import styles from "./flow.module.css";
+
+/**
+ * Team of Silicons' default sign-in (Anil, 2026-11-19, /__accounts-signin, Default style, vertical, Painted): an app
+ * that kept the default look signs in on a narrow card headed "Sign in with Team of Silicons", over the cloud painting,
+ * with Team of Silicons' Help, Privacy and Terms under the card and Powered by at the foot. Steps read it to head
+ * themselves the card's way (choose_method: "Sign in" and "to continue to {app}").
+ */
+const TosFrameContext = createContext(false);
+export const useTosFrame = () => useContext(TosFrameContext);
+const TOS_LINKS = [
+  { label: "Help", href: "https://teamofsilicons.com/help" },
+  { label: "Privacy", href: "https://teamofsilicons.com/legal/privacy" },
+  { label: "Terms", href: "https://teamofsilicons.com/legal/terms" },
+];
 
 /** The paint theme of a branding for this visitor: the app's forced theme, else the visitor's own. */
 export function usePaint(app: FrameApp | null, site: boolean): PaintTheme {
@@ -70,13 +87,19 @@ export interface HostedFrameProps {
 }
 
 export function HostedFrame({ app, site: siteProp, title, subtitle, children, footer, busy, poweredBy = true, plain, hideName, layout: pageLayout }: HostedFrameProps) {
-  const site = !!siteProp || !app;
-  const paint = usePaint(app, site);
   // The app's branding, with its error text kept readable (flow/legible.ts), in this page's layout.
   const branding = useMemo(() => {
     const base = legibleBranding(normalizeBranding(app?.branding as Partial<Branding> | undefined));
     return pageLayout && pageLayout !== base.layout ? { ...base, layout: pageLayout } : base;
   }, [app?.branding, pageLayout]);
+  // The site's own tokens: Silicon Accounts' pages, and apps that kept the default look (checked on the stored
+  // branding, before legibleBranding adjusts its error colour).
+  const defaultLook = useMemo(() => {
+    const stored = normalizeBranding(app?.branding as Partial<Branding> | undefined);
+    return isSiliconLook(stored) && stored.theme === "auto";
+  }, [app?.branding]);
+  const site = !!siteProp || !app || defaultLook;
+  const paint = usePaint(app, site);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [fontsTimedOut, setFontsTimedOut] = useState(false);
   // Fonts load on demand; the step fades in once they are there (or after 1.5 s), so headings never jump.
@@ -107,8 +130,40 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
     };
   }, [background]);
 
-  const layout = site ? "card" : branding.layout;
-  const stage = (
+  // Silicon Accounts' own pages are cards; an app in the default look keeps its own layout, background and density.
+  const own = !!siteProp || !app;
+  // An app in the default look: Team of Silicons' own sign-in card (TosFrameContext).
+  const tos = defaultLook && !own;
+  const layout = own || tos ? "card" : branding.layout;
+  const panel = (
+    <BrandPanel as="main" className={styles.panel} aria-busy={busy || undefined} data-fonts={fontsReady ? "ready" : "loading"} data-frame={tos ? "tos" : undefined}>
+      {tos ? (
+        <div className={styles.tosBar}>
+          <span className={styles.tosGlyph} aria-hidden="true"><AccountsGlyph /></span>
+          Sign in with Team of Silicons
+        </div>
+      ) : null}
+      {tos ? (
+        <div className={styles.tosBody}>{children}{footer}</div>
+      ) : (
+        <>
+          {plain ? null : <AppIdentity app={app} paint={paint} hideName={hideName} />}
+          {children}
+          {footer}
+        </>
+      )}
+    </BrandPanel>
+  );
+  const stage = tos ? (
+    <BrandStage>
+      <div className={styles.tosColumn}>
+        {panel}
+        <nav className={styles.tosLinks} aria-label="Help and policies">
+          {TOS_LINKS.map(link => <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer">{link.label}</a>)}
+        </nav>
+      </div>
+    </BrandStage>
+  ) : (
     <BrandStage>
       <BrandAside>
         <AppIdentity app={app} paint={paint} />
@@ -117,19 +172,17 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
           {subtitle ? <p className="sa-brand-subtitle">{subtitle}</p> : null}
         </div>
       </BrandAside>
-      <BrandPanel as="main" className={styles.panel} aria-busy={busy || undefined} data-fonts={fontsReady ? "ready" : "loading"}>
-        {plain ? null : <AppIdentity app={app} paint={paint} hideName={hideName} />}
-        {children}
-        {footer}
-      </BrandPanel>
+      {panel}
     </BrandStage>
   );
 
   return (
-    <div className={styles.hosted} data-paint={paint} data-layout={layout} data-site={site || undefined}>
+    <TosFrameContext.Provider value={tos}>
+    <div className={styles.hosted} data-paint={paint} data-layout={layout} data-site={site || undefined} data-frame={tos ? "tos" : undefined}>
       {site ? (
-        // Silicon Accounts itself: the site's own brand tokens (styles/tokens.css), in the card layout.
-        <div className={`sa-brand ${styles.scope}`} data-layout="card" data-bg="plain" data-density="comfortable" data-look="silicon">{stage}</div>
+        // The site's own brand tokens (styles/tokens.css): Silicon Accounts itself in the card layout, an app in the
+        // default look in its own.
+        <div className={`sa-brand ${styles.scope}`} data-layout={layout} data-bg={own ? "plain" : branding.background_style} data-density={own ? "comfortable" : branding.density} data-look="silicon">{stage}</div>
       ) : (
         <BrandingScope branding={branding} theme={paint} className={styles.scope} onFontsReady={() => setFontsLoaded(true)}>
           {stage}
@@ -137,5 +190,6 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
       )}
       {poweredBy ? <PoweredBy theme={paint} overlay className={styles.powered} /> : null}
     </div>
+    </TosFrameContext.Provider>
   );
 }

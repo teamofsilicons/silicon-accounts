@@ -159,7 +159,7 @@ export const journeys: Journey[] = [
         app: "briefcase",
         label: "default",
         wrongCode: true,
-        titles: { signin: /^Sign in to Briefcase$/, signup: /^Create your Briefcase account$/ },
+        titles: { signin: /^Sign in$/, signup: /^Sign up$/ },
         direct: ["email", "phone"],
         details: { expect: [{ title: /^Share your details with Briefcase$/, continueLabel: "Share and continue" }] },
         again: true,

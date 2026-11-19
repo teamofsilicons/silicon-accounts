@@ -2,11 +2,13 @@
 
 /**
  * choose_method: how the Carbon signs in (or signs up: the app's intent=signup shows the sign-up version of the page,
- * "Create your Briefcase account"; the account logic is the same). A browser that is already signed in is offered
- * "Continue as" first (with "Use another account", which tells the server to forget it for this flow). Otherwise the
- * app's methods show in its order: Google and Apple as neutral buttons, "or get a code", then email and phone as one
- * field ("Email or phone") and "Send Me a Code", with the prototype's note that there are no passwords and that Silicons
- * sign in with their secret key (Anil, 2026-11-12).
+ * the account logic is the same). In sections (Anil, 2026-11-19, /__signin D): the app (its icon, name and tagline; in
+ * the split layout the side beside the form shows it), then "Sign in with your Team of Silicons account" ("Sign up
+ * with…" on the sign-up page) over the ways in. A browser that is already signed in is offered "Continue as" there
+ * (with "Use Another Account", which tells the server to forget it for this flow). Otherwise the app's methods show in
+ * its order: Google and Apple as soft buttons, "or get a code", then email and phone as one field ("Email or phone")
+ * and "Send Me a Code". The app's own title (copy.title) stays the browser tab's title and the split layout's large
+ * text. The prototype's "No passwords" note is gone (Anil, 2026-11-19).
  *
  * `method` narrows the page to one method until the Carbon asks for the others: email or phone opens on that empty
  * field (nothing is ever filled in for the Carbon: an app cannot hand us an email or phone, and login_hint is ignored);
@@ -18,7 +20,12 @@ import { Button } from "@teamofsilicons/silicon-ui/button";
 import type { ApiError } from "@/lib/api/errors";
 import type { FlowController } from "../flow/controller";
 import { useFinePointer } from "../flow/hooks";
-import { appSubtitle, appTitle, firstName, intentOf, isProvider, type HostedFlow } from "../flow/model";
+import { AppMark } from "@/components/account/parts/app-mark";
+import { usePaint, useTosFrame } from "../flow/hosted-frame";
+import { brandLogo } from "@/lib/branding/apply";
+import { normalizeBranding } from "@/lib/branding/defaults";
+import type { Branding } from "@/lib/api/types";
+import { firstName, intentOf, isProvider, type HostedFlow } from "../flow/model";
 import { AccountRow, ContactForm, FlowAlert, OrDivider, ProviderButton, StepHeading, contactKinds, useStepErrors, type ContactKind } from "../flow/parts";
 import styles from "../flow/flow.module.css";
 
@@ -39,6 +46,24 @@ export interface ChooseMethodProps {
   onBack?: () => void;
   /** Every method from the start (the Carbon chose "Other Ways to Sign In" on the Opening page). */
   wide?: boolean;
+}
+
+/** The app's section: its icon (the account site's app mark: one size, one corner), its name and its own tagline. */
+function AppSection({ flow }: { flow: HostedFlow }) {
+  const paint = usePaint(flow.app, flow.app.first_party);
+  const branding = normalizeBranding(flow.app.branding as Partial<Branding> | undefined);
+  // Our own first-party apps wear the Silicon Accounts icon, as the frame's header does.
+  const logo = brandLogo(branding, flow.app, paint) ?? (flow.app.first_party ? "/icon-512.png" : null);
+  const tagline = flow.app.copy.subtitle?.trim() || null;
+  return (
+    <section className={styles.appSection} aria-label={flow.app.name}>
+      <AppMark app={{ app_id: flow.app.app_id, name: flow.app.name, logo_url: logo }} size={40} decorative className={styles.appMark} />
+      <div className={styles.appText}>
+        <p className={styles.appName}>{flow.app.name}</p>
+        {tagline ? <p className={styles.appTagline}>{tagline}</p> : null}
+      </div>
+    </section>
+  );
 }
 
 export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBack, wide }: ChooseMethodProps) {
@@ -115,7 +140,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
   const providerButtons = visibleProviders.length ? (
     <div className={styles.providers} data-count={visibleProviders.length}>
       {visibleProviders.map(provider => (
-        <ProviderButton key={provider} provider={provider} loading={busy === provider} disabled={!!busy && busy !== provider} onClick={() => void startProvider(provider)} />
+        <ProviderButton key={provider} provider={provider} variant="soft" loading={busy === provider} disabled={!!busy && busy !== provider} onClick={() => void startProvider(provider)} />
       ))}
     </div>
   ) : null;
@@ -134,49 +159,80 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
   ) : null;
   const both = !!providerButtons && !!contactForm;
 
-  return (
-    <>
-      {changing ? (
-        <StepHeading title="Send the code somewhere else" description={`Enter the ${changeTarget} to send a new 6 digit code to.`} />
+  const tos = useTosFrame();
+  const split = normalizeBranding(flow.app.branding as Partial<Branding> | undefined).layout === "split";
+  const ways = signedIn ? (
+    // The account and its two choices: 16 between them, 8 between the choices.
+    <div className={styles.continueAs}>
+      <AccountRow account={signedIn} />
+      <div className={styles.choices}>
+        <Button className={styles.wide} loading={busy === "continue"} disabled={busy === "switch"} onClick={() => void continueAs()}>
+          Continue as {firstName(signedIn.display_name)}
+        </Button>
+        <Button variant="soft" className={styles.wide} loading={busy === "switch"} disabled={busy === "continue"} onClick={() => void chooseAnother()}>
+          Use Another Account
+        </Button>
+      </div>
+    </div>
+  ) : methods.length ? (
+    <div className={styles.methods}>
+      {providersFirst ? (
+        <>
+          {providerButtons}
+          {both ? <OrDivider label="or get a code" /> : null}
+          {contactForm}
+        </>
       ) : (
-        <StepHeading title={appTitle(flow)} description={appSubtitle(flow) ?? undefined} appTitle splitLabel={signup ? "Sign up" : "Sign in"} noFocus />
+        <>
+          {contactForm}
+          {both ? <OrDivider /> : null}
+          {providerButtons}
+        </>
       )}
-      <FlowAlert error={errors.current} app={flow.app.name} />
+      {narrowed ? <button type="button" className={styles.textButton} onClick={() => setShowAll(true)}>{signup ? "Other Ways to Sign Up" : "Other Ways to Sign In"}</button> : null}
+      {changing && onBack ? <button type="button" className={styles.textButton} onClick={onBack}>Back to the code</button> : null}
+    </div>
+  ) : (
+    <Alert tone="warning" title={`${flow.app.name} has no sign-in methods yet`}>
+      {`Nobody can sign in to ${flow.app.name} until it turns on at least one method. If you run this app, turn one on in its sign-in setup on the developer site.`}
+    </Alert>
+  );
 
-      {signedIn ? (
-        <div className={styles.continueAs}>
-          <AccountRow account={signedIn} />
-          <Button className={styles.wide} loading={busy === "continue"} disabled={busy === "switch"} onClick={() => void continueAs()}>
-            Continue as {firstName(signedIn.display_name)}
-          </Button>
-          <Button variant="secondary" className={styles.wide} loading={busy === "switch"} disabled={busy === "continue"} onClick={() => void chooseAnother()}>
-            Use Another Account
-          </Button>
+  if (changing) {
+    return (
+      <>
+        <StepHeading title="Send the code somewhere else" description={`Enter the ${changeTarget} to send a new 6 digit code to.`} />
+        <FlowAlert error={errors.current} app={flow.app.name} />
+        {ways}
+      </>
+    );
+  }
+
+  // Team of Silicons' card (an app in the default look): the bar already says "Sign in with Team of Silicons", so the
+  // page heads itself "Sign in" (or "Sign up") "to continue to {app}", centred over the ways in (/__accounts-signin).
+  if (tos) {
+    return (
+      <div className={styles.chooseSections}>
+        <div className={styles.tosHead}>
+          <StepHeading title={signup ? "Sign up" : "Sign in"} noFocus />
+          <p className={styles.tosLine}>to continue to <strong>{flow.app.name}</strong></p>
         </div>
-      ) : methods.length ? (
-        <div className={styles.methods}>
-          {providersFirst ? (
-            <>
-              {providerButtons}
-              {both ? <OrDivider label="or get a code" /> : null}
-              {contactForm}
-            </>
-          ) : (
-            <>
-              {contactForm}
-              {both ? <OrDivider /> : null}
-              {providerButtons}
-            </>
-          )}
-          {!changing && contacts.length ? <p className={styles.methodsNote}>No passwords. Building a Silicon? It signs in with its secret key from the command line.</p> : null}
-          {narrowed ? <button type="button" className={styles.textButton} onClick={() => setShowAll(true)}>{signup ? "Other Ways to Sign Up" : "Other Ways to Sign In"}</button> : null}
-          {changing && onBack ? <button type="button" className={styles.textButton} onClick={onBack}>Back to the code</button> : null}
+        <div className={styles.signinGroup}>
+          <FlowAlert error={errors.current} app={flow.app.name} />
+          {ways}
         </div>
-      ) : (
-        <Alert tone="warning" title={`${flow.app.name} has no sign-in methods yet`}>
-          {`Nobody can sign in to ${flow.app.name} until it turns on at least one method. If you run this app, turn one on in its sign-in setup on the developer site.`}
-        </Alert>
-      )}
-    </>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.chooseSections}>
+      {split ? null : <AppSection flow={flow} />}
+      <section className={styles.signinGroup}>
+        <StepHeading title={signup ? "Sign up with your Team of Silicons account" : "Sign in with your Team of Silicons account"} section noFocus />
+        <FlowAlert error={errors.current} app={flow.app.name} />
+        {ways}
+      </section>
+    </div>
   );
 }

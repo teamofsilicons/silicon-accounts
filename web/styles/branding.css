@@ -111,8 +111,10 @@
 .sa-brand-title { margin: 0; color: var(--foreground); font: var(--display); letter-spacing: var(--display-tracking); text-wrap: balance; }
 .sa-brand-subtitle { margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-wrap: pretty; }
 .sa-brand-body { display: grid; min-width: 0; gap: var(--brand-gap, 16px); }
-.sa-brand-legal { margin: 0; color: var(--text-secondary); font: var(--hint); letter-spacing: var(--hint-tracking); }
-.sa-brand-legal a { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); }
+/* The small print in the muted grey, its links' underline close to the text and broken around descenders (Anil,
+   2026-11-19, /__signin D). */
+.sa-brand-legal { margin: 0; color: var(--text-muted); font: var(--hint); letter-spacing: var(--hint-tracking); }
+.sa-brand-legal a { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in oklab, currentColor 40%, transparent); text-underline-offset: .12em; text-decoration-skip-ink: auto; }
 
 /* Split: the app's side on the left, the form on the right. Folds into a card on narrow screens. */
 .sa-brand-aside { display: none; }
