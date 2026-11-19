@@ -117,6 +117,19 @@ function contrast(a: string, b: string): number {
   return (x + 0.05) / (y + 0.05);
 }
 
+/** Any CSS colour (lab(), oklch(), a hex…) as rgb()/rgba(), as the browser paints it on a canvas. */
+function rgbIn(page: Page, css: string): Promise<string> {
+  return page.evaluate(colour => {
+    const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("no 2d context");
+    context.clearRect(0, 0, 1, 1);
+    context.fillStyle = colour;
+    context.fillRect(0, 0, 1, 1);
+    const [r = 0, g = 0, b = 0, a = 255] = context.getImageData(0, 0, 1, 1).data;
+    return a === 255 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${a / 255})`;
+  }, css);
+}
+
 /** The colour on screen at one CSS pixel of the viewport. */
 async function pixel(page: Page, x: number, y: number): Promise<[number, number, number]> {
   const png = await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } });
@@ -272,17 +285,17 @@ const hostedChecks: MockCheck[] = [
     },
     run: async ({ page, requests }) => {
       await expect(heading(page, "Check your email")).toBeVisible();
-      await page.getByRole("button", { name: /^Change where the code goes/ }).click();
+      await page.getByRole("button", { name: "Use a Different Email" }).click();
       await expect(heading(page, "Send the code somewhere else")).toBeVisible();
       await page.getByRole("textbox", { name: "Email" }).fill("rv@gmail.test");
-      await page.getByRole("button", { name: "Send code" }).click();
+      await page.getByRole("button", { name: "Send Code" }).click();
       await expect(page.getByText(/only accepts email addresses at university\.test/).first()).toBeVisible();
       await expect(heading(page, "Send the code somewhere else")).toBeVisible();
       const reads = () => requests.filter(request => request.method === "GET" && request.path.startsWith("/v1/flows/")).length;
       // The server refused before touching the flow: nothing to read again.
       expect(reads()).toBe(1);
       // A refusal after which the flow is read again (its methods changed) keeps the field and its error too.
-      await page.getByRole("button", { name: "Send code" }).click();
+      await page.getByRole("button", { name: "Send Code" }).click();
       await expect(page.getByText(/does not offer it any more/).first()).toBeVisible();
       await expect.poll(reads).toBe(2);
       await expect(heading(page, "Send the code somewhere else")).toBeVisible();
@@ -296,6 +309,8 @@ const hostedChecks: MockCheck[] = [
     run: async ({ page }) => {
       const alert = page.locator("[data-error-code]");
       await expect(alert).toHaveAttribute("data-error-code", "provider_cancelled");
+      // The flow came back from Google (method=google): the page shows Google alone until the Carbon asks for the rest.
+      await page.getByRole("button", { name: "Other Ways to Sign In" }).click();
       await page.getByRole("button", { name: "Continue with Apple" }).click();
       await expect(alert).toHaveAttribute("data-error-code", "provider_not_configured");
       await expect(alert).toContainText("Apple is not available here");
@@ -319,13 +334,14 @@ const hostedChecks: MockCheck[] = [
       await expect(alert).toContainText("Google is not available here");
       await expect(alert).not.toContainText("ACCOUNTS_");
       expect(requests.filter(request => request.method === "POST" && request.path.endsWith("/oauth/google"))).toHaveLength(1);
-      await expect(page.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
+      // The Opening page stays, paused, with its own button and the way to the other methods.
+      await expect(page.getByRole("button", { name: "Continue to Google" })).toBeEnabled();
       await expect(page.getByRole("button", { name: "Other ways to sign in" })).toBeVisible();
       // The network is down when it starts (another flow: each opens Google once).
       await page.route("**/v1/flows/*/oauth/google", route => route.abort("internetdisconnected"));
       await page.goto(`${base}${flowPath("briefcase", "choose_method")}`);
       await expect(page.locator('[data-error-code="network_error"]')).toContainText("Silicon Accounts is unreachable");
-      await expect(page.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
+      await expect(page.getByRole("button", { name: "Continue to Google" })).toBeEnabled();
     },
   },
   {
@@ -334,61 +350,55 @@ const hostedChecks: MockCheck[] = [
     routes: [routeFlow(() => sampleFlow(appOf("commit"), "verify_code", { method_hint: "google" }))],
     run: async ({ page }) => {
       await expect(heading(page, "Check your email")).toBeVisible();
-      await page.getByRole("button", { name: /^Change where the code goes/ }).click();
+      await page.getByRole("button", { name: "Use a Different Email" }).click();
       await expect(heading(page, "Send the code somewhere else")).toBeVisible();
       await expect(page.getByText("Enter the email address to send a new 6 digit code to.")).toBeVisible();
       await expect(page.getByRole("textbox", { name: "Email" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Other ways to sign in" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: /^Other ways to sign in$/i })).toHaveCount(0);
       await expect(page.getByRole("button", { name: "Back to the code" })).toBeVisible();
     },
   },
   {
-    name: "consent: signed out in another tab, the page says so in plain words and offers to sign in again",
-    path: flowPath("briefcase", "consent"),
-    routes: [["POST /v1/flows/:id/consent", ({ params }) => apiError(401, "session_required", `This browser is no longer signed in (it signed out, or the session expired), so sign-in flow '${params.id}' can't continue for its account.`, `Call POST /v1/flows/${params.id}/switch and sign in again.`)]],
+    name: "details: signed out in another tab, the page says so in plain words and offers to sign in again",
+    path: flowPath("briefcase", "details"),
+    routes: [["POST /v1/flows/:id/details/continue", ({ params }) => apiError(401, "session_required", `This browser is no longer signed in (it signed out, or the session expired), so sign-in flow '${params.id}' can't continue for its account.`, `Call POST /v1/flows/${params.id}/switch and sign in again.`)]],
     run: async ({ page, requests }) => {
       await page.getByRole("button", { name: "Share and continue" }).click();
       const alert = page.locator('[data-error-code="session_required"]');
       await expect(alert).toContainText("You were signed out");
       await expect(alert).not.toContainText("/v1/");
       await expect(alert).not.toContainText("flow '");
-      await expect(page.getByRole("button", { name: "Share and continue" })).toBeDisabled();
-      await alert.getByRole("button", { name: "Sign in again" }).click();
+      await alert.getByRole("button", { name: "Sign In Again" }).click();
       await expect(heading(page, "Sign in")).toBeVisible();
       expect(requests.some(request => request.method === "POST" && request.path.endsWith("/switch"))).toBe(true);
     },
   },
   {
-    name: "requirements: signed out in another tab, the step offers to sign in again instead of blaming the number",
-    path: flowPath("dm", "requirements"),
-    routes: [["POST /v1/flows/:id/requirements/:kind", ({ params }) => apiError(401, "session_required", `This browser is no longer signed in (it signed out, or the session expired), so sign-in flow '${params.id}' can't continue for its account.`, `Call POST /v1/flows/${params.id}/switch and sign in again.`)]],
+    name: "details: adding a required phone after signing out in another tab offers to sign in again instead of blaming the number",
+    path: flowPath("dm", "details_missing"),
+    routes: [["POST /v1/flows/:id/details/add", ({ params }) => apiError(401, "session_required", `This browser is no longer signed in (it signed out, or the session expired), so sign-in flow '${params.id}' can't continue for its account.`, `Call POST /v1/flows/${params.id}/switch and sign in again.`)]],
     run: async ({ page }) => {
-      await expect(heading(page, "Add your phone number")).toBeVisible();
+      await expect(page.getByText("Add your phone number", { exact: true })).toBeVisible();
       await page.getByRole("textbox", { name: "Phone number" }).click();
       await page.keyboard.type("9876543210");
-      await page.getByRole("button", { name: "Send code" }).click();
+      await page.getByRole("button", { name: "Send Code" }).click();
       const alert = page.locator('[data-error-code="session_required"]');
       await expect(alert).toContainText("You were signed out");
       await expect(page.getByText(/\/v1\//)).toHaveCount(0);
-      await alert.getByRole("button", { name: "Sign in again" }).click();
-      await expect(heading(page, "Sign in to DM")).toBeVisible();
+      await alert.getByRole("button", { name: "Sign In Again" }).click();
+      await expect(heading(page, "Sign in with your Team of Silicons account")).toBeVisible();
     },
   },
   {
-    name: "consent: asking again for nothing new is not 'a little more'",
-    path: flowPath("briefcase", "consent"),
+    name: "details: asking again for nothing new is not 'a little more'",
+    path: flowPath("briefcase", "details_more"),
     routes: [routeFlow(() => {
-      const base = sampleFlow(appOf("briefcase"), "consent");
-      return {
-        ...base,
-        consent: {
-          required: (base.consent?.required ?? []).filter(row => row.scope === "profile" || row.scope === "email"),
-          optional: [{ scope: "timezone", label: "Timezone", value: "Asia/Kolkata", granted: true }],
-          previously_granted: ["profile", "email", "timezone"],
-        },
-        prompt: "consent",
-      };
+      const flow = sampleFlow(appOf("briefcase"), "details_more", { prompt: "consent" });
+      const details = flow.details;
+      if (!details) return flow;
+      // Everything was answered before: the email and timezone shared, the date of birth and phone left out.
+      return { ...flow, details: { ...details, fields: details.fields.map(field => ({ ...field, new: false, previously_granted: field.field === "email" || field.field === "timezone" })) } };
     })],
     run: async ({ page }) => {
       await expect(heading(page, "Share your details with Briefcase")).toBeVisible();
@@ -397,52 +407,68 @@ const hostedChecks: MockCheck[] = [
     },
   },
   {
-    name: "consent: asking for something new says so and marks it",
-    path: flowPath("briefcase", "consent_more"),
+    name: "details: asking for something new says so and marks it",
+    path: flowPath("briefcase", "details_more"),
     run: async ({ page }) => {
       await expect(heading(page, "Briefcase would like a little more")).toBeVisible();
       await expect(page.getByText("New", { exact: true }).first()).toBeVisible();
     },
   },
   {
-    name: "consent: the optional switches send exactly what was chosen; Cancel returns access_denied",
-    path: flowPath("briefcase", "consent"),
+    name: "details: the optional checkboxes send exactly what was chosen; Cancel returns access_denied",
+    path: flowPath("briefcase", "details"),
     run: async ({ page }) => {
-      await page.getByRole("switch", { name: "Timezone" }).click();
-      await page.getByRole("switch", { name: "Date of birth" }).click();
-      await expect(page.getByRole("switch", { name: "Phone number" })).toBeDisabled();
-      const sent = nextPost(page, "/consent");
+      const box = (label: string) => page.getByRole("checkbox", { name: new RegExp(`^${label}`) });
+      await box("Timezone").click();
+      await box("Date of birth").click();
+      await box("Timezone").click();
+      await expect(box("Phone number")).toBeDisabled();
+      const sent = nextPost(page, "/details/continue");
       await page.getByRole("button", { name: "Share and continue" }).click();
-      expect(await sent).toEqual({ approve: true, optional_scopes: ["dob"] });
+      expect(await sent).toEqual({ share: ["dob"] });
       await expect(heading(page, "Signed in to Briefcase")).toBeVisible();
-      await page.goto(page.url().replace(/[^/]*$/, encodeURIComponent("briefcase~consent")));
-      const declined = nextPost(page, "/consent");
+      await page.goto(page.url().replace(/[^/]*$/, encodeURIComponent("briefcase~details")));
+      const declined = nextPost(page, "/review");
       await page.getByRole("button", { name: "Cancel" }).click();
       expect(await declined).toEqual({ approve: false });
       await expect(heading(page, "Nothing was shared")).toBeVisible();
     },
   },
   {
-    name: "phone: a pasted number whose country the list lacks is sent exactly as typed",
+    name: "phone: a number with its country code in 'Email or phone' is sent as typed, never read in the visitor's country",
     path: flowPath("dm", "choose_method"),
     run: async ({ page }) => {
-      await page.getByRole("button", { name: "Phone", exact: true }).click();
+      const field = page.getByRole("textbox", { name: "Email or phone" });
+      await field.fill("+40 755 345 678");
+      await expect(field).toHaveValue("+40 755 345 678");
+      await expect(page.getByText(/Read as a number in/)).toHaveCount(0);
+      const sent = nextPost(page, "/phone");
+      await page.getByRole("button", { name: "Send Me a Code" }).click();
+      const body = await sent;
+      expect(String(body.phone).replace(/\s/g, "")).toBe("+40755345678");
+      expect(body.country).toBeUndefined();
+      await expect(heading(page, "Check your phone")).toBeVisible();
+    },
+  },
+  {
+    name: "phone: a pasted number whose country the list lacks is sent exactly as typed",
+    path: flowPath("dm", "details_missing"),
+    run: async ({ page }) => {
       const field = page.getByRole("textbox", { name: "Phone number" });
       await paste(field, "+40 755 345 678");
       await expect(page.locator('[data-phone-mode="international"]')).toBeVisible();
       await expect(field).toHaveValue("+40 755 345 678");
       await expect(page.getByText(/Romania \(\+40\)/).first()).toBeVisible();
-      const sent = nextPost(page, "/phone");
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      const sent = nextPost(page, "/details/add");
+      await page.getByRole("button", { name: "Send Code" }).click();
       expect(await sent).toEqual({ phone: "+40755345678" });
-      await expect(heading(page, "Check your phone")).toBeVisible();
+      await expect(page.getByRole("group", { name: "Code from the text message" })).toBeVisible();
     },
   },
   {
     name: "phone: autofill and '+7' typed into the country search switch to the number with its code",
-    path: flowPath("dm", "choose_method"),
+    path: flowPath("dm", "details_missing"),
     run: async ({ page }) => {
-      await page.getByRole("button", { name: "Phone", exact: true }).click();
       const field = page.getByRole("textbox", { name: "Phone number" });
       // Autofill: the whole number arrives in one input event.
       await field.evaluate(el => {
@@ -454,7 +480,7 @@ const hostedChecks: MockCheck[] = [
       await expect(page.locator('[data-phone-mode="international"]')).toBeVisible();
       await expect(field).toHaveValue("+36 20 123 4567");
       await expect(page.getByText(/Hungary \(\+36\)/).first()).toBeVisible();
-      await page.getByRole("button", { name: "Choose the country from the list" }).click();
+      await page.getByRole("button", { name: "Choose the Country From the List" }).click();
       await expect(page.locator('[data-phone-mode="picker"]')).toBeVisible();
       // "+" opens the country search; "7" matches none of its countries, so the field takes it as a number instead.
       await field.click();
@@ -465,67 +491,65 @@ const hostedChecks: MockCheck[] = [
       await expect(field).toBeFocused();
       await page.keyboard.type("9123456789");
       await expect(field).toHaveValue("+79123456789");
-      const sent = nextPost(page, "/phone");
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      const sent = nextPost(page, "/details/add");
+      await page.getByRole("button", { name: "Send Code" }).click();
       expect(await sent).toEqual({ phone: "+79123456789" });
     },
   },
   {
     name: "phone: numbers the list knows stay in it, and extra digits are never cut off",
-    path: flowPath("dm", "choose_method"),
+    path: flowPath("dm", "details_missing"),
     run: async ({ page }) => {
-      await page.getByRole("button", { name: "Phone", exact: true }).click();
       const field = page.getByRole("textbox", { name: "Phone number" });
       await paste(field, "+44 7400 123456");
       await expect(page.locator('[data-phone-mode="picker"]')).toBeVisible();
-      let sent = nextPost(page, "/phone");
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      let sent = nextPost(page, "/details/add");
+      await page.getByRole("button", { name: "Send Code" }).click();
       expect(await sent).toEqual({ phone: "+447400123456", country: "GB" });
-      await expect(heading(page, "Check your phone")).toBeVisible();
+      await expect(page.getByRole("group", { name: "Code from the text message" })).toBeVisible();
       // One digit too many for the United Kingdom: the picker would drop it (another person's number), so it is sent
       // as typed for the server to judge.
-      await page.getByRole("button", { name: /^Change where the code goes/ }).click();
-      await expect(heading(page, "Send the code somewhere else")).toBeVisible();
+      await page.getByRole("button", { name: "Change the phone number the code goes to" }).click();
+      await expect(field).toBeVisible();
       await field.fill("");
       await paste(field, "+44 7400 1234567");
       await expect(page.locator('[data-phone-mode="international"]')).toBeVisible();
-      sent = nextPost(page, "/phone");
-      await page.getByRole("button", { name: "Send code" }).click();
+      sent = nextPost(page, "/details/add");
+      await page.getByRole("button", { name: "Send Code" }).click();
       expect(await sent).toEqual({ phone: "+4474001234567" });
     },
   },
   {
-    name: "phone: a visitor in Romania starts with +40, and the requirements step takes any country",
-    path: flowPath("dm", "requirements"),
+    name: "phone: a visitor in Romania starts with +40, and adding a phone on the details page takes any country",
+    path: flowPath("dm", "details_missing"),
     timezone: "Europe/Bucharest",
     run: async ({ page }) => {
-      await expect(heading(page, "Add your phone number")).toBeVisible();
+      await expect(page.getByText("Add your phone number", { exact: true })).toBeVisible();
       const field = page.getByRole("textbox", { name: "Phone number" });
       await expect(page.locator('[data-phone-mode="international"]')).toBeVisible();
       await expect(field).toHaveValue("+40 ");
       await field.click();
       await page.keyboard.press("End");
       await page.keyboard.type("755 345 678");
-      const sent = nextPost(page, "/requirements/phone");
-      await page.getByRole("button", { name: "Send code" }).click();
+      const sent = nextPost(page, "/details/add");
+      await page.getByRole("button", { name: "Send Code" }).click();
       expect(await sent).toEqual({ phone: "+40755345678" });
     },
   },
   {
     name: "phone: a number with no country code, or an unknown one, is stopped with the reason",
-    path: flowPath("dm", "choose_method"),
+    path: flowPath("dm", "details_missing"),
     run: async ({ page, requests }) => {
-      await page.getByRole("button", { name: "Phone", exact: true }).click();
-      await page.getByRole("button", { name: "Country not in the list?" }).click();
+      await page.getByRole("button", { name: "Enter the Country Code Yourself" }).click();
       const field = page.getByRole("textbox", { name: "Phone number" });
       await expect(field).toBeFocused();
       await field.fill("+999 1234 5678");
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page.getByRole("button", { name: "Send Code" }).click();
       await expect(page.getByText(/No country's calling code starts with \+999/).first()).toBeVisible();
       await field.fill("0755 345 678");
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      await page.getByRole("button", { name: "Send Code" }).click();
       await expect(page.getByText(/Start the number with \+ and its country code/).first()).toBeVisible();
-      expect(requests.some(request => request.method === "POST" && request.path.endsWith("/phone"))).toBe(false);
+      expect(requests.some(request => request.method === "POST" && request.path.endsWith("/details/add"))).toBe(false);
     },
   },
   {
@@ -588,28 +612,19 @@ const hostedChecks: MockCheck[] = [
     },
   },
   {
-    name: "sign-up: the timezone's clear button shows keyboard focus",
-    path: flowPath("briefcase", "signup"),
-    run: async ({ page }) => {
-      const clear = page.getByRole("button", { name: "Clear selection" });
-      await expect(clear).toBeVisible();
-      expect(await focusPaintShows(page, clear, page.getByRole("combobox", { name: "Timezone" }))).toBe(true);
-    },
-  },
-  {
     name: "rows: a long name, id and address are never cut short (the action moves under them), at 1440 and 390 px",
-    path: flowPath("ledgerly", "requirements"),
+    path: flowPath("ledgerly", "details_step1"),
     routes: () => {
       const account = { ...SAMPLE_ACCOUNT, display_name: "Uxa Ledgerly Z82ldxq5mwt2", id: "c:uxa-ledgerly-z82ldxq5mwt2" };
       const flows: Record<string, () => FlowView> = {
-        requirements: () => sampleFlow(appOf("ledgerly"), "requirements", { signed_in_as: account }),
-        consent: () => sampleFlow(appOf("acme-notes"), "consent", { signed_in_as: account }),
+        details_step1: () => sampleFlow(appOf("ledgerly"), "details_step1", { signed_in_as: account }),
+        details: () => sampleFlow(appOf("acme-notes"), "details", { signed_in_as: account }),
         signup: () => {
           const flow = sampleFlow(appOf("briefcase"), "signup");
           return { ...flow, signup: flow.signup ? { ...flow.signup, email: "uxa.default.lfmko9byhscr2tq@example.test" } : null };
         },
       };
-      return [["GET /v1/flows/:id", ({ params }) => flowJson((flows[(params.id ?? "").split("~")[1] ?? ""] ?? flows.requirements!)())]];
+      return [["GET /v1/flows/:id", ({ params }) => flowJson((flows[(params.id ?? "").split("~")[1] ?? ""] ?? flows.details_step1!)())]];
     },
     run: async ({ page, base }) => {
       /** The row's text lines (photo or icon, text, action) that hide part of their words; anything sticking out. */
@@ -625,8 +640,8 @@ const hostedChecks: MockCheck[] = [
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 900 });
         for (const [path, expected] of [
-          [flowPath("ledgerly", "requirements"), ["Uxa Ledgerly Z82ldxq5mwt2", "c:uxa-ledgerly-z82ldxq5mwt2"]],
-          [flowPath("acme-notes", "consent"), ["Uxa Ledgerly Z82ldxq5mwt2", "c:uxa-ledgerly-z82ldxq5mwt2"]],
+          [flowPath("ledgerly", "details_step1"), ["Uxa Ledgerly Z82ldxq5mwt2", "c:uxa-ledgerly-z82ldxq5mwt2"]],
+          [flowPath("acme-notes", "details"), ["Uxa Ledgerly Z82ldxq5mwt2", "c:uxa-ledgerly-z82ldxq5mwt2"]],
           [flowPath("briefcase", "signup"), ["uxa.default.lfmko9byhscr2tq@example.test"]],
         ] as const) {
           await page.goto(`${base}${path}`, { waitUntil: "networkidle" });
@@ -646,7 +661,7 @@ const hostedChecks: MockCheck[] = [
     name: "sign-up: 'Not you?' ends the waiting sign-up through the flow alone (the server clears it)",
     path: flowPath("briefcase", "signup"),
     run: async ({ page, requests }) => {
-      await expect(heading(page, "Set up your account")).toBeVisible();
+      await expect(heading(page, "Welcome to Briefcase")).toBeVisible();
       await page.getByRole("button", { name: "Not you? Use another account" }).click();
       await expect(heading(page, "Sign in")).toBeVisible();
       const posts = requests.filter(request => request.method === "POST").map(request => request.path);
@@ -654,39 +669,7 @@ const hostedChecks: MockCheck[] = [
     },
   },
   {
-    name: "sign-up: a picked photo uploads to the sign-up at once and the account keeps it",
-    path: flowPath("briefcase", "signup"),
-    run: async ({ page, requests }) => {
-      const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload Photo/ }).click();
-      await (await chooser).setFiles({ name: "me.png", mimeType: "image/png", buffer: png() });
-      await expect(page.getByText("me.png is ready. It becomes your photo when you continue.").first()).toBeVisible();
-      expect(requests.filter(request => request.method === "POST" && request.path.endsWith("/signup/photo"))).toHaveLength(1);
-      const sent = nextPost(page, "/signup");
-      await page.getByRole("button", { name: "Create account" }).click();
-      const body = await sent;
-      expect(String(body.pfp_url)).toMatch(/^data:image\/svg\+xml/);
-      expect(body.id).toBe("c:saket-2");
-      await expect(heading(page, "Share your details with Briefcase")).toBeVisible();
-    },
-  },
-  {
-    name: "sign-up: a photo the server refuses says why and keeps the photo that was there",
-    path: flowPath("briefcase", "signup"),
-    routes: [["POST /v1/flows/:id/signup/photo", () => apiError(413, "photo_too_large", "The photo is 3145728 bytes; profile photos are limited to 2 MB (2097152 bytes).", "Resize or compress the image below 2 MB.")]],
-    run: async ({ page }) => {
-      const chooser = page.waitForEvent("filechooser");
-      await page.getByRole("button", { name: /Upload Photo/ }).click();
-      await (await chooser).setFiles({ name: "big.png", mimeType: "image/png", buffer: png() });
-      await expect(page.getByText(/Photos can be at most 2 MB/).first()).toBeVisible();
-      await expect(page.getByRole("button", { name: /Upload Photo/ })).toBeVisible();
-      const sent = nextPost(page, "/signup");
-      await page.getByRole("button", { name: "Create account" }).click();
-      expect((await sent).pfp_url).toBeUndefined();
-    },
-  },
-  {
-    name: "sign-up: a taken id offers free ones; the date of birth opens on a year grid",
+    name: "sign-up: a taken id offers free ones, and the one picked is sent",
     path: flowPath("briefcase", "signup"),
     run: async ({ page }) => {
       const field = page.getByRole("textbox", { name: "Your CarbonID" });
@@ -697,87 +680,9 @@ const hostedChecks: MockCheck[] = [
       const chosen = ((await chip.textContent()) ?? "").trim();
       await chip.click();
       await expect(field).toHaveValue(chosen.replace(/^c:/, ""));
-      await page.getByRole("button", { name: "Date of birth" }).click();
-      await page.getByRole("button", { name: /choose a year/ }).click();
-      await page.getByRole("option", { name: "1994" }).click();
-      await expect(page.getByRole("button", { name: /choose a year/ })).toContainText("1994");
-      await page.getByRole("gridcell", { name: /October 12, 1994/ }).click();
-      await expect(page.getByRole("button", { name: "Date of birth" })).toContainText("October 12, 1994");
       const sent = nextPost(page, "/signup");
-      await page.getByRole("button", { name: "Create account" }).click();
-      expect((await sent).dob).toBe("1994-10-12");
-    },
-  },
-  {
-    name: "sign-up: the timezone list opens on typing, ArrowDown or a click (not on Tab), closes when focus moves on, and is no Tab stop",
-    path: flowPath("briefcase", "signup"),
-    run: async ({ page }) => {
-      const field = page.getByRole("combobox", { name: "Timezone" });
-      const list = page.getByRole("listbox", { name: "Timezone options" });
-      const dob = page.getByRole("button", { name: "Date of birth" });
-      // Tab into the field: the list stays shut, so the fields under it stay in view.
-      await page.getByRole("textbox", { name: "Your CarbonID" }).focus();
-      await page.keyboard.press("Tab");
-      await expect(field).toBeFocused();
-      await expect(field).toHaveAttribute("aria-expanded", "false");
-      await expect(list).toHaveCount(0);
-      // Typing opens it; Tab walks on past it (the clear button, then the date of birth), and leaving closes it.
-      await page.keyboard.type("Los");
-      await expect(list).toBeVisible();
-      await expect(list).toHaveAttribute("tabindex", "-1");
-      for (let press = 0; press < 3 && !(await dob.evaluate(el => el === document.activeElement)); press++) {
-        await page.keyboard.press(tabKey(page));
-        expect(await page.evaluate(() => document.activeElement?.getAttribute("role") ?? null)).not.toBe("listbox");
-      }
-      await expect(dob).toBeFocused();
-      await expect(field).toHaveAttribute("aria-expanded", "false");
-      // ArrowDown opens it and moves through the options; Enter picks one.
-      await field.focus();
-      await page.keyboard.press("ArrowDown");
-      await expect(list).toBeVisible();
-      await page.keyboard.type("Los Angeles");
-      await page.keyboard.press("ArrowDown");
-      await page.keyboard.press("Enter");
-      await expect(field).toHaveAttribute("aria-expanded", "false");
-      await expect(field).toHaveValue(/^Los Angeles/);
-      // A click opens it too; Escape closes it.
-      await page.locator("h1").click();
-      await field.click();
-      await expect(list).toBeVisible();
-      await page.keyboard.press("Escape");
-      await expect(list).toHaveCount(0);
-      const sent = nextPost(page, "/signup");
-      await page.getByRole("button", { name: "Create account" }).click();
-      expect((await sent).timezone).toBe("America/Los_Angeles");
-    },
-  },
-  {
-    name: "sign-up: a photo uploaded before a reload is prefilled and can still be removed (the default photo is sent)",
-    run: async ({ page, base }) => {
-      const uploaded = `${base}/v1/photos/0199a7c2-5b1e-7c3a-9d0f-2f4b6c8d1e3a`;
-      await page.route(`${base}/v1/photos/**`, route => route.fulfill({ status: 200, contentType: "image/png", body: png() }));
-      // The server prefills the sign-up's own upload once there is one (here: after a reload).
-      await page.route(url => url.pathname === "/v1/flows/briefcase~signup", route => {
-        if (route.request().method() !== "GET") return route.fallback();
-        const flow = sampleFlow(appOf("briefcase"), "signup");
-        return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ flow: { ...flow, signup: flow.signup ? { ...flow.signup, pfp_url: uploaded } : null } }) });
-      });
-      await page.goto(`${base}${flowPath("briefcase", "signup")}`);
-      await expect(heading(page, "Set up your account")).toBeVisible();
-      await expect(page.getByText("The photo you uploaded becomes your photo when you continue.").first()).toBeVisible();
-      await expect(page.getByRole("button", { name: /Choose Another/ })).toBeVisible();
-      const preview = page.locator(`main img[src="${uploaded}"]`);
-      await expect(preview).toHaveCount(1);
-      await page.getByRole("button", { name: "Remove", exact: true }).click();
-      await expect(page.getByRole("button", { name: "Remove", exact: true })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: /Upload Photo/ })).toBeVisible();
-      // The preview is no longer the upload (the initials stand in for the default photo).
-      await expect(preview).toHaveCount(0);
-      const sent = nextPost(page, "/signup");
-      await page.getByRole("button", { name: "Create account" }).click();
-      const body = await sent;
-      expect("pfp_url" in body).toBe(true);
-      expect(body.pfp_url).toBeNull();
+      await page.getByRole("button", { name: "Create Account" }).click();
+      expect((await sent).id).toBe(`c:${chosen.replace(/^c:/, "")}`);
     },
   },
   {
@@ -788,7 +693,7 @@ const hostedChecks: MockCheck[] = [
       ["POST /v1/flows/:id/resend", () => flowJson(sampleFlow(appOf("briefcase"), "verify_code"))],
     ],
     run: async ({ page }) => {
-      await expect(page.getByText(/This code expired, so send a new one below/)).toBeVisible();
+      await expect(page.getByText(/It expired, so send a new one below/)).toBeVisible();
       await expect(page.getByText("This code expired. Send a new one.").first()).toBeVisible();
       await expect(page.getByText(/more minute/)).toHaveCount(0);
       await page.getByRole("button", { name: "Send a new code" }).click();
@@ -812,7 +717,7 @@ const hostedChecks: MockCheck[] = [
       // Keyboard focus shows while it waits (it stays a Tab stop): its fill changes, its muted ink stays.
       const look = () => resend.evaluate(el => getComputedStyle(el).backgroundColor);
       const resting = await look();
-      await page.getByRole("button", { name: "Change where the code goes (now s***@gmail.com)" }).focus();
+      await page.getByRole("button", { name: "Use a Different Email" }).focus();
       for (let press = 0; press < 12 && !(await resend.evaluate(el => el === document.activeElement)); press++) await page.keyboard.press(tabKey(page));
       expect(await resend.evaluate(el => el === document.activeElement && el.matches(":focus-visible"))).toBe(true);
       expect(await look()).not.toBe(resting);
@@ -828,7 +733,7 @@ const hostedChecks: MockCheck[] = [
       await expect(page.getByText(/9 more tries/).first()).toBeVisible();
       await expect(page.getByRole("textbox", { name: /digit 1 of 6/ })).toBeFocused();
       await page.keyboard.type("123456");
-      await expect(heading(page, "Set up your account")).toBeVisible();
+      await expect(heading(page, "Welcome to Briefcase")).toBeVisible();
     },
   },
   {
@@ -857,16 +762,16 @@ const hostedChecks: MockCheck[] = [
     run: async ({ page, base }) => {
       const primaryOf = (locator: Locator) => locator.evaluate(el => ({ fill: getComputedStyle(el).getPropertyValue("--primary").trim().toUpperCase(), text: getComputedStyle(el).color, bg: getComputedStyle(el).backgroundColor }));
       const site = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--primary").trim().toUpperCase());
-      const own = await primaryOf(page.getByRole("button", { name: "Continue", exact: true }));
+      const own = await primaryOf(page.getByRole("button", { name: "Send Me a Code", exact: true }));
       expect(own.fill).toBe(site);
-      expect(contrast(own.text, own.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(await rgbIn(page, own.text), await rgbIn(page, own.bg))).toBeGreaterThanOrEqual(4.5);
       await page.goto(`${base}${flowPath("acme-notes", "choose_method")}`);
-      const acme = await primaryOf(page.getByRole("button", { name: "Continue", exact: true }));
+      const acme = await primaryOf(page.getByRole("button", { name: "Send Me a Code", exact: true }));
       expect(acme.fill).toBe((appOf("acme-notes").branding.dark.primary ?? "").toUpperCase());
     },
   },
   {
-    name: "flow: in dark mode error text reads at 4.5:1 on the default card; an app's own readable danger colour is kept",
+    name: "flow: on a dark device error text reads at 4.5:1 on the default card (the site is light only); an app's own readable danger colour is kept",
     path: flowPath("briefcase", "verify_code"),
     dark: true,
     run: async ({ page, base }) => {
@@ -875,11 +780,12 @@ const hostedChecks: MockCheck[] = [
         await page.keyboard.type("111111");
         const error = page.getByText(/9 more tries/).first();
         await expect(error).toBeVisible();
-        return { text: await error.evaluate(el => getComputedStyle(el).color), card: await page.locator(".sa-brand-panel").evaluate(el => getComputedStyle(el).backgroundColor) };
+        return { text: await rgbIn(page, await error.evaluate(el => getComputedStyle(el).color)), card: await rgbIn(page, await page.locator(".sa-brand-panel").evaluate(el => getComputedStyle(el).backgroundColor)) };
       };
-      // The default dark danger is #FF8A80 (5.45:1 on the default dark card; the old #F97066 read at 4.46:1 there).
+      // An app in the default look wears the site's tokens, and the site is light only (lib/theme.ts): the light card
+      // and its danger colour, whatever the device prefers.
       const own = await wrongCode();
-      expect(own.card).toBe("rgb(53, 52, 50)");
+      expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
       expect(contrast(own.text, own.card)).toBeGreaterThanOrEqual(4.5);
       // Acme Notes keeps the same #F97066 on its own darker card (6:1): its colours stay exactly as it chose them.
       await page.goto(`${base}${flowPath("acme-notes", "verify_code")}`);
@@ -921,37 +827,22 @@ const hostedChecks: MockCheck[] = [
     },
   },
   {
-    name: "focus: the keyboard position shows on Email | Phone, the terms and support links, 'Powered by', the date of birth and the consent switches",
+    name: "focus: the keyboard position shows on the terms and support links, Help under the card, 'Powered by' and the details' checkboxes",
     run: async ({ page, base }) => {
-      /** Tabs from `start` to `target`, then compares the look of `area` (default: the target) focused and blurred. */
-      const focusShows = async (target: Locator, start: Locator, area?: Locator) => {
-        await start.focus();
-        for (let press = 0; press < 30 && !(await target.evaluate(el => el === document.activeElement)); press++) await page.keyboard.press(tabKey(page));
-        expect(await target.evaluate(el => el === document.activeElement && el.matches(":focus-visible"))).toBe(true);
-        const box = await (area ?? target).boundingBox();
-        if (!box) throw new Error("the focused part is not laid out");
-        const clip = { x: Math.max(0, box.x - 4), y: Math.max(0, box.y - 4), width: box.width + 8, height: box.height + 8 };
-        await page.waitForTimeout(250);
-        const focused = await page.screenshot({ clip });
-        await target.evaluate(el => (el as HTMLElement).blur());
-        await page.waitForTimeout(250);
-        return !focused.equals(await page.screenshot({ clip }));
-      };
+      const focusShows = (target: Locator, start: Locator, area?: Locator) => focusPaintShows(page, target, start, area);
       await page.goto(`${base}${flowPath("briefcase", "choose_method")}`, { waitUntil: "networkidle" });
-      const email = page.getByRole("textbox", { name: "Email" });
-      expect(await focusShows(page.getByRole("button", { name: "Email", exact: true }), page.getByRole("button", { name: "Continue with Apple" })), "Email | Phone").toBe(true);
-      expect(await focusShows(page.getByRole("link", { name: "terms" }), email), "the terms link").toBe(true);
+      const email = page.getByRole("textbox", { name: "Email or phone" });
+      expect(await focusShows(page.getByRole("link", { name: "terms", exact: true }), email), "the terms link").toBe(true);
       expect(await focusShows(page.getByRole("link", { name: /^support@/ }), email), "the support link").toBe(true);
+      expect(await focusShows(page.getByRole("navigation", { name: "Help and policies" }).getByRole("link", { name: "Help" }), email), "Help under the card").toBe(true);
       expect(await focusShows(page.locator("[data-powered-by] a"), email), "Powered by").toBe(true);
-      await page.goto(`${base}${flowPath("briefcase", "signup")}`, { waitUntil: "networkidle" });
-      expect(await focusShows(page.getByRole("button", { name: "Date of birth" }), page.getByRole("textbox", { name: "Your CarbonID" })), "the date of birth").toBe(true);
-      await page.goto(`${base}${flowPath("briefcase", "consent")}`, { waitUntil: "networkidle" });
-      expect(await focusShows(page.getByRole("switch", { name: "Timezone" }), page.getByRole("button", { name: "Switch account" }), page.locator('li[data-scope="timezone"]')), "a consent switch").toBe(true);
+      await page.goto(`${base}${flowPath("briefcase", "details")}`, { waitUntil: "networkidle" });
+      expect(await focusShows(page.getByRole("checkbox", { name: /^Timezone/ }), page.getByRole("button", { name: "Switch Account" }), page.locator('li[data-field="timezone"]')), "a details checkbox").toBe(true);
     },
   },
   {
-    name: "consent: at 320 px the account's name and id are not cut short (the switch moves under them); at 390 px it stays beside them",
-    path: flowPath("briefcase", "consent"),
+    name: "details: at 320 px the account's name and id are not cut short (Switch Account moves under them); at 390 px it stays beside them",
+    path: flowPath("briefcase", "details"),
     width: 320,
     run: async ({ page }) => {
       const row = page.locator("main [data-account]");
@@ -1082,7 +973,7 @@ const hostedChecks: MockCheck[] = [
       // A state nobody saved here: not a return at all, so a plain visit (signed out: a new sign-in opens).
       await visit("anything");
       await expect(page).toHaveURL(/\/authorize\/flow\//);
-      await expect(heading(page, "Sign in to Silicon Accounts")).toBeVisible();
+      await expect(heading(page, "Sign in with your Team of Silicons account")).toBeVisible();
       await expect(page.getByText(/evil\.example|800 555/)).toHaveCount(0);
       expect(requests.filter(request => request.method === "POST" && request.path === "/v1/flows")).toHaveLength(1);
       // This browser's own sign-in that ended: fixed words for its code, never the address's description or code.
@@ -1344,19 +1235,21 @@ const embedChecks: MockCheck[] = [
     },
   },
   {
-    name: "sdk: a dark page goes dark; a dark-branded app keeps an opaque dark pill on a light page; dark buttons use the brand blue",
+    name: "sdk: a dark page goes dark; a dark-branded app keeps an opaque dark pill on a light page; dark buttons use the site's ink",
     run: async ({ page, base, appOrigin, host }) => {
       await page.goto(host("/__checks/sdk-dark", doc(sdkTag(base, appOrigin), "margin:0;padding:24px;background:#141414")));
       await expect(page.locator("#sa").getByRole("button", { name: "Continue with email" })).toBeVisible();
       let look = await sdkLook(page);
       expect(look?.theme).toBe("dark");
-      expect(look?.primaryFill?.toUpperCase()).toBe("#1F5FB8");
+      // An app in the default look wears the account site's own tokens: its dark primary is #F2F2F2 (light: #181818).
+      expect(look?.primaryFill?.toUpperCase()).toBe("#F2F2F2");
       expect(contrast(look?.pillText ?? "", look?.pillBg ?? "")).toBeGreaterThanOrEqual(4.5);
       await page.goto(host("/__checks/sdk-acme", doc(sdkTag(base, appOrigin, "", "acme-notes"))));
       await expect(page.locator("#sa").getByRole("button", { name: "Continue with email" })).toBeVisible();
       look = await sdkLook(page);
       expect(look?.theme).toBe("dark");
-      expect(rgba(look?.pillBg ?? "")).toEqual([42, 41, 39, 1]);
+      // The pill is Silicon Accounts' own, never the app's: its dark one (#0B0F18), opaque on the light page.
+      expect(rgba(look?.pillBg ?? "")).toEqual([11, 15, 24, 1]);
       expect(contrast(look?.pillLink ?? "", look?.pillBg ?? "")).toBeGreaterThanOrEqual(4.5);
     },
   },
@@ -2089,8 +1982,14 @@ async function runMockChecks(selected: MockCheck[], base: string, engine: "chrom
   const appOrigin = APP_ORIGIN;
   const browser = await launch(engine);
   let failures = 0;
+  // A wait a check started but never awaited (a file chooser that never opened, say) rejects after the check is over:
+  // it fails the check that started it instead of ending the run.
+  let stray: string[] = [];
+  const onStray = (reason: unknown) => stray.push(`unawaited: ${reason instanceof Error ? reason.message.split("\n")[0] : String(reason)}`);
+  process.on("unhandledRejection", onStray);
   try {
     for (const check of selected) {
+      stray = [];
       const context = await browser.newContext({
         viewport: { width: check.width ?? 1280, height: 900 },
         colorScheme: check.dark ? "dark" : "light",
@@ -2098,6 +1997,10 @@ async function runMockChecks(selected: MockCheck[], base: string, engine: "chrom
         timezoneId: check.timezone ?? "Asia/Kolkata",
         reducedMotion: "reduce",
       });
+      // A missing control fails its check in 15 s rather than Playwright's 30; pages keep 30 s to load (next dev may be
+      // compiling).
+      context.setDefaultTimeout(15_000);
+      context.setDefaultNavigationTimeout(30_000);
       if ((check.as ?? "signed-out") === "carbon") await context.addCookies([{ name: "sa_session", value: "checks", url: base }]);
       const pages = new Map<string, string>();
       await context.route(`${appOrigin}/**`, route => {
@@ -2125,12 +2028,16 @@ async function runMockChecks(selected: MockCheck[], base: string, engine: "chrom
       }
       if (problems.length) await shootFailure(check.name, [page]);
       await context.close();
+      // Let waits the closed context rejected report before the next check starts.
+      await new Promise(done => setTimeout(done, 0));
+      problems.push(...stray);
       if (problems.length) {
         failures++;
         console.log(`✗ ${check.name}\n${problems.map(problem => `    ${problem}`).join("\n")}`);
       } else console.log(`✓ ${check.name} (${Date.now() - started} ms)`);
     }
   } finally {
+    process.off("unhandledRejection", onStray);
     await browser.close();
   }
   return failures;

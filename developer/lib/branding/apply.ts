@@ -8,7 +8,7 @@
  */
 import type { AppPublic, Branding, FlowView, Palette, ThemeMode } from "../api/types";
 import { legibleTint, mixHex, mixOklab } from "./contrast";
-import { LIMITS, isSiliconLook, normalizeBranding } from "./defaults";
+import { LIMITS, SITE_LOOK, isSiliconLook, normalizeBranding } from "./defaults";
 import { FONT_STACKS } from "./fonts";
 
 export type PaintTheme = "light" | "dark";
@@ -77,11 +77,13 @@ export function accentStrong(p: Palette, dark: boolean): string | null {
 /** The custom properties a branding paints in one theme. */
 export function brandingVariables(input: Branding | Partial<Branding> | null | undefined, theme: PaintTheme): Record<string, string> {
   const branding = normalizeBranding(input as Partial<Branding>);
-  const p: Palette = branding[theme];
+  const silicon = isSiliconLook(branding);
+  // An app that kept the default look signs in with the account site's own colours, not its stored palette (SITE_LOOK).
+  const site = silicon && branding.theme === "auto" ? SITE_LOOK[theme] : null;
+  const p: Palette = site ?? branding[theme];
   const dark = theme === "dark";
   const radius = branding.corner_style === "sharp" ? 0 : branding.radius;
   const compact = branding.density === "compact";
-  const silicon = isSiliconLook(branding);
   const vars: Record<string, string> = {
     "--background": p.background,
     "--surface": p.surface,
@@ -103,8 +105,8 @@ export function brandingVariables(input: Branding | Partial<Branding> | null | u
     // The edge of an outline button: the primary, unless it vanishes into the page (accentLine).
     "--accent-line": accentLine(p) ?? p.primary,
     "--primary": p.primary,
-    "--primary-hover": mix(p.primary, 90, p.foreground),
-    "--primary-pressed": mix(p.primary, 82, p.foreground),
+    "--primary-hover": site?.hover ?? mix(p.primary, 90, p.foreground),
+    "--primary-pressed": site?.pressed ?? mix(p.primary, 82, p.foreground),
     "--primary-foreground": p.primary_foreground,
     "--control-on": p.primary,
     "--control-glyph": p.primary_foreground,

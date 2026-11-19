@@ -27,6 +27,11 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   font) with the visitor's theme; an app with any colour or font of its own keeps it. The stored default palette
   (#1F5FB8) is unchanged; the pages just stop painting it. The email field has no placeholder on any page. Why: Anil,
   on Silicon Apps' sign-in beside Silicon Accounts': "two very different designs, we need to make this uniform".
+  2026-11-19: the same holds outside the hosted pages. The sign-in buttons an app embeds (the /embed/v1/buttons
+  iframe and the SDK script's buttons) and the developer site's branding preview paint an app in the default look with
+  the site's colours too (ink button, neutral greys), not #1F5FB8. The SDK on another site's page keeps the system
+  face (it cannot load Allo there), and the developer preview keeps its own faces and page layout. Why: Anil asked to
+  fix the places still showing the old blue.
 
 - **Connected Apps with no app explains how one gets there (2026-11-13).** Anil chose /__apps-empty C: "No apps yet" over three rows (open an app, with Browse Silicon Apps; sign in with Silicon Accounts; it shows up here). Why: Home's Apps card sends someone who has just joined here, and an empty state with nothing to do was a dead end. The prototype's words stay as the line under the heading.
 - **Home's introduction cards act (2026-11-13).** You lights the photo's ring; Silicons opens Create a Silicon (Silicons once there is one); Apps opens Connected Apps.

@@ -32,7 +32,7 @@ import { useEffect, useMemo, useRef, useSyncExternalStore, type CSSProperties } 
 import { useQuery } from "@tanstack/react-query";
 import type { AppPublic } from "@/lib/api/types";
 import { brandingAttributes, brandingVariables, resolveBrandTheme, type PaintTheme } from "@/lib/branding/apply";
-import { normalizeBranding } from "@/lib/branding/defaults";
+import { isSiliconLook, normalizeBranding } from "@/lib/branding/defaults";
 import { loadBrandingFonts } from "@/lib/branding/fonts";
 import {
   AUTHORIZE_PARAMS, INTENT_LABEL, METHOD_LABEL, METHOD_MARK, POWERED_BY_HREF, POWERED_MARK, isButtonIntent, primaryMethod, visibleIntents, visibleMethods,
@@ -155,11 +155,14 @@ export function EmbedButtons({ query, framingAllowed }: EmbedButtonsProps) {
     ? themeParam
     : resolveBrandTheme(app.data?.branding?.theme, themeParam === "auto" && deviceDark ? "dark" : "light");
   const branding = useMemo(() => (app.data ? normalizeBranding(app.data.branding) : null), [app.data]);
-  const vars = useMemo(() => (branding ? brandingVariables(branding, paint) : {}), [branding, paint]);
+  // An app that kept the default look wears the site's own tokens (styles/tokens.css), as its hosted pages do
+  // (flow/hosted-frame.tsx, Anil 2026-11-18): no painted palette or font, so the buttons are the site's ink and Allo.
+  const defaultLook = !!branding && isSiliconLook(branding) && branding.theme === "auto";
+  const vars = useMemo(() => (branding && !defaultLook ? brandingVariables(branding, paint) : {}), [branding, defaultLook, paint]);
   const attrs = useMemo(() => (branding ? brandingAttributes(branding, paint) : { "data-theme": paint }), [branding, paint]);
 
   // Ready (and announced to tests) once the branding's fonts are in, so the first visible paint is the final one.
-  const fonts = useQuery({ queryKey: ["embed", "fonts", branding?.font_family, branding?.heading_font_family], queryFn: () => loadBrandingFonts(branding!).then(() => true), enabled: !!branding, staleTime: Infinity });
+  const fonts = useQuery({ queryKey: ["embed", "fonts", branding?.font_family, branding?.heading_font_family], queryFn: () => loadBrandingFonts(branding!).then(() => true), enabled: !!branding && !defaultLook, staleTime: Infinity });
   const fontsReady = fonts.data === true;
 
   // Height to the parent whenever it changes (the height is not a secret; frame-ancestors limits who embeds it).
@@ -195,7 +198,7 @@ export function EmbedButtons({ query, framingAllowed }: EmbedButtonsProps) {
     if (problem) console.error(`Silicon Accounts embed: ${problem.message}${problem.hint ? ` ${problem.hint}` : ""} (${problem.code})`);
   }, [problem?.code]); // eslint-disable-line react-hooks/exhaustive-deps -- once per distinct problem
 
-  const ready = !!problem || (!!app.data && (fontsReady || !branding));
+  const ready = !!problem || (!!app.data && (fontsReady || !branding || defaultLook));
   const authorizeHref = (choice: { method: ButtonMethod } | { intent: ButtonIntent }) => {
     const params = new URLSearchParams();
     for (const key of AUTHORIZE_PARAMS) {

@@ -118,6 +118,18 @@ function current(palette: Palette, legacy: Palette, fresh: Palette): Palette {
  * pages then take the site's own faces (BDO Grotesk headings over the SF Pro system text) instead of Geist. Any font
  * or colour of the app's own keeps the app's look exactly.
  */
+/**
+ * What an app that kept the default look (isSiliconLook, theme auto) actually wears on its hosted pages since
+ * 2026-11-18: the account site's own tokens (web/styles/tokens.css, web/components/auth/flow/hosted-frame.tsx), an ink
+ * button under white in light and the reverse in dark, on neutral greys. The stored palette stays DEFAULT_LIGHT /
+ * DEFAULT_DARK (that is how the service knows the app kept the default); the preview paints these. Keep in step with
+ * tokens.css. `hover` and `pressed` are the site's --primary-hover and --primary-pressed.
+ */
+export const SITE_LOOK: Record<"light" | "dark", Palette & { hover: string; pressed: string }> = {
+  light: { primary: "#181818", primary_foreground: "#FFFFFF", background: "#FCFCFC", surface: "#FFFFFF", foreground: "#1B1B1B", muted: "#6B6B6B", border: "#E9E9E9", danger: "#B42318", hover: "#2E2E2E", pressed: "#0D0D0D" },
+  dark: { primary: "#F2F2F2", primary_foreground: "#141414", background: "#141414", surface: "#191919", foreground: "#F2F2F2", muted: "#8C8C8C", border: "#2B2B2B", danger: "#F4968C", hover: "#FFFFFF", pressed: "#D7D7D7" },
+};
+
 export function isSiliconLook(branding: Pick<Branding, "font_family" | "heading_font_family" | "light" | "dark">): boolean {
   const heading = branding.heading_font_family ?? branding.font_family;
   return branding.font_family === "Geist" && heading === "Geist" && samePalette(branding.light, DEFAULT_LIGHT) && samePalette(branding.dark, DEFAULT_DARK);
