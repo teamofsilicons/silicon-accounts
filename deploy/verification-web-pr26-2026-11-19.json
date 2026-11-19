@@ -1,0 +1,99 @@
+{
+  "verified_at": "2026-11-19T16:01:50.295260+00:00",
+  "release": "60e4374bae8e5f9e6c809aff8f5def6c0490692b",
+  "previous": "dc18dd7b0a79fbbfb60a879c2160df5f7e328233",
+  "web_build_id": "_zGjIXZefJXrEdJQZBds0",
+  "developer_build_id": "SvutBIacLXcCJxTseV3Yg",
+  "contents": "teamofsilicons/silicon-accounts#26 (Team of Silicons' default sign-in card for apps in the default look; the default look in the embed buttons, the SDK script and the developer site's branding preview; development-only playgrounds) and 60e4374 (the card's Help, Privacy and Terms row left out: those teamofsilicons.com pages answer 404)",
+  "api_source": "69b0a49f5eb207f3a60a50471430f1ae01342cf8",
+  "api_sha256": "6defd0282b1aadcb22028c50cb5ef7ef28940d01872627ca3108f274393a9cea",
+  "developer_source": "60e4374bae8e5f9e6c809aff8f5def6c0490692b",
+  "schema_version": 44,
+  "baseline_note": "Web and Developer overlay on live release dc18dd7: bin/ (API, migrations, Caddy), node/ and install.py copied byte for byte (cmp-checked); only accounts-web and accounts-developer restarted.",
+  "artifact": {
+    "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-web-pr26/60e4374bae8e5f9e6c809aff8f5def6c0490692b-3f6f3974071e92.tar.gz",
+    "sha256": "3f6f3974071e9288b4def1d9f5047d3be41225b9c3f5d668dd7da5da048c371f",
+    "size": 120771300
+  },
+  "predeployment_backup": {
+    "key": "backups/20261119T155939Z.dump",
+    "sha256": "07069a0def086f72a847ceb1d912094d156968e48b193448f3cd9540cd9f3474",
+    "size": 4947213
+  },
+  "activation_command_id": "7db28e10-cfc3-4759-982c-82d544eb2c03",
+  "activation": {
+    "source": "60e4374bae8e5f9e6c809aff8f5def6c0490692b",
+    "release": "60e4374bae8e5f9e6c809aff8f5def6c0490692b",
+    "previous": "dc18dd7b0a79fbbfb60a879c2160df5f7e328233",
+    "archive_files": {
+      "web_static": 520,
+      "developer_static": 306
+    },
+    "static_files_after_keeping_prior": {
+      "web": 761,
+      "developer": 412
+    },
+    "prior_static_files_kept": {
+      "web": 241,
+      "developer": 106
+    },
+    "release_files": 6195,
+    "unchanged_binaries": [
+      "accounts-api",
+      "accounts-migrate",
+      "caddy",
+      "node"
+    ],
+    "loopback_preflight": {
+      "port": 18590,
+      "v1_meta": 200,
+      "root": 200,
+      "__accounts-signin": 404
+    },
+    "restarted_units": [
+      "accounts-web",
+      "accounts-developer"
+    ],
+    "services_healthy": true,
+    "schema_changes": false,
+    "cutover_seconds": 1.4,
+    "activated_at": "2026-11-19T15:59:52Z"
+  },
+  "public_http": {
+    "https://accounts.teamofsilicons.com/": 200,
+    "https://accounts.teamofsilicons.com/v1/meta": 200,
+    "https://accounts.teamofsilicons.com/readyz": 200,
+    "https://accounts.teamofsilicons.com/__accounts-signin": 404,
+    "https://accounts.teamofsilicons.com/__google-signin": 404,
+    "https://developers.teamofsilicons.com/": 200,
+    "https://developers.teamofsilicons.com/auth/session": 200
+  },
+  "browser_verification": {
+    "browser": "Headless Chromium (Playwright), signed out; nothing submitted",
+    "path": "https://briefcase.teamofsilicons.com/auth/sign-in -> https://accounts.teamofsilicons.com/authorize/flow/<id>",
+    "checked_at_1440_and_390": [
+      "data-frame=tos: the 'Sign in with Team of Silicons' bar over the painting (1440), all card on the phone (390)",
+      "h1 'Sign in' and 'to continue to Silicon Briefcase'",
+      "Continue with Google, Continue with Apple, Send Me a Code",
+      "No 'Help and policies' navigation; Powered by at the foot",
+      "No console or page errors"
+    ]
+  },
+  "web_checks": {
+    "typecheck": true,
+    "lint": true,
+    "unit_tests_passed": 34,
+    "production_build": true,
+    "production_routing": true
+  },
+  "developer_checks": {
+    "typecheck": true,
+    "unit_tests_passed": 103,
+    "production_build": true,
+    "production_routing": true
+  },
+  "not_checked": [
+    "Auth checks against the mock API (components/auth/checks.ts) and the e2e suites",
+    "A completed sign-in through the new card"
+  ]
+}

@@ -209,3 +209,15 @@ build's 159 static files stay served for open tabs. Rollback: point `current` at
 Later that day main took in those branches (`44ec852`, `dd13197`, `4762132`). Main at `4762132` has the same source
 as every live component (web `dc18dd7`, API `69b0a49`, Developer `9cce3f4`), so a release built from main no longer
 rolls anything back.
+
+## Team of Silicons' default sign-in card (PR 26) — 2026-11-19
+
+Release `60e4374` changes the account site and the developer site: apps that kept the default look (Briefcase today) sign
+in on Team of Silicons' card, and the embed buttons, the SDK script and the developer site's branding preview paint the
+default look with the site's colours (teamofsilicons/silicon-accounts#26). The card's Help, Privacy and Terms row is left
+out (60e4374): those teamofsilicons.com pages answer 404. The development playgrounds answer 404 in production. It is a
+web and Developer overlay on the live release `dc18dd7`: API (`69b0a49`), migrations, Caddy and Node copied byte for byte.
+Schema unchanged at 44; verified backup `backups/20261119T155939Z.dump` first; only `accounts-web` and `accounts-developer` restarted
+(1.4 s), after a loopback preflight of the new web server. The previous builds' static files stay served for open tabs.
+Rollback: point `current` at `previous-release` (`dc18dd7`) and restart both units. SSM command `7db28e10-cfc3-4759-982c-82d544eb2c03`. Receipt:
+[verification-web-pr26-2026-11-19.json](verification-web-pr26-2026-11-19.json).
