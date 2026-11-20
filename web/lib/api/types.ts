@@ -285,6 +285,9 @@ export interface MyApp {
   active_sessions: number;
   /** When the account removed the app's access (status `access_removed`). */
   access_removed_at: Timestamp | null;
+  /** The app's latest sign-in or token refresh for this account, whichever is later (the app's activity, which can
+   * be in the background). Older API versions leave it out. */
+  last_active_at?: Timestamp | null;
 }
 
 /**

@@ -404,7 +404,8 @@ The apps you signed into, most recently used first. Filter with
       "first_signed_in_at": "2026-10-07T02:33:57.696Z",
       "last_signed_in_at": "2026-10-07T02:53:55.928Z",
       "access_removed_at": null,
-      "active_sessions": 1
+      "active_sessions": 1,
+      "last_active_at": "2026-10-09T08:12:40.511Z"
     }
   ],
   "next_cursor": null

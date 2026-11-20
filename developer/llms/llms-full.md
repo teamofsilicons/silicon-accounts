@@ -2557,7 +2557,7 @@ Adding and verifying are idempotent. Every add attempt counts before any 409 or 
 
 ## Apps you signed in to
 
-`GET /v1/me/apps?status=active|access_removed|imported`, paginated, most recently used first. The account site itself is not listed. Each item has `app` (`app_id`, `name`, `logo_url`, `logo_dark_url`, `homepage_url`), `membership_id`, `status`, `source` (`signin` for the hosted pages, `slt` for a short-lived token, `import`), `granted_scopes`, `first_signed_in_at`, `last_signed_in_at`, `access_removed_at` and `active_sessions`.
+`GET /v1/me/apps?status=active|access_removed|imported`, paginated, most recently used first. The account site itself is not listed. Each item has `app` (`app_id`, `name`, `logo_url`, `logo_dark_url`, `homepage_url`), `membership_id`, `status`, `source` (`signin` for the hosted pages, `slt` for a short-lived token, `import`), `granted_scopes`, `first_signed_in_at`, `last_signed_in_at`, `access_removed_at`, `active_sessions` and `last_active_at` (the later of the last sign-in and the app's last token refresh; an app can refresh in the background).
 
 `DELETE /v1/me/apps/{app_id}` removes an app's access and answers 204. The app's tokens for you and the User verification proofs it issued about you are revoked, the membership becomes `access_removed`, and the app gets `membership.access_removed`. Repeating it does nothing more, and signing in to the app again brings the membership back. Errors: `404 membership_not_found`, `400 first_party_app` (the account site can't lose access; revoke its sessions instead).
 

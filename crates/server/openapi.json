@@ -30528,6 +30528,14 @@
           },
           "active_sessions": {
             "type": "integer"
+          },
+          "last_active_at": {
+            "description": "The app's latest sign-in or token refresh for this account, whichever is later. An app can refresh in the background, so this is the app's activity, not necessarily the person's.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },

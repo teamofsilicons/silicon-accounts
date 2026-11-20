@@ -518,6 +518,13 @@ pub struct MyApp {
     /// Live token families the app holds for this account.
     #[serde(default, deserialize_with = "lenient_u64")]
     pub active_sessions: u64,
+    /// The app's latest sign-in or token refresh for this account, whichever is later.
+    #[serde(
+        default,
+        with = "crate::serde_util::rfc3339_ms::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_active_at: Option<OffsetDateTime>,
 }
 
 /// A browser session or a first-party (CLI) token family (`GET /v1/me/sessions`).

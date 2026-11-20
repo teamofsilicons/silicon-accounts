@@ -9,7 +9,7 @@
 
 .rows { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); list-style: none; }
 .row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); }
-.row + .row, .row + .foot { border-top: 1px solid var(--border-subtle); }
+.row + .row { border-top: 1px solid var(--border-subtle); }
 .text { display: grid; min-width: 0; flex: 1; gap: 0; }
 .rowTitle { min-width: 0; overflow: hidden; color: var(--foreground); font: var(--body); letter-spacing: var(--body-tracking); text-overflow: ellipsis; white-space: nowrap; }
 .rowDetail { min-width: 0; overflow: hidden; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); text-overflow: ellipsis; white-space: nowrap; }
@@ -19,7 +19,8 @@
 .actions { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--space-related); }
 /* Keep on Home's lighter soft fill (home-needs.module.css). */
 .keep { display: contents; --surface-muted: var(--neutral-2); --surface-pressed: var(--neutral-3); }
-.foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-related); padding: var(--space-related) var(--space-group); }
+/* An action for a whole list, under its box (Devices: Sign out of all other devices). */
+.listAction { display: flex; }
 
 /* 28px marks: a grey tile with an icon, or a logo on its own (Google, Apple, a browser). */
 .icon { --sq-r: var(--radius-control); --sq-fill: var(--surface-muted); display: grid; width: calc(var(--control-height-xs) + var(--space-tight)); height: calc(var(--control-height-xs) + var(--space-tight)); flex: none; place-items: center; background: var(--sq-fill); color: var(--text-secondary); }

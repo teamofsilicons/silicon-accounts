@@ -249,6 +249,12 @@
   --field-hint-colour: var(--text-secondary);
 }
 
+/* Danger buttons (Anil, 2026-11-21): hovered and pressed, a faint red under the red border instead of Silicon UI's
+   grey. The fill Button reads (--surface-muted), set on danger buttons only; a disabled one keeps its grey. */
+[data-variant="danger"]:not(:disabled) {
+  --surface-muted: color-mix(in oklab, var(--danger) 8%, var(--surface));
+}
+
 /* Allo's roundness (20, matching the Apps store) comes from Silicon UI 0.6.0: --font-roundness on every element. The
    dev tools keep the shipped type, so they drop it. */
 [data-type-inspect-exempt], [data-type-inspect-exempt] * { font-variation-settings: normal !important; }

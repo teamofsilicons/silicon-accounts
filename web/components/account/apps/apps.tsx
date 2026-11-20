@@ -34,11 +34,30 @@ import styles from "./apps.module.css";
 /** An app's page. */
 export const appHref = (appId: string) => `${paths.apps}/${encodeURIComponent(appId)}`;
 
-/** What the row says about an app under its name: when it last signed you in, or how it came to hold your details. */
+/**
+ * When the app was last active for you and when it last signed you in (Anil, 2026-11-21): "Active 2 hours ago · Signed in
+ * 2 days ago", the activity alone on a phone. Active is the later of the sign-in and the app's last token refresh
+ * (last_active_at), so when it reads the same as the sign-in only the sign-in shows.
+ */
+export function activity(item: MyApp, now: number) {
+  if (!item.last_signed_in_at) return null;
+  const signedIn = formatRelative(item.last_signed_in_at, now);
+  const active = item.last_active_at ? formatRelative(item.last_active_at, now) : signedIn;
+  return (
+    <>
+      {active !== signedIn ? (
+        // On a phone the line has room for one of the two: the activity.
+        <>Active <Strong>{active}</Strong><span className={styles.signedIn}> · Signed in <Strong>{signedIn}</Strong></span></>
+      ) : <>Signed in <Strong>{signedIn}</Strong></>}
+    </>
+  );
+}
+
+/** What the row says about an app under its name: when it was last active and signed you in, or how it came to hold your details. */
 export function appLine(item: MyApp, now: number) {
   if (item.status === "access_removed") return <>Access removed{item.access_removed_at ? <> <Strong>{formatDate(item.access_removed_at)}</Strong></> : null}</>;
   if (item.status === "imported") return "Imported you. You haven’t signed in yet.";
-  return item.last_signed_in_at ? <>Signed in <Strong>{formatRelative(item.last_signed_in_at, now)}</Strong></> : "You haven’t signed in yet";
+  return activity(item, now) ?? "You haven’t signed in yet";
 }
 
 export function Apps() {

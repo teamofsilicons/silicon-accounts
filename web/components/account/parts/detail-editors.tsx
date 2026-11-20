@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Editors for one detail at a time: the timezone (a searchable list of every IANA zone), the date of birth (the year,
+ * Editors for one detail at a time: the timezone (Sky bands over a searchable list of every IANA zone, as Create a
+ * Silicon picks one), the date of birth (the year,
  * then the day in a calendar) and a Silicon's photo by link. Each saves with one press; a failure stays in the editor
  * with the server's reason (the save hooks also toast it).
  *
@@ -19,6 +20,7 @@ import { Input } from "@teamofsilicons/silicon-ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@teamofsilicons/silicon-ui/popover";
 import { Select } from "@teamofsilicons/silicon-ui/select";
 import { timezoneOptions } from "@/lib/timezones";
+import { SkyBands } from "../silicons/sky-bands";
 import { describeError } from "./common";
 import partStyles from "./parts.module.css";
 import styles from "./editors.module.css";
@@ -95,7 +97,8 @@ export function TimezoneForm({ value, onSave, onDone, autoFocus }: TimezoneFormP
   const [draft, setDraft] = useState(value);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const options = useMemo(() => timezoneOptions(undefined, [value]), [value]);
+  // The zone picked on the sky stays in the list even when it is not one of the usual ones.
+  const options = useMemo(() => timezoneOptions(undefined, [value, draft]), [value, draft]);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!autoFocus) return;
@@ -117,6 +120,7 @@ export function TimezoneForm({ value, onSave, onDone, autoFocus }: TimezoneFormP
   };
   return (
     <div ref={root} className={styles.form}>
+      <SkyBands value={draft} onChange={next => { setDraft(next); setError(null); }} />
       <Combobox label="Timezone" options={options} value={draft} onValueChange={next => { setDraft(next); setError(null); }} placeholder="Search a city or an offset" />
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       <div className={styles.actions}>

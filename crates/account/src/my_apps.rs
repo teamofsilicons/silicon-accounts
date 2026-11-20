@@ -40,6 +40,7 @@ struct Row {
     logo_dark_url: Option<String>,
     homepage_url: Option<String>,
     active_sessions: i64,
+    last_active_at: Option<OffsetDateTime>,
 }
 
 /// One app in `GET /v1/me/apps`.
@@ -61,6 +62,11 @@ pub(crate) struct MyApp {
     access_removed_at: Option<OffsetDateTime>,
     /// Live sign-ins (token families) the app holds for this account.
     active_sessions: i64,
+    /// The app's latest use of this account: its latest sign-in or token refresh, whichever is
+    /// later. An app can refresh in the background, so this is the app's activity, not
+    /// necessarily the person's.
+    #[serde(with = "accounts_core::timefmt::rfc3339_ms_option")]
+    last_active_at: Option<OffsetDateTime>,
 }
 
 /// Silicon Accounts' own apps: the account site and CLI (`silicon-accounts`) and the developer platform
@@ -108,7 +114,9 @@ pub(crate) async fn list(
                 m.last_signed_in_at, m.access_removed_at, coalesce(m.last_signed_in_at, m.created_at) as sort_at, \
                 a.name, a.logo_url, a.logo_dark_url, a.homepage_url, \
                 (select count(*) from token_families f where f.account_uuid = m.account_uuid and f.app_id = m.app_id \
-                   and f.revoked_at is null and f.expires_at > now()) as active_sessions \
+                   and f.revoked_at is null and f.expires_at > now()) as active_sessions, \
+                greatest(m.last_signed_in_at, (select max(f.last_used_at) from token_families f \
+                   where f.account_uuid = m.account_uuid and f.app_id = m.app_id)) as last_active_at \
            from memberships m join apps a on a.app_id = m.app_id \
           where m.account_uuid = $1 and m.app_id <> all($2) and ($3::text is null or m.status = $3) \
             and (coalesce(m.last_signed_in_at, m.created_at), m.app_id) < ($4, $5) \
@@ -146,6 +154,7 @@ pub(crate) async fn list(
                     last_signed_in_at: r.last_signed_in_at,
                     access_removed_at: r.access_removed_at,
                     active_sessions: r.active_sessions,
+                    last_active_at: r.last_active_at,
                 },
             )
         })

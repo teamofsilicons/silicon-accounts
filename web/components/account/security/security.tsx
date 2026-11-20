@@ -334,24 +334,25 @@ function Devices() {
       <div className={styles.head}><h2 id="security-devices" className={styles.title}>Devices</h2></div>
       <ul data-sq="surface" className={styles.rows} aria-label="Signed-in sessions">
         {ordered.map(session => <DeviceRow key={session.id} session={session} now={now} />)}
-        {others.length ? (
-          <li className={styles.foot}>
-            <Button variant="danger" size="sm" onClick={() => { setOthersError(null); setAsking(true); }}>Sign Out of All Other Devices</Button>
-            <Dialog open={asking} onOpenChange={open => { if (!open && !signingOutOthers) setAsking(false); }}>
-              <DialogContent
-                title="Sign out of all other devices?"
-                description={<>{others.length === 1 ? "1 other sign-in ends" : `${others.length} other sign-ins end`}, including the silicon-accounts CLI and the developer site. This device stays signed in.</>}
-              >
-                {othersError ? <p className={styles.rowError} role="alert">{othersError}</p> : null}
-                <div className={styles.actions}>
-                  <Button variant="ghost" onClick={() => setAsking(false)} disabled={signingOutOthers}>Cancel</Button>
-                  <Button variant="danger" loading={signingOutOthers} onClick={() => void signOutOthers()}>Sign Out</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </li>
-        ) : null}
       </ul>
+      {/* For the whole list: under the box, outside it, so it is not read as the last device's (Anil, 2026-11-21). */}
+      {others.length ? (
+        <div className={styles.listAction}>
+          <Button variant="danger" size="sm" onClick={() => { setOthersError(null); setAsking(true); }}>Sign Out of All Other Devices</Button>
+          <Dialog open={asking} onOpenChange={open => { if (!open && !signingOutOthers) setAsking(false); }}>
+            <DialogContent
+              title="Sign out of all other devices?"
+              description={<>{others.length === 1 ? "1 other sign-in ends" : `${others.length} other sign-ins end`}, including the silicon-accounts CLI and the developer site. This device stays signed in.</>}
+            >
+              {othersError ? <p className={styles.rowError} role="alert">{othersError}</p> : null}
+              <div className={styles.actions}>
+                <Button variant="ghost" onClick={() => setAsking(false)} disabled={signingOutOthers}>Cancel</Button>
+                <Button variant="danger" loading={signingOutOthers} onClick={() => void signOutOthers()}>Sign Out</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      ) : null}
     </section>
   );
 }

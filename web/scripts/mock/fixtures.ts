@@ -106,8 +106,10 @@ export const myApps: MyApp[] = ["briefcase", "dm", "commit", "remind", "interfac
     source: "signin",
     granted_scopes: index % 2 ? ["profile", "email", "timezone"] : ["profile", "email"],
     first_signed_in_at: iso(-60 * 24 * (30 - index * 3)),
-    last_signed_in_at: iso(-60 * (index * 7 + 2)),
+    // The first app signed in weeks before its latest activity (Active … · Signed in …); the rest were active when they signed in.
+    last_signed_in_at: index === 0 ? iso(-60 * 24 * 40) : iso(-60 * (index * 7 + 2)),
     active_sessions: index === 6 ? 0 : (index % 3) + 1,
+    last_active_at: index === 6 ? iso(-60 * (index * 7 + 2)) : iso(-(index * 11 + 5)),
     access_removed_at: index === 6 ? iso(-60 * 24 * 2) : null,
   }));
 

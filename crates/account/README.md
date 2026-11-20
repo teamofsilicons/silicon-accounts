@@ -98,7 +98,7 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
 - `DELETE /v1/me/identities/{provider}/{subject}` → 204. 400 `invalid_provider`, 404
   `identity_not_found`, 409 `last_sign_in_method` (no email or phone left to sign in with).
 - `GET /v1/me/apps?status=active|access_removed|imported&limit&cursor` → items
-  `{"app":{"app_id","name","logo_url","logo_dark_url","homepage_url"},"membership_id","status","source","granted_scopes","first_signed_in_at","last_signed_in_at","access_removed_at","active_sessions"}`,
+  `{"app":{"app_id","name","logo_url","logo_dark_url","homepage_url"},"membership_id","status","source","granted_scopes","first_signed_in_at","last_signed_in_at","access_removed_at","active_sessions","last_active_at"}` (`last_active_at`: the later of the last sign-in and the app's last token refresh),
   most recently used first; the first-party apps (`silicon-accounts`: the account site and CLI;
   `developer`: the developer platform) are not listed.
 - `DELETE /v1/me/apps/{app_id}` → 204: the app's token families for the account and the User verification

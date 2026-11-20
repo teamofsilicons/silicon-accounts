@@ -1,0 +1,21 @@
+/* /__needs, seeing everything waiting (needs-more.tsx). The rows are Home's own (home-needs.module.css). */
+.intro { display: grid; gap: var(--space-tight); }
+.introTitle { margin: 0; font: var(--h2); letter-spacing: var(--h2-tracking); }
+.introNote { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.version { display: grid; gap: var(--space-inset); }
+.versionHead { display: grid; gap: var(--space-tight); }
+.versionName { margin: 0; font: var(--h3); letter-spacing: var(--h3-tracking); }
+.versionNote { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.stage { padding: var(--space-block) var(--gutter); border-radius: var(--radius-container); background: var(--background); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.column { display: grid; width: 100%; max-width: var(--page-narrow); margin-inline: auto; }
+
+/* The heading, with room at its end for the arrows. */
+.head { min-height: var(--control-height-sm); }
+.headEnd { display: flex; align-items: center; gap: var(--space-hair); margin-inline-start: auto; }
+.position { margin-inline-end: var(--space-tight); color: var(--text-secondary); font: var(--small); font-variant-numeric: tabular-nums; letter-spacing: var(--small-tracking); }
+
+/* 1 · Show all: the foot row, a quiet button centred under a hairline. */
+.foot { display: flex; justify-content: center; padding: var(--space-tight); border-top: 1px solid var(--border-subtle); }
+
+/* 3 · Carousel: each slide is the box with one row. */
+.slide { width: 100%; }

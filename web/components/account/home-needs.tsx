@@ -11,10 +11,13 @@
  * with a clear border; each row a 28px mark (a Silicon's, or the browser's logo), the title over one line (a request's
  * time left, grey over a week, amber from a week, red under 3 days, "Ends today" under a day; or the device's last use),
  * and at most one outlined button, so nothing in the list is filled; the device also has Keep, a soft grey button (Anil, 2026-11-11). The next item appears when the current one is handled.
+ *
+ * With more than one waiting, "1 of 5" and previous and next buttons beside the heading step through them, the new item
+ * sliding in from the side it comes from (Anil, 2026-11-21, the Arrows design in /__needs).
  */
 import Image from "next/image";
-import { useSyncExternalStore, type ReactNode } from "react";
-import { Laptop, TriangleAlert } from "lucide-react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight, Laptop, TriangleAlert } from "lucide-react";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { ButtonLink } from "@teamofsilicons/silicon-ui/button-link";
@@ -84,16 +87,29 @@ function timeLeft(request: CustodianRequest, now: number): { text: string; tone:
 
 function Requests({ id, title, limit, waiting, failed, error, retry, stale, now }: { id: string; title: string; limit?: number; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo[]; now: number }) {
   const signOut = useSignOutSession();
+  // Paging (only with a limit): which item leads, and the way the last step went, so the new one slides in from there.
+  const [page, setPage] = useState<{ start: number; step: "next" | "previous" | null }>({ start: 0, step: null });
   const items = [
     ...waiting.map(request => ({ kind: "request" as const, id: request.id, date: Date.parse(request.created_at), request })),
     ...stale.map(session => ({ kind: "device" as const, id: session.id, date: Date.parse(session.last_seen_at ?? session.created_at) + STALE_MS, session })),
   ].sort((a, b) => b.date - a.date || a.id.localeCompare(b.id));
+  const paged = !!limit && items.length > limit;
+  // An item handled elsewhere can shorten the list: stay on the last one there is.
+  const start = paged ? Math.min(page.start, items.length - limit) : 0;
+  const go = (step: "next" | "previous") => setPage({ start: start + (step === "next" ? 1 : -1), step });
 
   return (
     <section className={styles.section} aria-labelledby={`${id}-title`}>
       <div className={styles.head}>
         <h2 id={`${id}-title`} className={styles.title}>{title}</h2>
         {items.length > 0 ? <Badge size="sm" tone="neutral">{items.length}</Badge> : null}
+        {paged ? (
+          <span className={styles.pager}>
+            <span className={styles.position} aria-live="polite">{start + 1} of {items.length}</span>
+            <Button variant="ghost" size="sm" aria-label="Previous" disabled={start === 0} onClick={() => go("previous")}><ChevronLeft size={16} strokeWidth={2} aria-hidden="true" /></Button>
+            <Button variant="ghost" size="sm" aria-label="Next" disabled={start + limit >= items.length} onClick={() => go("next")}><ChevronRight size={16} strokeWidth={2} aria-hidden="true" /></Button>
+          </span>
+        ) : null}
       </div>
       <ul data-sq="surface" className={styles.rows}>
         {failed && items.length === 0 ? (
@@ -101,11 +117,11 @@ function Requests({ id, title, limit, waiting, failed, error, retry, stale, now 
             <Button variant="secondary" size="sm" onClick={retry}>Try Again</Button>
           </Row>
         ) : null}
-        {items.slice(0, limit).map(item => {
+        {items.slice(start, limit ? start + limit : undefined).map(item => {
           if (item.kind === "device") {
             const session = item.session;
             return (
-              <Row key={`device-${session.id}`} lead={<DeviceIcon session={session} />} title={`Still using ${sessionName(session)}?`} detail={`Last active ${spanText(now - Date.parse(session.last_seen_at ?? session.created_at))} ago`}>
+              <Row key={`device-${session.id}`} enter={page.step} lead={<DeviceIcon session={session} />} title={`Still using ${sessionName(session)}?`} detail={`Last active ${spanText(now - Date.parse(session.last_seen_at ?? session.created_at))} ago`}>
                 <Button variant="soft" size="sm" onClick={() => keepSession(session.id)}>Keep</Button>
                 <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => void signOut.mutateAsync(session.id).catch(() => undefined)}>Sign Out</Button>
               </Row>
@@ -115,7 +131,7 @@ function Requests({ id, title, limit, waiting, failed, error, retry, stale, now 
           const time = timeLeft(request, now);
           const transfer = request.kind === "transfer";
           return (
-            <Row key={request.id} lead={<SiliconMark seed={request.silicon.uuid} photo={request.silicon.pfp_url} size={28} pending={!transfer} />}
+            <Row key={request.id} enter={page.step} lead={<SiliconMark seed={request.silicon.uuid} photo={request.silicon.pfp_url} size={28} pending={!transfer} />}
               title={transfer ? `${personLabel(request.from)} is handing ${siliconName(request)} to you` : `${siliconName(request)} wants you to look after it`}
               when={{ text: time.text, tone: time.tone }}>
               <ButtonLink href={requestHref(request.id)} variant="secondary" size="sm">Review</ButtonLink>
@@ -141,9 +157,10 @@ function DeviceIcon({ session }: { session: SessionInfo }) {
  * One row (the boxed compact design, Anil 2026-11-11): the mark, the title over one line (a request's time left in its
  * colour, or a device's last use, or an error), and at most one outlined button (a device also has a quiet Keep).
  */
-function Row({ lead, title, detail, when, children }: { lead: ReactNode; title: string; detail?: string; when?: { text: string; tone: "neutral" | "warning" | "danger" }; children: ReactNode }) {
+function Row({ lead, title, detail, when, enter, children }: { lead: ReactNode; title: string; detail?: string; when?: { text: string; tone: "neutral" | "warning" | "danger" }; enter?: "next" | "previous" | null; children: ReactNode }) {
+  // A row that arrives by a step slides in from that side (keyed by item, so only the new one does).
   return (
-    <li className={styles.row}>
+    <li className={styles.row} data-enter={enter ?? undefined}>
       {lead}
       <span className={styles.text}>
         <span className={styles.rowTitle}>{title}</span>
