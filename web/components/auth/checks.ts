@@ -330,6 +330,46 @@ const hostedChecks: MockCheck[] = [
     },
   },
   {
+    name: "passkey: a button press while the autofill's challenge is on its way signs the button's challenge",
+    // Like the server, the mock keeps only the latest challenge. The autofill's request (the first) is held until the
+    // button's arrives (or 3s pass), then lands last: an answer to a challenge that isn't the latest is refused. The
+    // check opens the page itself: the harness's `path` waits for the network to go quiet, which the held request blocks.
+    routes: () => {
+      let latest = "";
+      const issued: string[] = [];
+      let buttonArrived = () => {};
+      const button = new Promise<void>(resolve => (buttonArrived = resolve));
+      return [
+        routeFlow(passkeyFlow),
+        ["POST /v1/flows/:id/passkey/options", async () => {
+          const challenge = randomBytes(32).toString("base64url");
+          if (issued.push(challenge) === 1) await Promise.race([button, new Promise(resolve => setTimeout(resolve, 3000))]);
+          else buttonArrived();
+          latest = challenge;
+          return { json: { challenge, rpId: "localhost", timeout: 60_000, userVerification: "preferred" } };
+        }],
+        ["POST /v1/flows/:id/passkey", ({ body }) => {
+          const json = (body as { credential?: { response?: { clientDataJSON?: string } } }).credential?.response?.clientDataJSON ?? "";
+          const signed = (JSON.parse(Buffer.from(json, "base64url").toString("utf8")) as { challenge?: string }).challenge;
+          if (signed !== latest) return apiError(401, "passkey_invalid", "This passkey couldn't be checked, so it didn't sign you in.", "Try again, or sign in another way.");
+          return flowJson(sampleFlow(appOf("briefcase"), "details"));
+        }],
+      ];
+    },
+    run: async ({ page, base, requests }) => {
+      await page.goto(`${base}${flowPath("briefcase", "choose_method")}`);
+      await virtualPasskey(page, base);
+      // The autofill asked first (it starts when the page shows the methods).
+      await expect.poll(() => requests.filter(r => r.path.endsWith("/passkey/options")).length).toBe(1);
+      const button = page.getByRole("button", { name: "Sign In with a Passkey" });
+      await button.click();
+      await expect(button).toHaveCount(0);
+      const posts = (suffix: string) => requests.filter(r => r.method === "POST" && r.path.endsWith(suffix)).length;
+      expect(posts("/passkey"), "the button's answer was refused: the autofill's challenge replaced its own").toBe(1);
+      expect(posts("/passkey/options")).toBe(2);
+    },
+  },
+  {
     name: "passkey: an unknown passkey is explained on the methods and the button works again",
     path: flowPath("briefcase", "choose_method"),
     routes: () => {
