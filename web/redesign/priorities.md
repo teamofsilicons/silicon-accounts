@@ -48,6 +48,8 @@ methods there today); a deploy; a passkey's name is cut short beside Rename and 
 - **Activity, parked until orgs** (Anil, 2026-11-12: "not yet ready, we'll get back to this with the complete context of the orgs"). Direction: combine the current design (the kind's icon) with B · Who leads from /__activity, because in an org an admin may make changes for a user, so a row must say who acted. One idea to draw then: the kind's icon and the actor's photo together. Playground: /__activity (components/kitchen/activity/).
 
 ## Waiting on Anil
+- Team of Silicons' Help, Privacy and Terms under the default sign-in card: taken out before release because the pages
+  don't exist on teamofsilicons.com yet (all 404). Put them back in flow/hosted-frame.tsx once they do (2026-11-19).
 - The hosted sign-in: D is built into choose_method (2026-11-19). Still to design in /__signin: the choose-an-account step for several accounts (select_account), then the consent step and an app's page in Connected Apps; recapture /__landing's How it works cards after.
 - Review /__landing, the landing in the account site's look with real screens (landing/apps/accounts/log.md, Lab): keep, change or drop; and whether the tour needs a heading of its own (it has none, so no words were invented) (2026-11-19).
 - Confirm the Super Visuals licence: Home's introduction now shows BG 110, 102 and 127 (picture cards, 2026-11-11). Say whether to file the Silicon UI IntroBanner request (redesign/requests/silicon-ui-intro-banner.md) (2026-11-10).
@@ -65,6 +67,7 @@ methods there today); a deploy; a passkey's name is cut short beside Rename and 
 
 ## Done (recent)
 
+- 2026-11-19 Team of Silicons' default sign-in card is live (PR 26, release 60e4374), without the Help, Privacy and Terms row.
 - 2026-11-18 Your Accounts shows the work profile’s own picture and places the organization logo beside its name.
 - 2026-11-18 Home shows the newest pending item with the full count. The profile picker aligns avatars, names and handles and marks the current account.
 

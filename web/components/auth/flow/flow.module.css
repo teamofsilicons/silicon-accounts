@@ -511,10 +511,6 @@ label.shareText[data-disabled] { cursor: default; }
 .tosHead { display: grid; justify-items: center; gap: var(--space-3); text-align: center; }
 .tosLine { margin: 0; color: var(--text-secondary); font: var(--body); letter-spacing: var(--body-tracking); }
 .tosLine strong { color: var(--foreground); font-weight: var(--weight-medium); }
-.tosLinks { display: flex; justify-self: end; gap: var(--space-1); }
-.tosLinks a { padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); background: color-mix(in oklab, var(--surface) 70%, transparent); color: var(--text-secondary); font: var(--caption); letter-spacing: var(--caption-tracking); text-decoration: none; backdrop-filter: blur(8px); }
-.tosLinks a:hover { background: var(--surface); color: var(--foreground); }
-.tosLinks a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 @container hosted (max-width: 640px) {
   .hosted[data-frame="tos"] .scope { background: var(--surface); }
@@ -522,6 +518,4 @@ label.shareText[data-disabled] { cursor: default; }
   .tosColumn { width: 100%; }
   .panel[data-frame="tos"] { --sq-r: 0; box-shadow: none; }
   .tosBody { padding: var(--space-8) var(--space-6); }
-  .tosLinks { justify-self: center; }
-  .tosLinks a { background: none; backdrop-filter: none; }
 }

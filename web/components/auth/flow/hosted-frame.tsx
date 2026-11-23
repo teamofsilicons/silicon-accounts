@@ -24,16 +24,12 @@ import styles from "./flow.module.css";
 /**
  * Team of Silicons' default sign-in (Anil, 2026-11-19, /__accounts-signin, Default style, vertical, Painted): an app
  * that kept the default look signs in on a narrow card headed "Sign in with Team of Silicons", over the cloud painting,
- * with Team of Silicons' Help, Privacy and Terms under the card and Powered by at the foot. Steps read it to head
- * themselves the card's way (choose_method: "Sign in" and "to continue to {app}").
+ * with Powered by at the foot. Steps read it to head themselves the card's way (choose_method: "Sign in" and "to
+ * continue to {app}"). Team of Silicons' Help, Privacy and Terms go under the card once those pages exist (they 404 on
+ * teamofsilicons.com as of 2026-11-19).
  */
 const TosFrameContext = createContext(false);
 export const useTosFrame = () => useContext(TosFrameContext);
-const TOS_LINKS = [
-  { label: "Help", href: "https://teamofsilicons.com/help" },
-  { label: "Privacy", href: "https://teamofsilicons.com/legal/privacy" },
-  { label: "Terms", href: "https://teamofsilicons.com/legal/terms" },
-];
 
 /** The paint theme of a branding for this visitor: the app's forced theme, else the visitor's own. */
 export function usePaint(app: FrameApp | null, site: boolean): PaintTheme {
@@ -158,9 +154,6 @@ export function HostedFrame({ app, site: siteProp, title, subtitle, children, fo
     <BrandStage>
       <div className={styles.tosColumn}>
         {panel}
-        <nav className={styles.tosLinks} aria-label="Help and policies">
-          {TOS_LINKS.map(link => <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer">{link.label}</a>)}
-        </nav>
       </div>
     </BrandStage>
   ) : (

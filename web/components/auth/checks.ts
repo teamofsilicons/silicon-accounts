@@ -917,14 +917,13 @@ const hostedChecks: MockCheck[] = [
     },
   },
   {
-    name: "focus: the keyboard position shows on the terms and support links, Help under the card, 'Powered by' and the details' checkboxes",
+    name: "focus: the keyboard position shows on the terms and support links, 'Powered by' and the details' checkboxes",
     run: async ({ page, base }) => {
       const focusShows = (target: Locator, start: Locator, area?: Locator) => focusPaintShows(page, target, start, area);
       await page.goto(`${base}${flowPath("briefcase", "choose_method")}`, { waitUntil: "networkidle" });
       const email = page.getByRole("textbox", { name: "Email or phone" });
       expect(await focusShows(page.getByRole("link", { name: "terms", exact: true }), email), "the terms link").toBe(true);
       expect(await focusShows(page.getByRole("link", { name: /^support@/ }), email), "the support link").toBe(true);
-      expect(await focusShows(page.getByRole("navigation", { name: "Help and policies" }).getByRole("link", { name: "Help" }), email), "Help under the card").toBe(true);
       expect(await focusShows(page.locator("[data-powered-by] a"), email), "Powered by").toBe(true);
       await page.goto(`${base}${flowPath("briefcase", "details")}`, { waitUntil: "networkidle" });
       expect(await focusShows(page.getByRole("checkbox", { name: /^Timezone/ }), page.getByRole("button", { name: "Switch Account" }), page.locator('li[data-field="timezone"]')), "a details checkbox").toBe(true);
