@@ -487,6 +487,15 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   enabled danger button fills a faint red (8% --danger) on hover and press, under the red border Silicon UI already
   draws. Set in styles/tokens.css through the token Button reads; upstream Silicon UI could ship it as the default.
 
+- Passkeys (Anil, 2026-11-23): a fifth Carbon sign-in method, on for every app unless it turns it off, offered on
+  every hosted sign-in page (all on the Silicon Accounts site, so one passkey signs a Carbon in to every app). A
+  passkey is added from Security → Your sign-in (or the one-time offer in Home's Needs you), needs a sign-in from the
+  last 30 minutes to add, and never creates an account: the sign-up page doesn't show it, and an app must keep another
+  method on. Removing one keeps the last-way-in rule. Interfaces (their own origins) don't offer it. Built before the
+  contract (understanding/UNDERSTANDING.md lists four methods): Anil updates it. The WebAuthn checks are our own, pure
+  Rust (crates/core/src/webauthn.rs, ciborium and RustCrypto), not webauthn-rs, which would bring OpenSSL into a build
+  that has none.
+
 ## Dialog rules (Anil, 2026-11-11; from the CarbonID dialog, applied to every Personal info dialog)
 
 Every dialog follows these. The first three are set in CSS, so a new dialog gets them without asking: the variables

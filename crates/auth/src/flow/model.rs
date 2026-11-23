@@ -343,8 +343,11 @@ pub struct FlowExtras {
     pub pending: Option<Pending>,
     /// What went wrong last (cleared by the next action).
     pub error: Option<FlowError>,
-    /// How the account authenticated in this flow: email | phone | google | apple | session.
+    /// How the account authenticated in this flow: email | phone | google | apple | passkey |
+    /// session.
     pub auth_method: Option<String>,
+    /// The challenge of the passkey sign-in asked for last (used once).
+    pub passkey_challenge: Option<String>,
     /// The account was created (or an imported one claimed) in this flow.
     pub new_account: bool,
     /// The Carbon chose "use another account": don't offer the browser's account again.

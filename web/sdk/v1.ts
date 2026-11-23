@@ -16,7 +16,7 @@
  *                                 "Sign up"; our pages then show every method)
  *   data-intent                   signin (default) | signup: which of our pages opens (the sign-in or the sign-up
  *                                 version); with data-buttons="intents" it keeps just that button
- *   data-method                   google | apple | email | phone: show just that method's button
+ *   data-method                   google | apple | email | phone | passkey: show just that method's button
  *   data-scope, data-nonce, data-prompt, data-theme (light | dark | auto)
  *
  * An app never passes a Carbon's email or phone: there is no login hint. The Carbon always types it on our pages
@@ -210,7 +210,7 @@ function authorizeUrl(options?: AuthorizeOptions): string {
   const o = merge(options);
   if (!o.appId) throw new Error(`${TAG} appId is missing. Set data-app-id on the script tag or pass { appId }.`);
   if (!o.redirectUri) throw new Error(`${TAG} redirectUri is missing. Set data-redirect-uri on the script tag or pass { redirectUri } (a callback URL registered for the app).`);
-  if (o.method && !isButtonMethod(o.method)) throw new Error(`${TAG} method must be google, apple, email or phone (got "${o.method}").`);
+  if (o.method && !isButtonMethod(o.method)) throw new Error(`${TAG} method must be google, apple, email, phone or passkey (got "${o.method}").`);
   if (o.intent && !isButtonIntent(o.intent)) throw new Error(`${TAG} intent must be signin or signup (got "${o.intent}").`);
   const query = new URLSearchParams({ app_id: o.appId, redirect_uri: o.redirectUri, response_type: "code" });
   const add = (key: string, value: string | undefined) => {

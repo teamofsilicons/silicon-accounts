@@ -511,6 +511,11 @@ https Iris is covered by `https:` already). `sdk/build.mjs` writes `public/sdk/v
 
 Every shared-foundation request from the area builders, resolved in the shared code:
 
+- **Passkeys** (`lib/passkey.ts`, 2026-11-23): `createPasskey` / `getPasskey` run the WebAuthn ceremonies with the
+  API's JSON options (base64url) and return `PublicKeyCredential.toJSON()`, using the browser's own JSON helpers when
+  it has them; a cancelled sheet resolves to null, other failures throw `PasskeyError` with words to show.
+  `usePasskeySupport()` is false on the server and the first paint. The hosted sign-in uses it in
+  `components/auth/steps/choose-method.tsx`, Security in `components/account/security/passkeys.tsx`.
 - **Navigation guard** (`lib/navigation-guard.ts`, `components/foundation/shell/leave-question.tsx`): see Conventions.
   The shell routes the dock, phone sheet, brand, palette, number keys, Settings and sign-out through it; the developer
   area's own window-capture click/keydown interception, synthetic Escape and copy of the typing rule are gone.

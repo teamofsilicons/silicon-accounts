@@ -1,0 +1,55 @@
+/* /__silicon: a Silicon's page as its profile (silicon-profile-lab.tsx). Rows are the account pages' (parts/rows). */
+.lab { display: grid; width: 100%; max-width: calc(var(--page-max) + 2 * var(--gutter)); gap: var(--space-page); margin-inline: auto; padding: var(--space-page) var(--gutter); background: var(--background); color: var(--foreground); }
+.intro { display: grid; gap: var(--space-related); }
+.title { margin: 0; font: var(--h1); letter-spacing: var(--h1-tracking); }
+.lede { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.version { display: grid; gap: var(--space-inset); }
+.versionHead { display: grid; gap: var(--space-tight); }
+.versionName { margin: 0; font: var(--h3); letter-spacing: var(--h3-tracking); }
+.versionNote { max-width: 70ch; margin: 0; color: var(--text-secondary); font: var(--small); letter-spacing: var(--small-tracking); }
+.stage { padding: var(--space-block) var(--gutter); border-radius: var(--radius-container); background: var(--background); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.column { display: grid; width: 100%; max-width: var(--page-narrow); margin-inline: auto; }
+
+/* The page: the profile, then its sections, 32px apart. */
+.page { display: grid; gap: var(--space-page); }
+.identity { display: grid; justify-items: start; gap: var(--space-tight); }
+.identity[data-centred] { justify-items: center; }
+.name { margin: 0; color: var(--foreground); font: var(--h1); letter-spacing: var(--h1-tracking); }
+.id { padding: var(--space-hair) var(--space-tight); border-radius: var(--radius-control); background: var(--surface-muted); color: var(--text-secondary); font-size: var(--text-sm); }
+.facts { margin: 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+.actions { display: flex; justify-content: flex-end; gap: var(--space-related); }
+
+/* The portrait: the Alive avatar on a wash of its own colours (the Silicon cards' wash, silicon-card.module.css). */
+.portrait { --sq-r: var(--radius-container); --sq-fill: var(--surface); position: relative; display: block; flex: none; overflow: hidden; aspect-ratio: 1; background:
+    radial-gradient(ellipse 82% 85% at 35% 38%, color-mix(in oklab, var(--avatar-1) 34%, var(--sq-fill)), transparent 85%),
+    radial-gradient(ellipse 82% 85% at 68% 46%, color-mix(in oklab, var(--avatar-3) 32%, var(--sq-fill)), transparent 85%),
+    linear-gradient(135deg, color-mix(in oklab, var(--avatar-1) 14%, var(--sq-fill)), color-mix(in oklab, var(--avatar-2) 12%, var(--sq-fill)) 55%, color-mix(in oklab, var(--avatar-3) 14%, var(--sq-fill))); }
+.portrait[data-size="md"] { width: calc(var(--space-page) * 3); }
+.portrait[data-size="lg"] { width: calc(var(--space-page) * 4.5); }
+.portraitAvatar { position: absolute; inset: 0; width: auto; height: 78%; aspect-ratio: 1; margin: auto; }
+
+/* A · Beside */
+.beside { display: flex; align-items: center; gap: var(--space-block); }
+.besideText { display: grid; min-width: 0; gap: var(--space-related); }
+
+/* B · Centred */
+.centred { display: grid; justify-items: center; gap: var(--space-inset); text-align: center; }
+.stats { display: grid; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: var(--space-related) 0 0; border-block: 1px solid var(--border-subtle); }
+.stats > div { display: grid; gap: var(--space-hair); padding: var(--space-inset) var(--space-related); }
+.stats > div + div { border-inline-start: 1px solid var(--border-subtle); }
+.stats dt { color: var(--text-muted); font: var(--caption); letter-spacing: var(--caption-tracking); }
+.stats dd { margin: 0; color: var(--foreground); font: var(--label); letter-spacing: var(--label-tracking); }
+
+/* C · Its sky: the band, then the body with the photo over the band's lower edge. */
+.sky { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); overflow: hidden; border: 1px solid var(--sq-stroke); background: var(--sq-fill); }
+.skyBand { position: relative; height: calc(var(--space-page) * 5); }
+/* The creature standing in its sky, at the band's centre. */
+.skyAvatar { position: absolute; inset: 0; width: auto; height: 76%; aspect-ratio: 1; margin: auto; }
+.skyTime { position: absolute; inset-block-start: var(--space-group); inset-inline-end: var(--space-group); display: inline-flex; align-items: center; gap: var(--space-tight); font: var(--small); letter-spacing: var(--small-tracking); }
+.skyBody { display: grid; justify-items: start; gap: var(--space-related); padding: var(--space-block); }
+
+@media (max-width: 639px) {
+  .beside { flex-direction: column; align-items: flex-start; }
+  .stats { grid-template-columns: minmax(0, 1fr); }
+  .stats > div + div { border-inline-start: 0; border-block-start: 1px solid var(--border-subtle); }
+}

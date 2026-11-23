@@ -13,6 +13,7 @@ import type {
   BrowserSession, CliLoginChallenge, ConfigHistoryItem, ContactChallenge, ContactField, CreateSilicon,
   CustodianRequest, CustodianRequestStatus, DeliveriesQuery, DetailsAdd, DeviceAuthorization, DeviceRequest, EmailView, FlowCreate,
   FlowEnvelope, FlowView, HistoryItem, HistoryQuery, IdAvailability, IdentityView, ImportJob, ImportOptions, ImportRow,
+  PasskeyCreationOptionsJSON, PasskeyRequestOptionsJSON, PasskeyView,
   ImportRowResult, ImportRowsQuery, Introspection, IssuedProof, Jwks, ManagedSilicon, Me, Meta, MyApp, MyProof,
   UserVerificationRequest, OidcDiscovery, OutboxMessage, OwnedApp, Page, PageQuery, PhoneView, PhotoUploaded, ProfileUpdate,
   ProofRevokeRequest, ProofVerification, ReplayRequest, ReplayResult, ReportReceipt, SessionInfo, ShortLivedToken,
@@ -92,6 +93,16 @@ export const flows = {
   resend: (id: string) => flowCall(`/v1/flows/${seg(id)}/resend`),
   /** Verify the 6-digit code. Errors: invalid_code (422, remaining_attempts), code_expired (410), verification_locked (423). */
   verify: (id: string, code: string) => flowCall(`/v1/flows/${seg(id)}/verify`, { code }),
+  /**
+   * `POST /v1/flows/{id}/passkey/options`: the request options for `navigator.credentials.get()` (lib/passkey.ts).
+   * 403 method_not_enabled when the app turned passkeys off.
+   */
+  passkeyOptions: (id: string) => request<PasskeyRequestOptionsJSON>(`/v1/flows/${seg(id)}/passkey/options`, { method: "POST", body: {} }),
+  /**
+   * `POST /v1/flows/{id}/passkey`: the browser's answer signs the passkey's account in. 401 passkey_unknown (no account
+   * has it) or passkey_invalid; a refusal leaves the flow at choose_method with `error` set.
+   */
+  passkey: (id: string, credential: unknown) => flowCall(`/v1/flows/${seg(id)}/passkey`, { credential }),
   /** Start Google or Apple: navigate the top-level window to the returned `authorize_url`. */
   oauthStart: (id: string, provider: "google" | "apple") => request<{ authorize_url: string }>(`/v1/flows/${seg(id)}/oauth/${provider}`, { method: "POST", body: {} }),
   /**
@@ -210,6 +221,20 @@ export const me = {
     list: async () => items(await request<Page<IdentityView>>("/v1/me/identities")),
     /** 409 last_sign_in_method when it is the only way left to sign in. */
     remove: (provider: "google" | "apple", subject: string) => request<null>(`/v1/me/identities/${seg(provider)}/${seg(subject)}`, { method: "DELETE" }),
+  },
+
+  passkeys: {
+    list: async () => items(await request<Page<PasskeyView>>("/v1/me/passkeys")),
+    /**
+     * `POST /v1/me/passkeys/options`: the creation options for `navigator.credentials.create()`. The account site's
+     * session only, signed in within 30 minutes: 403 reauthentication_required otherwise.
+     */
+    options: () => request<PasskeyCreationOptionsJSON>("/v1/me/passkeys/options", { method: "POST", body: {} }),
+    /** `POST /v1/me/passkeys` (201): finishes adding it. 409 passkey_in_use / passkey_registration_expired, 400 passkey_invalid. */
+    add: (credential: unknown, name?: string) => request<PasskeyView>("/v1/me/passkeys", { method: "POST", body: { credential, name } }),
+    rename: (id: string, name: string) => request<PasskeyView>(`/v1/me/passkeys/${seg(id)}`, { method: "PATCH", body: { name } }),
+    /** 409 last_sign_in_method when it is the only way left to sign in. */
+    remove: (id: string) => request<null>(`/v1/me/passkeys/${seg(id)}`, { method: "DELETE" }),
   },
 
   apps: {

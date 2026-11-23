@@ -3,15 +3,17 @@
  * functions only: the SDK is a dependency-free script, so nothing here may import from the account site.
  */
 
-export type ButtonMethod = "google" | "apple" | "email" | "phone";
+export type ButtonMethod = "google" | "apple" | "email" | "phone" | "passkey";
 
-const KNOWN: readonly ButtonMethod[] = ["google", "apple", "email", "phone"];
+const KNOWN: readonly ButtonMethod[] = ["google", "apple", "email", "phone", "passkey"];
 
+/** A passkey button opens our sign-in page at the top level, where the passkey sheet can show (never in a frame). */
 export const METHOD_LABEL: Readonly<Record<ButtonMethod, string>> = {
   google: "Continue with Google",
   apple: "Continue with Apple",
   email: "Continue with email",
   phone: "Continue with phone number",
+  passkey: "Sign in with a passkey",
 };
 
 /** Which hosted page a button opens: the sign-in page or the sign-up page (the account logic is the same). */
@@ -52,6 +54,8 @@ export const METHOD_MARK: Readonly<Record<ButtonMethod, string>> = {
     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="3"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
   phone:
     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="3"/><path d="M12 18h.01"/></svg>',
+  passkey:
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>',
 };
 
 /** The Silicon Accounts mark for the "Powered by" line (fixed colours, never branded). */

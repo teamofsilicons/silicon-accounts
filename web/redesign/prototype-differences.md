@@ -7,6 +7,12 @@ Every place the account site differs from [prototype-v7.html](prototype-v7.html)
 First pass 2026-10-30, by comparing the prototype's pages (busy and new-account states) with the live site. A category
 marked "check" is a first guess, to be confirmed against Silicon UI's code before acting on it.
 
+## Passkeys (2026-11-23): not in the prototype, asked for by Anil
+
+Anil asked for passkeys as a sign-in method; prototype-v7 has none. Built on the prototype's own parts: a row per passkey
+in Your sign-in (as Google's row, with Rename and Remove), "Sign In with a Passkey" with the provider buttons on the
+sign-in page (as Continue with Google), and a Needs you row offering one (as the device row, Keep becomes Not Now).
+
 ## Brand decisions (6): Anil decides
 
 | What | Prototype | Site | Status |

@@ -19,6 +19,7 @@
  * address the browser was sent to, and that origin is in the fake apps' allowed_origins.
  */
 import { execSync } from "node:child_process";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -271,7 +272,96 @@ async function allowFraming(context: BrowserContext, appOrigin: string): Promise
 /* Mock checks: the hosted flow                                                                                        */
 /* ------------------------------------------------------------------------------------------------------------------ */
 
+/**
+ * A Chromium virtual authenticator (CDP WebAuthn domain) on the page, holding one passkey for this site, so the
+ * browser's own ceremony runs (the mock API answers for the server). Returns its credential id.
+ */
+async function virtualPasskey(page: Page, base: string): Promise<string> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+  });
+  const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const credentialId = randomBytes(16).toString("base64url");
+  await cdp.send("WebAuthn.addCredential", {
+    authenticatorId,
+    credential: {
+      credentialId: Buffer.from(credentialId, "base64url").toString("base64"),
+      isResidentCredential: true,
+      rpId: new URL(base).hostname,
+      privateKey: privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+      userHandle: Buffer.from("a8K").toString("base64"),
+      signCount: 0,
+    },
+  });
+  return credentialId;
+}
+
+const passkeyFlow = () => {
+  const flow = sampleFlow(appOf("briefcase"), "choose_method");
+  return { ...flow, methods: [...flow.methods.filter(method => method !== "passkey"), "passkey"] } as FlowView;
+};
+
 const hostedChecks: MockCheck[] = [
+  {
+    name: "passkey: the button runs the browser's passkey sheet and the answer signs in",
+    path: flowPath("briefcase", "choose_method"),
+    // The checks run on localhost (--base), the RP ID the options name.
+    routes: () => [
+      routeFlow(passkeyFlow),
+      ["POST /v1/flows/:id/passkey/options", () => ({ json: { challenge: randomBytes(32).toString("base64url"), rpId: "localhost", timeout: 60_000, userVerification: "preferred" } })],
+      ["POST /v1/flows/:id/passkey", () => flowJson(sampleFlow(appOf("briefcase"), "details"))],
+    ],
+    run: async ({ page, base }) => {
+      const credentialId = await virtualPasskey(page, base);
+      const button = page.getByRole("button", { name: "Sign In with a Passkey" });
+      await expect(button).toBeVisible();
+      const posted = nextPost(page, "/passkey");
+      await button.click();
+      const body = await posted;
+      const credential = body.credential as { rawId?: string; type?: string; response?: Record<string, string> };
+      expect(credential.type).toBe("public-key");
+      expect(credential.rawId).toBe(credentialId);
+      expect(credential.response?.signature?.length ?? 0).toBeGreaterThan(20);
+      expect(credential.response?.authenticatorData?.length ?? 0).toBeGreaterThan(40);
+      // Signed in: the page moved on from the methods.
+      await expect(button).toHaveCount(0);
+    },
+  },
+  {
+    name: "passkey: an unknown passkey is explained on the methods and the button works again",
+    path: flowPath("briefcase", "choose_method"),
+    routes: () => {
+      let refused = false;
+      return [
+        routeFlow(() => (refused ? { ...passkeyFlow(), error: { code: "passkey_unknown", message: "This passkey isn't on any Silicon Accounts account, or it was removed.", hint: "Sign in another way, then add a passkey under Security on the account site." } } as FlowView : passkeyFlow())),
+        ["POST /v1/flows/:id/passkey/options", () => ({ json: { challenge: randomBytes(32).toString("base64url"), rpId: "localhost", timeout: 60_000, userVerification: "preferred" } })],
+        ["POST /v1/flows/:id/passkey", () => {
+          refused = true;
+          return apiError(401, "passkey_unknown", "This passkey isn't on any Silicon Accounts account, or it was removed.", "Sign in another way, then add a passkey under Security on the account site.");
+        }],
+      ];
+    },
+    run: async ({ page, base }) => {
+      await virtualPasskey(page, base);
+      await page.getByRole("button", { name: "Sign In with a Passkey" }).click();
+      await expect(page.locator("[data-error-code]")).toHaveAttribute("data-error-code", "passkey_unknown");
+      await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toBeEnabled();
+    },
+  },
+  {
+    name: "passkey: the sign-up page doesn't offer a passkey (it only signs in an account that has one)",
+    path: flowPath("briefcase", "signup_intent"),
+    routes: () => {
+      const flow = sampleFlow(appOf("briefcase"), "signup_intent");
+      return [routeFlow(() => ({ ...flow, methods: [...flow.methods, "passkey"] } as FlowView))];
+    },
+    run: async ({ page }) => {
+      await expect(page.getByRole("heading", { name: /Sign up/ }).first()).toBeVisible();
+      await expect(page.getByRole("button", { name: "Sign In with a Passkey" })).toHaveCount(0);
+    },
+  },
   {
     name: "change: a refused address stays under its field instead of jumping back to the old code",
     path: flowPath("campus-connect", "verify_code"),

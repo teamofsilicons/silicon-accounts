@@ -33,7 +33,7 @@ export type TokenOrigin = "authorization_code" | "slt" | "silicon_login" | "devi
 export type VerifiedVia = "code" | "google" | "apple";
 export type Provider = "google" | "apple";
 /** Carbon sign-in methods an app can enable. */
-export type SigninMethod = "google" | "apple" | "email" | "phone";
+export type SigninMethod = "google" | "apple" | "email" | "phone" | "passkey";
 /** Account details an app can require or optionally ask for. */
 export type ContactField = "email" | "phone" | "dob" | "timezone";
 /** OAuth scopes. `profile` is always granted; `openid` adds an id_token; `offline_access` is accepted and ignored. */
@@ -478,7 +478,8 @@ export interface AppleConfig {
 
 /** An app's whole sign-in configuration (no secrets). */
 export interface SigninConfig {
-  methods: { email: boolean; phone: boolean; google: boolean; apple: boolean };
+  /** `passkey`: on unless the app turns it off; it only signs in an account that already has one. */
+  methods: { email: boolean; phone: boolean; google: boolean; apple: boolean; passkey: boolean };
   method_order: SigninMethod[];
   google: GoogleConfig;
   apple: AppleConfig;

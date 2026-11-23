@@ -41,6 +41,32 @@ export function keepSession(id: string) {
   keptListeners.forEach(listener => listener());
 }
 
+/** The passkey offer on Home (Anil, 2026-11-23): "Not now" is remembered in this browser, as Keep is. */
+const PASSKEY_OFFER_KEY = "accounts.home.passkey-offer";
+const offerListeners = new Set<() => void>();
+
+export const subscribePasskeyOffer = (listener: () => void) => {
+  offerListeners.add(listener);
+  return () => offerListeners.delete(listener);
+};
+
+export function readPasskeyOfferDismissed(): boolean {
+  try {
+    return window.localStorage.getItem(PASSKEY_OFFER_KEY) === "dismissed";
+  } catch {
+    return false;
+  }
+}
+
+export function dismissPasskeyOffer() {
+  try {
+    window.localStorage.setItem(PASSKEY_OFFER_KEY, "dismissed");
+  } catch {
+    // Storage blocked: the offer comes back next visit.
+  }
+  offerListeners.forEach(listener => listener());
+}
+
 export interface Step {
   key: "provider" | "email" | "phone" | "devices";
   done: boolean;

@@ -30,7 +30,7 @@ async fn migrations_are_idempotent_and_seed_the_first_party_app() {
         .expect("config");
     assert_eq!(
         config.available_methods(&ctx.state.settings),
-        vec![Method::Email, Method::Phone]
+        vec![Method::Email, Method::Phone, Method::Passkey]
     );
     assert!(config.redirect_allowed(
         &ctx.state.settings,

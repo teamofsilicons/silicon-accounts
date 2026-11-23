@@ -9,7 +9,8 @@
  *                 askRotate; the new key is shown above the list until it is stored).
  *   Your sign-in  Google and Apple (connected with their email, or Connect; Unlink asks in a dialog that names the ways
  *                 in you keep, as the prototype's askUnlink), Email code and Text code (the emails and
- *                 phone numbers that get a code; the row opens them in a dialog at ?edit=email|phone).
+ *                 phone numbers that get a code; the row opens them in a dialog at ?edit=email|phone), then the
+ *                 passkeys (passkeys.tsx: Rename, Remove, and Add; Anil, 2026-11-23).
  *   Devices       where you are signed in: this device marked, the others with Sign Out; then "Sign out of all other
  *                 devices".
  *   Activity      the way to every sign-in and change.
@@ -45,6 +46,7 @@ import { SecretReveal } from "../parts/secret-reveal";
 import { ContactList, interfaceReturn, LinkResult, PROVIDER_NAMES, ProviderMark, securityHref } from "../sign-in-methods/sign-in-methods";
 import { sessionName } from "./sessions";
 import { LinkItem, LinkRow, Row, Section, Tile } from "../parts/rows";
+import { PasskeyRows } from "./passkeys";
 import styles from "./security.module.css";
 
 export function Security() {
@@ -229,6 +231,7 @@ function YourSignIn({ carbon, backTo }: { carbon: CarbonMe; backTo: string | nul
       {/* The prototype's srow: the whole row opens its list in a dialog (?edit=…), a chevron at its end. */}
       <LinkItem href={securityHref(backTo, "email")} replace scroll={false} lead={<Tile><AtSign size={16} strokeWidth={2} /></Tile>} title="Email code" detail={emails.length ? emails.join(", ") : "Not set up"} />
       <LinkItem href={securityHref(backTo, "phone")} replace scroll={false} lead={<Tile><Phone size={16} strokeWidth={2} /></Tile>} title="Text code" detail={phones.length ? phones.join(", ") : "Not set up"} />
+      <PasskeyRows carbon={carbon} returnTo={securityHref(backTo)} />
     </Section>
   );
 }
@@ -240,6 +243,7 @@ function otherWays(carbon: CarbonMe, without: IdentityView): string[] {
     .map(provider => PROVIDER_NAMES[provider]);
   if (carbon.emails.length) ways.push("an email code");
   if (carbon.phones.length) ways.push("a text code");
+  if (carbon.passkeys?.length) ways.push(carbon.passkeys.length === 1 ? "your passkey" : "your passkeys");
   return ways;
 }
 

@@ -44,7 +44,8 @@ pub(crate) async fn unlink(
     accounts_core::repo::accounts::lock(&mut tx, me.uuid()).await?;
     let (contacts, others): (i64, i64) = sqlx::query_as(
         "select (select count(*) from account_emails where account_uuid = $1) \
-              + (select count(*) from account_phones where account_uuid = $1), \
+              + (select count(*) from account_phones where account_uuid = $1) \
+              + (select count(*) from passkeys where account_uuid = $1), \
                 (select count(*) from identities where account_uuid = $1 \
                    and not (provider = $2 and subject = $3))",
     )

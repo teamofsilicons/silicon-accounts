@@ -115,6 +115,31 @@ pub struct IdentityView {
     pub last_used_at: Option<OffsetDateTime>,
 }
 
+/// A passkey in `Me.passkeys` and `GET /v1/me/passkeys`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PasskeyView {
+    pub id: uuid::Uuid,
+    pub name: String,
+    /// Synced to the Carbon's other devices by their password manager.
+    pub backed_up: bool,
+    #[serde(with = "crate::timefmt::rfc3339_ms")]
+    pub created_at: OffsetDateTime,
+    #[serde(with = "crate::timefmt::rfc3339_ms_option")]
+    pub last_used_at: Option<OffsetDateTime>,
+}
+
+impl From<&crate::repo::passkeys::Passkey> for PasskeyView {
+    fn from(p: &crate::repo::passkeys::Passkey) -> Self {
+        PasskeyView {
+            id: p.id,
+            name: p.name.clone(),
+            backed_up: p.backed_up,
+            created_at: p.created_at,
+            last_used_at: p.last_used_at,
+        }
+    }
+}
+
 impl From<&Identity> for IdentityView {
     fn from(i: &Identity) -> Self {
         IdentityView {
@@ -155,6 +180,8 @@ pub struct MeView {
     pub phones: Option<Vec<PhoneView>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub identities: Option<Vec<IdentityView>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub passkeys: Option<Vec<PasskeyView>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub custodian_of: Option<i64>,
     // Silicon only (`custodian` is present and may be null)
@@ -212,6 +239,7 @@ impl MeView {
             emails: None,
             phones: None,
             identities: None,
+            passkeys: None,
             custodian_of: None,
             custodian: None,
             webhook_url: None,
@@ -231,6 +259,7 @@ impl MeView {
         m.emails = Some(emails.iter().map(EmailView::from).collect());
         m.phones = Some(phones.iter().map(PhoneView::from).collect());
         m.identities = Some(identities.iter().map(IdentityView::from).collect());
+        m.passkeys = Some(Vec::new());
         m.custodian_of = Some(custodian_of);
         m
     }
@@ -255,13 +284,10 @@ pub async fn load_me(conn: &mut PgConnection, account: &Account) -> ApiResult<Me
             let identities = crate::repo::identities::list_for_account(conn, &account.uuid).await?;
             let custodian_of =
                 crate::repo::accounts::count_silicons_in_custody(conn, &account.uuid).await?;
-            Ok(MeView::carbon(
-                account,
-                &emails,
-                &phones,
-                &identities,
-                custodian_of,
-            ))
+            let passkeys = crate::repo::passkeys::list_for_account(conn, &account.uuid).await?;
+            let mut me = MeView::carbon(account, &emails, &phones, &identities, custodian_of);
+            me.passkeys = Some(passkeys.iter().map(PasskeyView::from).collect());
+            Ok(me)
         }
         AccountKind::Silicon => {
             let custodian = match &account.custodian_uuid {

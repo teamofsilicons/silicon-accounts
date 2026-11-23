@@ -49,6 +49,7 @@ pub mod timefmt;
 pub mod ting;
 pub mod uuid_migration;
 pub mod views;
+pub mod webauthn;
 
 #[cfg(feature = "test-support")]
 pub mod test_support;

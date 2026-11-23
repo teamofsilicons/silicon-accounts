@@ -122,6 +122,9 @@ pub struct Methods {
     pub phone: bool,
     pub google: bool,
     pub apple: bool,
+    /// On unless the app turns it off: a document saved before passkeys existed reads it as on
+    /// (`#[serde(default)]` takes the missing field from `Default`), so every app offers them.
+    pub passkey: bool,
 }
 
 impl Default for Methods {
@@ -131,6 +134,7 @@ impl Default for Methods {
             phone: false,
             google: false,
             apple: false,
+            passkey: true,
         }
     }
 }
@@ -142,6 +146,7 @@ impl Methods {
             Method::Phone => self.phone,
             Method::Google => self.google,
             Method::Apple => self.apple,
+            Method::Passkey => self.passkey,
         }
     }
 
@@ -151,10 +156,17 @@ impl Methods {
             Method::Phone => self.phone = on,
             Method::Google => self.google = on,
             Method::Apple => self.apple = on,
+            Method::Passkey => self.passkey = on,
         }
     }
 
     pub fn any(&self) -> bool {
+        self.email || self.phone || self.google || self.apple || self.passkey
+    }
+
+    /// True when a method that can start an account is on (a passkey only signs in an account
+    /// that already has one).
+    pub fn any_account_starting(&self) -> bool {
         self.email || self.phone || self.google || self.apple
     }
 }
@@ -565,7 +577,13 @@ impl Default for SigninConfig {
     fn default() -> Self {
         SigninConfig {
             methods: Methods::default(),
-            method_order: vec![Method::Google, Method::Apple, Method::Email, Method::Phone],
+            method_order: vec![
+                Method::Google,
+                Method::Apple,
+                Method::Email,
+                Method::Phone,
+                Method::Passkey,
+            ],
             google: GoogleConfig::default(),
             apple: AppleConfig::default(),
             redirect_uris: Vec::new(),
@@ -776,7 +794,7 @@ impl SigninConfig {
     pub fn normalize(&mut self) {
         let mut seen = BTreeSet::new();
         self.method_order.retain(|m| seen.insert(*m));
-        for m in [Method::Google, Method::Apple, Method::Email, Method::Phone] {
+        for m in Method::ALL.iter().copied() {
             if !self.method_order.contains(&m) {
                 self.method_order.push(m);
             }
@@ -854,10 +872,10 @@ impl SigninConfig {
     pub fn validate(&self, secrets: ConfigSecretsPresent) -> Result<(), FieldErrors> {
         let mut e = FieldErrors::new();
 
-        if !self.methods.any() {
+        if !self.methods.any_account_starting() {
             e.add(
                 "methods",
-                "at least one sign-in method (email, phone, google or apple) must be enabled",
+                "at least one sign-in method (email, phone, google or apple) must be enabled; a passkey only signs in an account that already has one",
             );
         }
 
@@ -1040,6 +1058,7 @@ impl SigninConfig {
                 phone: true,
                 google: settings.google.managed_configured(),
                 apple: settings.apple.managed_configured(),
+                passkey: true,
             };
             self.google.mode = ProviderMode::Managed;
             self.apple.mode = ProviderMode::Managed;
@@ -1979,7 +1998,13 @@ mod tests {
             .expect("valid");
         assert_eq!(
             c.method_order,
-            vec![Method::Email, Method::Google, Method::Apple, Method::Phone]
+            vec![
+                Method::Email,
+                Method::Google,
+                Method::Apple,
+                Method::Phone,
+                Method::Passkey
+            ]
         );
         assert_eq!(c.allowed_email_domains, vec!["university.test"]);
         assert!(c.email_domain_allowed("a@university.test"));
@@ -2326,20 +2351,28 @@ mod tests {
         assert!(c.methods.email && c.methods.phone && !c.methods.google && !c.methods.apple);
         assert_eq!(
             c.available_methods(&settings),
-            vec![Method::Email, Method::Phone]
+            vec![Method::Email, Method::Phone, Method::Passkey]
         );
         settings.google.client_id = Some("id".into());
         settings.google.client_secret = Some(secrecy::SecretString::from("secret"));
         let c = SigninConfig::default().effective(&settings, "silicon-accounts");
         assert_eq!(
             c.available_methods(&settings),
-            vec![Method::Google, Method::Email, Method::Phone]
+            vec![
+                Method::Google,
+                Method::Email,
+                Method::Phone,
+                Method::Passkey
+            ]
         );
         // Managed Google without managed credentials is hidden for other apps too.
         let other = SigninConfig::default()
             .apply_patch(&json!({"methods": {"apple": true}}), no_secrets())
             .expect("valid");
-        assert_eq!(other.available_methods(&settings), vec![Method::Email]);
+        assert_eq!(
+            other.available_methods(&settings),
+            vec![Method::Email, Method::Passkey]
+        );
 
         // The developer site: same rules, details never asked, one exact redirect URI.
         let stored = with_details(&["email"], &["timezone"])

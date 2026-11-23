@@ -33,7 +33,7 @@ async fn creates_a_bound_flow_with_the_spec_view() {
     assert_eq!(f["app"]["app_id"], app.app_id);
     assert_eq!(f["app"]["first_party"], false);
     assert_eq!(f["app"]["branding"]["light"]["primary"], "#1F5FB8");
-    assert_eq!(f["methods"], json!(["email"]));
+    assert_eq!(f["methods"], json!(["email", "passkey"]));
     assert_eq!(f["signed_in_as"], serde_json::Value::Null);
     assert_eq!(f["challenge"], serde_json::Value::Null);
     assert_eq!(f["redirect_to"], serde_json::Value::Null);
@@ -264,7 +264,10 @@ async fn first_party_redirects_stay_on_the_site() {
     let r = start_flow(&ctx, &mut b, "silicon-accounts", json!({})).await;
     assert_eq!(r.status, 201, "{}", r.json);
     assert_eq!(r.json["flow"]["app"]["first_party"], true);
-    assert_eq!(r.json["flow"]["methods"], json!(["email", "phone"]));
+    assert_eq!(
+        r.json["flow"]["methods"],
+        json!(["email", "phone", "passkey"])
+    );
     let r = start_flow(
         &ctx,
         &mut b,

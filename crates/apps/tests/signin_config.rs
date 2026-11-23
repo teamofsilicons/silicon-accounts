@@ -353,7 +353,7 @@ async fn byo_secrets_are_encrypted_masked_and_never_in_history() {
         .clone();
     assert_eq!(
         methods,
-        json!(["google", "apple", "email"]),
+        json!(["google", "apple", "email", "passkey"]),
         "BYO providers show without managed credentials"
     );
 

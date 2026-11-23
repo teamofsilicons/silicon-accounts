@@ -283,6 +283,29 @@ Errors:
 - 410 `code_expired` (after 10 minutes, or replaced by a resend); 409 `code_already_used`.
 - 409 `invalid_step`: the flow isn't at `verify_code`, so no code was sent.
 - 403 `signup_not_allowed` (the app takes no new accounts); 403 `email_domain_not_allowed`.
+
+### `POST /v1/flows/{id}/passkey/options`
+
+The request options for `navigator.credentials.get()` (`PublicKeyCredentialRequestOptionsJSON`): a
+challenge, the RP ID (the host of the Silicon Accounts site) and no allow list, so the browser
+offers the Carbon's own passkey for this site. The challenge is kept on the flow and used once.
+403 `method_not_enabled` when the app turned passkeys off (`methods.passkey: false`); 429 after
+60 a minute from one address.
+
+### `POST /v1/flows/{id}/passkey`
+
+`{"credential": PublicKeyCredential.toJSON()}` from `navigator.credentials.get()`. A passkey on an
+active account signs the browser in (`Set-Cookie: sa_session=…`) and moves on like a right code
+(`details` or `complete`); the sign-in is recorded with `method: "passkey"`. A passkey never signs
+anyone up: a Carbon adds one on the account site (`POST /v1/me/passkeys`).
+
+Errors (each leaves the flow at `choose_method` with `error` set):
+
+- 401 `passkey_unknown`: no account has this passkey (never added, or removed).
+- 401 `passkey_invalid`: the answer doesn't check out (made on another origin, a signature that
+  doesn't verify, a signature counter that went backwards).
+- 409 `passkey_challenge_missing`: the answer isn't for this flow's current request (already used).
+- 409 `account_unavailable`; 403 `email_domain_not_allowed`.
 - 409 `account_unavailable`: the address belongs to an account that can't sign in.
 - 409 `flow_changed`: the flow moved in another tab.
 

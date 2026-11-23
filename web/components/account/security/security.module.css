@@ -32,6 +32,7 @@
 .skeleton { display: grid; gap: var(--space-section); margin-top: var(--space-section); }
 .skeletonSection { display: grid; gap: var(--space-inset); }
 /* Unlink's dialog: Cancel then Unlink at the end (decisions.md, Dialog rules 6). */
+.dialogForm { display: grid; }
 .dialogActions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-related); margin-top: var(--space-group); }
 
 @media (max-width: 639px) {

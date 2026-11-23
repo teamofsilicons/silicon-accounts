@@ -10,11 +10,15 @@
  * and "Send Me a Code". The app's own title (copy.title) stays the browser tab's title and the split layout's large
  * text. The prototype's "No passwords" note is gone (Anil, 2026-11-19).
  *
+ * A passkey (Anil, 2026-11-23) is one more button with the providers, "Sign In with a Passkey", where the browser can use
+ * passkeys and the app offers them; the email field's autofill offers this browser's passkeys too. It signs in only an
+ * account that already has one, so the sign-up page doesn't show it.
+ *
  * `method` narrows the page to one method until the Carbon asks for the others: email or phone opens on that empty
  * field (nothing is ever filled in for the Carbon: an app cannot hand us an email or phone, and login_hint is ignored);
  * Google and Apple first show the Opening page (steps/opening.tsx), and this page only when they come back.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import type { ApiError } from "@/lib/api/errors";
@@ -23,10 +27,11 @@ import { useFinePointer } from "../flow/hooks";
 import { AppMark } from "@/components/account/parts/app-mark";
 import { usePaint, useTosFrame } from "../flow/hosted-frame";
 import { brandLogo } from "@/lib/branding/apply";
+import { canAutofillPasskeys, usePasskeySupport } from "@/lib/passkey";
 import { normalizeBranding } from "@/lib/branding/defaults";
 import type { Branding } from "@/lib/api/types";
 import { firstName, intentOf, isProvider, type HostedFlow } from "../flow/model";
-import { AccountRow, ContactForm, FlowAlert, OrDivider, ProviderButton, StepHeading, contactKinds, useStepErrors, type ContactKind } from "../flow/parts";
+import { AccountRow, ContactForm, FlowAlert, OrDivider, PasskeyButton, ProviderButton, StepHeading, contactKinds, useStepErrors, type ContactKind } from "../flow/parts";
 import styles from "../flow/flow.module.css";
 
 export interface ContactMemory {
@@ -85,6 +90,10 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
   const narrowed = !changing && !showAll && !!hint && methods.includes(hint) && methods.length > 1;
   const visibleProviders = changing ? [] : narrowed ? providers.filter(method => method === hint) : providers;
   const visibleContacts = narrowed ? contacts.filter(kind => kind === hint) : contacts;
+  // Known in the browser only (the server can't tell what this browser does).
+  const passkeysHere = usePasskeySupport();
+  const passkeyOffered = methods.includes("passkey") && !signup && passkeysHere;
+  const showPasskey = passkeyOffered && !changing && (!narrowed || hint === "passkey");
   /** What "Send the code somewhere else" asks for: the kinds the app offers. */
   const changeTarget = contacts.length > 1 ? "email or phone number" : contacts[0] === "phone" ? "phone number" : "email address";
   const firstProvider = methods.findIndex(isProvider);
@@ -92,6 +101,34 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
   const providersFirst = firstProvider >= 0 && (firstContact < 0 || firstProvider < firstContact);
   const signedIn = changing ? null : flow.signed_in_as;
   const initialKind: ContactKind | undefined = memory.kind ?? (hint === "email" || hint === "phone" ? hint : undefined);
+
+  /** The autofill's wait for a passkey; a button press stops it first (one ceremony at a time). */
+  const autofill = useRef<AbortController | null>(null);
+
+  const signInWithPasskey = async () => {
+    autofill.current?.abort();
+    errors.begin();
+    setBusy("passkey");
+    const failure = await ctl.passkey();
+    setBusy(null);
+    if (failure) errors.fail(failure);
+  };
+
+  // The email field offers this browser's passkeys in its autofill while the page waits for a choice.
+  const signedInAs = flow.signed_in_as;
+  useEffect(() => {
+    if (!passkeyOffered || changing || signedInAs) return;
+    const controller = new AbortController();
+    autofill.current = controller;
+    void canAutofillPasskeys().then(async can => {
+      if (!can || controller.signal.aborted) return;
+      const failure = await ctl.passkey({ autofill: true, signal: controller.signal });
+      if (failure && !controller.signal.aborted && failure.code !== "passkey_failed") errors.fail(failure);
+    });
+    return () => controller.abort();
+    // errors is a fresh object each render; the wait only depends on whether a passkey can be offered here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passkeyOffered, changing, signedInAs, ctl]);
 
   const startProvider = async (provider: "google" | "apple") => {
     errors.begin();
@@ -137,11 +174,12 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
     return failure;
   };
 
-  const providerButtons = visibleProviders.length ? (
-    <div className={styles.providers} data-count={visibleProviders.length}>
+  const providerButtons = visibleProviders.length || showPasskey ? (
+    <div className={styles.providers} data-count={visibleProviders.length + (showPasskey ? 1 : 0)}>
       {visibleProviders.map(provider => (
         <ProviderButton key={provider} provider={provider} variant="soft" loading={busy === provider} disabled={!!busy && busy !== provider} onClick={() => void startProvider(provider)} />
       ))}
+      {showPasskey ? <PasskeyButton variant="soft" loading={busy === "passkey"} disabled={!!busy && busy !== "passkey"} onClick={() => void signInWithPasskey()} /> : null}
     </div>
   ) : null;
   const contactForm = visibleContacts.length ? (
@@ -155,6 +193,7 @@ export function ChooseMethod({ flow, ctl, notice, memory, onSent, changing, onBa
       autoFocus={fine && !signedIn}
       errorContext={{ app: flow.app.name }}
       kindsLabel={signup ? "Sign up with" : "Sign in with"}
+      passkeyAutofill={passkeyOffered}
     />
   ) : null;
   const both = !!providerButtons && !!contactForm;

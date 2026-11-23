@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use accounts_core::{ApiResult, AppState};
 use axum::Router;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, patch, post};
 use sqlx::PgPool;
 use tokio::task::JoinHandle;
 
@@ -36,6 +36,7 @@ mod interface_profile;
 mod lookup;
 mod my_apps;
 mod organizations;
+mod passkeys;
 mod photos;
 mod profile;
 mod sessions;
@@ -90,6 +91,12 @@ pub fn router() -> Router<AppState> {
         .route(
             "/v1/me/identities/{provider}/{subject}",
             delete(identities::unlink),
+        )
+        .route("/v1/me/passkeys", get(passkeys::list).post(passkeys::add))
+        .route("/v1/me/passkeys/options", post(passkeys::options))
+        .route(
+            "/v1/me/passkeys/{id}",
+            patch(passkeys::rename).delete(passkeys::remove),
         )
         .route("/v1/me/apps", get(my_apps::list))
         .route("/v1/me/apps/{app_id}", delete(my_apps::remove_access))

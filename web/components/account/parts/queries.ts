@@ -14,13 +14,16 @@
  * - `useCreateSiliconOnce`, `useRotateStkOnce`: the shared secret actions (lib/query
  *   useSecretMutation: never cached, reset after hand-off); the names stay for the pages that use them.
  * - `useChangeOwnId`, `useChangeSiliconIdInForm`: id changes whose refusals the id form explains in place (no toast).
+ * - `useAddPasskey`, `useRenamePasskey`, `useRemovePasskey`: /v1/me/passkeys (adding runs the browser ceremony in
+ *   lib/passkey.ts between the two calls).
  */
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/endpoints";
 import type { ApiError } from "@/lib/api/errors";
 import { request } from "@/lib/api/http";
-import type { CustodianRequest, EmailView, IdAvailability, ManagedSilicon, Me, MyApp, MyProof, Page, PendingTransfer, PhoneView, Provider, SessionInfo, Timestamp, TransferRequest } from "@/lib/api/types";
+import type { CustodianRequest, EmailView, IdAvailability, ManagedSilicon, Me, MyApp, MyProof, Page, PasskeyView, PendingTransfer, PhoneView, Provider, SessionInfo, Timestamp, TransferRequest } from "@/lib/api/types";
+import { createPasskey } from "@/lib/passkey";
 import { queryKeys } from "@/lib/query/keys";
 import { setMe } from "@/lib/query/session";
 
@@ -153,6 +156,52 @@ export function useUnlinkProvider() {
       void client.invalidateQueries({ queryKey: queryKeys.me.view });
     },
     { errorTitle: "It is still linked" },
+  );
+}
+
+/** Puts the account's passkeys into the cached Me view and reads it again. */
+function storePasskeys(client: ReturnType<typeof useQueryClient>, change: (list: PasskeyView[]) => PasskeyView[]): void {
+  client.setQueryData<Me>(queryKeys.me.view, me => (me && me.kind === "carbon" ? { ...me, passkeys: change(me.passkeys ?? []) } : me));
+  void client.invalidateQueries({ queryKey: queryKeys.me.view });
+}
+
+/**
+ * Adds a passkey: the API's options, the browser's passkey sheet, the answer back. Resolves with the passkey, or null
+ * when the person cancelled the sheet. Errors: 403 reauthentication_required (sign in again first), 409 passkey_in_use,
+ * a PasskeyError from the browser.
+ */
+export function useAddPasskey() {
+  const client = useQueryClient();
+  return useMutation<PasskeyView | null, ApiError | Error, { name: string }>({
+    mutationFn: async ({ name }) => {
+      const options = await api.me.passkeys.options();
+      const credential = await createPasskey(options);
+      if (!credential) return null;
+      return api.me.passkeys.add(credential, name);
+    },
+    onSuccess: added => {
+      if (added) storePasskeys(client, list => [...list.filter(item => item.id !== added.id), added]);
+    },
+    meta: { toast: false },
+  });
+}
+
+/** Renames a passkey. */
+export function useRenamePasskey() {
+  const client = useQueryClient();
+  return useMutation<PasskeyView, ApiError, { id: string; name: string }>({
+    mutationFn: ({ id, name }) => api.me.passkeys.rename(id, name),
+    onSuccess: renamed => storePasskeys(client, list => list.map(item => (item.id === renamed.id ? renamed : item))),
+    meta: { toast: false },
+  });
+}
+
+/** Removes a passkey; the row shows "Removed" first. 409 last_sign_in_method. */
+export function useRemovePasskey() {
+  return useSettledMutation(
+    (id: string) => api.me.passkeys.remove(id),
+    (client, _data, id) => storePasskeys(client, list => list.filter(item => item.id !== id)),
+    { errorTitle: "The passkey is still on your account" },
   );
 }
 

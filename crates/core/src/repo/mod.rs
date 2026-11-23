@@ -20,6 +20,7 @@ pub mod identities;
 pub mod memberships;
 pub mod organizations;
 pub mod otp;
+pub mod passkeys;
 pub mod photos;
 pub mod publishing;
 pub mod rate_limit;

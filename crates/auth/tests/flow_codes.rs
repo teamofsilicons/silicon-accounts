@@ -410,10 +410,13 @@ async fn phone_codes_use_e164_and_need_the_method() {
         .await;
     assert_eq!(r.status, 403);
     assert_eq!(r.error_code(), Some("method_not_enabled"));
-    assert_eq!(r.json["error"]["details"]["methods"], json!(["email"]));
+    assert_eq!(
+        r.json["error"]["details"]["methods"],
+        json!(["email", "passkey"])
+    );
 
     let f = new_flow(&ctx, &mut b, &app.app_id, json!({})).await;
-    assert_eq!(f["methods"], json!(["email", "phone"]));
+    assert_eq!(f["methods"], json!(["email", "phone", "passkey"]));
     let id = id_of(&f);
     let r = b
         .post(

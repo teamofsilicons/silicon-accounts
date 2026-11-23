@@ -12,12 +12,15 @@
  * time left, grey over a week, amber from a week, red under 3 days, "Ends today" under a day; or the device's last use),
  * and at most one outlined button, so nothing in the list is filled; the device also has Keep, a soft grey button (Anil, 2026-11-11). The next item appears when the current one is handled.
  *
+ * And once, until it is added or set aside (Anil, 2026-11-23): "Sign in faster with a passkey" when the Carbon has none
+ * and this browser can make one, with Add and a soft Not Now (remembered in this browser), after everything else.
+ *
  * With more than one waiting, "1 of 5" and previous and next buttons beside the heading step through them, the new item
  * sliding in from the side it comes from (Anil, 2026-11-21, the Arrows design in /__needs).
  */
 import Image from "next/image";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Laptop, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, KeyRound, Laptop, TriangleAlert } from "lucide-react";
 import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { ButtonLink } from "@teamofsilicons/silicon-ui/button-link";
@@ -25,9 +28,13 @@ import type { CustodianRequest, SessionInfo } from "@/lib/api/types";
 import { useMe } from "@/lib/query/session";
 import { NEEDS_YOU_ID } from "./parts/anchors";
 import { browserLogo, browserOf } from "./parts/browser";
-import { keepSession, readKept, staleSessions, STALE_MS, subscribeKept } from "./parts/checkup";
+import { dismissPasskeyOffer, keepSession, readKept, readPasskeyOfferDismissed, staleSessions, STALE_MS, subscribeKept, subscribePasskeyOffer } from "./parts/checkup";
+import { ApiError } from "@/lib/api/errors";
+import { passkeyNameHere, usePasskeySupport } from "@/lib/passkey";
+import { firstPartySignInUrl } from "@/lib/query/session";
+import { paths } from "@/lib/navigation";
 import { asCarbon, describeError, msUntil, personLabel, spanText, useNow } from "./parts/common";
-import { useEveryCustodianRequest, useEverySession, useSignOutSession } from "./parts/queries";
+import { useAddPasskey, useEveryCustodianRequest, useEverySession, useSignOutSession } from "./parts/queries";
 import { SiliconMark } from "./parts/silicon-mark";
 import { sessionName } from "./security/sessions";
 import { requestHref } from "./silicons/request-page";
@@ -42,6 +49,8 @@ export function HomeNeeds() {
   const sessions = useEverySession();
   const now = useNow(30_000);
   const kept = useSyncExternalStore(subscribeKept, readKept, () => "");
+  const passkeysHere = usePasskeySupport();
+  const offerDismissed = useSyncExternalStore(subscribePasskeyOffer, readPasskeyOfferDismissed, () => true);
   if (!carbon) return null;
 
   // The requests are part of the answer: wait for them rather than say "all set" too early.
@@ -49,13 +58,15 @@ export function HomeNeeds() {
   const waiting = requests.data?.items ?? [];
   const failed = !!requests.error && !requests.data;
   const stale = staleSessions(sessions.data?.items, now, kept);
+  // An API that doesn't list passkeys yet (no `passkeys` field) never gets the offer.
+  const offer = passkeysHere && !offerDismissed && carbon.passkeys !== undefined && carbon.passkeys.length === 0;
 
   // Nothing waiting: nothing to show (no "You're all set", Anil 2026-10-31).
-  if (!waiting.length && !failed && !stale.length) return null;
+  if (!waiting.length && !failed && !stale.length && !offer) return null;
 
   return (
     <div id={NEEDS_YOU_ID} className={styles.group} tabIndex={-1}>
-      <Requests id={NEEDS_YOU_ID} title="Needs you" limit={1} waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={stale} now={now} />
+      <Requests id={NEEDS_YOU_ID} title="Needs you" limit={1} waiting={waiting} failed={failed} error={requests.error} retry={() => void requests.refetch()} stale={stale} offer={offer} now={now} />
     </div>
   );
 }
@@ -85,13 +96,15 @@ function timeLeft(request: CustodianRequest, now: number): { text: string; tone:
   return { text: `${spanText(left)} left`, tone: left < 3 * DAY ? "danger" : left <= 7 * DAY ? "warning" : "neutral", used };
 }
 
-function Requests({ id, title, limit, waiting, failed, error, retry, stale, now }: { id: string; title: string; limit?: number; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo[]; now: number }) {
+function Requests({ id, title, limit, waiting, failed, error, retry, stale, offer = false, now }: { id: string; title: string; limit?: number; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo[]; offer?: boolean; now: number }) {
   const signOut = useSignOutSession();
   // Paging (only with a limit): which item leads, and the way the last step went, so the new one slides in from there.
   const [page, setPage] = useState<{ start: number; step: "next" | "previous" | null }>({ start: 0, step: null });
   const items = [
     ...waiting.map(request => ({ kind: "request" as const, id: request.id, date: Date.parse(request.created_at), request })),
     ...stale.map(session => ({ kind: "device" as const, id: session.id, date: Date.parse(session.last_seen_at ?? session.created_at) + STALE_MS, session })),
+    // The passkey offer waits on nothing, so it comes after everything that does.
+    ...(offer ? [{ kind: "passkey" as const, id: "passkey-offer", date: 0 }] : []),
   ].sort((a, b) => b.date - a.date || a.id.localeCompare(b.id));
   const paged = !!limit && items.length > limit;
   // An item handled elsewhere can shorten the list: stay on the last one there is.
@@ -118,6 +131,7 @@ function Requests({ id, title, limit, waiting, failed, error, retry, stale, now 
           </Row>
         ) : null}
         {items.slice(start, limit ? start + limit : undefined).map(item => {
+          if (item.kind === "passkey") return <PasskeyOffer key="passkey-offer" enter={page.step} />;
           if (item.kind === "device") {
             const session = item.session;
             return (
@@ -140,6 +154,34 @@ function Requests({ id, title, limit, waiting, failed, error, retry, stale, now 
         })}
       </ul>
     </section>
+  );
+}
+
+/**
+ * "Sign in faster with a passkey" (Anil, 2026-11-23): Add makes one here (lib/passkey.ts); Not Now sets the offer aside
+ * in this browser. A sign-in older than 30 minutes is asked again first, and comes back to Security to press Add.
+ */
+function PasskeyOffer({ enter }: { enter?: "next" | "previous" | null }) {
+  const add = useAddPasskey();
+  const [error, setError] = useState<string | null>(null);
+  const start = async () => {
+    setError(null);
+    try {
+      await add.mutateAsync({ name: passkeyNameHere() });
+    } catch (raw) {
+      if (raw instanceof ApiError && raw.code === "reauthentication_required") {
+        window.location.assign(firstPartySignInUrl(`${paths.signInMethods}?add=passkey`, { prompt: "login" }));
+        return;
+      }
+      setError(raw instanceof Error && !(raw instanceof ApiError) ? raw.message : describeError(raw));
+    }
+  };
+  return (
+    <Row enter={enter} lead={<span data-sq="surface" className={styles.icon} aria-hidden="true"><KeyRound size={16} strokeWidth={2} /></span>}
+      title="Sign in faster with a passkey" detail={error ?? "Face ID, Touch ID or your screen lock, instead of a code"}>
+      <Button variant="soft" size="sm" disabled={add.isPending} onClick={dismissPasskeyOffer}>Not Now</Button>
+      <Button variant="secondary" size="sm" loading={add.isPending} onClick={() => void start()}>Add</Button>
+    </Row>
   );
 }
 

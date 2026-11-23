@@ -87,7 +87,7 @@ export function SignIn() {
 }
 
 const PROMPTS: readonly FlowPrompt[] = ["login", "select_account", "consent"];
-const METHODS: readonly SigninMethod[] = ["google", "apple", "email", "phone"];
+const METHODS: readonly SigninMethod[] = ["google", "apple", "email", "phone", "passkey"];
 
 function SignInRoundTrip() {
   const router = useRouter();

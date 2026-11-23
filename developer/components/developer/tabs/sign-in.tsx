@@ -79,6 +79,7 @@ export function SignInTab() {
   const methodInfo = (method: SigninMethod): MethodRowInfo => {
     if (method === "email") return { status: "A 6 digit code by email, valid for 10 minutes" };
     if (method === "phone") return { status: "A 6 digit code by SMS, valid for 10 minutes" };
+    if (method === "passkey") return { status: "Signs in a Carbon who added a passkey on the account site; never creates an account" };
     if (draft[method].mode === "managed") {
       return {
         status: `One click, with Silicon Accounts' ${METHOD_LABEL[method]} setup`,

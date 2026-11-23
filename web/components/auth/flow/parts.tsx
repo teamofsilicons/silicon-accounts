@@ -8,7 +8,7 @@
  */
 import { createContext, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode, type RefObject } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Transition, type Variants } from "motion/react";
-import { Check, Mail, Smartphone } from "lucide-react";
+import { Check, KeyRound, Mail, Smartphone } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
 import { Button } from "@teamofsilicons/silicon-ui/button";
@@ -301,6 +301,18 @@ export function ProviderButton({ provider, loading, disabled, onClick, variant =
   );
 }
 
+/** "Sign In with a Passkey": the same neutral button as the providers, with a key. */
+export function PasskeyButton({ loading, disabled, onClick, variant = "secondary" }: { loading?: boolean; disabled?: boolean; onClick: () => void; variant?: "secondary" | "soft" }) {
+  return (
+    <Button type="button" variant={variant} className={styles.wide} loading={loading} disabled={disabled} data-method="passkey" onClick={onClick}>
+      <span className={styles.providerLabel}>
+        <KeyRound className={styles.mark} size={18} strokeWidth={2} aria-hidden="true" />
+        Sign In with a Passkey
+      </span>
+    </Button>
+  );
+}
+
 /** The line between the ways in: "or", or what comes next ("or get a code", the prototype's words above the field). */
 export function OrDivider({ label = "or" }: { label?: string }) {
   return (
@@ -546,6 +558,8 @@ export interface ContactFormProps {
   errorContext?: ErrorContext;
   /** No longer shown (the Email | Phone switch became one field); kept so callers needn't change. */
   kindsLabel?: string;
+  /** The field's autofill also offers this browser's passkeys (`autocomplete="… webauthn"`). */
+  passkeyAutofill?: boolean;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -571,7 +585,7 @@ const regionName = (iso: string): string => {
  * likely country (guessCountry), which the line under the field names, with "Choose Country" opening PhoneField's
  * country picker for anyone abroad. One kind alone keeps its own field.
  */
-export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, submitLabel, onSubmit, autoFocus, note, errorContext }: ContactFormProps) {
+export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, submitLabel, onSubmit, autoFocus, note, errorContext, passkeyAutofill }: ContactFormProps) {
   const both = kinds.includes("email") && kinds.includes("phone");
   const [kind] = useState<ContactKind>(() => (initialKind && kinds.includes(initialKind) ? initialKind : kinds[0] ?? "email"));
   const [email, setEmail] = useState(initialEmail ?? "");
@@ -649,7 +663,7 @@ export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, su
             type="text"
             name="username"
             inputMode="email"
-            autoComplete="username"
+            autoComplete={passkeyAutofill ? "username webauthn" : "username"}
             autoCapitalize="off"
             spellCheck={false}
             value={typed}
@@ -675,7 +689,7 @@ export function ContactForm({ kinds, initialKind, initialEmail, initialPhone, su
           type="email"
           name="email"
           inputMode="email"
-          autoComplete="email"
+          autoComplete={passkeyAutofill ? "email webauthn" : "email"}
           autoCapitalize="off"
           spellCheck={false}
           value={email}

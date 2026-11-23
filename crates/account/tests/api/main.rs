@@ -12,5 +12,6 @@ mod identities;
 mod lookup;
 mod me;
 mod organizations;
+mod passkeys;
 mod photos;
 mod sessions;
