@@ -142,8 +142,11 @@ except Exception:
     for url in HEALTH:
         healthy(url)
     raise
-(root / 'previous-release').write_text(str(baseline) + '\n')
-(root / 'previous-release').chmod(0o600)
+# previous-release is a symlink to the release a rollback restores (the overlays since 2026-11 keep it that way).
+link = root / 'previous-release.next'
+link.unlink(missing_ok=True)
+link.symlink_to(baseline)
+os.replace(link, root / 'previous-release')
 receipt = {key: manifest[key] for key in ('release', 'revision', 'baseline', 'bucket')}
 receipt.update(backup_key=backup_key, backup_sha256=sha(backup), migration_version=int(SCHEMA_TO),
                prior_static_files_kept=kept, unchanged_configuration=True, health='passed',
