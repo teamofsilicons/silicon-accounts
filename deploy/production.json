@@ -164,7 +164,7 @@
   "WebPr25Verification": "deploy/verification-web-pr25-2026-11-18.json",
   "DeveloperInviteePicturesVerification": "deploy/verification-developer-invitee-pictures-2026-11-18.json",
   "DeveloperFiltersVerification": "deploy/verification-compact-developer-filters-2026-11-18.json",
-  "MainMatchesLiveRevision": null,
+  "MainMatchesLiveRevision": "97af13e73903d144c5e56bb2c7466fdefab9be60",
   "WebPr26Verification": "deploy/verification-web-pr26-2026-11-19.json",
   "PasskeysVerification": "deploy/verification-passkeys-2026-11-24.json"
 }

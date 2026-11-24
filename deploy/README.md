@@ -226,7 +226,7 @@ Rollback: point `current` at `previous-release` (`dc18dd7`) and restart both uni
 
 Release `accounts-passkeys-bf1379c` (source `bf1379c`) is live with migration 0045: Carbons add passkeys on Security and
 sign in with them on every hosted sign-in page (teamofsilicons/silicon-accounts#27, with 3118014: the sign-in page asks
-for passkey options one at a time). PR 27 is not merged yet, so main does not match production until it is. It is an
+for passkey options one at a time). PR 27 is merged (97af13e), so main has the live source plus these records. It is an
 API, migrations, web and Developer overlay on the live release `60e4374` ([passkeys-cutover.py](passkeys-cutover.py)):
 Node, Caddy, `/etc/accounts` and the `accounts-*` units kept byte for byte (hash-checked), the previous builds' static
 files kept for open tabs. Verified backup `backups/predeploy-passkeys-20261123T212330Z.dump` first; the live API kept
