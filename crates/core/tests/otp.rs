@@ -624,3 +624,179 @@ fn created_challenges_never_print_their_code() {
     );
     assert!(!printed.contains("424242"), "{printed}");
 }
+
+#[tokio::test]
+async fn verify_with_external_sms_verifier_checks_phone_and_leaves_email_local() {
+    use accounts_core::delivery::{SendError, SmsCodeVerifier, VerifyCheckOutcome};
+    use async_trait::async_trait;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct ScriptedVerifier {
+        calls: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl SmsCodeVerifier for ScriptedVerifier {
+        async fn check(&self, _to: &str, code: &str) -> Result<VerifyCheckOutcome, SendError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            match code {
+                "654321" => Ok(VerifyCheckOutcome::Approved),
+                "404000" => Ok(VerifyCheckOutcome::ExpiredOrMaxAttempts),
+                "503000" => Err(SendError::retryable("provider down")),
+                _ => Ok(VerifyCheckOutcome::WrongCode),
+            }
+        }
+        fn name(&self) -> &'static str {
+            "scripted"
+        }
+    }
+
+    let ctx = TestContext::new().await;
+    let verifier = ScriptedVerifier {
+        calls: AtomicUsize::new(0),
+    };
+
+    // Phone challenge delegates to the external SMS verifier.
+    let phone = otp::send(
+        &mut *ctx.conn().await,
+        &ctx.state.keys.pepper,
+        &ctx.state.settings,
+        &NewChallenge {
+            purpose: OtpPurpose::AddPhone,
+            channel: OtpChannel::Phone,
+            destination: "+918894979874",
+            account_uuid: None,
+            flow_id: None,
+            ip: None,
+        },
+    )
+    .await
+    .expect("phone challenge");
+
+    // Provider 503 returns 503 and does NOT increment failed_streak.
+    let err = otp::verify_with_verifier(
+        &ctx.state.db,
+        &ctx.state.keys.pepper,
+        &ctx.state.settings,
+        phone.challenge.id,
+        "503000",
+        &Expect::default(),
+        None,
+        Some(&verifier),
+    )
+    .await
+    .expect_err("503");
+    assert_eq!(err.status.as_u16(), 503);
+    assert_eq!(err.code, "sms_verification_unavailable");
+
+    // Wrong code increments streak (remaining_attempts = 9, proving 503 didn't count).
+    let err = otp::verify_with_verifier(
+        &ctx.state.db,
+        &ctx.state.keys.pepper,
+        &ctx.state.settings,
+        phone.challenge.id,
+        "111111",
+        &Expect::default(),
+        None,
+        Some(&verifier),
+    )
+    .await
+    .expect_err("wrong");
+    assert_eq!(err.code, "invalid_code");
+    assert_eq!(err.details["remaining_attempts"], 9);
+
+    // Right code from Twilio Verify succeeds (even though it differs from local phone.code).
+    let ok = otp::verify_with_verifier(
+        &ctx.state.db,
+        &ctx.state.keys.pepper,
+        &ctx.state.settings,
+        phone.challenge.id,
+        "654321",
+        &Expect::default(),
+        None,
+        Some(&verifier),
+    )
+    .await
+    .expect("approved");
+    assert!(ok.consumed_at.is_some());
+
+    // Reusing the consumed challenge returns 409 WITHOUT calling the provider again.
+    let before = verifier.calls.load(Ordering::SeqCst);
+    let err = otp::verify_with_verifier(
+        &ctx.state.db,
+        &ctx.state.keys.pepper,
+        &ctx.state.settings,
+        phone.challenge.id,
+        "654321",
+        &Expect::default(),
+        None,
+        Some(&verifier),
+    )
+    .await
+    .expect_err("already used");
+    assert_eq!(err.code, "code_already_used");
+    assert_eq!(verifier.calls.load(Ordering::SeqCst), before);
+
+    // ExpiredOrMaxAttempts expires the challenge in DB and returns 410 code_expired.
+    let phone2 = otp::send(
+        &mut *ctx.conn().await,
+        &ctx.state.keys.pepper,
+        &ctx.state.settings,
+        &NewChallenge {
+            purpose: OtpPurpose::AddPhone,
+            channel: OtpChannel::Phone,
+            destination: "+918894979874",
+            account_uuid: None,
+            flow_id: None,
+            ip: None,
+        },
+    )
+    .await
+    .expect("phone2");
+    let err = otp::verify_with_verifier(
+        &ctx.state.db,
+        &ctx.state.keys.pepper,
+        &ctx.state.settings,
+        phone2.challenge.id,
+        "404000",
+        &Expect::default(),
+        None,
+        Some(&verifier),
+    )
+    .await
+    .expect_err("expired");
+    assert_eq!(err.status.as_u16(), 410);
+    assert_eq!(err.code, "code_expired");
+
+    // Email challenges still check local code_hash and never call the SMS verifier.
+    let email = otp::send(
+        &mut *ctx.conn().await,
+        &ctx.state.keys.pepper,
+        &ctx.state.settings,
+        &NewChallenge {
+            purpose: OtpPurpose::AddEmail,
+            channel: OtpChannel::Email,
+            destination: "verify-test@example.test",
+            account_uuid: None,
+            flow_id: None,
+            ip: None,
+        },
+    )
+    .await
+    .expect("email");
+    let before = verifier.calls.load(Ordering::SeqCst);
+    let ok = otp::verify_with_verifier(
+        &ctx.state.db,
+        &ctx.state.keys.pepper,
+        &ctx.state.settings,
+        email.challenge.id,
+        &email.code,
+        &Expect::default(),
+        None,
+        Some(&verifier),
+    )
+    .await
+    .expect("email local verify");
+    assert!(ok.consumed_at.is_some());
+    assert_eq!(verifier.calls.load(Ordering::SeqCst), before);
+}

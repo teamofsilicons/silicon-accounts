@@ -182,7 +182,7 @@ async fn create_registration(
     sqlx::query("insert into interface_account_registrations(challenge_id,interface_id,profile) values ($1,$2,$3)")
         .bind(sent.challenge.id).bind(interface).bind(json!(profile)).execute(&mut *tx).await?;
     tx.commit().await?;
-    delivery::spawn_deliver(state, message);
+    delivery::deliver_otp(state, sent.challenge.channel, message).await;
     Ok((
         StatusCode::CREATED,
         json!({
@@ -228,7 +228,7 @@ async fn complete(
         ));
     }
     let profile: Profile = serde_json::from_value(profile)?;
-    let proof = otp::verify_in_transaction(
+    let proof = otp::verify_in_transaction_with_verifier(
         &mut tx,
         &state.keys.pepper,
         &state.settings,
@@ -240,12 +240,13 @@ async fn complete(
             account_uuid: None,
         },
         None,
+        state.sms_verifier.as_deref(),
     )
     .await;
     let stored = match proof {
         Ok(challenge) => challenge,
         Err(e) => {
-            if e.code == "invalid_code" {
+            if e.code == "invalid_code" || e.code == "code_expired" {
                 tx.commit().await?;
             }
             return Err(e);

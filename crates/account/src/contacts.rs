@@ -136,7 +136,7 @@ async fn add(
         )
         .await?;
         tx.commit().await?;
-        delivery::spawn_deliver(state, message_id);
+        delivery::deliver_otp(state, created.challenge.channel, message_id).await;
         let ch = &created.challenge;
         Ok((
             StatusCode::CREATED,
@@ -185,7 +185,7 @@ async fn verify(
         // Wrong codes count per address (core's `otp::verify`): with every sign-in code and
         // every other account's add code to the same address, so adding someone else's address
         // never buys more guesses than signing in with it.
-        let challenge = otp::verify(
+        let challenge = otp::verify_with_verifier(
             &state.db,
             &state.keys.pepper,
             &state.settings,
@@ -197,6 +197,7 @@ async fn verify(
                 account_uuid: Some(me.uuid()),
             },
             None,
+            state.sms_verifier.as_deref(),
         )
         .await?;
         let mut tx = state.db.begin().await?;

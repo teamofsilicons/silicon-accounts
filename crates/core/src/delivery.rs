@@ -193,7 +193,11 @@ pub async fn enqueue_otp(
             channel: MessageChannel::Sms,
             to: challenge.destination.clone(),
             subject: None,
-            text_body: templates::otp_sms(code, challenge.purpose, app_name, minutes),
+            text_body: if settings.sms_uses_twilio_verify() {
+                "Twilio Verify SMS verification code".into()
+            } else {
+                templates::otp_sms(code, challenge.purpose, app_name, minutes)
+            },
             html_body: None,
             purpose: format!("otp_{}", challenge.purpose),
         },
@@ -201,6 +205,10 @@ pub async fn enqueue_otp(
     if settings.delivery == DeliveryMode::Local {
         // Never sent; the dev outbox shows it as written.
         return enqueue(conn, settings, &msg).await;
+    }
+    if challenge.channel == OtpChannel::Phone && settings.sms_uses_twilio_verify() {
+        // Twilio Verify generates and delivers the code itself; nothing secret is stored here.
+        return insert(conn, settings, &msg, None).await;
     }
     // The code is stored only sealed: the readable columns show it as REDACTED_CODE.
     let sealed = message_keyring(settings)?.encrypt(&serde_json::to_vec(&SealedBody {
@@ -397,10 +405,166 @@ impl Sender for TwilioSender {
     }
 }
 
-/// Routes email to Postmark and SMS to Twilio.
+/// Result of checking a 6-digit SMS code with an external verification provider (Twilio Verify).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerifyCheckOutcome {
+    /// The provider approved the code.
+    Approved,
+    /// The code did not match; the verification is still open.
+    WrongCode,
+    /// The verification expired, was already consumed/canceled, or reached the provider's
+    /// attempt limit — the caller must request a new code.
+    ExpiredOrMaxAttempts,
+}
+
+/// Checks a 6-digit SMS code with an external verification provider (Twilio Verify).
+#[async_trait]
+pub trait SmsCodeVerifier: Send + Sync {
+    async fn check(&self, to: &str, code: &str) -> Result<VerifyCheckOutcome, SendError>;
+    /// Short name for logs.
+    fn name(&self) -> &'static str;
+}
+
+/// Twilio Verify v2 API:
+/// - send: `POST {api_url}/v2/Services/{verify_service_sid}/Verifications` (`To`, `Channel=sms`)
+/// - check: `POST {api_url}/v2/Services/{verify_service_sid}/VerificationCheck` (`To`, `Code`)
+#[derive(Clone)]
+pub struct TwilioVerifySender {
+    pub http: reqwest::Client,
+    pub api_url: String,
+    pub account_sid: String,
+    pub auth_token: secrecy::SecretString,
+    pub verify_service_sid: String,
+}
+
+#[async_trait]
+impl Sender for TwilioVerifySender {
+    async fn send(&self, msg: &OutboundMessage) -> Result<String, SendError> {
+        if msg.channel != MessageChannel::Sms {
+            return Err(SendError::permanent("Twilio Verify only sends SMS"));
+        }
+        let form = [("To", msg.to_address.as_str()), ("Channel", "sms")];
+        let resp = self
+            .http
+            .post(format!(
+                "{}/v2/Services/{}/Verifications",
+                self.api_url.trim_end_matches('/'),
+                self.verify_service_sid
+            ))
+            .basic_auth(&self.account_sid, Some(self.auth_token.expose_secret()))
+            .form(&form)
+            .send()
+            .await
+            .map_err(|e| {
+                SendError::retryable(format!(
+                    "Twilio Verify request failed: {}",
+                    without_url(&e)
+                ))
+            })?;
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        let parsed: serde_json::Value =
+            serde_json::from_str(&text).unwrap_or(serde_json::Value::Null);
+        if status.is_success() {
+            return Ok(parsed["sid"].as_str().unwrap_or("").to_string());
+        }
+        let code = parsed["code"].as_i64().unwrap_or(-1);
+        let detail = format!(
+            "Twilio Verify answered {} (code {}): {}",
+            status.as_u16(),
+            code,
+            parsed["message"].as_str().unwrap_or("no message")
+        );
+        // 60203 = Max send attempts reached on Twilio Verify; retrying immediately won't help.
+        if (status.as_u16() == 429 && code != 60203) || status.is_server_error() {
+            Err(SendError::retryable(detail))
+        } else {
+            Err(SendError::permanent(detail))
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "twilio_verify"
+    }
+}
+
+#[async_trait]
+impl SmsCodeVerifier for TwilioVerifySender {
+    async fn check(&self, to: &str, code: &str) -> Result<VerifyCheckOutcome, SendError> {
+        let form = [("To", to), ("Code", code)];
+        let resp = self
+            .http
+            .post(format!(
+                "{}/v2/Services/{}/VerificationCheck",
+                self.api_url.trim_end_matches('/'),
+                self.verify_service_sid
+            ))
+            .basic_auth(&self.account_sid, Some(self.auth_token.expose_secret()))
+            .form(&form)
+            .send()
+            .await
+            .map_err(|e| {
+                SendError::retryable(format!(
+                    "Twilio Verify check failed: {}",
+                    without_url(&e)
+                ))
+            })?;
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        let parsed: serde_json::Value =
+            serde_json::from_str(&text).unwrap_or(serde_json::Value::Null);
+        if status.is_success() {
+            let state = parsed["status"].as_str().unwrap_or("");
+            let valid = parsed["valid"].as_bool().unwrap_or(false);
+            if state == "approved" || valid {
+                return Ok(VerifyCheckOutcome::Approved);
+            }
+            if matches!(
+                state,
+                "expired" | "canceled" | "max_attempts_reached" | "deleted"
+            ) {
+                return Ok(VerifyCheckOutcome::ExpiredOrMaxAttempts);
+            }
+            return Ok(VerifyCheckOutcome::WrongCode);
+        }
+        let twilio_code = parsed["code"].as_i64().unwrap_or(-1);
+        let msg = parsed["message"].as_str().unwrap_or("no message");
+        // 404 / 20404: verification expired, already approved/canceled, or hit max attempts.
+        // 429 / 60202: max check attempts reached for the current verification.
+        if (status.as_u16() == 404 && twilio_code == 20404)
+            || (status.as_u16() == 429 && twilio_code == 60202)
+        {
+            tracing::warn!(
+                status = status.as_u16(),
+                twilio_code,
+                detail = msg,
+                "Twilio Verify verification is no longer checkable (expired or max attempts)"
+            );
+            return Ok(VerifyCheckOutcome::ExpiredOrMaxAttempts);
+        }
+        let detail = format!(
+            "Twilio Verify check answered {} (code {}): {}",
+            status.as_u16(),
+            twilio_code,
+            msg
+        );
+        if status.as_u16() == 429 || status.is_server_error() {
+            Err(SendError::retryable(detail))
+        } else {
+            Err(SendError::permanent(detail))
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "twilio_verify"
+    }
+}
+
+/// Routes email to Postmark and SMS to Twilio Verify (preferred) or Twilio Programmable Messaging.
 #[derive(Clone, Default)]
 pub struct ProviderSender {
     pub postmark: Option<PostmarkSender>,
+    pub twilio_verify: Option<TwilioVerifySender>,
     pub twilio: Option<TwilioSender>,
 }
 
@@ -414,10 +578,11 @@ impl Sender for ProviderSender {
                     "email is not configured (ACCOUNTS_POSTMARK_SERVER_TOKEN is missing)",
                 )),
             },
-            MessageChannel::Sms => match &self.twilio {
-                Some(t) => t.send(msg).await,
-                None => Err(SendError::permanent(
-                    "SMS is not configured (ACCOUNTS_TWILIO_ACCOUNT_SID / _AUTH_TOKEN / _MESSAGING_SERVICE_SID or _FROM are missing)",
+            MessageChannel::Sms => match (&self.twilio_verify, &self.twilio) {
+                (Some(v), _) => v.send(msg).await,
+                (None, Some(t)) => t.send(msg).await,
+                (None, None) => Err(SendError::permanent(
+                    "SMS is not configured (ACCOUNTS_TWILIO_ACCOUNT_SID / _AUTH_TOKEN / _VERIFY_SERVICE_SID or _MESSAGING_SERVICE_SID / _FROM are missing)",
                 )),
             },
         }
@@ -464,20 +629,59 @@ pub fn sender_from_settings(settings: &Settings, http: &reqwest::Client) -> Arc<
                     server_token: token,
                     from: from_header(&settings.postmark.from),
                 });
+            let twilio_verify = twilio_verify_from_settings(settings, http);
             let twilio = match (&settings.twilio.account_sid, &settings.twilio.auth_token) {
-                (Some(sid), Some(token)) if settings.twilio.configured() => Some(TwilioSender {
-                    http: http.clone(),
-                    api_url: settings.twilio.api_url.clone(),
-                    account_sid: sid.clone(),
-                    auth_token: token.clone(),
-                    messaging_service_sid: settings.twilio.messaging_service_sid.clone(),
-                    from: settings.twilio.from.clone(),
-                }),
+                (Some(sid), Some(token)) if settings.twilio.messaging_configured() => {
+                    Some(TwilioSender {
+                        http: http.clone(),
+                        api_url: settings.twilio.api_url.clone(),
+                        account_sid: sid.clone(),
+                        auth_token: token.clone(),
+                        messaging_service_sid: settings.twilio.messaging_service_sid.clone(),
+                        from: settings.twilio.from.clone(),
+                    })
+                }
                 _ => None,
             };
-            Arc::new(ProviderSender { postmark, twilio })
+            Arc::new(ProviderSender {
+                postmark,
+                twilio_verify,
+                twilio,
+            })
         }
     }
+}
+
+fn twilio_verify_from_settings(
+    settings: &Settings,
+    http: &reqwest::Client,
+) -> Option<TwilioVerifySender> {
+    if !settings.sms_uses_twilio_verify() {
+        return None;
+    }
+    match (
+        &settings.twilio.account_sid,
+        &settings.twilio.auth_token,
+        &settings.twilio.verify_service_sid,
+    ) {
+        (Some(sid), Some(token), Some(service_sid)) => Some(TwilioVerifySender {
+            http: http.clone(),
+            api_url: settings.twilio.verify_api_url.clone(),
+            account_sid: sid.clone(),
+            auth_token: token.clone(),
+            verify_service_sid: service_sid.clone(),
+        }),
+        _ => None,
+    }
+}
+
+/// The external SMS OTP verifier when Twilio Verify is active; `None` in local or
+/// Programmable Messaging mode (where codes are checked against `otp_challenges.code_hash`).
+pub fn sms_verifier_from_settings(
+    settings: &Settings,
+    http: &reqwest::Client,
+) -> Option<Arc<dyn SmsCodeVerifier>> {
+    twilio_verify_from_settings(settings, http).map(|v| Arc::new(v) as Arc<dyn SmsCodeVerifier>)
 }
 
 /// What happened to a message.
@@ -584,7 +788,7 @@ pub async fn deliver_claimed(
             if recorded == 0 {
                 return Ok(claim_lost(msg));
             }
-            tracing::info!(message_id = %msg.id, purpose = %msg.purpose, channel = %msg.channel, sender = sender.name(), "message sent");
+            tracing::info!(message_id = %msg.id, provider_message_id = %provider_id, purpose = %msg.purpose, channel = %msg.channel, sender = sender.name(), "message sent");
             Ok(DeliveryOutcome::Sent {
                 provider_message_id: provider_id,
             })
@@ -671,6 +875,23 @@ pub fn spawn_deliver(state: &AppState, id: Uuid) {
             tracing::error!(message_id = %id, error = %e, "immediate delivery failed; the worker will retry");
         }
     });
+}
+
+/// Delivers an OTP message right after its transaction commits.
+///
+/// When Twilio Verify handles SMS, awaits the fast `/Verifications` API call so the verification
+/// exists at Twilio before the caller can submit a code; otherwise behaves like [`spawn_deliver`].
+pub async fn deliver_otp(state: &AppState, channel: OtpChannel, id: Uuid) {
+    if state.settings.delivery == DeliveryMode::Local {
+        return;
+    }
+    if channel == OtpChannel::Phone && state.settings.sms_uses_twilio_verify() {
+        if let Err(e) = deliver_now(state, id).await {
+            tracing::error!(message_id = %id, error = %e, "immediate Twilio Verify delivery failed; the worker will retry");
+        }
+    } else {
+        spawn_deliver(state, id);
+    }
 }
 
 /// The first standalone 6-digit number in a text (dev outbox convenience).

@@ -834,3 +834,120 @@ async fn a_code_verified_while_the_account_is_deleted_adds_nothing() {
             .expect("owner");
     assert_eq!(owner, None, "the address is free for anyone");
 }
+
+#[tokio::test]
+async fn add_and_verify_phone_via_twilio_verify() {
+    use accounts_core::config::DeliveryMode;
+    use axum::extract::Form;
+    use axum::http::StatusCode;
+    use axum::routing::post;
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
+
+    let sent_to: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let sent_to_clone = sent_to.clone();
+    let mock = axum::Router::new()
+        .route(
+            "/v2/Services/VAmockservice/Verifications",
+            post(move |Form(form): Form<HashMap<String, String>>| {
+                let sent_to = sent_to_clone.clone();
+                async move {
+                    assert_eq!(form.get("Channel").map(String::as_str), Some("sms"));
+                    sent_to.lock().unwrap().push(form["To"].clone());
+                    (
+                        StatusCode::CREATED,
+                        axum::Json(json!({
+                            "sid": "VE11111111111111111111111111111111",
+                            "status": "pending"
+                        })),
+                    )
+                }
+            }),
+        )
+        .route(
+            "/v2/Services/VAmockservice/VerificationCheck",
+            post(|Form(form): Form<HashMap<String, String>>| async move {
+                assert_eq!(form.get("To").map(String::as_str), Some("+918894979874"));
+                if form.get("Code").map(String::as_str) == Some("246810") {
+                    (
+                        StatusCode::OK,
+                        axum::Json(json!({ "status": "approved", "valid": true })),
+                    )
+                } else {
+                    (
+                        StatusCode::OK,
+                        axum::Json(json!({ "status": "pending", "valid": false })),
+                    )
+                }
+            }),
+        );
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind");
+    let addr = listener.local_addr().expect("addr");
+    tokio::spawn(async move {
+        axum::serve(listener, mock).await.expect("serve");
+    });
+
+    let mut settings = accounts_core::Settings::for_tests();
+    settings.delivery = DeliveryMode::Providers;
+    settings.twilio.account_sid = Some("ACmock".into());
+    settings.twilio.auth_token = Some("tokmock".into());
+    settings.twilio.verify_service_sid = Some("VAmockservice".into());
+    settings.twilio.verify_api_url = format!("http://{addr}");
+
+    let mut ctx = TestContext::with_settings(settings).await;
+    ctx.state.sender =
+        accounts_core::delivery::sender_from_settings(&ctx.state.settings, &ctx.state.http);
+    let carbon = ctx.carbon().await;
+    let tok = token(&ctx, &carbon).await;
+
+    let r = call(
+        &ctx,
+        Req::post("/v1/me/phones")
+            .bearer(&tok)
+            .json(json!({ "phone": "+918894979874" })),
+    )
+    .await;
+    assert_status(&r, 201);
+    let challenge = r.json["challenge_id"]
+        .as_str()
+        .expect("challenge")
+        .to_string();
+    assert_eq!(*sent_to.lock().unwrap(), vec!["+918894979874"]);
+
+    let (status, provider_id, has_sealed): (String, Option<String>, bool) = sqlx::query_as(
+        "select status, provider_message_id, sealed_body is not null from outbound_messages where to_address = '+918894979874'",
+    )
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("outbound row");
+    assert_eq!(status, "sent");
+    assert_eq!(
+        provider_id.as_deref(),
+        Some("VE11111111111111111111111111111111")
+    );
+    assert!(!has_sealed, "Twilio Verify stores no local OTP code");
+
+    let bad = call(
+        &ctx,
+        Req::post("/v1/me/phones/verify")
+            .bearer(&tok)
+            .json(json!({ "challenge_id": challenge, "code": "999999" })),
+    )
+    .await;
+    assert_error(&bad, 422, "invalid_code");
+    assert_eq!(bad.json["error"]["details"]["remaining_attempts"], 9);
+
+    let ok = call(
+        &ctx,
+        Req::post("/v1/me/phones/verify")
+            .bearer(&tok)
+            .json(json!({ "challenge_id": challenge, "code": "246810" })),
+    )
+    .await;
+    assert_status(&ok, 200);
+    assert_eq!(ok.json["items"][0]["phone"], "+918894979874");
+    assert_eq!(ok.json["items"][0]["is_primary"], true);
+}

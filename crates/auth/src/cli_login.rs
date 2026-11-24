@@ -124,7 +124,7 @@ pub async fn start(
     )
     .await?;
     tx.commit().await?;
-    delivery::spawn_deliver(&state, message_id);
+    delivery::deliver_otp(&state, created.challenge.channel, message_id).await;
     let mut response = axum::Json(json!({
         "challenge_id": created.challenge.id,
         "destination": created.challenge.masked_destination(),
@@ -160,7 +160,7 @@ pub async fn verify(
         ))
         .hint("Pass the challenge_id from the start response unchanged.")
     })?;
-    let challenge = otp::verify(
+    let challenge = otp::verify_with_verifier(
         &state.db,
         &state.keys.pepper,
         &state.settings,
@@ -175,6 +175,7 @@ pub async fn verify(
             ip: meta.ip.as_deref(),
             user_agent: meta.user_agent.as_deref(),
         }),
+        state.sms_verifier.as_deref(),
     )
     .await?;
     let account_uuid = challenge
