@@ -500,7 +500,7 @@ async fn send_signin_code(
     model::save(&mut tx, &flow).await?;
     let response = respond(&mut tx, state, meta, None, &flow, &fa, Vec::new()).await?;
     tx.commit().await?;
-    delivery::spawn_deliver(state, message_id);
+    delivery::deliver_otp(state, created.challenge.channel, message_id).await;
     Ok(response)
 }
 
@@ -564,7 +564,7 @@ pub async fn resend_code(
     model::save(&mut tx, &flow).await?;
     let response = respond(&mut tx, &state, &meta, None, &flow, &fa, Vec::new()).await?;
     tx.commit().await?;
-    delivery::spawn_deliver(&state, message_id);
+    delivery::deliver_otp(&state, created.challenge.channel, message_id).await;
     Ok(response)
 }
 
@@ -607,7 +607,7 @@ pub async fn verify_code(
         (challenge_id, flow.app_id)
     };
     // Verification persists failures on its own (the lockout must survive this request).
-    let challenge = otp::verify(
+    let challenge = otp::verify_with_verifier(
         &state.db,
         &state.keys.pepper,
         &state.settings,
@@ -623,6 +623,7 @@ pub async fn verify_code(
             ip: meta.ip.as_deref(),
             user_agent: meta.user_agent.as_deref(),
         }),
+        state.sms_verifier.as_deref(),
     )
     .await?;
 

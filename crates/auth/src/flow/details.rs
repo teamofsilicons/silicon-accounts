@@ -1068,7 +1068,7 @@ pub async fn add_detail(
     model::save(&mut tx, &flow).await?;
     let response = respond(&mut tx, &state, &meta, &flow, &fa).await?;
     tx.commit().await?;
-    delivery::spawn_deliver(&state, message_id);
+    delivery::deliver_otp(&state, created.challenge.channel, message_id).await;
     Ok(response)
 }
 
@@ -1105,7 +1105,7 @@ pub async fn verify_detail(
         (challenge_id, account.uuid)
     };
     // The lockout counts every code sent to the address (core's `otp::verify`).
-    let challenge = otp::verify(
+    let challenge = otp::verify_with_verifier(
         &state.db,
         &state.keys.pepper,
         &state.settings,
@@ -1117,6 +1117,7 @@ pub async fn verify_detail(
             account_uuid: Some(&account_uuid),
         },
         None,
+        state.sms_verifier.as_deref(),
     )
     .await?;
 

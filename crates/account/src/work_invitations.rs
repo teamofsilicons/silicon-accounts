@@ -264,7 +264,7 @@ async fn verify(
         .map_err(|_| ApiError::unprocessable("invalid_dob", "dob must be YYYY-MM-DD."))?;
     accounts_core::normalize::validate_dob(dob, OffsetDateTime::now_utc().date())
         .map_err(|e| ApiError::unprocessable("invalid_dob", e))?;
-    let verified = otp::verify(
+    let verified = otp::verify_with_verifier(
         &state.db,
         &state.keys.pepper,
         &state.settings,
@@ -276,6 +276,7 @@ async fn verify(
             account_uuid: None,
         },
         None,
+        state.sms_verifier.as_deref(),
     )
     .await?;
     if verified.destination != email {

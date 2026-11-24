@@ -238,3 +238,16 @@ Rollback is a symlink switch to `previous-release` (0045 is additive; the old co
 `30214a69-5cdf-42e2-8d46-7ad637e1f631` (activation) and `c878678c-457b-4af4-ba39-4ba06fb23868` (symlink and receipt).
 Briefcase's live sign-in shows Sign In with a Passkey at 1440 and 390 with no console errors. Receipt:
 [verification-passkeys-2026-11-24.json](verification-passkeys-2026-11-24.json).
+
+## Twilio Verify for SMS OTP — 2026-11-24
+
+Release `accounts-twilio-verify-e02a2f5` (source `e02a2f5`) is live as an API-only overlay on `accounts-passkeys-bf1379c`
+([twilio-verify-cutover.py](twilio-verify-cutover.py)): SMS OTP sends and code checks now go through Twilio Verify v2
+(`ACCOUNTS_TWILIO_VERIFY_SERVICE_SID`, service `VAc1f4...ebe082` renamed from `"Silicon IAM"` to `"Silicon Accounts"`),
+replacing the empty Programmable Messaging service (`MG1224...6b4cc7`, which had been failing with Twilio error `21704`).
+Web, Developer, migrations (schema unchanged at 45), Node, Caddy, and all systemd units were kept byte for byte.
+Verified backup `backups/predeploy-twilio-verify-20261124T183202Z.dump` uploaded first; Secrets Manager updated
+(`addd98c1-fc39-49ab-8f88-db27285ab5e4`) and `/etc/accounts/api.env` refreshed; only `accounts-api` restarted and
+passed local and public readiness. Rollback: point `current` at `previous-release` (`accounts-passkeys-bf1379c`) and
+restart `accounts-api`. SSM command `3f986e72-44f9-428a-a830-476f88a270f2`. Receipt:
+[verification-twilio-verify-2026-11-24.json](verification-twilio-verify-2026-11-24.json).

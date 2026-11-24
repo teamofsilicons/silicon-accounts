@@ -9,7 +9,7 @@ use sqlx::PgPool;
 use crate::config::Settings;
 use crate::crypto::stk::StkHasher;
 use crate::crypto::{CryptoError, Keyring, Pepper};
-use crate::delivery::Sender;
+use crate::delivery::{Sender, SmsCodeVerifier};
 use crate::jwt::{JwtError, JwtKeys};
 use crate::repo::apps::AppCredentialCache;
 
@@ -72,6 +72,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     /// Email/SMS sender for the configured delivery mode.
     pub sender: Arc<dyn Sender>,
+    /// External SMS OTP verifier when Twilio Verify is active; `None` checks local hashes.
+    pub sms_verifier: Option<Arc<dyn SmsCodeVerifier>>,
     /// 60 s cache of verified app credentials.
     pub app_cache: AppCredentialCache,
     /// Fetches trusted OIDC issuers' keys (SSRF-guarded) and caches them.
@@ -108,6 +110,7 @@ impl AppState {
         let keys = Keys::from_settings(&settings)?;
         let http = build_http_client()?;
         let sender = crate::delivery::sender_from_settings(&settings, &http);
+        let sms_verifier = crate::delivery::sms_verifier_from_settings(&settings, &http);
         let federation =
             crate::federation::FederationClient::new(settings.federation_allow_loopback)
                 .map_err(StartupError::Http)?;
@@ -117,6 +120,7 @@ impl AppState {
             keys: Arc::new(keys),
             http,
             sender,
+            sms_verifier,
             app_cache: AppCredentialCache::new(),
             federation,
             identity_key: crate::identity_tokens::IdentityKeyCell::new(),
@@ -126,6 +130,12 @@ impl AppState {
     /// Replaces the sender (tests, mocks).
     pub fn with_sender(mut self, sender: Arc<dyn Sender>) -> AppState {
         self.sender = sender;
+        self
+    }
+
+    /// Replaces the external SMS OTP verifier (tests, mocks).
+    pub fn with_sms_verifier(mut self, verifier: Option<Arc<dyn SmsCodeVerifier>>) -> AppState {
+        self.sms_verifier = verifier;
         self
     }
 

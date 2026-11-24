@@ -34,6 +34,7 @@ use uuid::Uuid;
 
 use crate::config::Settings;
 use crate::crypto::{Pepper, constant_time_eq, generate_otp};
+use crate::delivery::{SmsCodeVerifier, VerifyCheckOutcome};
 use crate::error::{ApiError, ApiResult};
 use crate::models::{ActorKind, OtpChannel, OtpPurpose};
 use crate::repo::audit::{self, AuditEntry, SigninRecord};
@@ -271,8 +272,40 @@ pub async fn verify(
     expect: &Expect<'_>,
     attempt: Option<Attempt<'_>>,
 ) -> ApiResult<OtpChallenge> {
+    verify_with_verifier(pool, pepper, settings, challenge_id, code, expect, attempt, None).await
+}
+
+/// Checks a code, delegating phone codes to `sms_verifier` (Twilio Verify) when provided.
+///
+/// The provider check runs outside any database transaction so no row lock is held across the
+/// network call; pre-checks still run first so unknown, locked, used or expired challenges never
+/// hit the provider.
+pub async fn verify_with_verifier(
+    pool: &PgPool,
+    pepper: &Pepper,
+    settings: &Settings,
+    challenge_id: Uuid,
+    code: &str,
+    expect: &Expect<'_>,
+    attempt: Option<Attempt<'_>>,
+    sms_verifier: Option<&dyn SmsCodeVerifier>,
+) -> ApiResult<OtpChallenge> {
+    let code = validate_code_shape(code)?;
+    let external_outcome = if let Some(verifier) = sms_verifier {
+        let mut conn = pool.acquire().await?;
+        let pre = precheck_without_lock(&mut conn, settings, challenge_id, expect).await?;
+        drop(conn);
+        if pre.channel == OtpChannel::Phone {
+            Some(check_with_provider(verifier, challenge_id, &pre.destination, code).await?)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let mut tx = pool.begin().await?;
-    let result = verify_in_transaction(
+    let result = finish_verify_in_transaction(
         &mut tx,
         pepper,
         settings,
@@ -280,9 +313,14 @@ pub async fn verify(
         code,
         expect,
         attempt,
+        external_outcome,
     )
     .await;
-    if result.is_ok() || result.as_ref().is_err_and(|e| e.code == "invalid_code") {
+    if result.is_ok()
+        || result
+            .as_ref()
+            .is_err_and(|e| e.code == "invalid_code" || e.code == "code_expired")
+    {
         tx.commit().await?;
     }
     result
@@ -299,6 +337,46 @@ pub async fn verify_in_transaction(
     expect: &Expect<'_>,
     attempt: Option<Attempt<'_>>,
 ) -> ApiResult<OtpChallenge> {
+    verify_in_transaction_with_verifier(
+        conn,
+        pepper,
+        settings,
+        challenge_id,
+        code,
+        expect,
+        attempt,
+        None,
+    )
+    .await
+}
+
+/// Verify inside the caller's transaction, delegating phone codes to `sms_verifier` when provided.
+/// Commit `invalid_code` or `code_expired` errors to persist attempt counts and expirations.
+pub async fn verify_in_transaction_with_verifier(
+    conn: &mut PgConnection,
+    pepper: &Pepper,
+    settings: &Settings,
+    challenge_id: Uuid,
+    code: &str,
+    expect: &Expect<'_>,
+    attempt: Option<Attempt<'_>>,
+    sms_verifier: Option<&dyn SmsCodeVerifier>,
+) -> ApiResult<OtpChallenge> {
+    let code = validate_code_shape(code)?;
+    let (c, now) = load_and_lock_challenge(conn, settings, challenge_id, expect).await?;
+    let outcome = if c.channel == OtpChannel::Phone
+        && let Some(verifier) = sms_verifier
+    {
+        check_with_provider(verifier, challenge_id, &c.destination, code).await?
+    } else if constant_time_eq(&pepper.hash(code), &c.code_hash) {
+        VerifyCheckOutcome::Approved
+    } else {
+        VerifyCheckOutcome::WrongCode
+    };
+    apply_verify_outcome(conn, settings, &c, now, outcome, attempt).await
+}
+
+fn validate_code_shape(code: &str) -> ApiResult<&str> {
     let code = code.trim();
     if code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()) {
         return Err(ApiError::unprocessable(
@@ -310,6 +388,65 @@ pub async fn verify_in_transaction(
         )
         .hint("Type the 6-digit code from the message."));
     }
+    Ok(code)
+}
+
+async fn check_with_provider(
+    verifier: &dyn SmsCodeVerifier,
+    challenge_id: Uuid,
+    destination: &str,
+    code: &str,
+) -> ApiResult<VerifyCheckOutcome> {
+    verifier.check(destination, code).await.map_err(|e| {
+        tracing::error!(
+            challenge_id = %challenge_id,
+            verifier = verifier.name(),
+            error = %e.message,
+            "SMS verification provider check failed"
+        );
+        ApiError::unavailable(
+            "sms_verification_unavailable",
+            "Silicon Accounts could not verify this text code right now.",
+        )
+        .hint("Try again in a moment, or request a new code.")
+    })
+}
+
+/// Non-locking pre-check so unknown, locked, consumed or expired challenges never call Twilio.
+async fn precheck_without_lock(
+    conn: &mut PgConnection,
+    settings: &Settings,
+    challenge_id: Uuid,
+    expect: &Expect<'_>,
+) -> ApiResult<OtpChallenge> {
+    let (destination, now): (Option<String>, OffsetDateTime) =
+        sqlx::query_as("select (select destination from otp_challenges where id = $1), now()")
+            .bind(challenge_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    let Some(destination) = destination else {
+        return Err(not_found(challenge_id));
+    };
+    let rows: Vec<OtpChallenge> = sqlx::query_as(concat!(
+        "select ",
+        challenge_columns!(),
+        " from otp_challenges where destination = $1 \
+           and (id = $2 or (consumed_at is null and expires_at > now()) or locked_until > now()) \
+         order by id"
+    ))
+    .bind(&destination)
+    .bind(challenge_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    check_challenge_rows(&rows, challenge_id, expect, settings, now)
+}
+
+async fn load_and_lock_challenge(
+    conn: &mut PgConnection,
+    settings: &Settings,
+    challenge_id: Uuid,
+    expect: &Expect<'_>,
+) -> ApiResult<(OtpChallenge, OffsetDateTime)> {
     let (destination, now): (Option<String>, OffsetDateTime) =
         sqlx::query_as("select (select destination from otp_challenges where id = $1), now()")
             .bind(challenge_id)
@@ -331,6 +468,17 @@ pub async fn verify_in_transaction(
     .bind(challenge_id)
     .fetch_all(&mut *conn)
     .await?;
+    let c = check_challenge_rows(&rows, challenge_id, expect, settings, now)?;
+    Ok((c, now))
+}
+
+fn check_challenge_rows(
+    rows: &[OtpChallenge],
+    challenge_id: Uuid,
+    expect: &Expect<'_>,
+    settings: &Settings,
+    now: OffsetDateTime,
+) -> ApiResult<OtpChallenge> {
     let Some(c) = rows.iter().find(|r| r.id == challenge_id).cloned() else {
         return Err(not_found(challenge_id));
     };
@@ -363,26 +511,78 @@ pub async fn verify_in_transaction(
         )
         .hint("Use the most recent code, or request a new one."));
     }
+    Ok(c)
+}
 
-    if constant_time_eq(&pepper.hash(code), &c.code_hash) {
-        let done: OtpChallenge = sqlx::query_as(concat!(
-            "update otp_challenges set consumed_at = now(), failed_streak = 0, locked_until = null \
-             where id = $1 returning ",
-            challenge_columns!()
-        ))
-        .bind(c.id)
-        .fetch_one(&mut *conn)
-        .await?;
-        // A right code ends the streak for the whole address.
-        sqlx::query(
-            "update otp_challenges set failed_streak = 0 where destination = $1 and id <> $2 \
-             and consumed_at is null and expires_at > now() and failed_streak > 0",
-        )
-        .bind(&destination)
-        .bind(c.id)
-        .execute(&mut *conn)
-        .await?;
-        return Ok(done);
+#[allow(clippy::too_many_arguments)]
+async fn finish_verify_in_transaction(
+    conn: &mut PgConnection,
+    pepper: &Pepper,
+    settings: &Settings,
+    challenge_id: Uuid,
+    code: &str,
+    expect: &Expect<'_>,
+    attempt: Option<Attempt<'_>>,
+    external_outcome: Option<VerifyCheckOutcome>,
+) -> ApiResult<OtpChallenge> {
+    let (c, now) = load_and_lock_challenge(conn, settings, challenge_id, expect).await?;
+    let outcome = match external_outcome {
+        Some(outcome) => outcome,
+        None => {
+            if constant_time_eq(&pepper.hash(code), &c.code_hash) {
+                VerifyCheckOutcome::Approved
+            } else {
+                VerifyCheckOutcome::WrongCode
+            }
+        }
+    };
+    apply_verify_outcome(conn, settings, &c, now, outcome, attempt).await
+}
+
+async fn apply_verify_outcome(
+    conn: &mut PgConnection,
+    settings: &Settings,
+    c: &OtpChallenge,
+    now: OffsetDateTime,
+    outcome: VerifyCheckOutcome,
+    attempt: Option<Attempt<'_>>,
+) -> ApiResult<OtpChallenge> {
+    let destination = &c.destination;
+    match outcome {
+        VerifyCheckOutcome::Approved => {
+            let done: OtpChallenge = sqlx::query_as(concat!(
+                "update otp_challenges set consumed_at = now(), failed_streak = 0, locked_until = null \
+                 where id = $1 returning ",
+                challenge_columns!()
+            ))
+            .bind(c.id)
+            .fetch_one(&mut *conn)
+            .await?;
+            // A right code ends the streak for the whole address.
+            sqlx::query(
+                "update otp_challenges set failed_streak = 0 where destination = $1 and id <> $2 \
+                 and consumed_at is null and expires_at > now() and failed_streak > 0",
+            )
+            .bind(destination)
+            .bind(c.id)
+            .execute(&mut *conn)
+            .await?;
+            return Ok(done);
+        }
+        VerifyCheckOutcome::ExpiredOrMaxAttempts => {
+            sqlx::query(
+                "update otp_challenges set expires_at = least(expires_at, now()) where id = $1",
+            )
+            .bind(c.id)
+            .execute(&mut *conn)
+            .await?;
+            return Err(ApiError::gone(
+                "code_expired",
+                "This verification code expired or reached the maximum number of tries.",
+            )
+            .hint("Request a new code and try again."));
+        }
+        VerifyCheckOutcome::WrongCode => {}
     }
 
     // A wrong code: one more for the address's streak.
@@ -397,7 +597,7 @@ pub async fn verify_in_transaction(
         "select coalesce(sum(failed_streak), 0)::bigint from otp_challenges \
          where destination = $1 and consumed_at is null and expires_at > now()",
     )
-    .bind(&destination)
+    .bind(destination)
     .fetch_one(&mut *conn)
     .await?;
     let lock_seconds = settings.otp_lock_seconds;
@@ -409,7 +609,7 @@ pub async fn verify_in_transaction(
             "update otp_challenges set locked_until = now() + make_interval(secs => $2), failed_streak = 0 \
              where destination = $1 and consumed_at is null and expires_at > now() returning locked_until",
         )
-        .bind(&destination)
+        .bind(destination)
         .bind(lock_seconds as f64)
         .fetch_all(&mut *conn)
         .await?;
@@ -417,7 +617,7 @@ pub async fn verify_in_transaction(
         if let Some(attempt) = attempt
             && matches!(c.purpose, OtpPurpose::Signin | OtpPurpose::CliLogin)
         {
-            record_lock(conn, &c, attempt, until).await?;
+            record_lock(conn, c, attempt, until).await?;
         }
         until
     } else {

@@ -1,0 +1,47 @@
+{
+  "verified_at": "2026-11-24T18:32:06.432814+00:00",
+  "release": "accounts-twilio-verify-e02a2f5",
+  "revision": "e02a2f57cfb36bb1ccb3e7fb78e0919c42ef4126",
+  "previous": "accounts-passkeys-bf1379c",
+  "contents": "Switch SMS OTP delivery and verification to Twilio Verify v2 (/Verifications + /VerificationCheck) via ACCOUNTS_TWILIO_VERIFY_SERVICE_SID, keeping Programmable Messaging as fallback; renamed Twilio Verify service VAc1f4...ebe082 from 'Silicon IAM' to 'Silicon Accounts'.",
+  "api_source": "e02a2f57cfb36bb1ccb3e7fb78e0919c42ef4126",
+  "api_sha256": "0b43dc4aa698dd208aef412d2613015ad7b6fcc01b23683c91e425da3b0740c4",
+  "schema_version": {
+    "before": 45,
+    "after": 45
+  },
+  "baseline_note": "API-only overlay on accounts-passkeys-bf1379c (deploy/twilio-verify-cutover.py): web, Developer, Node, Caddy, migrations and systemd units kept byte for byte; /etc/accounts/api.env refreshed from Secrets Manager to replace ACCOUNTS_TWILIO_MESSAGING_SERVICE_SID with ACCOUNTS_TWILIO_VERIFY_SERVICE_SID.",
+  "artifact": {
+    "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-twilio-verify/e02a2f57cfb36bb1ccb3e7fb78e0919c42ef4126-1c9540229b71.tar.gz",
+    "sha256": "1c9540229b71f2b1144065193004e0b106ed4a194d5924a1695b1da95fa964f4",
+    "size": 40760304
+  },
+  "predeployment_backup": {
+    "key": "backups/predeploy-twilio-verify-20261124T183202Z.dump",
+    "sha256": "0e44e7d0fe1ea18ecfa4e85a186e559c68e924018a4b6bae88a28b4f762cf466",
+    "pg_restore_list": true
+  },
+  "secrets_manager_version_id": "addd98c1-fc39-49ab-8f88-db27285ab5e4",
+  "twilio_verify_service": {
+    "sid_masked": "VAc1f4...ebe082",
+    "friendly_name": "Silicon Accounts",
+    "code_length": 6
+  },
+  "activation_command_id": "3f986e72-44f9-428a-a830-476f88a270f2",
+  "activation": {
+    "restarted_units": [
+      "accounts-api"
+    ],
+    "local_health": {
+      "8589/readyz": 200,
+      "8590/v1/meta": 200,
+      "8600/auth/session": 200
+    },
+    "public_health": {
+      "https://accounts.teamofsilicons.com/readyz": 200,
+      "https://accounts.teamofsilicons.com/v1/meta": 200
+    },
+    "live_sms_otp_verified": true
+  },
+  "previous_release": "/opt/accounts/releases/accounts-passkeys-bf1379c"
+}

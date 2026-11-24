@@ -103,6 +103,8 @@ pub const VARIABLES: &[&str] = &[
     "ACCOUNTS_TWILIO_AUTH_TOKEN",
     "ACCOUNTS_TWILIO_FROM",
     "ACCOUNTS_TWILIO_MESSAGING_SERVICE_SID",
+    "ACCOUNTS_TWILIO_VERIFY_API_URL",
+    "ACCOUNTS_TWILIO_VERIFY_SERVICE_SID",
     "ACCOUNTS_WEBHOOK_ALLOW_PRIVATE",
     "ACCOUNTS_WEB_DIST",
     "ACCOUNTS_WORKER_ENABLED",
@@ -191,11 +193,17 @@ pub struct PostmarkSettings {
     pub api_url: String,
 }
 
-/// Twilio (SMS) settings. `messaging_service_sid` is preferred over `from`.
+/// Twilio (SMS) settings. `verify_service_sid` (Twilio Verify) is preferred for SMS OTPs;
+/// otherwise Programmable Messaging uses `messaging_service_sid` over `from`.
 #[derive(Debug, Clone)]
 pub struct TwilioSettings {
     pub account_sid: Option<String>,
     pub auth_token: Option<SecretString>,
+    /// Twilio Verify service SID (`VA...`). When set, SMS OTPs are sent and checked via Verify.
+    pub verify_service_sid: Option<String>,
+    /// Base URL for Verify; POSTs to `{verify_api_url}/v2/Services/{sid}/Verifications` and
+    /// `.../VerificationCheck`.
+    pub verify_api_url: String,
     pub messaging_service_sid: Option<String>,
     pub from: Option<String>,
     /// Base URL; the sender POSTs to `{api_url}/2010-04-01/Accounts/{sid}/Messages.json`.
@@ -203,11 +211,23 @@ pub struct TwilioSettings {
 }
 
 impl TwilioSettings {
-    /// True when SMS can actually be sent.
-    pub fn configured(&self) -> bool {
+    /// True when Twilio Verify (preferred for SMS OTP) is configured.
+    pub fn verify_configured(&self) -> bool {
+        self.account_sid.is_some()
+            && self.auth_token.is_some()
+            && self.verify_service_sid.is_some()
+    }
+
+    /// True when Twilio Programmable Messaging is configured.
+    pub fn messaging_configured(&self) -> bool {
         self.account_sid.is_some()
             && self.auth_token.is_some()
             && (self.messaging_service_sid.is_some() || self.from.is_some())
+    }
+
+    /// True when SMS can actually be sent.
+    pub fn configured(&self) -> bool {
+        self.verify_configured() || self.messaging_configured()
     }
 }
 
@@ -548,6 +568,8 @@ impl Settings {
             twilio: TwilioSettings {
                 account_sid: None,
                 auth_token: None,
+                verify_service_sid: None,
+                verify_api_url: "https://verify.twilio.com".into(),
                 messaging_service_sid: None,
                 from: None,
                 api_url: "https://api.twilio.com".into(),
@@ -824,6 +846,9 @@ impl Settings {
         s.postmark.api_url = r.http_url("ACCOUNTS_POSTMARK_API_URL", "https://api.postmarkapp.com");
         s.twilio.account_sid = r.opt("ACCOUNTS_TWILIO_ACCOUNT_SID");
         s.twilio.auth_token = r.secret("ACCOUNTS_TWILIO_AUTH_TOKEN");
+        s.twilio.verify_service_sid = r.opt("ACCOUNTS_TWILIO_VERIFY_SERVICE_SID");
+        s.twilio.verify_api_url =
+            r.http_url("ACCOUNTS_TWILIO_VERIFY_API_URL", "https://verify.twilio.com");
         s.twilio.messaging_service_sid = r.opt("ACCOUNTS_TWILIO_MESSAGING_SERVICE_SID");
         s.twilio.from = r.opt("ACCOUNTS_TWILIO_FROM");
         s.twilio.api_url = r.http_url("ACCOUNTS_TWILIO_API_URL", "https://api.twilio.com");
@@ -1141,6 +1166,11 @@ impl Settings {
         self.delivery == DeliveryMode::Local || self.twilio.configured()
     }
 
+    /// True when SMS OTPs are sent and checked through Twilio Verify.
+    pub fn sms_uses_twilio_verify(&self) -> bool {
+        self.delivery == DeliveryMode::Providers && self.twilio.verify_configured()
+    }
+
     /// True when the dev outbox endpoint may be served.
     pub fn dev_outbox_enabled(&self) -> bool {
         self.expose_dev_outbox && !self.environment.is_production()
@@ -1441,5 +1471,33 @@ mod tests {
         assert_eq!(s.extra_allowed_origins, vec!["http://127.0.0.1:8590"]);
         assert_eq!(s.bind_addr.port(), 8589);
         assert!(s.dev_outbox_enabled());
+    }
+
+    #[test]
+    fn twilio_verify_config_enables_sms_without_messaging_service() {
+        let s = Settings::from_lookup(lookup(&[
+            ("ACCOUNTS_DELIVERY", "providers"),
+            ("ACCOUNTS_TWILIO_ACCOUNT_SID", "AC1234"),
+            ("ACCOUNTS_TWILIO_AUTH_TOKEN", "secret"),
+            ("ACCOUNTS_TWILIO_VERIFY_SERVICE_SID", "VA1234"),
+            ("ACCOUNTS_TWILIO_VERIFY_API_URL", "http://127.0.0.1:9999/"),
+        ]))
+        .expect("valid verify settings");
+        assert!(s.twilio.verify_configured());
+        assert!(!s.twilio.messaging_configured());
+        assert!(s.twilio.configured());
+        assert!(s.sms_delivery_configured());
+        assert!(s.sms_uses_twilio_verify());
+        assert_eq!(s.twilio.verify_api_url, "http://127.0.0.1:9999");
+
+        // Local delivery never uses Twilio Verify even when the SID is set.
+        let local = Settings::from_lookup(lookup(&[
+            ("ACCOUNTS_DELIVERY", "local"),
+            ("ACCOUNTS_TWILIO_ACCOUNT_SID", "AC1234"),
+            ("ACCOUNTS_TWILIO_AUTH_TOKEN", "secret"),
+            ("ACCOUNTS_TWILIO_VERIFY_SERVICE_SID", "VA1234"),
+        ]))
+        .expect("valid local settings");
+        assert!(!local.sms_uses_twilio_verify());
     }
 }
