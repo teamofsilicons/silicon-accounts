@@ -14,11 +14,12 @@
  *
  * Flow failures are never toasts: the Carbon reads them on the card.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/endpoints";
 import { ApiError } from "@/lib/api/errors";
 import type { ContactField, FlowView, SignupPhoto, SignupSubmit } from "@/lib/api/types";
+import { getPasskey, PasskeyError } from "@/lib/passkey";
 import { queryKeys } from "@/lib/query/keys";
 import { placeOf, rememberLook, type HostedFlow } from "./model";
 
@@ -34,6 +35,8 @@ const RESYNC = new Set([
   "signup_already_completed", "requirements_missing", "detail_not_on_page", "no_previous_page",
   "flow_changed", "flow_completed", "flow_failed", "invalid_step", "code_already_used", "challenge_not_found", "no_code_sent",
   "session_required", "method_not_enabled", "continue_not_allowed", "reauthentication_required",
+  // A refused passkey: the server saved why on the flow and put it back at the methods.
+  "passkey_unknown", "passkey_invalid", "passkey_challenge_missing",
 ]);
 
 /**
@@ -60,6 +63,12 @@ export interface FlowActions {
   verify: (code: string) => Promise<ActionResult>;
   /** Starts Google or Apple and sends the browser there. Resolves with an error only when it could not. */
   startProvider: (provider: "google" | "apple") => Promise<ActionResult>;
+  /**
+   * Signs in with a passkey: asks the API for the options, lets the browser show its passkey sheet (or, with
+   * `autofill`, waits for a passkey picked from the email field's autofill), and sends the answer. Cancelling resolves
+   * with null and changes nothing.
+   */
+  passkey: (options?: { autofill?: boolean; signal?: AbortSignal }) => Promise<ActionResult>;
   /** Uploads the sign-up photo (the flow and sign-up cookies prove it is this sign-up's). */
   uploadSignupPhoto: (file: Blob) => Promise<SignupPhoto | ApiError>;
   /** Creates the account (or finishes an imported one). */
@@ -103,6 +112,9 @@ export function useFlowController(id: string): FlowController {
   });
   const [failure, setFailure] = useState<ApiError | null>(null);
   const [notice, setNotice] = useState<ApiError | null>(null);
+  // The flow keeps only the latest passkey challenge, so options are asked for one at a time: a button press made while
+  // the autofill's request is still on its way would otherwise get its challenge replaced by the autofill's.
+  const passkeyOptionsInFlight = useRef<Promise<unknown>>(Promise.resolve());
 
   const actions = useMemo<FlowActions>(() => {
     const key = queryKeys.flow(id);
@@ -173,6 +185,19 @@ export function useFlowController(id: string): FlowController {
           window.location.assign(url);
           return null;
         } catch (raw) {
+          return handle(ApiError.from(raw));
+        }
+      },
+      passkey: async ({ autofill = false, signal } = {}) => {
+        try {
+          const asking = passkeyOptionsInFlight.current.then(() => api.flows.passkeyOptions(id));
+          passkeyOptionsInFlight.current = asking.catch(() => null);
+          const options = await asking;
+          const credential = await getPasskey(options, { autofill, signal });
+          if (!credential) return null;
+          return await run(() => api.flows.passkey(id, credential));
+        } catch (raw) {
+          if (raw instanceof PasskeyError) return new ApiError({ status: 0, code: "passkey_failed", message: raw.message, hint: null });
           return handle(ApiError.from(raw));
         }
       },

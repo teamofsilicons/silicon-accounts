@@ -2592,6 +2592,270 @@
         }
       }
     },
+    "/v1/flows/{id}/passkey/options": {
+      "post": {
+        "tags": [
+          "Sign-in"
+        ],
+        "operationId": "startFlowPasskey",
+        "summary": "Ask for a passkey sign-in",
+        "description": "The `PublicKeyCredentialRequestOptionsJSON` to pass to `navigator.credentials.get()`: no allow list, so the authenticator offers the Carbon's own passkey for this service. The challenge is kept on the flow and used once. 403 `method_not_enabled` when the app turned passkeys off.",
+        "security": [
+          {
+            "flowCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FlowId"
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request options.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/flows/{id}/passkey": {
+      "post": {
+        "tags": [
+          "Sign-in"
+        ],
+        "operationId": "signInFlowPasskey",
+        "summary": "Sign in with a passkey",
+        "description": "Send what `navigator.credentials.get()` returned (`PublicKeyCredential.toJSON()`). A passkey on an account signs that account's browser in (`Set-Cookie: sa_session`) and the flow goes on as after a code. A passkey never signs anyone up.\n\n- `passkey_unknown` (401): the passkey isn't on any account, or was removed\n- `passkey_invalid` (401): the answer couldn't be checked (another origin, a signature that doesn't verify, a counter that went backwards)\n- `passkey_challenge_missing` (409): the answer isn't for this flow's current request\n- `account_unavailable` (409), `method_not_enabled` and `email_domain_not_allowed` (403)\n\nA refused answer leaves the flow at `choose_method` with `error` set.",
+        "security": [
+          {
+            "flowCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FlowId"
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "credential"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "credential": {
+                    "$ref": "#/components/schemas/PasskeyCredential"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The flow.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              },
+              "Set-Cookie": {
+                "description": "The browser session (`sa_session`) or the sign-up session (`sa_signup`).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "description": "Not allowed.\n\n- `signup_not_allowed`: the app takes no new accounts (`allow_signup: false`)\n- `email_domain_not_allowed`: the app accepts only some email domains\n- `flow_not_bound`: the request lacks this flow's `sa_flow` cookie: continue in the browser that started it\n- `origin_not_allowed`: a cookie-authenticated POST/PUT/PATCH/DELETE came without the account site's `Origin`; use a Bearer token instead of the cookie",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "signup_not_allowed",
+                    "message": "The app takes no new accounts (allow_signup: false)."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "signup_not_allowed",
+              "email_domain_not_allowed",
+              "flow_not_bound",
+              "origin_not_allowed"
+            ]
+          },
+          "404": {
+            "description": "Not found.\n\n- `flow_not_found`: unknown flow id",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "flow_not_found",
+                    "message": "Unknown flow id."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "flow_not_found"
+            ]
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "410": {
+            "description": "Gone.\n\n- `flow_expired`: flows last 60 minutes; start again from the app\n- `code_expired`: older than 10 minutes, or replaced by a resend; send a new one",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "flow_expired",
+                    "message": "Flows last 60 minutes; start again from the app."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "flow_expired",
+              "code_expired"
+            ]
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "422": {
+            "description": "Validation failed.\n\n- `invalid_code`: wrong code (`details.remaining_attempts` for the address), or not 6 digits (not counted). The 10th wrong one in a row has `remaining_attempts: 0`, `details.locked_until` and `Retry-After`\n- `validation_failed`: fields are missing, of the wrong type, invalid, or unknown: `details.fields` maps each path (`branding.radius`, `scopes[3]`) to its problem; every problem is reported at once",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "invalid_code",
+                    "message": "That code is wrong; 9 more tries for a***@example.test before a 60 second cooldown.",
+                    "details": {
+                      "remaining_attempts": 9
+                    }
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "invalid_code",
+              "validation_failed"
+            ]
+          },
+          "423": {
+            "$ref": "#/components/responses/Locked"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/v1/flows/{id}/signup": {
       "post": {
         "tags": [
@@ -10783,6 +11047,375 @@
             "x-error-codes": [
               "last_sign_in_method"
             ]
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/me/passkeys": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "listMyPasskeys",
+        "summary": "Your passkeys",
+        "description": "The passkeys you added to sign in with, oldest first. Adding one happens in the browser, with POST /v1/me/passkeys/options and POST /v1/me/passkeys.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The passkeys.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Page"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Passkey"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CarbonOnly"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "addPasskey",
+        "summary": "Add a passkey",
+        "description": "Finishes adding a passkey: send what `navigator.credentials.create()` returned for the options of POST /v1/me/passkeys/options (`PublicKeyCredential.toJSON()`), and optionally a name (up to 64 characters; default `Passkey`). The account site's session only, signed in within the last 30 minutes.\n\n- `passkey_invalid` (400): the credential couldn't be checked (another origin, another challenge, a key we don't accept)\n- `passkey_registration_expired` (409): no open registration (more than five minutes, already used, or replaced by a newer one)\n- `passkey_in_use` (409): the passkey is already on an account\n- `reauthentication_required` (403), `browser_session_required` (400)",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "credential"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "credential": {
+                    "$ref": "#/components/schemas/PasskeyCredential"
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passkey"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CarbonOnly"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/me/passkeys/options": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "startPasskeyRegistration",
+        "summary": "Start adding a passkey",
+        "description": "The `PublicKeyCredentialCreationOptionsJSON` to pass to `navigator.credentials.create()`: a discoverable credential, no attestation, ES256, EdDSA or RS256, your passkeys already added excluded. It opens a registration for five minutes; a newer one replaces it. The account site's session only (`browser_session_required`), signed in within the last 30 minutes (`reauthentication_required`); up to 20 passkeys (`passkey_limit`).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The creation options.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CarbonOnly"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/me/passkeys/{id}": {
+      "patch": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "renamePasskey",
+        "summary": "Rename a passkey",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's id, as `GET /v1/me/passkeys` lists it.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The passkey.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passkey"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CarbonOnly"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "removePasskey",
+        "summary": "Remove a passkey",
+        "description": "Refused (409 `last_sign_in_method`) when it is the only way left to sign in.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The passkey's id, as `GET /v1/me/passkeys` lists it.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CarbonOnly"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -30083,6 +30716,13 @@
           "custodian_of": {
             "type": "integer",
             "description": "How many Silicons this Carbon is custodian of."
+          },
+          "passkeys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Passkey"
+            },
+            "description": "The passkeys the Carbon added."
           }
         }
       },
@@ -30528,6 +31168,14 @@
           },
           "active_sessions": {
             "type": "integer"
+          },
+          "last_active_at": {
+            "description": "The app's latest sign-in or token refresh for this account, whichever is later. An app can refresh in the background, so this is the app's activity, not necessarily the person's.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -31369,7 +32017,8 @@
               "google",
               "apple",
               "email",
-              "phone"
+              "phone",
+              "passkey"
             ]
           },
           "response_type": {
@@ -31433,7 +32082,8 @@
                 "google",
                 "apple",
                 "email",
-                "phone"
+                "phone",
+                "passkey"
               ]
             }
           },
@@ -33776,7 +34426,7 @@
         "properties": {
           "methods": {
             "type": "object",
-            "description": "At least one enabled.",
+            "description": "At least one of email, phone, google or apple enabled (a passkey only signs in an account that already has one).",
             "properties": {
               "email": {
                 "type": "boolean"
@@ -33789,6 +34439,10 @@
               },
               "apple": {
                 "type": "boolean"
+              },
+              "passkey": {
+                "type": "boolean",
+                "description": "Signing in with a passkey the Carbon added on the account site. On unless turned off; it never creates an account, so another method must be on too."
               }
             }
           },
@@ -33800,7 +34454,8 @@
                 "google",
                 "apple",
                 "email",
-                "phone"
+                "phone",
+                "passkey"
               ]
             }
           },
@@ -33913,6 +34568,10 @@
               },
               "apple": {
                 "type": "boolean"
+              },
+              "passkey": {
+                "type": "boolean",
+                "description": "Signing in with a passkey the Carbon added on the account site. On unless turned off; it never creates an account, so another method must be on too."
               }
             }
           },
@@ -33927,7 +34586,8 @@
                 "google",
                 "apple",
                 "email",
-                "phone"
+                "phone",
+                "passkey"
               ]
             }
           },
@@ -34221,7 +34881,8 @@
                 "google",
                 "apple",
                 "email",
-                "phone"
+                "phone",
+                "passkey"
               ]
             },
             "description": "The enabled methods, in order."
@@ -36154,6 +36815,47 @@
             "description": "Only with `?require=`."
           }
         }
+      },
+      "Passkey": {
+        "type": "object",
+        "description": "A passkey a Carbon added to sign in with.",
+        "required": [
+          "id",
+          "name",
+          "backed_up",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "The Carbon's name for it, e.g. the device or password manager that keeps it."
+          },
+          "backed_up": {
+            "type": "boolean",
+            "description": "Synced to the Carbon's other devices by their password manager."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "PasskeyCredential": {
+        "type": "object",
+        "description": "`PublicKeyCredential.toJSON()` from the browser: `id`, `rawId`, `type` (`public-key`) and `response` (base64url fields).",
+        "additionalProperties": true
       }
     },
     "responses": {

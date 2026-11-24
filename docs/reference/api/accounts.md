@@ -383,7 +383,50 @@ Linking happens in the browser: [`POST /v1/me/identities/{provider}`](sign-in.md
 ### `DELETE /v1/me/identities/{provider}/{subject}`
 
 **204.** Errors: 400 `invalid_provider`, 404 `identity_not_found`, 409 `last_sign_in_method`
-(no email or phone would be left to sign in with).
+(no email, phone or passkey would be left to sign in with).
+
+## Passkeys
+
+A Carbon adds passkeys on the account site and signs in with them on any hosted sign-in page
+(`POST /v1/flows/{id}/passkey`). They are WebAuthn discoverable credentials for the Silicon
+Accounts site (no attestation; ES256, EdDSA or RS256). `GET /v1/me` lists them in `passkeys`.
+
+### `GET /v1/me/passkeys`
+
+```json
+{
+  "items": [
+    { "id": "019a8d6e-5b1c-7f3a-9c2d-4e8f1a2b3c4d", "name": "iCloud Keychain on macOS", "backed_up": true,
+      "created_at": "2026-11-23T10:15:00.000Z", "last_used_at": null }
+  ],
+  "next_cursor": null
+}
+```
+
+### `POST /v1/me/passkeys/options`
+
+Starts adding one: the `PublicKeyCredentialCreationOptionsJSON` for
+`navigator.credentials.create()`, with your passkeys already added excluded. Open for five
+minutes; a newer one replaces it. The account site's session only (400
+`browser_session_required` with an access token), signed in within the last 30 minutes (403
+`reauthentication_required`: sign in again with `prompt=login`). 409 `passkey_limit` at 20.
+
+### `POST /v1/me/passkeys`
+
+`{"credential": PublicKeyCredential.toJSON(), "name"?}` → **201** with the passkey. `name` is up to
+64 characters (default `Passkey`). Errors: 400 `passkey_invalid` (another origin, another
+challenge, a key we don't take), 409 `passkey_registration_expired` (none open, or used: each
+registration is used once, even when refused), 409 `passkey_in_use` (on an account already), 400
+`invalid_passkey_name`.
+
+### `PATCH /v1/me/passkeys/{id}`
+
+`{"name"}` → the passkey. 404 `passkey_not_found`.
+
+### `DELETE /v1/me/passkeys/{id}`
+
+**204.** 404 `passkey_not_found`; 409 `last_sign_in_method` when it is the only way left to
+sign in. Every change is in your history (`account.passkey.added`, `.renamed`, `.removed`).
 
 ## Apps you signed into
 
@@ -404,7 +447,8 @@ The apps you signed into, most recently used first. Filter with
       "first_signed_in_at": "2026-10-07T02:33:57.696Z",
       "last_signed_in_at": "2026-10-07T02:53:55.928Z",
       "access_removed_at": null,
-      "active_sessions": 1
+      "active_sessions": 1,
+      "last_active_at": "2026-10-09T08:12:40.511Z"
     }
   ],
   "next_cursor": null

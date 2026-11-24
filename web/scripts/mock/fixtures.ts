@@ -83,6 +83,7 @@ export const carbon: CarbonMe = {
   ],
   phones: [{ phone: "+919876543210", is_primary: true, verified_at: "2026-09-02T08:10:00.000Z" }],
   identities: [{ provider: "google", subject: "108233491177834234", email: "saketdev12@gmail.com", created_at: "2026-09-01T09:00:00.000Z", last_used_at: iso(-60 * 26) }],
+  passkeys: [{ id: "019a8d6e-5b1c-7f3a-9c2d-4e8f1a2b3c4d", name: "iCloud Keychain on macOS", backed_up: true, created_at: "2026-09-20T10:15:00.000Z", last_used_at: iso(-60 * 5) }],
   custodian_of: 3,
 };
 
@@ -106,8 +107,10 @@ export const myApps: MyApp[] = ["briefcase", "dm", "commit", "remind", "interfac
     source: "signin",
     granted_scopes: index % 2 ? ["profile", "email", "timezone"] : ["profile", "email"],
     first_signed_in_at: iso(-60 * 24 * (30 - index * 3)),
-    last_signed_in_at: iso(-60 * (index * 7 + 2)),
+    // The first app signed in weeks before its latest activity (Active … · Signed in …); the rest were active when they signed in.
+    last_signed_in_at: index === 0 ? iso(-60 * 24 * 40) : iso(-60 * (index * 7 + 2)),
     active_sessions: index === 6 ? 0 : (index % 3) + 1,
+    last_active_at: index === 6 ? iso(-60 * (index * 7 + 2)) : iso(-(index * 11 + 5)),
     access_removed_at: index === 6 ? iso(-60 * 24 * 2) : null,
   }));
 

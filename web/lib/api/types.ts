@@ -32,8 +32,8 @@ export type MembershipSource = "signin" | "slt" | "import";
 export type TokenOrigin = "authorization_code" | "slt" | "silicon_login" | "device" | "cli_code";
 export type VerifiedVia = "code" | "google" | "apple";
 export type Provider = "google" | "apple";
-/** Carbon sign-in methods an app can enable. */
-export type SigninMethod = "google" | "apple" | "email" | "phone";
+/** Carbon sign-in methods an app can enable. A passkey only signs in an account that already has one. */
+export type SigninMethod = "google" | "apple" | "email" | "phone" | "passkey";
 /** Account details an app can require or optionally ask for. */
 export type ContactField = "email" | "phone" | "dob" | "timezone";
 /** OAuth scopes. `profile` is always granted; `openid` adds an id_token; `offline_access` is accepted and ignored. */
@@ -146,6 +146,39 @@ export interface IdentityView {
   last_used_at: Timestamp | null;
 }
 
+/** A passkey the Carbon added to sign in with (`Me.passkeys`, `GET /v1/me/passkeys`). */
+export interface PasskeyView {
+  id: string;
+  name: string;
+  /** Synced to the Carbon's other devices by their password manager. */
+  backed_up: boolean;
+  created_at: Timestamp;
+  last_used_at: Timestamp | null;
+}
+
+/**
+ * WebAuthn options as the API sends them (`PublicKeyCredentialCreationOptionsJSON` /
+ * `PublicKeyCredentialRequestOptionsJSON`): binary fields are base64url strings. lib/passkey.ts hands them to the browser.
+ */
+export interface PasskeyCreationOptionsJSON {
+  challenge: string;
+  rp: { id: string; name: string };
+  user: { id: string; name: string; displayName: string };
+  pubKeyCredParams: { type: "public-key"; alg: number }[];
+  timeout?: number;
+  attestation?: string;
+  authenticatorSelection?: Record<string, unknown>;
+  excludeCredentials?: { type: "public-key"; id: string; transports?: string[] }[];
+  hints?: string[];
+}
+export interface PasskeyRequestOptionsJSON {
+  challenge: string;
+  rpId?: string;
+  timeout?: number;
+  userVerification?: string;
+  allowCredentials?: { type: "public-key"; id: string; transports?: string[] }[];
+}
+
 interface MeBase {
   org?: OrganizationRef | null;
   org_custodian?: OrganizationRef | null;
@@ -169,6 +202,8 @@ export interface CarbonMe extends MeBase {
   emails: EmailView[];
   phones: PhoneView[];
   identities: IdentityView[];
+  /** Older API versions leave it out. */
+  passkeys?: PasskeyView[];
   /** How many Silicons this Carbon is custodian of. */
   custodian_of: number;
 }
@@ -285,6 +320,9 @@ export interface MyApp {
   active_sessions: number;
   /** When the account removed the app's access (status `access_removed`). */
   access_removed_at: Timestamp | null;
+  /** The app's latest sign-in or token refresh for this account, whichever is later (the app's activity, which can
+   * be in the background). Older API versions leave it out. */
+  last_active_at?: Timestamp | null;
 }
 
 /**

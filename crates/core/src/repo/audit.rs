@@ -66,6 +66,8 @@ pub mod method {
     pub const PHONE: &str = "phone";
     pub const GOOGLE: &str = "google";
     pub const APPLE: &str = "apple";
+    /// A passkey (WebAuthn) added on the account site.
+    pub const PASSKEY: &str = "passkey";
     pub const SILICON_STK: &str = "silicon_stk";
     pub const SLT: &str = "slt";
     /// A short-lived token exchanged by an app's public client (`public_client` on, no secret).

@@ -176,6 +176,10 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
   3 ("Ends today" under a day); soonest first, the unused device last. Every row's actions share one column so the
   times line up. At most one strong button per row: Review primary; Decline and Keep ghost; Sign out and Try again
   secondary. The bar is the product's accent in every row because Progress has no tone. (2026-11-08)
+- Needs you pages through what waits (Anil, 2026-11-21, the Arrows design of three in /__needs, the others kept there):
+  Home still shows one item, and with more than one waiting the heading ends in "1 of 5" and quiet previous and next
+  buttons. The new item slides in from the side it comes from and fades up (--duration-considered, --ease-enter; a
+  fade alone with reduced motion) while the box keeps still. A handled item drops out and the position stays put.
 - Connected apps uses the page bar and Silicon UI as it ships, like /silicons (Anil, 2026-11-07): Card per app, its parts in their slots; the page bar moved to `components/account/parts/` for every account page. (2026-11-07)
 - Silicon UI 0.3.0 published to npm (Anil, 2026-10-17); the site depends on ^0.3.0. Why: keeps CI and deploys on npm. (2026-10-17)
 - Text face: Silicon UI's Hanken Grotesk (loaded with next/font as --font-hanken-grotesk); BDO Grotesk no longer
@@ -479,6 +483,19 @@ Format: `- <decision>. Why: <reason>. (YYYY-MM-DD)`
 - 2026-11-11 (Anil, Public id audit, all six): the id prefix is Silicon UI Input's new prefix slot (local patch), the typed id's size, so c:anil reads as one id; the live status is the field's hint (12/400, a problem its error) in place of a rest hint ("Your old id stays reserved for you for 10 days, so you can take it back."), so no empty line is held; the order is the id (description "Your id is c:anil. Others find you by it."), the field, then a hint-role note ("Apps you have signed into are told. They know you by an internal id that never changes."); the uuid is no longer shown in it; inline mono is .93em of its line (--mono-inline-scale); free ids are Silicon UI secondary xs buttons.
 - 2026-11-11 (Anil): a Carbon's c:id is called CarbonID in all copy (not "Public id", not "id"): Personal info's row and dialog, the change form and field, Home, the Silicons intro, Activity, the command menu, the error toast and sign-up. A Silicon's si:id still says "id" until decided (SiliconID?).
 
+- Danger buttons hover red, not grey (Anil, 2026-11-21, from Sign Out of All Other Devices; "Yes, everywhere"): every
+  enabled danger button fills a faint red (8% --danger) on hover and press, under the red border Silicon UI already
+  draws. Set in styles/tokens.css through the token Button reads; upstream Silicon UI could ship it as the default.
+
+- Passkeys (Anil, 2026-11-23): a fifth Carbon sign-in method, on for every app unless it turns it off, offered on
+  every hosted sign-in page (all on the Silicon Accounts site, so one passkey signs a Carbon in to every app). A
+  passkey is added from Security → Your sign-in (or the one-time offer in Home's Needs you), needs a sign-in from the
+  last 30 minutes to add, and never creates an account: the sign-up page doesn't show it, and an app must keep another
+  method on. Removing one keeps the last-way-in rule. Interfaces (their own origins) don't offer it. Built before the
+  contract (understanding/UNDERSTANDING.md lists four methods): Anil updates it. The WebAuthn checks are our own, pure
+  Rust (crates/core/src/webauthn.rs, ciborium and RustCrypto), not webauthn-rs, which would bring OpenSSL into a build
+  that has none.
+
 ## Dialog rules (Anil, 2026-11-11; from the CarbonID dialog, applied to every Personal info dialog)
 
 Every dialog follows these. The first three are set in CSS, so a new dialog gets them without asking: the variables
@@ -502,7 +519,7 @@ on `[role="dialog"]` in `styles/tokens.css` and the `[role="dialog"] strong` rul
   rows (parts/rows.tsx, now shared with Security). /apps is one list (each app's mark, name and "Signed in 2 weeks ago",
   linking to its page), then Permissions between apps (with its active count), then "Access removed" only when there
   are any. /apps/[id]: Connected apps above the name with Open, where it lives and since when, Who uses it, What it can
-  see about you (Name, photo and CarbonID marked Always, then each shared detail with its value), Also acts for you (Stop,
+  see about you ("Every app sees your name, photo and CarbonID." under the title, then that row and each shared detail with its value; Anil, 2026-11-21: the prototype's Always badge read as how often the app looks, so it is gone). An app's line says when it was last active as well as when it signed you in (Anil, 2026-11-21): "Active 2 hours ago · Signed in 2 days ago", in the list and in Who uses it; Active is the API's last_active_at (the later of the sign-in and the app's last token refresh, so background refreshes count), shown only when it reads differently from the sign-in, and alone on a phone, where the line has room for one, Also acts for you (Stop,
   asked first), and Remove (asked first, following the dialog rules; your Silicons keep their own access). The
   membership id, the sessions count's own line, the With access / Access removed switch and the in-card remove are gone.
 - 2026-11-12 (Anil): Permissions between apps (/proofs) as the prototype draws it: Connected apps above the title, one

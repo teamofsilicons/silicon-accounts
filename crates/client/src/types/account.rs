@@ -193,6 +193,13 @@ pub struct Me {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub identities: Vec<Identity>,
+    /// Carbon only: the passkeys the Carbon added to sign in with.
+    #[serde(
+        default,
+        deserialize_with = "lenient_vec",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub passkeys: Vec<Passkey>,
     /// Carbon only: how many Silicons this Carbon is custodian of.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custodian_of: Option<u64>,
@@ -329,6 +336,36 @@ pub struct Identity {
     )]
     pub created_at: Option<OffsetDateTime>,
     /// When it was last used to sign in.
+    #[serde(
+        default,
+        with = "crate::serde_util::rfc3339_ms::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_used_at: Option<OffsetDateTime>,
+}
+
+/// A passkey a Carbon added to sign in with (`GET /v1/me/passkeys`). Adding one is a browser
+/// ceremony on the account site.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct Passkey {
+    /// Its id (to rename or remove it).
+    #[serde(deserialize_with = "lenient_string")]
+    pub id: String,
+    /// The Carbon's name for it.
+    #[serde(default, deserialize_with = "lenient_string")]
+    pub name: String,
+    /// Synced to the Carbon's other devices by their password manager.
+    #[serde(default)]
+    pub backed_up: bool,
+    /// When it was added.
+    #[serde(
+        default,
+        with = "crate::serde_util::rfc3339_ms::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub created_at: Option<OffsetDateTime>,
+    /// When it last signed the Carbon in.
     #[serde(
         default,
         with = "crate::serde_util::rfc3339_ms::option",
@@ -518,6 +555,13 @@ pub struct MyApp {
     /// Live token families the app holds for this account.
     #[serde(default, deserialize_with = "lenient_u64")]
     pub active_sessions: u64,
+    /// The app's latest sign-in or token refresh for this account, whichever is later.
+    #[serde(
+        default,
+        with = "crate::serde_util::rfc3339_ms::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_active_at: Option<OffsetDateTime>,
 }
 
 /// A browser session or a first-party (CLI) token family (`GET /v1/me/sessions`).

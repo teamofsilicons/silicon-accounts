@@ -196,6 +196,9 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   --space-section 16, --space-block 24, --space-page 32), and the title roles one step down (display 28, h1 22, h2 18,
   h3 16); text stays at 16. `:root[data-density="comfortable"]` holds the scale before; the dev panel's Look → Density
   sets it, kept in this browser (`accounts.dev.density`), to compare.
+- **Danger buttons** (`styles/tokens.css`, 2026-11-21): hovered and pressed, every enabled `Button variant="danger"`
+  fills a faint red (8% `--danger` over `--surface`) under its red border instead of Silicon UI's grey, by setting
+  `--surface-muted` on `[data-variant="danger"]`. Only Button has a danger variant; a disabled one keeps the grey.
 - **Allo on trial** (2026-11-18): `--font-body` (and so `--font-display`) is Allo, self-hosted from
   `assets/fonts/allo` as `--font-allo` in `app/fonts.ts`, with the system font behind it. The note below is the shipped type.
 - **Typography** (`styles/tokens.css`, `app/fonts.ts`, 2026-11-09): Silicon UI's typography as it ships, in Hanken
@@ -508,6 +511,11 @@ https Iris is covered by `https:` already). `sdk/build.mjs` writes `public/sdk/v
 
 Every shared-foundation request from the area builders, resolved in the shared code:
 
+- **Passkeys** (`lib/passkey.ts`, 2026-11-23): `createPasskey` / `getPasskey` run the WebAuthn ceremonies with the
+  API's JSON options (base64url) and return `PublicKeyCredential.toJSON()`, using the browser's own JSON helpers when
+  it has them; a cancelled sheet resolves to null, other failures throw `PasskeyError` with words to show.
+  `usePasskeySupport()` is false on the server and the first paint. The hosted sign-in uses it in
+  `components/auth/steps/choose-method.tsx`, Security in `components/account/security/passkeys.tsx`.
 - **Navigation guard** (`lib/navigation-guard.ts`, `components/foundation/shell/leave-question.tsx`): see Conventions.
   The shell routes the dock, phone sheet, brand, palette, number keys, Settings and sign-out through it; the developer
   area's own window-capture click/keydown interception, synthetic Escape and copy of the typing rule are gone.

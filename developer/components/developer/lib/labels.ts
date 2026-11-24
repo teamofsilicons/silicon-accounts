@@ -5,13 +5,14 @@
 import type { BadgeTone } from "@/components/silicon-ui/badge/badge";
 import type { AppSource, AppStatus, DeliveryStatus, ImportOutcome, MembershipSource, SigninMethod } from "@/lib/api/types";
 
-export const METHOD_LABEL: Record<SigninMethod, string> = { google: "Google", apple: "Apple", email: "Email", phone: "Phone" };
+export const METHOD_LABEL: Record<SigninMethod, string> = { google: "Google", apple: "Apple", email: "Email", phone: "Phone", passkey: "Passkey" };
 
 export const METHOD_DESCRIPTION: Record<SigninMethod, string> = {
   google: "Sign in with Google",
   apple: "Sign in with Apple",
   email: "A 6 digit code sent by email",
   phone: "A 6 digit code sent by SMS",
+  passkey: "A passkey the Carbon added on the account site (Face ID, Touch ID, a screen lock)",
 };
 
 export const SOURCE_LABEL: Record<AppSource, string> = {
@@ -54,6 +55,7 @@ export const SIGNIN_METHOD_LABEL: Record<string, string> = {
   phone: "SMS code",
   google: "Google",
   apple: "Apple",
+  passkey: "Passkey",
   silicon_stk: "Silicon STK",
   slt: "Short-lived token",
   device: "CLI device code",

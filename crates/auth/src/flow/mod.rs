@@ -21,6 +21,7 @@ pub mod details;
 pub mod handlers;
 pub mod model;
 pub mod next;
+pub mod passkey;
 pub mod signup;
 pub mod view;
 
@@ -124,6 +125,9 @@ impl FlowApp {
                 accounts_core::models::signin_config::ConfigSecretsPresent::default(),
             )
             .map_err(accounts_core::ApiError::validation)?;
+        // A passkey is bound to the account site's origin; an Interface's backend can run this
+        // flow from its own origin, where the browser would refuse it.
+        self.config.methods.passkey = false;
         Ok(())
     }
 

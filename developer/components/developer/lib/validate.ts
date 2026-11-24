@@ -157,7 +157,7 @@ export interface SecretsCheck {
 export function signinProblems(config: EditableConfig, secrets: SecretsCheck): Record<string, string> {
   const out: Record<string, string> = {};
   const methods = config.methods;
-  if (!methods.email && !methods.phone && !methods.google && !methods.apple) out.methods = "Turn on at least one sign-in method: email, phone, Google or Apple.";
+  if (!methods.email && !methods.phone && !methods.google && !methods.apple) out.methods = "Turn on at least one of email, phone, Google or Apple: a passkey only signs in an account that already has one.";
 
   const google = config.google;
   if (google.prompt && !(GOOGLE_PROMPTS as readonly string[]).includes(google.prompt)) out["google.prompt"] = "Choose select_account, consent, none or \"consent select_account\".";

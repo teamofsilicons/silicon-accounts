@@ -17,7 +17,7 @@
  */
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "motion/react";
-import { Lock, Mail, Phone, Smartphone } from "lucide-react";
+import { KeyRound, Lock, Mail, Phone, Smartphone } from "lucide-react";
 import { Avatar } from "@/components/silicon-ui/avatar/avatar";
 import { Button } from "@/components/silicon-ui/button/button";
 import { Checkbox } from "@/components/silicon-ui/checkbox/checkbox";
@@ -162,14 +162,17 @@ function DestinationRow({ channel, destination }: { channel: "email" | "phone"; 
   );
 }
 
-type Block = { kind: "provider"; method: "google" | "apple" } | { kind: "form"; methods: Array<"email" | "phone"> };
+type Block = { kind: "provider"; method: "google" | "apple" | "passkey" } | { kind: "form"; methods: Array<"email" | "phone"> };
 
 function MethodsStep({ config, intent }: { config: EditableConfig; intent: "signin" | "signup" }) {
   const blocks: Block[] = [];
   let form: { kind: "form"; methods: Array<"email" | "phone"> } | null = null;
   for (const method of config.method_order) {
     if (!config.methods[method]) continue;
-    if (method === "google" || method === "apple") blocks.push({ kind: "provider", method });
+    // A passkey signs in an existing account only, so the sign-up page doesn't show it.
+    if (method === "passkey") {
+      if (intent === "signin") blocks.push({ kind: "provider", method });
+    } else if (method === "google" || method === "apple") blocks.push({ kind: "provider", method });
     else if (form) form.methods.push(method);
     else {
       form = { kind: "form", methods: [method] };
@@ -204,8 +207,8 @@ function MethodsStep({ config, intent }: { config: EditableConfig; intent: "sign
               <div className={styles.providers}>
                 {group.map(block => block.kind === "provider" ? (
                   <Button key={block.method} variant="secondary" className={styles.providerButton} tabIndex={-1}>
-                    {block.method === "google" ? <GoogleMark size={16} /> : <AppleMark size={16} />}
-                    {`${verb} ${PROVIDER_NAME[block.method]}`}
+                    {block.method === "google" ? <GoogleMark size={16} /> : block.method === "apple" ? <AppleMark size={16} /> : <KeyRound size={16} strokeWidth={1.75} aria-hidden="true" />}
+                    {block.method === "passkey" ? "Sign In with a Passkey" : `${verb} ${PROVIDER_NAME[block.method]}`}
                   </Button>
                 ) : null)}
               </div>
@@ -465,7 +468,7 @@ function Legal({ appName, config, legal }: { appName: string; config: EditableCo
 /** The app's own site with the buttons the SDK and the embed render: direct method buttons, and Sign in / Sign up. */
 function ButtonsPage({ appName, config, theme }: { appName: string; config: EditableConfig; theme: PaintTheme }) {
   const methods = config.method_order.filter(method => config.methods[method]);
-  const label = { google: "Continue with Google", apple: "Continue with Apple", email: "Continue with email", phone: "Continue with phone number" } as const;
+  const label = { google: "Continue with Google", apple: "Continue with Apple", email: "Continue with email", phone: "Continue with phone number", passkey: "Sign in with a passkey" } as const;
   return (
     <div className={styles.site} data-theme={theme}>
       <div className={styles.siteBar}><b>{appName}</b><span>Pricing</span><span>Docs</span><span className={styles.siteSpacer} /><span>Log in</span></div>
@@ -478,7 +481,7 @@ function ButtonsPage({ appName, config, theme }: { appName: string; config: Edit
               <div className={styles.siteButtons}>
                 {methods.length ? methods.map(method => (
                   <Button key={method} variant={method === "email" ? "primary" : "secondary"} className={styles.wide} tabIndex={-1}>
-                    {method === "google" ? <GoogleMark size={16} /> : method === "apple" ? <AppleMark size={16} /> : method === "email" ? <Mail size={16} strokeWidth={1.75} aria-hidden="true" /> : <Phone size={16} strokeWidth={1.75} aria-hidden="true" />}
+                    {method === "google" ? <GoogleMark size={16} /> : method === "apple" ? <AppleMark size={16} /> : method === "email" ? <Mail size={16} strokeWidth={1.75} aria-hidden="true" /> : method === "passkey" ? <KeyRound size={16} strokeWidth={1.75} aria-hidden="true" /> : <Phone size={16} strokeWidth={1.75} aria-hidden="true" />}
                     {label[method]}
                   </Button>
                 )) : <p className={styles.empty}>No sign-in method is on.</p>}

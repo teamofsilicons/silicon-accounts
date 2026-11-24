@@ -122,7 +122,7 @@ async fn google_new_identity_signs_up_with_its_name_and_picture() {
         json!({"login_hint": "ada@example.test"}),
     )
     .await;
-    assert_eq!(f["methods"], json!(["google", "email"]));
+    assert_eq!(f["methods"], json!(["google", "email", "passkey"]));
     let id = id_of(&f);
     let r = oauth_start(&ctx, &mut b, &id, "google").await;
     assert_eq!(r.status, 200, "{}", r.json);
@@ -453,7 +453,7 @@ async fn managed_providers_need_managed_credentials() {
     let f = new_flow(&ctx, &mut b, &app.app_id, json!({})).await;
     assert_eq!(
         f["methods"],
-        json!(["email"]),
+        json!(["email", "passkey"]),
         "buttons that would only fail are hidden"
     );
     for p in ["google", "apple"] {

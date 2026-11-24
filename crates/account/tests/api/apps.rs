@@ -85,6 +85,16 @@ async fn lists_the_apps_signed_into() {
         "update memberships set last_signed_in_at = now() - interval '1 day' where app_id = '{removed}'"
     ))
     .await;
+    // The active app signed in three days ago and refreshed a token an hour ago: it was last
+    // active an hour ago.
+    ctx.exec(&format!(
+        "update memberships set last_signed_in_at = now() - interval '3 days' where app_id = '{active}'"
+    ))
+    .await;
+    ctx.exec(&format!(
+        "update token_families set last_used_at = now() - interval '1 hour' where app_id = '{active}'"
+    ))
+    .await;
     let tok = token(&ctx, &carbon).await;
 
     let r = call(&ctx, Req::get("/v1/me/apps").bearer(&tok)).await;
@@ -111,10 +121,24 @@ async fn lists_the_apps_signed_into() {
             .is_some_and(|n| n.starts_with("Test app"))
     );
     assert!(a["first_signed_in_at"].as_str().is_some());
+    let at = |v: &Value| {
+        time::OffsetDateTime::parse(
+            v.as_str().expect("a time"),
+            &time::format_description::well_known::Rfc3339,
+        )
+        .expect("rfc3339")
+    };
+    let since = time::OffsetDateTime::now_utc() - at(&a["last_active_at"]);
+    assert!(
+        since > time::Duration::minutes(50) && since < time::Duration::minutes(70),
+        "last_active_at is the refresh, not the sign-in: {}",
+        a["last_active_at"]
+    );
     let i = item(&imported.app_id);
     assert_eq!(i["status"], "imported");
     assert_eq!(i["source"], "import");
     assert_eq!(i["first_signed_in_at"], Value::Null);
+    assert_eq!(i["last_active_at"], Value::Null);
     let x = item(&removed);
     assert_eq!(x["status"], "access_removed");
     assert!(x["access_removed_at"].as_str().is_some());

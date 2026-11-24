@@ -37,7 +37,7 @@ export function sectionOf(path: string): SectionKey {
   return KEY_SECTION.get(top) ?? "signin";
 }
 
-export const METHODS: readonly SigninMethod[] = ["google", "apple", "email", "phone"];
+export const METHODS: readonly SigninMethod[] = ["google", "apple", "email", "phone", "passkey"];
 export const CONTACT_FIELDS: readonly ContactField[] = ["email", "phone", "dob", "timezone"];
 export const FLOW_LAYOUTS: readonly BrandLayout[] = ["card", "split", "minimal"];
 export const MAX_FLOW_STEPS = 8;
@@ -69,7 +69,7 @@ export function normalizeFlow(value: unknown): SigninFlow | null {
 /** A complete, editable config from whatever the server (or a fixture) sent. */
 export function normalizeConfig(view: Partial<SigninConfigView> | null | undefined): EditableConfig {
   const raw = (view ?? {}) as Partial<SigninConfigView>;
-  const methods = { email: true, phone: false, google: false, apple: false, ...(raw.methods ?? {}) };
+  const methods = { email: true, phone: false, google: false, apple: false, passkey: true, ...(raw.methods ?? {}) };
   const order = list<SigninMethod>(raw.method_order, METHODS);
   for (const method of METHODS) if (!order.includes(method)) order.push(method);
   const google: GoogleConfig = {
@@ -85,7 +85,7 @@ export function normalizeConfig(view: Partial<SigninConfigView> | null | undefin
     key_id: strOrNull(raw.apple?.key_id),
   };
   return {
-    methods: { email: !!methods.email, phone: !!methods.phone, google: !!methods.google, apple: !!methods.apple },
+    methods: { email: !!methods.email, phone: !!methods.phone, google: !!methods.google, apple: !!methods.apple, passkey: !!methods.passkey },
     method_order: order,
     google,
     apple,
@@ -227,6 +227,7 @@ const PATH_LABELS: Record<string, string> = {
   "methods.phone": "Phone sign-in",
   "methods.google": "Google sign-in",
   "methods.apple": "Apple sign-in",
+  "methods.passkey": "Passkey sign-in",
   method_order: "Method order",
   "google.mode": "Google: one click or bring your own",
   "google.client_id": "Google client ID",

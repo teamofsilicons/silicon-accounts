@@ -242,12 +242,14 @@ impl Provider {
 }
 
 text_enum! {
-    /// Carbon sign-in methods an app can enable.
+    /// Carbon sign-in methods an app can enable. A passkey signs in an existing account only: it is
+    /// added from the account site, never used to sign up (Anil, 2026-11-23).
     pub enum Method {
         Google = "google",
         Apple = "apple",
         Email = "email",
         Phone = "phone",
+        Passkey = "passkey",
     }
 }
 
@@ -744,7 +746,7 @@ mod tests {
         let err = serde_json::from_str::<Method>("\"github\"").expect_err("unknown");
         assert!(
             err.to_string()
-                .starts_with("'github' is not one of google, apple, email, phone"),
+                .starts_with("'github' is not one of google, apple, email, phone, passkey"),
             "{err}"
         );
         assert_eq!("phone".parse::<ContactField>(), Ok(ContactField::Phone));

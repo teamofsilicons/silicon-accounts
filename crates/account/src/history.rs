@@ -490,6 +490,7 @@ fn method_phrase(method: &str) -> String {
         "phone" => "a phone code".into(),
         "google" => "Google".into(),
         "apple" => "Apple".into(),
+        "passkey" => "a passkey".into(),
         "silicon_stk" => "the STK".into(),
         "slt" => "a short-lived token".into(),
         "slt_public_client" => "a short-lived token, exchanged by the app's public client".into(),
@@ -1171,6 +1172,15 @@ fn describe(r: Row, me: &Account, l: &Lookups) -> HistoryItem {
                     ),
                     None,
                 ),
+                "account.passkey.added" => {
+                    ("Passkey added".to_string(), detail_str(details, "name"))
+                }
+                "account.passkey.renamed" => {
+                    ("Passkey renamed".to_string(), detail_str(details, "name"))
+                }
+                "account.passkey.removed" => {
+                    ("Passkey removed".to_string(), detail_str(details, "name"))
+                }
                 "account.identity.unlinked" => (
                     format!(
                         "{} account disconnected",

@@ -78,6 +78,11 @@ pub fn router() -> Router<AppState> {
         )
         .route("/v1/flows/{id}/resend", post(flow::handlers::resend_code))
         .route("/v1/flows/{id}/verify", post(flow::handlers::verify_code))
+        .route(
+            "/v1/flows/{id}/passkey/options",
+            post(flow::passkey::options),
+        )
+        .route("/v1/flows/{id}/passkey", post(flow::passkey::sign_in))
         // Connecting Google/Apple to the signed-in Carbon (account site).
         .route("/v1/me/identities/{provider}", post(link::start_link))
         .route("/v1/flows/{id}/signup", post(flow::signup::submit_signup))

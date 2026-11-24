@@ -14,7 +14,6 @@ import { useRouter } from "next/navigation";
 import { ArrowUpRight, Cake, Clock, LayoutGrid, Mail, Phone, UserRound } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
 import { Avatar } from "@teamofsilicons/silicon-ui/avatar";
-import { Badge } from "@teamofsilicons/silicon-ui/badge";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import { ButtonLink } from "@teamofsilicons/silicon-ui/button-link";
 import { Dialog, DialogContent } from "@teamofsilicons/silicon-ui/dialog";
@@ -22,7 +21,7 @@ import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
 import { Skeleton } from "@teamofsilicons/silicon-ui/skeleton";
 import { Page } from "@/components/foundation/layout/layout";
 import type { Me, MyApp, MyProof, Scope } from "@/lib/api/types";
-import { formatDate, formatPhone, formatRelative, plural } from "@/lib/format";
+import { formatDate, formatPhone, plural } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useMe } from "@/lib/query/session";
 import { timezoneLabel } from "@/lib/timezones";
@@ -31,6 +30,7 @@ import { asCarbon, describeError, useNow } from "../parts/common";
 import { PageBar } from "../parts/page-bar";
 import { useEveryApp, useEveryProof, useRemoveAccess } from "../parts/queries";
 import { Row, Section, Strong, Tile } from "../parts/rows";
+import { activity } from "./apps";
 import { ActiveProofRow } from "./proof-rows";
 import styles from "./apps.module.css";
 
@@ -130,7 +130,7 @@ function AppDetails({ item, me, now, proofs }: { item: MyApp; me: Me | undefined
           detail={removed ? <>Access removed{item.access_removed_at ? <> <Strong>{formatDate(item.access_removed_at)}</Strong></> : null}</>
             : imported ? `${app.name} imported you. You haven’t signed in yet.`
               : item.last_signed_in_at
-                ? <>Signed in <Strong>{formatRelative(item.last_signed_in_at, now)}</Strong>{item.active_sessions ? <> · {plural(item.active_sessions, "active session")}</> : null}</>
+                ? <>{activity(item, now)}{item.active_sessions ? <> · {plural(item.active_sessions, "active session")}</> : null}</>
                 : "You haven’t signed in yet"}
         />
       </Section>
@@ -140,14 +140,12 @@ function AppDetails({ item, me, now, proofs }: { item: MyApp; me: Me | undefined
           <Row lead={<Tile><UserRound size={16} strokeWidth={2} /></Tile>} title="Nothing" detail="Sign in to it again to give it access." />
         </Section>
       ) : (
-        <Section id="app-sees" title="What it can see about you">
+        <Section id="app-sees" title="What it can see about you" description="Every app sees your name, photo and CarbonID.">
           <Row
             lead={<Tile><UserRound size={16} strokeWidth={2} /></Tile>}
             title="Name, photo and CarbonID"
             detail={me ? <>{me.display_name}{me.id ? <> · {me.id}</> : null}</> : "Every app sees these"}
-          >
-            <Badge size="sm" tone="neutral">Always</Badge>
-          </Row>
+          />
           {details.map(detail => (
             <Row key={detail.label} lead={<Tile>{detail.icon}</Tile>} title={detail.label} detail={detail.value ?? "Not added yet"} />
           ))}

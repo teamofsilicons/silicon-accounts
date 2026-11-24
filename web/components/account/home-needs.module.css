@@ -2,10 +2,25 @@
    one white list with a clear border: a 28px mark, the title over its time left or detail, one outlined button. 48px under what comes before (the column's 24px and 24px more), like every section. */
 .group { display: grid; margin-top: var(--space-section); outline: none; }
 .section { display: grid; gap: var(--space-inset); }
-.head { display: flex; align-items: center; gap: var(--space-related); }
+.head { display: flex; min-height: var(--control-height-sm); align-items: center; gap: var(--space-related); }
+
+/* Paging (Anil, 2026-11-21, the Arrows design in /__needs): "1 of 5" and two quiet arrows at the heading's end. */
+.pager { display: flex; align-items: center; gap: var(--space-hair); margin-inline-start: auto; }
+.position { margin-inline-end: var(--space-tight); color: var(--text-secondary); font: var(--small); font-variant-numeric: tabular-nums; letter-spacing: var(--small-tracking); }
+/* The item a step brings slides in a little from the side it comes from and fades up; the box keeps still. */
+.row[data-enter] { animation: needs-enter var(--duration-considered) var(--ease-enter) both; }
+.row[data-enter="next"] { --needs-from: var(--space-section); }
+.row[data-enter="previous"] { --needs-from: calc(-1 * var(--space-section)); }
+@keyframes needs-enter {
+  from { opacity: 0; transform: translateX(var(--needs-from)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .row[data-enter] { animation-name: needs-fade; }
+  @keyframes needs-fade { from { opacity: 0; } }
+}
 .title { margin: 0; color: var(--foreground); font: var(--h2); letter-spacing: var(--h2-tracking); }
 
-.rows { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; margin: 0; padding: 0; border: 1px solid var(--sq-stroke); background: var(--sq-fill); list-style: none; }
+.rows { --sq-r: var(--radius-container); --sq-fill: var(--surface); --sq-stroke: var(--border); display: grid; overflow: clip; margin: 0; padding: 0; border: 1px solid var(--sq-stroke); background: var(--sq-fill); list-style: none; }
 /* Compact (Anil, 2026-11-11, the boxed version from /__needs): 8px above and below (4px felt tight), so a two-line
    row is about 58px. */
 .row { display: flex; min-width: 0; align-items: center; gap: var(--space-group); padding: var(--space-related) var(--space-group); }

@@ -74,7 +74,7 @@ test("leaving the Image background drops an image URL the server would refuse, s
 test("the Pages tab previews only the pages a Carbon can meet with the draft's methods", async () => {
   const { previewPages } = await import("../components/developer/lib/preview-pages");
   const labels = (methods: Partial<Record<"email" | "phone" | "google" | "apple", boolean>>, order: Array<"email" | "phone" | "google" | "apple">, extra: Record<string, unknown> = {}) =>
-    previewPages(normalizeConfig({ methods: { email: false, phone: false, google: false, apple: false, ...methods }, method_order: order, ...extra })).map(option => option.label);
+    previewPages(normalizeConfig({ methods: { email: false, phone: false, google: false, apple: false, passkey: false, ...methods }, method_order: order, ...extra })).map(option => option.label);
   // ledgerly: email, phone and Google; no Apple, so no Carbon ever sees an Opening Apple page.
   const ledgerly = labels({ email: true, phone: true, google: true }, ["email", "phone", "google"], { required_fields: ["email"], optional_fields: ["timezone"], flow: { steps: [step("contact", ["email"]), step("about", ["timezone"])], review: true } });
   assert.deepEqual(ledgerly, ["Sign in", "Sign up", "Opening Google", "Email code", "Phone code", "Set up account", "Details 1", "Details 2", "Review", "Embed buttons"]);

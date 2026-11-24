@@ -180,8 +180,8 @@ entry.
 
 | Field | Default | Rule |
 |---|---|---|
-| `methods` | `{"email": true, "phone": false, "google": false, "apple": false}` | at least one enabled |
-| `method_order` | `["google","apple","email","phone"]` | order of the buttons |
+| `methods` | `{"email": true, "phone": false, "google": false, "apple": false, "passkey": true}` | at least one of email, phone, google or apple enabled (a passkey only signs in an account that already has one) |
+| `method_order` | `["google","apple","email","phone","passkey"]` | order of the buttons |
 | `google.mode` / `apple.mode` | `managed` | `managed` (one click, our credentials) or `byo` (yours) |
 | `google.client_id` | null | required with `byo` (with a `client_secret`); at most 255 characters |
 | `google.prompt` | `select_account` | `select_account`, `consent`, `none` or `consent select_account` |

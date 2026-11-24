@@ -20,6 +20,7 @@ import { Button } from "@teamofsilicons/silicon-ui/button";
 import { Progress } from "@teamofsilicons/silicon-ui/progress";
 import { SiliconMark } from "@/components/account/parts/silicon-mark";
 import { CompactNeeds } from "./needs-compact";
+import { NeedsMore } from "./needs-more";
 import styles from "./needs-lab.module.css";
 
 interface Item {
@@ -71,8 +72,10 @@ export function NeedsLab() {
     <main className={styles.lab}>
       <header className={styles.intro}>
         <h1 className={styles.title}>Needs you: alternatives</h1>
-        <p className={styles.lede}>First the compact versions (2026-11-11, at Home&rsquo;s width, three things then one), then the earlier alternatives. Sample words; buttons do nothing here.</p>
+        <p className={styles.lede}>First ways to see everything waiting (2026-11-21), then the compact versions (2026-11-11, at Home&rsquo;s width, three things then one), then the earlier alternatives. Sample words; buttons do nothing here.</p>
       </header>
+      <NeedsMore />
+      <h2 className={styles.title}>Compact versions</h2>
       <CompactNeeds />
       <h2 className={styles.title}>Earlier alternatives</h2>
       {DESIGNS.map(design => (

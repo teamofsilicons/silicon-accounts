@@ -17,7 +17,8 @@ async fn public_config_is_cors_open_and_lists_available_methods() {
     assert_eq!(r.status, 200, "{}", r.json);
     assert_eq!(r.headers["access-control-allow-origin"], "*");
     assert_eq!(r.json["app_id"], a.app_id.as_str());
-    assert_eq!(r.json["methods"], json!(["email"]));
+    // Passkeys are on for every app unless it turns them off (Anil, 2026-11-23).
+    assert_eq!(r.json["methods"], json!(["email", "passkey"]));
     assert_eq!(r.json["branding"]["light"]["primary"], "#1F5FB8");
     assert_eq!(
         r.json["branding"]["dark"]["primary"], "#1F5FB8",
@@ -42,7 +43,7 @@ async fn public_config_is_cors_open_and_lists_available_methods() {
     .await;
     assert_eq!(r.status, 200, "{}", r.json);
     let r = call(&ctx, Req::get(&format!("/v1/apps/{}/public", a.app_id))).await;
-    assert_eq!(r.json["methods"], json!(["phone", "email"]));
+    assert_eq!(r.json["methods"], json!(["phone", "email", "passkey"]));
     assert_eq!(r.json["branding"]["radius"], 28);
     assert_eq!(r.json["copy"]["title"], "Sign in to Pub");
     // What the embed page needs for its frame-ancestors (normalized, no trailing slash).

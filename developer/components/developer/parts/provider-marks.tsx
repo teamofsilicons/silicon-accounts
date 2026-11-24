@@ -3,7 +3,7 @@
  * four-colour "G" in its real colours, Apple's mark in the text colour (as Apple's guidelines ask), and line icons for
  * email and phone.
  */
-import { Mail, Smartphone } from "lucide-react";
+import { KeyRound, Mail, Smartphone } from "lucide-react";
 import type { SigninMethod } from "@/lib/api/types";
 
 export function GoogleMark({ size = 18 }: { size?: number }) {
@@ -29,5 +29,6 @@ export function MethodMark({ method, size = 18 }: { method: SigninMethod; size?:
   if (method === "google") return <GoogleMark size={size} />;
   if (method === "apple") return <AppleMark size={size} />;
   if (method === "email") return <Mail size={size} strokeWidth={1.75} aria-hidden="true" />;
+  if (method === "passkey") return <KeyRound size={size} strokeWidth={1.75} aria-hidden="true" />;
   return <Smartphone size={size} strokeWidth={1.75} aria-hidden="true" />;
 }

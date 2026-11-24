@@ -21,7 +21,7 @@ use super::view::{self, ViewContext};
 use super::{FlowApp, FlowResponse, details, load_bound, next};
 
 /// Builds the response view for a flow.
-async fn respond(
+pub(super) async fn respond(
     conn: &mut PgConnection,
     state: &AppState,
     meta: &ClientMeta,
@@ -46,7 +46,7 @@ async fn respond(
 
 /// Saves the flow with `error` recorded and back at `choose_method`, commits, and returns the
 /// error (the attempt failed, but the flow must remember why and be usable again).
-async fn persist_failure(
+pub(super) async fn persist_failure(
     mut tx: sqlx::Transaction<'_, sqlx::Postgres>,
     flow: &mut Flow,
     error: ApiError,

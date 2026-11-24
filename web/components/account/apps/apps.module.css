@@ -30,3 +30,8 @@
 
 /* /proofs: the line under the page bar. */
 .lead { margin: var(--space-section) 0 0; color: var(--text-soft); font: var(--small); letter-spacing: var(--small-tracking); }
+
+/* An app's activity line (activity() in apps.tsx): a phone shows when it was active, not also when it signed in. */
+@media (max-width: 639px) {
+  .signedIn { display: none; }
+}

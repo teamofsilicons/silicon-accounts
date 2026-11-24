@@ -54,6 +54,7 @@ const DIRECT_LABEL: Record<SigninMethod, string> = {
   apple: "Continue with Apple",
   email: "Continue with email",
   phone: "Continue with phone number",
+  passkey: "Sign in with a passkey",
 };
 
 const DIRECT_NOTE: Record<SigninMethod, string> = {
@@ -61,6 +62,7 @@ const DIRECT_NOTE: Record<SigninMethod, string> = {
   apple: "Our Opening page shows first, then Apple.",
   email: "Our pages open straight on the email field; the Carbon types it there.",
   phone: "Our pages open straight on the phone number field.",
+  passkey: "Our sign-in page opens and asks for the Carbon's passkey (top level, never in a frame).",
 };
 
 interface Sdk {
