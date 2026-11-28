@@ -16,7 +16,7 @@
 .page { display: flex; min-width: 0; flex: 1; flex-direction: column; }
 
 /* Loading and failure states of the shell itself. */
-/* An account page loading (PageSkeleton): the page bar as parts/page-bar.module.css draws it, then sections as
+/* An account page loading (PageSkeleton): the page bar as Silicon UI's PageBar draws it, then sections as
    parts/rows.module.css spaces them (a heading 16px over its box, sections 32px apart). */
 .loadingBar { position: sticky; z-index: var(--layer-sticky); top: var(--top-height, 0px); display: grid; padding: var(--space-related) var(--space-inset); border-bottom: 1px solid var(--border); background: var(--surface); }
 /* The breadcrumb's line: 28px, as Silicon UI's Breadcrumb draws it. */

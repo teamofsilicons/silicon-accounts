@@ -25,7 +25,7 @@ import { useDeveloperUrl, useMeta } from "@/lib/query/session";
 import { AppMark } from "../parts/app-mark";
 import { describeError, useNow } from "../parts/common";
 import { ListCap } from "../parts/list-cap";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { useEveryApp, useEveryProof } from "../parts/queries";
 import { LinkItem, LinkRow, Row, Section, Strong, Tile } from "../parts/rows";
 import { InterfaceAccess } from "./interface-access";

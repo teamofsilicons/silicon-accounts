@@ -34,7 +34,7 @@ import { useEverySilicon } from "../parts/queries";
 import { dismissReveal, usePendingReveals, type Reveal } from "../parts/reveals";
 import { SecretReveal } from "../parts/secret-reveal";
 import { SiliconCard } from "../parts/silicon-card";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { STARTER_URL, SiliconsIntro } from "./silicons-intro";
 import styles from "./silicons.module.css";
 

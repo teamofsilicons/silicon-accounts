@@ -27,7 +27,7 @@ import { useMe } from "@/lib/query/session";
 import { timezoneLabel } from "@/lib/timezones";
 import { AppMark } from "../parts/app-mark";
 import { asCarbon, describeError, useNow } from "../parts/common";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { useEveryApp, useEveryProof, useRemoveAccess } from "../parts/queries";
 import { Row, Section, Strong, Tile } from "../parts/rows";
 import { activity } from "./apps";

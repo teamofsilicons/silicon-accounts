@@ -39,7 +39,7 @@ import { asCarbon, describeError, isDefaultPhoto, msUntil, PHOTO_ACCEPT, PHOTO_M
 import { PhotoUrlForm, TimezoneForm } from "../parts/detail-editors";
 import { IdChangeForm } from "../parts/id-change-form";
 import { recipient } from "../parts/handover";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { useCancelTransferSettled, useChangeSiliconIdInForm, useDeleteSiliconSettled, useEverySilicon, useSiliconDefaultPhoto, useStartTransfer } from "../parts/queries";
 import { dismissReveal, dismissRevealsOf, usePendingReveals } from "../parts/reveals";
 import { Row, Section, Strong, Tile } from "../parts/rows";

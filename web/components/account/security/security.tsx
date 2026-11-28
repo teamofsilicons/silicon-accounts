@@ -38,7 +38,7 @@ import { browserLogo, browserOf } from "../parts/browser";
 import { keepSession, readKept, staleSessions, subscribeKept } from "../parts/checkup";
 import { asCarbon, asSilicon, describeError, spanText, stkRotatedAt, useNow } from "../parts/common";
 import { useConnectProvider, useEverySession, useEverySilicon, useSignOutSession, useUnlinkProvider } from "../parts/queries";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { SiliconMark } from "../parts/silicon-mark";
 import { ChangeKeyDialog } from "../silicons/change-key";
 import { dismissReveal, usePendingReveals } from "../parts/reveals";

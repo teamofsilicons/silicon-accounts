@@ -15,7 +15,7 @@ import { paths } from "@/lib/navigation";
 import { useMe } from "@/lib/query/session";
 import { asCarbon, asSilicon, describeError } from "../parts/common";
 import { CreateSiliconForm, revealCreated } from "./create-silicon";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { siliconHref } from "./silicons";
 import styles from "./new-silicon-page.module.css";
 

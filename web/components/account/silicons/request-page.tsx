@@ -21,7 +21,7 @@ import type { CustodianRequest } from "@/lib/api/types";
 import { paths } from "@/lib/navigation";
 import { useMe } from "@/lib/query/session";
 import { describeError, msUntil, personLabel, spanText, useNow } from "../parts/common";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { useDecideRequest, useEveryCustodianRequest, type Decision } from "../parts/queries";
 import { SiliconMark } from "../parts/silicon-mark";
 import styles from "./request-page.module.css";

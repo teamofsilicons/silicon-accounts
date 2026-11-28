@@ -17,7 +17,7 @@ import { paths } from "@/lib/navigation";
 import { ActiveProofRow, EndedProofRow } from "../apps/proof-rows";
 import { describeError } from "../parts/common";
 import { ListCap } from "../parts/list-cap";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { useEveryProof } from "../parts/queries";
 import { Section } from "../parts/rows";
 import styles from "../apps/apps.module.css";

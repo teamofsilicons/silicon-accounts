@@ -211,7 +211,7 @@ development only: production answers 404 unless the server runs with `ACCOUNTS_K
   `:root`, so changing a token changes every role and every Silicon UI component. Use a role, never a raw size; a family
   set after `font:` (mono, the story serif) keeps the role's size and line. Silicon UI's components keep fixed weights
   (500, 400): `redesign/prototype-differences.md`. Colours are ours: #FCFCFC, Silicon UI's greys, the blue accent.
-- **Page bar** (`components/account/parts/page-bar.tsx`, 2026-11-07): on /silicons, /silicons/new, /apps and /personal: a parent link, the title (`--h1`, as on every page) under it, supporting buttons on its right, pinned with a line under it.
+- **Page bar** (Silicon UI's `PageBar` since 0.7.2, designed 2026-11-07): on /silicons, /silicons/new, /apps and /personal: a parent link, the title (`--h1`, as on every page) under it, supporting buttons on its right, pinned with a line under it.
 - **Personal info** (`components/account/identity/identity.tsx`, 2026-11-09): the page bar, then a Silicon UI Card
   for Profile and one for Contact. Their rows (label, value, chevron; the whole row opens its editor by `?edit=`) are
   drawn on tokens and the type roles until Silicon UI has a settings list: `redesign/requests/silicon-ui-settings-list.md`
