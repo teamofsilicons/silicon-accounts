@@ -11,11 +11,10 @@ Last updated: 2026-11-28
 1. developer-site e2e suites still use the old hosted sign-in words ("Email", "Create account": j-pages, b-bff-session,
    f-signin-tab, h-details, i-flows); auth-flows-oidc needs openid-client installed.
 ## Next
-1. Anil: menu rows at 32 px (were 36) under Silicon UI 0.7; see decisions.md, 2026-11-28.
-2. The developer site's vendored Silicon UI: bring in #30 and #31 (6 of the overlays audit's last 7 failures; its ⌘K
+1. The developer site's vendored Silicon UI: bring in #30 and #31 (6 of the overlays audit's last 7 failures; its ⌘K
    menu and docs search can then drop direct Radix).
-3. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
-4. Identity screens: `pnpm screens --only account-identity` fails while a real API runs on 8589; run with it stopped.
+2. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
+3. Identity screens: `pnpm screens --only account-identity` fails while a real API runs on 8589; run with it stopped.
 
 Done 2026-11-28: the shell on Silicon UI 0.7's AppShell, the account row on AccountMenu (Switcher), tokens.css without what 0.7.0 ships.
 

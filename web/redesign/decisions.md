@@ -622,8 +622,8 @@ Create Account; "Not You?" kept. After deleting an account: /goodbye, "Your acco
 - The page box keeps AppShell's corner (`--radius-container` with `--corner-shape`, a 14 px squircle), not the site's
   8 px round, with no override. Why: Anil saw both and agreed (relayed by the Silicon UI AppShell session, 2026-11-28);
   they look about equally round.
-- Open (Anil): menu rows at 32 px (Silicon UI 0.7.0 draws list and menu option rows at `--control-height-sm`), where
-  they were 36, in the switcher and every other menu.
+- Menu and list option rows are 32 px (Silicon UI 0.7 draws them at `--control-height-sm`; 0.6 had a fixed 36), in the
+  account menu and every dropdown, select and combobox. Why: Anil, "32px it is" (2026-11-28).
 
 ## 2026-11-14: A deleted account is archived for 10 days, then deleted
 
