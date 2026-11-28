@@ -75,6 +75,11 @@ export function useCarbonPicture(me: Pick<Me, "kind" | "uuid" | "pfp_url"> | nul
   return me ? pictureOf(me, parse(raw)) : null;
 }
 
+/** A profile's picture address read once, outside a hook (each account in the account menu). */
+export function pictureSrcOf(profile: Pick<Me, "kind" | "uuid" | "pfp_url">): string | null {
+  return pictureOf(profile, parse(readRaw(profile.uuid))).src;
+}
+
 /**
  * The Carbon's pixel avatar whatever their picture is, the figure alone (no background square): the look they saved
  * in this browser, else the one drawn from their uuid. For places that show every Carbon as their avatar, photo or not

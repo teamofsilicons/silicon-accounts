@@ -610,10 +610,12 @@ Create Account; "Not You?" kept. After deleting an account: /goodbye, "Your acco
   `onNavigate`), the command registry (lib/commands.ts, passed as `commands` with the palette's open state), the
   number keys, the page transitions and the loading, error and bare states. Why: Anil asked for Accounts and the Apps
   store to move onto it (relayed by the Silicon UI session, 2026-11-28); 0.7.0 was built from Accounts' shell.
-- The account switcher stays the site's own (profile-menu.tsx: ProfileMenu beside the page, ProfileList in the phone
-  sheet) in AppShell's `account` slot, not UserMenu. Why: Anil wants the row built the Apps store's way, a plain button
-  opening a native popover (works without script, lighter) with Accounts' look; Silicon UI is building it as a new
-  component (relayed by the Silicon UI AppShell session, 2026-11-28). Switch to it once released.
+- The account switcher is Silicon UI 0.7.1's AccountMenu in the Switcher layout (`showIdentity={false}`, one
+  AccountMenuItem per account with AccountMenuAvatar, its handle and org, `current` on the signed-in one; then Add
+  another account, Your accounts and Sign out), `presentation="list"` in the phone sheet; profile-menu.tsx is gone.
+  Why: Anil wants the row built the Apps store's way, a button opening a native popover (works without script,
+  lighter), with Accounts' look, and picked the Switcher layout for both apps (relayed by the Silicon UI AppShell
+  session, 2026-11-28). Not UserMenu.
 - Silicon UI's colours, the compact scale and `--canvas` are the site's: tokens.css no longer sets them. It still sets
   the focus halo, the series, the Silicon marks, the sky, and repeats Silicon UI's light and dark for a branded
   subtree (Silicon UI sets them on :root only).

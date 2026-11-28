@@ -118,13 +118,13 @@ const foundationScreens: ScreenSpec[] = [
   } },
   { name: "shell-nav-sheet", path: "/silicons", widths: [390], fullPage: false, prepare: async page => {
     await page.getByRole("button", { name: "Menu" }).click();
-    await expect(page.getByRole("dialog", { name: "Menu" }).getByRole("navigation", { name: "Accounts on this browser" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: "Add another account" })).toBeVisible();
     await page.waitForTimeout(900);
   } },
-  // The account switcher at the sidebar's foot (AppShell's account slot, profile-menu.tsx), beside the page.
+  // The account switcher at the sidebar's foot (AppShell's account slot, AccountMenu), beside the page.
   { name: "shell-account-menu", path: "/", waitFor: "[data-home]", widths: [1440], fullPage: false, prepare: async page => {
     await page.getByRole("button", { name: /^Accounts, signed in as/ }).click();
-    await expect(page.getByRole("menuitem", { name: "Add another account" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add another account" })).toBeVisible();
     await page.waitForTimeout(600);
   } },
   { name: "embed-buttons", path: `/embed/v1/buttons?${EMBED_QUERY("briefcase", "http://127.0.0.1:8593/briefcase/callback")}`, as: "signed-out", waitFor: "#silicon-accounts-embed[data-ready]", widths: [390] },

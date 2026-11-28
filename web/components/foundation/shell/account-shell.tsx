@@ -16,23 +16,24 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ViewTransition, useCallback, useEffect, type ReactNode } from "react";
-import { Database, LogOut, SwatchBook, UserRound, UserRoundPlus } from "lucide-react";
+import { Database, LogOut, SwatchBook, UserRound, UserRoundPlus, UsersRound } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
+import { AccountMenu, AccountMenuAvatar, AccountMenuItem, AccountMenuSeparator } from "@teamofsilicons/silicon-ui/account-menu";
 import { AppShell, useAppShell, type AppShellPlace, type AppShellProps } from "@teamofsilicons/silicon-ui/app-shell";
 import { Button } from "@teamofsilicons/silicon-ui/button";
 import type { CommandItem } from "@teamofsilicons/silicon-ui/command-palette";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
 import { Page } from "@/components/foundation/layout/layout";
 import type { AccountSummary } from "@/lib/api/types";
+import { pictureSrcOf, useCarbonPicture } from "@/lib/carbon-avatar";
 import { setCommandPaletteOpen, useCommandPaletteOpen, useCommands, useRegisterCommands } from "@/lib/commands";
 import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
-import { confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
+import { confirmNavigation, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
 import { browserProfileChanged, useBrowserAccounts, useSwitchBrowserAccount } from "@/lib/query/linked-accounts";
 import { beginSignIn, firstPartySignInUrl, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
 import { PrototypeMark } from "./brand-mark";
 import { LeaveQuestionHost } from "./leave-question";
-import { ProfileList, ProfileMenu } from "./profile-menu";
 import { SidebarLinks, SidebarNav } from "./sidebar";
 import styles from "./shell.module.css";
 
@@ -82,21 +83,55 @@ export function PageSkeleton({ pathname = "" }: { pathname?: string }) {
 const PAGE_CLASSES = { "nav-forward": "page-forward", "nav-back": "page-back", "nav-fade": "page-fade", default: "page-fade" };
 
 /**
- * The sidebar's account row (profile-menu.tsx): beside the page a full-width row opening the switcher upward; in the
- * phone sheet its rows listed in place, and a choice closes the sheet. Kept on the site's own switcher for now (Anil,
- * 2026-11-28): Silicon UI is building the row the Apps store's way (a native popover) as a new component.
+ * The sidebar's account row: Silicon UI's AccountMenu in the Switcher layout (Anil, 2026-11-28, for Accounts and the
+ * Apps store). Beside the page a row that opens a native popover the row's width; in the phone sheet the same rows in
+ * place, and a choice closes the sheet. Every account signed in on this browser (and their linked work accounts), the
+ * current one ticked, then Add another account, Your accounts and Sign out. Choosing an account switches this
+ * browser's session to it and opens Home; other tabs follow. Sign out ends the current account and its linked work
+ * accounts here, and the API resumes the most recently used other account, if any.
  */
-function AccountMenu({ account, place, onManage, onSignOut, signingOut }: {
+function AccountRow({ account, place, others, onSwitch, onAdd, onManage, onSignOut, signingOut }: {
   account: AccountSummary;
   place: AppShellPlace;
+  others: Array<AccountSummary & { org?: { name: string } | null }>;
+  onSwitch: (uuid: string) => void;
+  onAdd: () => void;
   onManage: () => void;
-  onSignOut: () => void | Promise<void>;
+  onSignOut: () => void;
   signingOut: boolean;
 }) {
   const { closeMenu } = useAppShell();
-  return place === "menu"
-    ? <ProfileList account={account} onManage={onManage} onSignOut={onSignOut} signingOut={signingOut} onDone={closeMenu} />
-    : <ProfileMenu account={account} onManage={onManage} onSignOut={onSignOut} signingOut={signingOut} />;
+  const picture = useCarbonPicture(account);
+  const profiles = [{ ...account, org: null, src: picture?.src ?? undefined }, ...others.map(other => ({ ...other, src: pictureSrcOf(other) ?? undefined }))];
+  // In the phone sheet a choice also closes the sheet (beside the page the popover closes itself).
+  const then = (run: () => void) => () => {
+    closeMenu();
+    run();
+  };
+  return (
+    <AccountMenu name={account.display_name} avatarSrc={picture?.src ?? undefined} showIdentity={false} presentation={place === "menu" ? "list" : "menu"} label={`Accounts, signed in as ${account.display_name}`}>
+      {profiles.map(profile => {
+        const handle = profile.id ?? profile.uuid;
+        return (
+          <AccountMenuItem
+            key={profile.uuid}
+            icon={<AccountMenuAvatar name={profile.display_name} src={profile.src} />}
+            description={profile.org ? `${handle} · ${profile.org.name}` : handle}
+            current={profile.uuid === account.uuid}
+            onClick={then(() => { if (profile.uuid !== account.uuid) onSwitch(profile.uuid); })}
+          >
+            {profile.display_name}
+          </AccountMenuItem>
+        );
+      })}
+      <AccountMenuSeparator />
+      <AccountMenuItem icon={<UserRoundPlus size={16} strokeWidth={2} aria-hidden="true" />} onClick={then(onAdd)}>Add another account</AccountMenuItem>
+      <AccountMenuItem icon={<UsersRound size={16} strokeWidth={2} aria-hidden="true" />} onClick={then(onManage)}>Your accounts</AccountMenuItem>
+      <AccountMenuItem icon={<LogOut size={16} strokeWidth={2} aria-hidden="true" />} disabled={signingOut} onClick={then(onSignOut)}>
+        {signingOut ? "Signing out" : "Sign out"}
+      </AccountMenuItem>
+    </AccountMenu>
+  );
 }
 
 /**
@@ -199,18 +234,6 @@ export function AccountShell({ children }: { children: ReactNode }) {
     }
   }, [signOut]);
 
-  /**
-   * The account menu's "Sign out": with nothing to ask about, the menu shows the sign-out's progress (a promise); when
-   * a page will ask about unsaved work first, the menu closes at once and the question takes over.
-   */
-  const menuSignOut = useCallback((): void | Promise<void> => {
-    if (navigationIsGuarded(paths.home, "sign-out")) {
-      void doSignOut();
-      return;
-    }
-    return doSignOut();
-  }, [doSignOut]);
-
   // Commands every account page has.
   useRegisterCommands(() => [
     ...SECTIONS.map(section => {
@@ -312,7 +335,16 @@ export function AccountShell({ children }: { children: ReactNode }) {
       brand={brand}
       nav={<SidebarNav activeKey={active?.key} />}
       account={place => account ? (
-        <AccountMenu account={account} place={place} onManage={() => void go(paths.linkedAccounts)} onSignOut={menuSignOut} signingOut={signingOut} />
+        <AccountRow
+          account={account}
+          place={place}
+          others={otherAccounts}
+          onSwitch={uuid => void switchTo(uuid)}
+          onAdd={addAccount}
+          onManage={() => void go(paths.linkedAccounts)}
+          onSignOut={() => void doSignOut()}
+          signingOut={signingOut}
+        />
       ) : null}
       links={<SidebarLinks developerUrl={developerUrl} />}
       sidebarLabel="Account sidebar"

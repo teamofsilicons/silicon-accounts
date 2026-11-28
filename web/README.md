@@ -33,7 +33,7 @@ Node 24 or newer. Read the bundled Next docs in `node_modules/next/dist/docs/` b
 breaking changes (`proxy.ts` instead of `middleware.ts`, async `params`/`searchParams`, `PageProps<"/route">` from
 `next typegen`, Turbopack by default).
 
-The sidebar's account switcher is `components/foundation/shell/profile-menu.tsx`, in AppShell's `account` slot: a radio menu opening upward beside the page, its rows listed in place in the phone sheet (until Silicon UI's native-popover account row is released, 2026-11-28). Each profile shows its name and handle, with a check beside the current account.
+The sidebar's account switcher is Silicon UI's AccountMenu in the Switcher layout (2026-11-28, `AccountRow` in `account-shell.tsx`), in AppShell's `account` slot: a native popover the row's width beside the page, its rows listed in place in the phone sheet. Each profile shows its name and handle, with a check beside the current account.
 
 ## Topology
 
@@ -142,7 +142,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 
 `app/(app)/layout.tsx` mounts the client providers for everything under it (one query cache across the account pages
 and the hosted pages); the root layout and the public landing load none. `app/(app)/(shell)/layout.tsx` wraps the
-account pages in the account shell (sidebar, ⌘K palette, sign-in gate). The shell is Silicon UI's AppShell since 0.7.0 (2026-11-28); it is full height (2026-11-17): from 900px there is no top bar, and the sidebar holds the brand and Search at its head and the account switcher at its foot (`profile-menu.tsx`, 2026-11-18: every account signed in on this browser, Add another account, Your accounts, Sign out; listed in place in the phone sheet); under 900px a top bar shows the brand and a Menu button that opens the sidebar in a bottom sheet. While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
+account pages in the account shell (sidebar, ⌘K palette, sign-in gate). The shell is Silicon UI's AppShell since 0.7.0 (2026-11-28); it is full height (2026-11-17): from 900px there is no top bar, and the sidebar holds the brand and Search at its head and the account switcher at its foot (AccountMenu, 2026-11-18: every account signed in on this browser, Add another account, Your accounts, Sign out; listed in place in the phone sheet); under 900px a top bar shows the brand and a Menu button that opens the sidebar in a bottom sheet. While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
 development only: production answers 404 unless the server runs with `ACCOUNTS_KITCHEN=1`.
 
 ## Conventions
