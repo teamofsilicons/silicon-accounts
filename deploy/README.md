@@ -221,3 +221,20 @@ Schema unchanged at 44; verified backup `backups/20261119T155939Z.dump` first; o
 (1.4 s), after a loopback preflight of the new web server. The previous builds' static files stay served for open tabs.
 Rollback: point `current` at `previous-release` (`dc18dd7`) and restart both units. SSM command `7db28e10-cfc3-4759-982c-82d544eb2c03`. Receipt:
 [verification-web-pr26-2026-11-19.json](verification-web-pr26-2026-11-19.json).
+
+## Passkeys for Carbon sign-in (PR 27) — 2026-11-24
+
+Release `accounts-passkeys-bf1379c` (source `bf1379c`) is live with migration 0045: Carbons add passkeys on Security and
+sign in with them on every hosted sign-in page (teamofsilicons/silicon-accounts#27, with 3118014: the sign-in page asks
+for passkey options one at a time). PR 27 is not merged yet, so main does not match production until it is. It is an
+API, migrations, web and Developer overlay on the live release `60e4374` ([passkeys-cutover.py](passkeys-cutover.py)):
+Node, Caddy, `/etc/accounts` and the `accounts-*` units kept byte for byte (hash-checked), the previous builds' static
+files kept for open tabs. Verified backup `backups/predeploy-passkeys-20261123T212330Z.dump` first; the live API kept
+serving through the backup and migration (0045 only adds `passkeys` and `passkey_registrations`); schema 44 → 45; then
+`accounts-api`, `accounts-web` and `accounts-developer` restarted and passed local readiness. The cutover stopped at its
+last step: it wrote `previous-release` as a file, which is a symlink on this host. Nothing rolled back (every check
+before it had passed); the symlink was repointed from `dc18dd7` to `60e4374` separately and the script now replaces it.
+Rollback is a symlink switch to `previous-release` (0045 is additive; the old code ignores the new tables). SSM commands
+`30214a69-5cdf-42e2-8d46-7ad637e1f631` (activation) and `c878678c-457b-4af4-ba39-4ba06fb23868` (symlink and receipt).
+Briefcase's live sign-in shows Sign In with a Passkey at 1440 and 390 with no console errors. Receipt:
+[verification-passkeys-2026-11-24.json](verification-passkeys-2026-11-24.json).

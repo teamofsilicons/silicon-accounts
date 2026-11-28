@@ -146,8 +146,13 @@ A Carbon can sign in with:
 - `phone` - phone number + a 6 digit verification code.
 - `google` - Sign in with Google.
 - `apple` - Sign in with Apple.
+- `passkey` - a passkey the Carbon added to their account, kept by their device or password manager.
 
 Each app decides which of these it wants, any combination of them, and configures it itself.
+
+### Passkeys
+
+A Carbon adds passkeys on `accounts.teamofsilicons.com`, under Security, and needs a sign-in from the last 30 minutes to do it. Every sign-in page is on our site, so one passkey signs them in to every app. A passkey only signs in an account that already has one: it never signs anyone up, so the sign-up page doesn't offer it. Passkeys are on for every app unless the app turns them off, and Interfaces don't offer them. A Carbon can't remove the last way into their account, and a passkey counts as one.
 
 ### Email and phone verification
 
@@ -314,6 +319,7 @@ Keep verification records and their history after the credential material expire
 This is where a Carbon manages their account. They should be able to:
 - see and edit their details
 - add, remove and change their primary emails and phone numbers
+- add, rename and remove their passkeys
 - see every app they've signed into, and remove an app's access
 - see and revoke their User verification proofs
 - see the Silicons they're custodian of, create a new Silicon, rotate its STK, and transfer it to another Carbon

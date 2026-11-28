@@ -862,6 +862,130 @@ mod tests {
         );
     }
 
+    /// A sign-in answer for accounts.example with these authenticator flags and client data, signed by `sign`.
+    fn signed_answer(
+        flags: u8,
+        client_data: Value,
+        sign: impl Fn(&[u8]) -> Vec<u8>,
+    ) -> AuthenticationResponse {
+        let client_data = serde_json::to_vec(&client_data).expect("json");
+        let mut auth_data = Sha256::digest(b"accounts.example").to_vec();
+        auth_data.push(flags);
+        auth_data.extend_from_slice(&1u32.to_be_bytes());
+        let mut signed = auth_data.clone();
+        signed.extend_from_slice(&Sha256::digest(&client_data));
+        let id = b64url_encode(b"key");
+        AuthenticationResponse {
+            id: id.clone(),
+            raw_id: id,
+            kind: "public-key".into(),
+            response: AssertionResponse {
+                client_data_json: b64url_encode(&client_data),
+                authenticator_data: b64url_encode(&auth_data),
+                signature: b64url_encode(&sign(&signed)),
+                user_handle: None,
+            },
+        }
+    }
+
+    fn get_data(challenge: &str) -> Value {
+        json!({ "type": "webauthn.get", "challenge": challenge, "origin": "https://accounts.example" })
+    }
+
+    fn cose(entries: Vec<(i64, ciborium::Value)>) -> Vec<u8> {
+        let map = entries.into_iter().map(|(k, v)| (k.into(), v)).collect();
+        let mut out = Vec::new();
+        ciborium::into_writer(&ciborium::Value::Map(map), &mut out).expect("cbor");
+        out
+    }
+
+    fn ed25519() -> (ed25519_dalek::SigningKey, Vec<u8>) {
+        let key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+        let public = key.verifying_key().to_bytes().to_vec();
+        let cose_key = cose(vec![
+            (1, 1.into()),
+            (3, EDDSA.into()),
+            (-1, 6.into()),
+            (-2, ciborium::Value::Bytes(public)),
+        ]);
+        (key, cose_key)
+    }
+
+    #[test]
+    fn signs_in_with_eddsa_and_rs256_keys() {
+        use ed25519_dalek::Signer as _;
+        use rsa::traits::PublicKeyParts as _;
+        let (ed, ed_cose) = ed25519();
+        let rsa_key = rsa::RsaPrivateKey::new(&mut rsa::rand_core::OsRng, 2048).expect("rsa");
+        let rsa_cose = cose(vec![
+            (1, 3.into()),
+            (3, RS256.into()),
+            (-1, ciborium::Value::Bytes(rsa_key.n().to_bytes_be())),
+            (-2, ciborium::Value::Bytes(rsa_key.e().to_bytes_be())),
+        ]);
+        let sign_ed = |m: &[u8]| ed.sign(m).to_bytes().to_vec();
+        let sign_rsa = |m: &[u8]| {
+            rsa_key
+                .sign(rsa::Pkcs1v15Sign::new::<Sha256>(), &Sha256::digest(m))
+                .expect("sign")
+        };
+        let keys: [(&[u8], i64, &dyn Fn(&[u8]) -> Vec<u8>); 2] =
+            [(&ed_cose, EDDSA, &sign_ed), (&rsa_cose, RS256, &sign_rsa)];
+
+        for (cose_key, algorithm, sign) in keys {
+            assert_eq!(cose_algorithm(cose_key), Ok(algorithm));
+            let stored = StoredKey {
+                public_key: cose_key,
+                algorithm,
+                sign_count: 0,
+            };
+            let challenge = new_challenge();
+            let answer = signed_answer(0x01 | 0x04, get_data(&challenge), sign);
+            let ok = verify_authentication(&rp(), &challenge, &answer, &stored);
+            assert_eq!(ok.map(|v| v.sign_count), Ok(1), "algorithm {algorithm}");
+
+            // Signed over something else.
+            let forged = signed_answer(0x01 | 0x04, get_data(&challenge), |m| {
+                sign(&[m, b"x"].concat())
+            });
+            assert_eq!(
+                verify_authentication(&rp(), &challenge, &forged, &stored),
+                Err(WebauthnError::BadSignature),
+                "algorithm {algorithm}"
+            );
+        }
+    }
+
+    #[test]
+    fn refuses_no_presence_and_another_sites_frame() {
+        use ed25519_dalek::Signer as _;
+        let (ed, ed_cose) = ed25519();
+        let sign = |m: &[u8]| ed.sign(m).to_bytes().to_vec();
+        let stored = StoredKey {
+            public_key: &ed_cose,
+            algorithm: EDDSA,
+            sign_count: 0,
+        };
+
+        // Verified, but the authenticator didn't say the person was there (no UP flag).
+        let challenge = new_challenge();
+        let answer = signed_answer(0x04, get_data(&challenge), sign);
+        assert_eq!(
+            verify_authentication(&rp(), &challenge, &answer, &stored),
+            Err(WebauthnError::UserNotPresent)
+        );
+
+        // Our own origin, but inside another site's frame.
+        let challenge = new_challenge();
+        let mut data = get_data(&challenge);
+        data["crossOrigin"] = json!(true);
+        let answer = signed_answer(0x01 | 0x04, data, sign);
+        assert_eq!(
+            verify_authentication(&rp(), &challenge, &answer, &stored),
+            Err(WebauthnError::WrongOrigin)
+        );
+    }
+
     #[test]
     fn relying_party_from_hosts() {
         let rp = RelyingParty::new("localhost", &["http://localhost:9100"]);

@@ -14,7 +14,7 @@
  *
  * Flow failures are never toasts: the Carbon reads them on the card.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/endpoints";
 import { ApiError } from "@/lib/api/errors";
@@ -112,6 +112,9 @@ export function useFlowController(id: string): FlowController {
   });
   const [failure, setFailure] = useState<ApiError | null>(null);
   const [notice, setNotice] = useState<ApiError | null>(null);
+  // The flow keeps only the latest passkey challenge, so options are asked for one at a time: a button press made while
+  // the autofill's request is still on its way would otherwise get its challenge replaced by the autofill's.
+  const passkeyOptionsInFlight = useRef<Promise<unknown>>(Promise.resolve());
 
   const actions = useMemo<FlowActions>(() => {
     const key = queryKeys.flow(id);
@@ -187,7 +190,9 @@ export function useFlowController(id: string): FlowController {
       },
       passkey: async ({ autofill = false, signal } = {}) => {
         try {
-          const options = await api.flows.passkeyOptions(id);
+          const asking = passkeyOptionsInFlight.current.then(() => api.flows.passkeyOptions(id));
+          passkeyOptionsInFlight.current = asking.catch(() => null);
+          const options = await asking;
           const credential = await getPasskey(options, { autofill, signal });
           if (!credential) return null;
           return await run(() => api.flows.passkey(id, credential));

@@ -1,0 +1,96 @@
+{
+ "verified_at": "2026-11-23T21:24:23.847914+00:00",
+ "release": "accounts-passkeys-bf1379c",
+ "revision": "bf1379c718da527399641e41390f1bd017597af8",
+ "previous": "60e4374bae8e5f9e6c809aff8f5def6c0490692b",
+ "contents": "teamofsilicons/silicon-accounts#27 (passkeys for Carbon sign-in: migration 0045, /v1/me/passkeys, /v1/flows/{id}/passkey, the passkey button and autofill on the hosted sign-in, Security's passkey rows; app activity, Needs you pages and account-site fixes) and 3118014 (one passkey options request at a time; EdDSA, RS256, UP and crossOrigin tests; UNDERSTANDING)",
+ "api_source": "bf1379c718da527399641e41390f1bd017597af8",
+ "api_sha256": "992b2f94c202585230ddbbfd2c9ececaf4f2976bfba7f8a369aac04887d2bc18",
+ "web_build_id": "jDrGlpJkJvvN676VicMcg",
+ "developer_build_id": "KoZtx6nRh14GFoTd4W9-E",
+ "schema_version": {
+  "before": 44,
+  "after": 45
+ },
+ "baseline_note": "API, migrations, web and Developer overlay on the live release 60e4374 (deploy/passkeys-cutover.py): Node, Caddy and every file under /etc/accounts and the accounts-* units kept byte for byte (hash-checked); the previous builds' static files kept for open tabs.",
+ "artifact": {
+  "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-passkeys/bf1379c718da527399641e41390f1bd017597af8-b9fe16889932.tar.gz",
+  "sha256": "b9fe1688993204871288e364659df239e93f6467d21e2dc15f995218b48aa078",
+  "size": 108415977,
+  "files": 5099
+ },
+ "predeployment_backup": {
+  "key": "backups/predeploy-passkeys-20261123T212330Z.dump",
+  "sha256": "5339561f13728cc33ae24e41dd1c97ccc3b8a72925c51cb27f9017c2e0ee0d81",
+  "size": 6431910,
+  "pg_restore_list": true
+ },
+ "activation_command_id": "30214a69-5cdf-42e2-8d46-7ad637e1f631",
+ "activation": {
+  "migration": "0045 passkeys applied; 44 already applied",
+  "restarted_units": [
+   "accounts-api",
+   "accounts-web",
+   "accounts-developer"
+  ],
+  "local_health": {
+   "8589/readyz": 200,
+   "8590/v1/meta": 200,
+   "8600/auth/session": 200
+  },
+  "unchanged_configuration": true,
+  "prior_static_files_kept": {
+   "web": 577,
+   "developer": 284
+  },
+  "stopped_at": "Writing previous-release: the script wrote it as a file, but on this host it is a symlink (a directory to open). Everything before it had passed, so nothing rolled back; the script is fixed to replace the symlink."
+ },
+ "finish_command_id": "c878678c-457b-4af4-ba39-4ba06fb23868",
+ "previous_release": "/opt/accounts/releases/60e4374bae8e5f9e6c809aff8f5def6c0490692b (was dc18dd7)",
+ "public_http": {
+  "https://accounts.teamofsilicons.com/": 200,
+  "https://accounts.teamofsilicons.com/readyz": 200,
+  "https://accounts.teamofsilicons.com/v1/meta": 200,
+  "GET https://accounts.teamofsilicons.com/v1/me/passkeys": 401,
+  "POST https://accounts.teamofsilicons.com/v1/me/passkeys/options": 401,
+  "POST https://accounts.teamofsilicons.com/v1/flows/nope/passkey/options (no Origin)": 403,
+  "https://accounts.teamofsilicons.com/__accounts-signin": 404,
+  "https://developers.teamofsilicons.com/": 200,
+  "https://developers.teamofsilicons.com/auth/session": 200,
+  "openapi_passkey_paths": 5
+ },
+ "browser_verification": {
+  "browser": "Headless Google Chrome (Playwright), signed out; nothing clicked or submitted",
+  "path": "https://briefcase.teamofsilicons.com/auth/sign-in -> https://accounts.teamofsilicons.com/authorize/flow/<id>",
+  "checked_at_1440_and_390": [
+   "h1 'Sign in'",
+   "Continue with Google, Continue with Apple, Sign In with a Passkey, Send Me a Code",
+   "the email field offers passkey autofill (autocomplete webauthn)",
+   "No console or page errors"
+  ]
+ },
+ "rust_tests": {
+  "workspace_passed": 1091,
+  "failed": 0,
+  "ignored": 3
+ },
+ "web_checks": {
+  "typecheck": true,
+  "lint": true,
+  "unit_tests_passed": 34,
+  "auth_checks_passed": 58,
+  "production_build": true,
+  "production_routing": true
+ },
+ "developer_checks": {
+  "typecheck": true,
+  "unit_tests": "88 of 103 pass on this Mac's Node 22.11; the same 12 fail on the live baseline 60e4374 here (production runs Node 24.21)",
+  "production_build": true,
+  "production_routing": true
+ },
+ "not_checked": [
+  "Adding a passkey and signing in with it in production",
+  "The developer site's passkey toggle in production",
+  "The developer unit tests on Node 24"
+ ]
+}
