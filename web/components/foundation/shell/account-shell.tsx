@@ -1,55 +1,40 @@
 "use client";
 
 /**
- * The account site's frame for signed-in pages: from 900px the sidebar (sidebar.tsx) beside the page, the window's full
- * height, with the brand (home) and search (the ⌘K palette) at its head and the account menu at its foot; below that a
- * top bar with the brand and a menu button that opens the same sidebar in a bottom sheet (Anil, 2026-11-17). Also the ⌘K palette, number-key
- * shortcuts and page transitions. It also guards the account routes: visitors without a
- * session are sent to sign in and come back to the page they asked for. At "/" a signed-out visitor sees the landing
- * page, rendered bare (without the shell).
+ * The account site's frame for signed-in pages: Silicon UI's AppShell (Anil, 2026-11-28, Silicon UI 0.7.0). From 900px
+ * the sidebar beside the page, the window's full height, with the brand (home) and Search (the ⌘K palette) at its head,
+ * the sections, and the account switcher and other sites at its foot; below that a top bar with the brand and a menu
+ * button that opens the same sidebar in a bottom sheet. Here: the guards, the command registry and number keys, page
+ * transitions, and the loading, error and bare states. It also guards the account routes: visitors without a session
+ * are sent to sign in and come back to the page they asked for. At "/" a signed-out visitor sees the landing page,
+ * rendered bare (without the shell).
  *
- * Every navigation the shell starts (brand, palette, number keys, Settings, signing out) asks the
- * page's navigation guards first (lib/navigation-guard.ts), and so does a plain click on any other link while a guard
- * protects its destination: a page with unsaved work registers one guard and every way out asks.
+ * Every navigation the shell starts (a sidebar link, the brand, the palette, number keys, the account menu, signing
+ * out) asks the page's navigation guards first (lib/navigation-guard.ts), and so does a plain click on any other link
+ * while a guard protects its destination: a page with unsaved work registers one guard and every way out asks.
  */
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ViewTransition, useCallback, useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Database, LogOut, Menu, Search, SwatchBook, UserRound, UserRoundPlus } from "lucide-react";
+import { ViewTransition, useCallback, useEffect, type ReactNode } from "react";
+import { Database, LogOut, SwatchBook, UserRound, UserRoundPlus } from "lucide-react";
 import { Alert } from "@teamofsilicons/silicon-ui/alert";
-import { BottomSheet } from "@teamofsilicons/silicon-ui/bottom-sheet";
+import { AppShell, useAppShell, type AppShellPlace, type AppShellProps } from "@teamofsilicons/silicon-ui/app-shell";
 import { Button } from "@teamofsilicons/silicon-ui/button";
+import type { CommandItem } from "@teamofsilicons/silicon-ui/command-palette";
 import { SkeletonBlock } from "@/components/foundation/feedback/skeleton-block";
-import { Page, SkipLink } from "@/components/foundation/layout/layout";
-import { openCommandPalette, toggleCommandPalette, useCommandPaletteOpen, useRegisterCommands } from "@/lib/commands";
+import { Page } from "@/components/foundation/layout/layout";
+import type { AccountSummary } from "@/lib/api/types";
+import { setCommandPaletteOpen, useCommandPaletteOpen, useCommands, useRegisterCommands } from "@/lib/commands";
 import { ELSEWHERE, MORE_DESTINATIONS, SECTIONS, navigationType, paths, sectionFor } from "@/lib/navigation";
-import { GUARDED_NAVIGATION, confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
+import { confirmNavigation, navigationIsGuarded, useGuardedLinks } from "@/lib/navigation-guard";
 import { notifyError } from "@/lib/notify";
 import { browserProfileChanged, useBrowserAccounts, useSwitchBrowserAccount } from "@/lib/query/linked-accounts";
 import { beginSignIn, firstPartySignInUrl, useDeveloperUrl, useMe, useSession, useSignOut } from "@/lib/query/session";
 import { PrototypeMark } from "./brand-mark";
-import { CommandMenu } from "./command-menu";
 import { LeaveQuestionHost } from "./leave-question";
 import { ProfileList, ProfileMenu } from "./profile-menu";
-import { Sidebar } from "./sidebar";
-import { SIDEBAR_STEPS, SidebarResize, useSidebarStep } from "./sidebar-resize";
+import { SidebarLinks, SidebarNav } from "./sidebar";
 import styles from "./shell.module.css";
-
-const subscribeNothing = () => () => undefined;
-
-/** Under 900px the section list moves from beside the page into a bottom sheet. */
-const NARROW = "(max-width: 899px)";
-const subscribeNarrow = (change: () => void) => {
-  const media = window.matchMedia(NARROW);
-  media.addEventListener("change", change);
-  return () => media.removeEventListener("change", change);
-};
-const readNarrow = () => window.matchMedia(NARROW).matches;
-
-function detectApple(): boolean {
-  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
-  return /mac|iphone|ipad|ipod/i.test(nav.userAgentData?.platform ?? nav.platform ?? "");
-}
 
 /** True when the event target is a text field, so global shortcuts never steal keys from typing. */
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -96,6 +81,43 @@ export function PageSkeleton({ pathname = "" }: { pathname?: string }) {
 
 const PAGE_CLASSES = { "nav-forward": "page-forward", "nav-back": "page-back", "nav-fade": "page-fade", default: "page-fade" };
 
+/**
+ * The sidebar's account row (profile-menu.tsx): beside the page a full-width row opening the switcher upward; in the
+ * phone sheet its rows listed in place, and a choice closes the sheet. Kept on the site's own switcher for now (Anil,
+ * 2026-11-28): Silicon UI is building the row the Apps store's way (a native popover) as a new component.
+ */
+function AccountMenu({ account, place, onManage, onSignOut, signingOut }: {
+  account: AccountSummary;
+  place: AppShellPlace;
+  onManage: () => void;
+  onSignOut: () => void | Promise<void>;
+  signingOut: boolean;
+}) {
+  const { closeMenu } = useAppShell();
+  return place === "menu"
+    ? <ProfileList account={account} onManage={onManage} onSignOut={onSignOut} signingOut={signingOut} onDone={closeMenu} />
+    : <ProfileMenu account={account} onManage={onManage} onSignOut={onSignOut} signingOut={signingOut} />;
+}
+
+/**
+ * AppShell with the command registry's commands and the palette's open state. Its own component, so a page registering
+ * commands re-renders only this, not AccountShell (whose commands would register again, and again).
+ */
+function CommandShell(props: Omit<AppShellProps, "commands" | "onCommand" | "commandsOpen" | "onCommandsOpenChange">) {
+  const commands = useCommands();
+  const paletteOpen = useCommandPaletteOpen();
+  const items: CommandItem[] = commands.map(({ id, label, description, group, keywords, icon, shortcut }) => ({ id, label, description, group, keywords, icon, shortcut }));
+  return (
+    <AppShell
+      {...props}
+      commands={items}
+      onCommand={item => commands.find(entry => entry.id === item.id)?.run()}
+      commandsOpen={paletteOpen}
+      onCommandsOpenChange={setCommandPaletteOpen}
+    />
+  );
+}
+
 export function AccountShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -103,13 +125,9 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const me = useMe();
   const { signOut, pending: signingOut } = useSignOut();
   const paletteOpen = useCommandPaletteOpen();
-  const isApple = useSyncExternalStore(subscribeNothing, detectApple, () => false);
   const isHome = pathname === "/";
   const active = sectionFor(pathname);
   const developerUrl = useDeveloperUrl();
-  const narrow = useSyncExternalStore(subscribeNarrow, readNarrow, () => false);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [sidebarStep, setSidebarStep] = useSidebarStep();
 
   // Account routes need a session; "/" shows the landing page instead. (Sign-ins come back to /sign-in, which restores
   // the page: this home page never reads a code, state or error from its address.)
@@ -137,7 +155,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
     push(href);
   }, [pathname, push]);
 
-  // From 900px the page box is the scroller, not the window (shell.module.css), so a new page starts at its top.
+  // From 900px the page box is the scroller, not the window (AppShell), so a new page starts at its top.
   useEffect(() => {
     document.getElementById("main")?.scrollTo({ top: 0 });
   }, [pathname]);
@@ -151,7 +169,7 @@ export function AccountShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", onSwitch);
   }, [session?.account.uuid]);
 
-  // The accounts signed in on this browser, for the palette's switch commands (the switcher reads the same query).
+  // The accounts signed in on this browser, for the switcher and the palette's switch commands.
   const browserAccounts = useBrowserAccounts(status === "signed_in");
   const switchAccount = useSwitchBrowserAccount();
   const switchTo = useCallback(async (uuid: string) => {
@@ -164,6 +182,9 @@ export function AccountShell({ children }: { children: ReactNode }) {
     }
   }, [switchAccount]);
   const otherAccounts = (browserAccounts.data?.accounts ?? []).filter(other => other.uuid !== session?.account.uuid);
+  const addAccount = useCallback(() => {
+    void confirmNavigation(paths.signIn).then(ok => { if (ok) window.location.assign(firstPartySignInUrl(paths.home, { prompt: "login" })); });
+  }, []);
 
   // Links in the pages ask too while a guard protects where they go.
   useGuardedLinks(push);
@@ -179,8 +200,8 @@ export function AccountShell({ children }: { children: ReactNode }) {
   }, [signOut]);
 
   /**
-   * The user menu's "Sign out": with nothing to ask about, the menu shows the sign-out's progress (a promise); when a
-   * page will ask about unsaved work first, the menu closes at once and the question takes over.
+   * The account menu's "Sign out": with nothing to ask about, the menu shows the sign-out's progress (a promise); when
+   * a page will ask about unsaved work first, the menu closes at once and the question takes over.
    */
   const menuSignOut = useCallback((): void | Promise<void> => {
     if (navigationIsGuarded(paths.home, "sign-out")) {
@@ -252,19 +273,14 @@ export function AccountShell({ children }: { children: ReactNode }) {
       group: "Account",
       icon: <UserRoundPlus size={16} strokeWidth={2} />,
       keywords: ["add", "account", "sign in", "another", "profile"],
-      run: () => void confirmNavigation(paths.signIn).then(ok => { if (ok) window.location.assign(firstPartySignInUrl(paths.home, { prompt: "login" })); }),
+      run: addAccount,
     },
     { id: "account.signout", label: "Sign out", description: "Sign this browser out of Silicon Accounts", group: "Account", icon: <LogOut size={16} strokeWidth={2} />, keywords: ["logout", "log out", "sign out"], run: () => void doSignOut() },
-  ], [go, doSignOut, developerUrl, otherAccounts.map(other => other.uuid).join(), switchTo]);
+  ], [go, doSignOut, addAccount, developerUrl, otherAccounts.map(other => other.uuid).join(), switchTo]);
 
-  // ⌘K toggles the palette; 1 to 7 jump to sections (never while typing or with a layer open).
+  // 1 to 7 jump to sections (never while typing or with a layer open). ⌘K is AppShell's.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        toggleCommandPalette();
-        return;
-      }
       if (event.metaKey || event.ctrlKey || event.altKey || event.repeat || paletteOpen || isTypingTarget(event.target)) return;
       // Any open layer (Radix dialogs, drawers and sheets carry no aria-modal), menu or popup list keeps the keys.
       const layers = document.querySelectorAll("[role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox']");
@@ -283,79 +299,33 @@ export function AccountShell({ children }: { children: ReactNode }) {
   const account = session ? me.data ?? session.account : null;
 
   const brand = (
-    <Link href={paths.home} aria-label="Team of Silicons Accounts" data-sq="surface" className={styles.brand} {...{ [GUARDED_NAVIGATION]: "" }} onClick={event => {
-      if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
-      event.preventDefault();
-      void go(paths.home, event.currentTarget);
-    }}>
+    <Link href={paths.home} aria-label="Team of Silicons Accounts" data-sq="surface" className={styles.brand}>
       <PrototypeMark />
       <span className={styles.brandText}>Team of Silicons <b className={styles.brandProduct}>Accounts</b></span>
     </Link>
   );
-  const search = (
-    // Keyed by the layout: Silicon UI's Button measures its label once and keeps that width inline, so a new Button
-    // measures again when the sidebar moves between the page's side and the phone sheet.
-    <Button
-      key={narrow ? "narrow" : "wide"}
-      variant="soft"
-      size="sm"
-      className={styles.search}
-      onClick={() => {
-        setSheetOpen(false);
-        openCommandPalette();
-      }}
-      aria-keyshortcuts={isApple ? "Meta+K" : "Control+K"}
-    >
-      <Search size={16} strokeWidth={2.1} aria-hidden="true" />
-      <span className={styles.searchLabel}>Search</span>
-      <kbd data-sq="surface" className={styles.keys}>{isApple ? "⌘K" : "Ctrl K"}</kbd>
-    </Button>
-  );
-  // The account switcher at the sidebar's foot (profile-menu.tsx): beside the page a full-width row opening a menu; in
-  // the phone sheet its rows are listed in place.
-  const accountMenu = account ? (
-    <ProfileMenu account={account} onManage={() => void go(paths.linkedAccounts)} onSignOut={menuSignOut} signingOut={signingOut} />
-  ) : null;
-  const accountList = account ? (
-    <ProfileList account={account} onManage={() => void go(paths.linkedAccounts)} onSignOut={menuSignOut} signingOut={signingOut} onDone={() => setSheetOpen(false)} />
-  ) : null;
 
-  // The full-height shell (Anil, 2026-11-17, from the Apps store): from 900px no top bar; the sidebar carries the
-  // wordmark and search at its head and the account menu at its foot, and it and the page box run the window's full
-  // height in 8px of padding. Under 900px a top bar with the wordmark and the menu button; the sidebar (search, the
-  // sections, the account menu, the other sites) opens in a bottom sheet, and the page is full bleed. (The top-bar
-  // shell of 2026-10-30 is in git before this change.)
+  // Silicon UI's AppShell (2026-11-28; the full-height shell of 2026-11-17 and the top-bar shell of 2026-10-30 are in
+  // git before it). Every link in it is followed through `go`, so the guards ask first.
   const chrome = (content: ReactNode) => (
-    <div className={styles.shell}>
-      <SkipLink href="#main" />
-      {/* Drawn on every width, hidden from 900px by CSS, so a phone has it before the page knows its width. */}
-      <header className={styles.top}>
-        {brand}
-        {narrow ? (
-          <BottomSheet
-            title="Your account"
-            open={sheetOpen}
-            onOpenChange={setSheetOpen}
-            trigger={<Button variant="ghost" size="sm" aria-label="Menu"><Menu size={18} strokeWidth={2} aria-hidden="true" /></Button>}
-          >
-            <Sidebar activeKey={active?.key} developerUrl={developerUrl} onNavigate={() => setSheetOpen(false)} head={search} account={accountList} />
-          </BottomSheet>
-        ) : null}
-      </header>
-      <div className={styles.body} style={{ "--sidebar-width": `${SIDEBAR_STEPS[sidebarStep]}px` } as CSSProperties}>
-        {narrow ? null : (
-          <>
-            <aside id="account-sidebar" className={styles.aside}>
-              <Sidebar activeKey={active?.key} developerUrl={developerUrl} head={<><div className={styles.brandRow}>{brand}</div>{search}</>} account={accountMenu} />
-            </aside>
-            <SidebarResize step={sidebarStep} onStep={setSidebarStep} controls="account-sidebar" />
-          </>
-        )}
-        <main id="main" data-sq-native="" className={styles.main} tabIndex={-1}>{content}</main>
-      </div>
-      <CommandMenu />
+    <CommandShell
+      brand={brand}
+      nav={<SidebarNav activeKey={active?.key} />}
+      account={place => account ? (
+        <AccountMenu account={account} place={place} onManage={() => void go(paths.linkedAccounts)} onSignOut={menuSignOut} signingOut={signingOut} />
+      ) : null}
+      links={<SidebarLinks developerUrl={developerUrl} />}
+      sidebarLabel="Account sidebar"
+      onNavigate={({ href, event }) => {
+        event.preventDefault();
+        const link = event.target instanceof Element ? event.target.closest<HTMLElement>("a[href]") : null;
+        void go(href, link);
+      }}
+      storageKey="sa.sidebar-step"
+    >
+      {content}
       <LeaveQuestionHost />
-    </div>
+    </CommandShell>
   );
 
   if (status === "signed_in") {

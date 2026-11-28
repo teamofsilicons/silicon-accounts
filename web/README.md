@@ -33,7 +33,7 @@ Node 24 or newer. Read the bundled Next docs in `node_modules/next/dist/docs/` b
 breaking changes (`proxy.ts` instead of `middleware.ts`, async `params`/`searchParams`, `PageProps<"/route">` from
 `next typegen`, Turbopack by default).
 
-The signed-in header uses `components/foundation/shell/profile-menu.tsx` for the profile picker. It opens a radio menu on desktop and a bottom drawer below 640px. Each profile shows its name and handle, with a check beside the current account.
+The sidebar's account switcher is `components/foundation/shell/profile-menu.tsx`, in AppShell's `account` slot: a radio menu opening upward beside the page, its rows listed in place in the phone sheet (until Silicon UI's native-popover account row is released, 2026-11-28). Each profile shows its name and handle, with a check beside the current account.
 
 ## Topology
 
@@ -142,7 +142,7 @@ shared parts and a first version of each route; each area's builder owns its rou
 
 `app/(app)/layout.tsx` mounts the client providers for everything under it (one query cache across the account pages
 and the hosted pages); the root layout and the public landing load none. `app/(app)/(shell)/layout.tsx` wraps the
-account pages in the account shell (sidebar, ⌘K palette, sign-in gate). The shell is full height (2026-11-17): from 900px there is no top bar, and the sidebar holds the brand and Search at its head and the account switcher at its foot (`profile-menu.tsx`, 2026-11-18: every account signed in on this browser, Add another account, Your accounts, Sign out; listed in place in the phone sheet); under 900px a top bar shows the brand and a Menu button that opens the sidebar in a bottom sheet. While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
+account pages in the account shell (sidebar, ⌘K palette, sign-in gate). The shell is Silicon UI's AppShell since 0.7.0 (2026-11-28); it is full height (2026-11-17): from 900px there is no top bar, and the sidebar holds the brand and Search at its head and the account switcher at its foot (`profile-menu.tsx`, 2026-11-18: every account signed in on this browser, Add another account, Your accounts, Sign out; listed in place in the phone sheet); under 900px a top bar shows the brand and a Menu button that opens the sidebar in a bottom sheet. While the session loads, the shell draws the page it is about to show (`PageSkeleton`): the page bar with the title when the path names a section or a page reached from one (a crumb line on nested pages), then sections on the page column, so nothing moves when the page arrives. `app/(app)/(auth)/` pages render bare (the hosted card and the branding runtime). `/__kitchen` (the style guide) is
 development only: production answers 404 unless the server runs with `ACCOUNTS_KITCHEN=1`.
 
 ## Conventions
@@ -355,7 +355,7 @@ All edits are of four kinds, and keep Arc's look and motion:
 - **Silicon UI #28/#29 (2026-11-10):** the account site's existing 0.4.0 pnpm package patch now includes PhoneInput's flag/code gap and chevron clearance and Dialog's borderless ghost close control, alongside the earlier Select fix. The shared source changes are saved in `redesign/silicon-ui-issues-28-29.patch` for the deferred release; `components/account/screens.ts` captures the Security phone dialog in both themes and at phone and desktop widths.
 - **PhoneInput audit (2026-11-10):** the same package patch now preserves unsupported and overlong international input instead of changing its digits, rejects invalid native form submission, chooses an allowed default when countries are restricted, and keeps its error description and disabled form value correct. Security screenshots also cover an unsupported number moving to PhoneField's plain international mode without losing its digits.
 - **PhoneInput picker in dialogs (2026-11-10):** the shared country list floats beyond scrollable dialog bounds while remaining attached to the field, and uses the field's radius and corner shape. `components/account/screens.ts` checks the open list's visible bounds and radius and exercises a pointer choice below the dialog plus a keyboard choice at desktop and phone widths.
-- **Silicon UI #30/#31 (2026-11-12):** CommandPalette's Esc name includes its visible word, options are reached by arrows rather than Tab, and quiet text uses the higher contrast secondary token. DialogContent supports a headerless, top-placed palette with a hidden accessible title. `components/foundation/shell/command-menu.tsx` now uses that Dialog instead of direct Radix. `scripts/screens.ts` checks the keyboard sequence, Escape and focus return in both themes at desktop and phone widths; a normal Personal info dialog is also checked. The 0.4.0 pnpm patch carries the change until release, with cumulative upstream source in `redesign/silicon-ui-unreleased-through-31.patch`.
+- **Silicon UI #30/#31 (2026-11-12):** CommandPalette's Esc name includes its visible word, options are reached by arrows rather than Tab, and quiet text uses the higher contrast secondary token. DialogContent supports a headerless, top-placed palette with a hidden accessible title. The palette (AppShell's own since 2026-11-28) uses that Dialog instead of direct Radix. `scripts/screens.ts` checks the keyboard sequence, Escape and focus return in both themes at desktop and phone widths; a normal Personal info dialog is also checked. The 0.4.0 pnpm patch carries the change until release, with cumulative upstream source in `redesign/silicon-ui-unreleased-through-31.patch`.
 - **Silicon UI #32 (2026-11-13):** Tabs have a 2px frame around them instead of 4px (Anil chose it in `/__tabs`, version A); the keyboard ring is drawn inside the tab and the tab, selection and hover corners stay concentric. The 0.4.0 pnpm patch carries it until release; the request is `redesign/requests/silicon-ui-tabs-thin-frame.md`.
 
 | Component | What changed |
@@ -780,7 +780,8 @@ in `redesign/api-gaps.md`).
   `/sign-in-methods`; Developers and Docs at its foot as small soft chips (`ButtonLink` soft, xs), no arrow. Beside the page from 900 px, in a bottom sheet
   opened from the top bar below that. NavList is experimental: allowed in `eslint.config.mjs` (`allowExperimental`).
   The dock (`dock.tsx`) is gone; sections are no longer called pillars. Its width comes in steps (200, 248, 296 px)
-  from a handle on the page box's left edge (`sidebar-resize.tsx`, remembered in localStorage `sa.sidebar-step`).
+  from a handle on the page box's left edge (AppShell's `steps`, remembered in localStorage `sa.sidebar-step`).
+  Since 2026-11-28 sidebar.tsx gives AppShell its `nav` (`SidebarNav`) and `links` (`SidebarLinks`); AppShell places them.
 - **Dev tools** (`components/foundation/dev/dev-states.tsx`, 2026-10-31, regrouped 2026-11-08 and 2026-11-09): in
   `next dev` only, a round flask button at the lower right of every page in `app/(app)` (mounted in its layout since
   2026-11-13: the account pages, the sign-in pages, device approval and the playgrounds; not the embed) (a dot counts what is changed, a crosshair
@@ -839,7 +840,7 @@ in `redesign/api-gaps.md`).
   origin's photo needs CORS to be read;
   without it, or with under one colour, it returns null and the ring keeps the Silicon colours. `usePicturePalette(src, count)`
   gives the picture's colours as they are (k-means, dark to light) for Home's You card.
-- **The scrolling page box** (`shell.module.css`, 2026-10-30): from 900 px the shell is the window's height and never
+- **The scrolling page box** (AppShell's since 2026-11-28; the site's `shell.module.css` before, 2026-10-30): from 900 px the shell is the window's height and never
   scrolls; `#main` (the page box) is the one scroller, with `overscroll-behavior: contain`, and the shell scrolls it to
   the top on every path change (Next restores the window's scroll, not the box's). Inside it `--top-height` is 0, so
   what a page pins (`position: sticky`) is measured from the box's top, and `--scroll-view` is the box's visible

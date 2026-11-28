@@ -601,6 +601,28 @@ Create Account; "Not You?" kept. After deleting an account: /goodbye, "Your acco
   Under 900px the top bar shows the mark, the name and the menu button; Search and the account menu are in the sheet.
   Replaces the 2026-10-30 top bar (brand, search centred, account menu). Anil: "im using a full height content, and
   search and account in sidebar design for apps, can we try that in accounts as well?"
+
+## The shell on Silicon UI's AppShell (2026-11-28)
+
+- The account shell is Silicon UI 0.7.0's AppShell, not the site's own copy: the frame, the resize steps
+  (`storageKey="sa.sidebar-step"`, the same 200 / 248 / 296 px), the phone bottom sheet, the skip link, the Search row
+  and the ⌘K palette are AppShell's. account-shell.tsx keeps the guards (every link in the shell goes through `go` from
+  `onNavigate`), the command registry (lib/commands.ts, passed as `commands` with the palette's open state), the
+  number keys, the page transitions and the loading, error and bare states. Why: Anil asked for Accounts and the Apps
+  store to move onto it (relayed by the Silicon UI session, 2026-11-28); 0.7.0 was built from Accounts' shell.
+- The account switcher stays the site's own (profile-menu.tsx: ProfileMenu beside the page, ProfileList in the phone
+  sheet) in AppShell's `account` slot, not UserMenu. Why: Anil wants the row built the Apps store's way, a plain button
+  opening a native popover (works without script, lighter) with Accounts' look; Silicon UI is building it as a new
+  component (relayed by the Silicon UI AppShell session, 2026-11-28). Switch to it once released.
+- Silicon UI's colours, the compact scale and `--canvas` are the site's: tokens.css no longer sets them. It still sets
+  the focus halo, the series, the Silicon marks, the sky, and repeats Silicon UI's light and dark for a branded
+  subtree (Silicon UI sets them on :root only).
+- The page box keeps AppShell's corner (`--radius-container` with `--corner-shape`, a 14 px squircle), not the site's
+  8 px round, with no override. Why: Anil saw both and agreed (relayed by the Silicon UI AppShell session, 2026-11-28);
+  they look about equally round.
+- Open (Anil): menu rows at 32 px (Silicon UI 0.7.0 draws list and menu option rows at `--control-height-sm`), where
+  they were 36, in the switcher and every other menu.
+
 ## 2026-11-14: A deleted account is archived for 10 days, then deleted
 
 Saket: "make it so that it's archived, send them an mail, and after 10 days if they dont log back in it would
