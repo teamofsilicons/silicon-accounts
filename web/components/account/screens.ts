@@ -78,7 +78,7 @@ const openSecurityPhone = async (page: Page) => {
   await page.getByRole("textbox", { name: "Phone number" }).waitFor();
 };
 /** A Silicon's panel: the side column from 1024px (SidePanel), the bottom drawer under it. */
-const drawer = "[role='dialog'], [data-side-panel][data-open]";
+const drawer = "[role='dialog']:visible, [data-side-panel][data-open]";
 
 async function openSilicon(page: Page, id: string) {
   await page.getByRole("button", { name: new RegExp(`^Manage ${id}`) }).click();
@@ -196,11 +196,11 @@ const shown: ScreenSpec[] = [
   { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
   // Identity: the card, its back, the photo menu, the editors and the id dialog with a taken id.
   { name: "account-identity", path: "/personal", waitFor: card },
-  { name: "account-identity-name", path: "/personal?edit=name", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
-  { name: "account-identity-photo", path: "/personal?edit=photo", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
-  { name: "account-identity-timezone", path: "/personal?edit=timezone", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
-  { name: "account-identity-dob", path: "/personal?edit=dob", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); } },
-  { name: "account-identity-year-select", path: "/personal?edit=dob", waitFor: "[role='dialog']", fullPage: false, prepare: async page => {
+  { name: "account-identity-name", path: "/personal?edit=name", waitFor: "[role='dialog']:visible", fullPage: false, prepare: async page => { await wait(page); } },
+  { name: "account-identity-photo", path: "/personal?edit=photo", waitFor: "[role='dialog']:visible", fullPage: false, prepare: async page => { await wait(page); } },
+  { name: "account-identity-timezone", path: "/personal?edit=timezone", waitFor: "[role='dialog']:visible", fullPage: false, prepare: async page => { await wait(page); } },
+  { name: "account-identity-dob", path: "/personal?edit=dob", waitFor: "[role='dialog']:visible", fullPage: false, prepare: async page => { await wait(page); } },
+  { name: "account-identity-year-select", path: "/personal?edit=dob", waitFor: "[role='dialog']:visible", fullPage: false, prepare: async page => {
     await page.getByRole("combobox", { name: "Year" }).click();
     await page.getByRole("option", { name: "1998", exact: true }).press("End");
     const alignment = (year: string) => page.evaluate(expected => {
@@ -217,7 +217,7 @@ const shown: ScreenSpec[] = [
     await page.mouse.move(next.x + next.width / 2, next.y + next.height / 2);
     await expect.poll(() => alignment("1901")).toBeLessThan(1);
   } },
-  { name: "account-identity-change-id", path: "/personal?edit=id", waitFor: "[role='dialog']", fullPage: false, prepare: async page => { await wait(page); await page.keyboard.type("shubham"); await wait(page, 1200); } },
+  { name: "account-identity-change-id", path: "/personal?edit=id", waitFor: "[role='dialog']:visible", fullPage: false, prepare: async page => { await wait(page); await page.keyboard.type("shubham"); await wait(page, 1200); } },
 
   // Sign-in methods: the lists, adding an email up to the code, and the remove question.
   { name: "account-sign-in-methods", path: "/sign-in-methods" },
