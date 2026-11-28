@@ -14,7 +14,7 @@ import { LayoutGrid, LogIn, MousePointerClick, ShieldCheck } from "lucide-react"
 import { EmptyState } from "@teamofsilicons/silicon-ui/empty-state";
 import { ButtonLink } from "@/components/foundation/button-link";
 import { AppMark } from "@/components/account/parts/app-mark";
-import { PageBar } from "@/components/account/parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { LinkItem, Row, Section, Tile } from "@/components/account/parts/rows";
 import styles from "./apps-empty-lab.module.css";
 

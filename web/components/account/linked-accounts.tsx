@@ -3,7 +3,7 @@
 /**
  * Your Accounts (/linked-accounts, from main's work accounts, 2026-11-03; on the account pages' design 2026-11-13): the
  * personal and work accounts one sign-in reaches, and switching between them. Reached from Personal Info's "Your
- * Accounts" row. The page bar (parts/page-bar.tsx), a lead line, then sections of the account pages' rows
+ * Accounts" row. Silicon UI's PageBar, a lead line, then sections of the account pages' rows
  * (parts/rows.tsx):
  *
  * - Personal and Work: each account with its own avatar, its id and org (logo beside the name), Main or Linked, and
@@ -37,7 +37,7 @@ import {
   useBrowserAccounts,
 } from "@/lib/query/linked-accounts";
 import { AppMark } from "./parts/app-mark";
-import { PageBar } from "./parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { LinkRow, Row, Section, Tile } from "./parts/rows";
 import styles from "./linked-accounts.module.css";
 

@@ -2,7 +2,7 @@
 
 /**
  * Personal info (/personal), built to the lead designer's prototype (redesign/prototype-v7.html: personal, .scard,
- * .srow) on Silicon UI (Anil, 2026-11-09): the page bar (parts/page-bar.tsx), then a Silicon UI Card per group with its
+ * .srow) on Silicon UI (Anil, 2026-11-09): Silicon UI's PageBar, then a Silicon UI Card per group with its
  * rows. Silicon UI has no settings row yet (redesign/requests/silicon-ui-settings-list.md), so the rows are drawn here
  * with tokens and the type roles until it ships. Each whole row opens its editor in a dialog: a row is a
  * link to `?edit=<field>`, and the dialog follows the address (closing it drops the parameter, and focus goes back to
@@ -42,7 +42,7 @@ import { useMe } from "@/lib/query/session";
 import { asCarbon, describeError } from "../parts/common";
 import { TimezoneForm } from "../parts/detail-editors";
 import { IdChangeForm } from "../parts/id-change-form";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { PhotoControl } from "../parts/photo-control";
 import { useChangeOwnId } from "../parts/queries";
 import { ContactList } from "../sign-in-methods/sign-in-methods";

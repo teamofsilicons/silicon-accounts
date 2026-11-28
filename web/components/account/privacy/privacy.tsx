@@ -26,7 +26,7 @@ import { appHref } from "../apps/apps";
 import { seen } from "../apps/app-page";
 import { AppMark } from "../parts/app-mark";
 import { asCarbon, asSilicon, describeError } from "../parts/common";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { useEveryApp } from "../parts/queries";
 import { LinkItem, Row, Section, Tile } from "../parts/rows";
 import styles from "./privacy.module.css";

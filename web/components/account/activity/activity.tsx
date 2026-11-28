@@ -26,7 +26,7 @@ import { timezoneLabel } from "@/lib/timezones";
 import { AppMark } from "../parts/app-mark";
 import { asCarbon, describeError, readableTimes } from "../parts/common";
 import { handFocus, pageMain } from "../parts/focus";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { useEverySilicon } from "../parts/queries";
 import { Row, Section, Tile } from "../parts/rows";
 import { siliconOf, type DetailContext } from "./history-details";

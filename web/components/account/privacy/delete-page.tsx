@@ -37,7 +37,7 @@ import { useMe } from "@/lib/query/session";
 import { AppMark } from "../parts/app-mark";
 import { asCarbon, asSilicon, describeError, msUntil, personLabel, spanText, useNow } from "../parts/common";
 import { recipient } from "../parts/handover";
-import { PageBar } from "../parts/page-bar";
+import { PageBar } from "@teamofsilicons/silicon-ui/page-bar";
 import { OrgCloses } from "./privacy";
 import {
   useCancelTransferSettled,
