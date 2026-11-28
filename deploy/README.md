@@ -251,3 +251,18 @@ Verified backup `backups/predeploy-twilio-verify-20261124T183202Z.dump` uploaded
 passed local and public readiness. Rollback: point `current` at `previous-release` (`accounts-passkeys-bf1379c`) and
 restart `accounts-api`. SSM command `3f986e72-44f9-428a-a830-476f88a270f2`. Receipt:
 [verification-twilio-verify-2026-11-24.json](verification-twilio-verify-2026-11-24.json).
+
+## AppShell and PageBar on Silicon UI 0.7 (PRs 29 and 30) — 2026-11-28
+
+Release `accounts-web-pr30-782b373` (source `782b373`, main) changes only the account site: the shell is Silicon UI
+0.7's AppShell with 0.7.1's AccountMenu as the account row (teamofsilicons/silicon-accounts#29), and every page's bar is
+0.7.2's PageBar (teamofsilicons/silicon-accounts#30). Both were opened against `compact` and merged into main instead
+(`2e0e19a`, `782b373`), so compact's `2834cf6` (Old sign-ins: API and migration 0046) is not released. Main now has the
+source of every live component. It is a web overlay on `accounts-twilio-verify-e02a2f5` ([web-cutover.py](web-cutover.py)):
+every file outside `web/` compared equal to the baseline, `/etc/accounts` and the `accounts-*` units hash-checked, the
+previous builds' 702 static files kept for open tabs. Schema unchanged at 45 and the database untouched, so no backup.
+The new server answered on loopback port 18590 first; only `accounts-web` restarted (1.4 s). Two earlier runs stopped
+before switching: a failed transient `accounts-web-preflight` unit from PR 26 was still loaded (preflight units are now
+named by time), then the repacked archive had not reached S3. Rollback: point `current` at `previous-release`
+(`accounts-twilio-verify-e02a2f5`) and restart `accounts-web`. SSM command `2fda7e20-2403-4b30-b078-9837bf5ba951`.
+Receipt: [verification-web-pr30-2026-11-28.json](verification-web-pr30-2026-11-28.json).

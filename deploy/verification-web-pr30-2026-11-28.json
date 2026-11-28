@@ -1,0 +1,70 @@
+{
+ "verified_at": "2026-11-28T11:01:05.114534+00:00",
+ "release": "accounts-web-pr30-782b373",
+ "revision": "782b3732a24a00761f1443d62d27d116d8cbbe30",
+ "baseline": "accounts-twilio-verify-e02a2f5",
+ "contents": "teamofsilicons/silicon-accounts#29 (the account shell on Silicon UI 0.7's AppShell; the account row is 0.7.1's AccountMenu, Switcher layout) and #30 (every page's bar is Silicon UI 0.7.2's PageBar). Both were opened against compact and merged into main instead (2e0e19a, 782b373), leaving compact's 2834cf6 (Old sign-ins, migration 0046) unreleased.",
+ "web_build_id": "CCVqAHfOClP_RHF_0QuUY",
+ "previous_web_build_id": "jDrGlpJkJvvN676VicMcg",
+ "api_source": "e02a2f57cfb36bb1ccb3e7fb78e0919c42ef4126",
+ "developer_source": "bf1379c718da527399641e41390f1bd017597af8",
+ "schema_version": 45,
+ "baseline_note": "Web-only overlay on the live release accounts-twilio-verify-e02a2f5 (deploy/web-cutover.py): every file outside web/ compared equal to the baseline, /etc/accounts and the accounts-* units hash-checked unchanged; the database was not touched, so no backup was taken.",
+ "artifact": {
+  "archive": "s3://silicon-accounts-production-backups-zgctnskyqqre/releases/accounts-web-pr30/782b3732a24a00761f1443d62d27d116d8cbbe30-3cd519863adc.tar.gz",
+  "sha256": "3cd519863adc915deae18b7b2538344b1515cde6076907ccf7f3f548e63c6198",
+  "size": 57605995,
+  "overlay_files": 2843
+ },
+ "activation_command_id": "2fda7e20-2403-4b30-b078-9837bf5ba951",
+ "activation": {
+  "loopback_preflight": {
+   "port": 18590,
+   "v1_meta": 200,
+   "root": 200
+  },
+  "restarted_units": [
+   "accounts-web"
+  ],
+  "cutover_seconds": 1.4,
+  "prior_static_files_kept": 702,
+  "unchanged_outside_web": true,
+  "unchanged_configuration": true,
+  "local_health": {
+   "8589/readyz": 200,
+   "8590/v1/meta": 200,
+   "8590/": 200,
+   "8600/auth/session": 200
+  }
+ },
+ "stopped_runs": [
+  {
+   "command_id": "72d22879-58a9-443e-9d8f-81ae3def8de8",
+   "stopped_at": "Starting the preflight: accounts-web-preflight was still loaded as a failed transient unit from the PR 26 release (2026-11-19). Nothing switched; the script now names each preflight unit by time and checks the port is free."
+  },
+  {
+   "command_id": "07a3d3b9-c567-4c4c-9030-a73cec19cf83",
+   "stopped_at": "Downloading the archive (403): the repacked archive had not reached S3. Nothing switched; uploaded again and confirmed with head-object."
+  }
+ ],
+ "previous_release": "/opt/accounts/releases/accounts-twilio-verify-e02a2f5",
+ "public_http": {
+  "https://accounts.teamofsilicons.com/": 200,
+  "https://accounts.teamofsilicons.com/readyz": 200,
+  "https://accounts.teamofsilicons.com/v1/meta": 200,
+  "https://accounts.teamofsilicons.com/personal": 200,
+  "https://accounts.teamofsilicons.com/__accounts-signin": 404,
+  "https://developers.teamofsilicons.com/": 200,
+  "https://developers.teamofsilicons.com/auth/session": 200,
+  "root_html_build_id": "CCVqAHfOClP_RHF_0QuUY"
+ },
+ "browser_verification": {
+  "browser": "Chrome, signed in as c:saket; read only",
+  "checked": [
+   "/apps: AppShell sidebar (wordmark, Search with the shortcut key, sections, the account row with its switcher chevron, Developers and Docs) and the PageBar title",
+   "/apps/briefcase: PageBar with the Connected Apps parent link, the title and its Open action",
+   "No console errors"
+  ]
+ },
+ "rollback": "Point /opt/accounts/current at previous-release (accounts-twilio-verify-e02a2f5) and restart accounts-web."
+}
