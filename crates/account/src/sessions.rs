@@ -37,6 +37,7 @@ struct Row {
     last_seen_at: OffsetDateTime,
     expires_at: OffsetDateTime,
     origin: Option<String>,
+    kept_at: Option<OffsetDateTime>,
 }
 
 /// The first-party apps whose token families are sessions of Silicon Accounts itself.
@@ -61,6 +62,10 @@ pub(crate) struct SessionView {
     last_seen_at: OffsetDateTime,
     #[serde(with = "accounts_core::timefmt::rfc3339_ms")]
     expires_at: OffsetDateTime,
+    /// When the Carbon chose to keep this sign-in although it was not used lately
+    /// (`POST /v1/me/sessions/{id}/keep`); null when they never did.
+    #[serde(with = "accounts_core::timefmt::rfc3339_ms_option")]
+    kept_at: Option<OffsetDateTime>,
     /// True for the session making this request.
     current: bool,
 }
@@ -233,16 +238,16 @@ pub(crate) async fn list(
         None => (END_OF_TIME, Uuid::max()),
     };
     let rows: Vec<Row> = sqlx::query_as(
-        "select x.kind, x.id, x.label, x.ip, x.user_agent, x.created_at, x.last_seen_at, x.expires_at, x.origin from ( \
+        "select x.kind, x.id, x.label, x.ip, x.user_agent, x.created_at, x.last_seen_at, x.expires_at, x.origin, x.kept_at from ( \
            (select 'browser'::text as kind, s.id, null::text as label, s.ip, s.user_agent, s.created_at, \
-                   s.last_seen_at, s.expires_at, null::text as origin \
+                   s.last_seen_at, s.expires_at, null::text as origin, s.kept_at \
               from browser_sessions s \
              where s.account_uuid = $1 and s.revoked_at is null and s.expires_at > now() \
                and (s.created_at, s.id) < ($2, $3) \
              order by s.created_at desc, s.id desc limit $4) \
            union all \
            (select case when f.app_id = $6 then 'developer' else 'cli' end::text, f.id, f.label, f.ip, \
-                   f.user_agent, f.created_at, coalesce(f.last_used_at, f.created_at), f.expires_at, f.origin \
+                   f.user_agent, f.created_at, coalesce(f.last_used_at, f.created_at), f.expires_at, f.origin, f.kept_at \
               from token_families f \
              where f.account_uuid = $1 and f.app_id = any($5) and f.revoked_at is null and f.expires_at > now() \
                and (f.created_at, f.id) < ($2, $3) \
@@ -288,6 +293,7 @@ pub(crate) async fn list(
                 created_at: r.created_at,
                 last_seen_at: r.last_seen_at,
                 expires_at: r.expires_at,
+                kept_at: r.kept_at,
                 current,
             }
         })
@@ -369,6 +375,37 @@ pub(crate) async fn revoke(
         );
     }
     Ok(response)
+}
+
+/// `POST /v1/me/sessions/{id}/keep` → 204. The Carbon keeps a browser, first-party or
+/// developer-platform sign-in that was not used lately: Home stops asking "Still using …?" about it,
+/// on every browser, until it is used and goes quiet again. Error: 404 `session_not_found`.
+pub(crate) async fn keep(
+    State(state): State<AppState>,
+    me: AccountAuth,
+    Path(raw): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let Ok(id) = Uuid::parse_str(raw.trim()) else {
+        return Err(session_not_found(&raw));
+    };
+    let mut conn = state.db.acquire().await?;
+    if sessions::keep(&mut conn, me.uuid(), id).await? {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    let kept = sqlx::query(
+        "update token_families set kept_at = now() \
+         where id = $1 and account_uuid = $2 and app_id = any($3) and revoked_at is null and expires_at > now()",
+    )
+    .bind(id)
+    .bind(me.uuid())
+    .bind(&SESSION_APPS[..])
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if kept == 0 {
+        return Err(session_not_found(&raw));
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[cfg(test)]

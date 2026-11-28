@@ -248,6 +248,8 @@ export const me = {
     /** Browser sessions and first-party (CLI / Silicon) sign-ins. */
     list: (query?: PageQuery) => request<Page<SessionInfo>>("/v1/me/sessions", { query: pageQuery(query) }),
     revoke: (id: string) => request<null>(`/v1/me/sessions/${seg(id)}`, { method: "DELETE" }),
+    /** Keeps a sign-in that wasn't used lately: Home stops asking about it until it is used and goes quiet again. */
+    keep: (id: string) => request<null>(`/v1/me/sessions/${seg(id)}/keep`, { method: "POST" }),
   },
 
   /** Sign-ins, id changes, custodian changes, proofs, app access and security events, newest first. */

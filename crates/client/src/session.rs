@@ -388,6 +388,14 @@ impl<'a> AccountSession<'a> {
             .map(|_| ())
     }
 
+    /// `POST /v1/me/sessions/{id}/keep`: keep a sign-in that was not used lately, so the account
+    /// site stops asking about it.
+    pub async fn keep_session(&self, id: &str) -> Result<()> {
+        self.send(Method::POST, &["v1", "me", "sessions", id, "keep"], None)
+            .await
+            .map(|_| ())
+    }
+
     /// `GET /v1/me/history`.
     pub async fn history(&self, query: &HistoryQuery) -> Result<Page<HistoryItem>> {
         let url = self.client.endpoint_with_query(

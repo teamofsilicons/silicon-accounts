@@ -5,7 +5,7 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-11-23
+Last updated: 2026-11-26
 
 ## Now
 1. developer-site e2e suites still use the old hosted sign-in words ("Email", "Create account": j-pages, b-bff-session,
@@ -25,6 +25,9 @@ Done 2026-11-23: passkeys. The API (WebAuthn in crates/core/src/webauthn.rs, rou
 crates/auth), Security's passkey rows, "Sign In with a Passkey" on every hosted sign-in, the passkey offer in Needs you,
 the SDK and embed buttons and the developer site's method toggle. Left: Anil updates understanding/UNDERSTANDING.md (four
 methods there today); a deploy; a passkey's name is cut short beside Rename and Remove at phone width.
+
+Done 2026-11-26: old sign-ins. Browser sessions end after 60 days unused; Needs you asks after 30 days,
+once per device; Keep is stored on the account (decisions.md 2026-11-26). Needs a deploy with migration 0046.
 
 ## Waiting on the API
 - Everything in [api-gaps.md](api-gaps.md): notifications, data download, a Silicon's activity, apps and sign-in

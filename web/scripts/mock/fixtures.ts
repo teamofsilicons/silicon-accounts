@@ -115,8 +115,11 @@ export const myApps: MyApp[] = ["briefcase", "dm", "commit", "remind", "interfac
   }));
 
 export const sessions: SessionInfo[] = [
-  { id: session.session.id, kind: "browser", origin: "browser", label: "Safari on macOS", ip: "103.48.12.9", user_agent: "Mozilla/5.0 (Macintosh)", created_at: iso(-60 * 24 * 3), last_seen_at: iso(-2), expires_at: "2029-03-25T09:41:00.000Z", current: true },
-  { id: "0192a6f0-0000-7000-8000-000000000002", kind: "cli", origin: "device", label: "silicon-accounts CLI on build-box", ip: "103.48.12.11", user_agent: "silicon-accounts-cli/0.2.0", created_at: iso(-60 * 24 * 9), last_seen_at: iso(-60 * 5), expires_at: iso(60 * 24 * 80), current: false },
+  { id: session.session.id, kind: "browser", origin: "browser", label: "Safari on macOS", ip: "103.48.12.9", user_agent: "Mozilla/5.0 (Macintosh)", created_at: iso(-60 * 24 * 3), last_seen_at: iso(-2), expires_at: "2029-03-25T09:41:00.000Z", kept_at: null, current: true },
+  { id: "0192a6f0-0000-7000-8000-000000000002", kind: "cli", origin: "device", label: "silicon-accounts CLI on build-box", ip: "103.48.12.11", user_agent: "silicon-accounts-cli/0.2.0", created_at: iso(-60 * 24 * 9), last_seen_at: iso(-60 * 5), expires_at: iso(60 * 24 * 80), kept_at: null, current: false },
+  // Two old sign-ins on one phone, asked about together on Home (Anil, 2026-11-26).
+  { id: "0192a6f0-0000-7000-8000-000000000003", kind: "browser", origin: "browser", label: "Safari on iOS", ip: "103.48.12.20", user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1", created_at: iso(-60 * 24 * 50), last_seen_at: iso(-60 * 24 * 34), expires_at: iso(60 * 24 * 26), kept_at: null, current: false },
+  { id: "0192a6f0-0000-7000-8000-000000000004", kind: "browser", origin: "browser", label: "Safari on iOS", ip: "103.48.12.21", user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1", created_at: iso(-60 * 24 * 52), last_seen_at: iso(-60 * 24 * 41), expires_at: iso(60 * 24 * 19), kept_at: null, current: false },
 ];
 
 const siliconBase = { kind: "silicon" as const, custodian: carbonSummary };

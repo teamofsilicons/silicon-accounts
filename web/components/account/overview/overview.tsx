@@ -38,8 +38,8 @@ import { useMe } from "@/lib/query/session";
 import { NEEDS_YOU_ID, NEW_SILICON_PARAM } from "../parts/anchors";
 import { AppMark } from "../parts/app-mark";
 import { asCarbon, describeError, msUntil, personLabel, spanText, useNow } from "../parts/common";
-import { useEveryApp, useEveryCustodianRequest, useEverySession, useEverySilicon, useSignOutSession } from "../parts/queries";
-import { STEP_ICON, checkupSteps, keepSession, readKept, subscribeKept, type Step } from "../parts/checkup";
+import { useEveryApp, useEveryCustodianRequest, useEverySession, useEverySilicon, useKeepSessions, useSignOutSession } from "../parts/queries";
+import { STEP_ICON, checkupSteps, readKept, subscribeKept, type Step } from "../parts/checkup";
 import { SiliconMark } from "../parts/silicon-mark";
 import { RequestDeck } from "../silicons/request-deck";
 import styles from "./overview.module.css";
@@ -224,6 +224,7 @@ function NeedsYou({ me }: { me: Me }) {
 
 function Checklist({ steps }: { steps: Step[] }) {
   const signOut = useSignOutSession();
+  const keep = useKeepSessions();
   const left = steps.filter(step => !step.done);
   const done = steps.filter(step => step.done);
   return (
@@ -242,7 +243,7 @@ function Checklist({ steps }: { steps: Step[] }) {
             <Row key={step.key} lead={<span data-sq="surface" className={`${styles.iconTile} ${styles.iconTileWarning}`} aria-hidden="true"><Icon size={16} strokeWidth={2} /></span>} title={step.title} detail={step.detail}>
               {step.key === "devices" && step.stale ? (
                 <>
-                  <Button variant="ghost" size="sm" onClick={() => step.stale && keepSession(step.stale.id)}>Keep</Button>
+                  <Button variant="ghost" size="sm" onClick={() => step.stale && void keep.mutateAsync([step.stale]).catch(() => undefined)}>Keep</Button>
                   <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => step.stale && void signOut.mutateAsync(step.stale.id).catch(() => undefined)}>Sign Out</Button>
                 </>
               ) : (

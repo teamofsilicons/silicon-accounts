@@ -5,7 +5,8 @@
  *
  * - a Silicon asking them to be its custodian, with Review (Accept and Decline are in the review);
  * - a Carbon handing them a Silicon, with Review;
- * - a device signed in but not used for 7 days (components/account/parts/checkup.ts), with Keep and Sign out.
+ * - a device signed in but not used for 30 days, all its old sign-ins together (components/account/parts/checkup.ts),
+ *   with Keep and Sign out.
  *
  * Nothing shows when nothing waits. The compact boxed design (Anil, 2026-11-11, picked from /__needs): one white list
  * with a clear border; each row a 28px mark (a Silicon's, or the browser's logo), the title over one line (a request's
@@ -28,15 +29,14 @@ import type { CustodianRequest, SessionInfo } from "@/lib/api/types";
 import { useMe } from "@/lib/query/session";
 import { NEEDS_YOU_ID } from "./parts/anchors";
 import { browserLogo, browserOf } from "./parts/browser";
-import { dismissPasskeyOffer, keepSession, readKept, readPasskeyOfferDismissed, staleSessions, STALE_MS, subscribeKept, subscribePasskeyOffer } from "./parts/checkup";
+import { dismissPasskeyOffer, readKept, readPasskeyOfferDismissed, staleDevices, staleDeviceText, STALE_MS, subscribeKept, subscribePasskeyOffer, type StaleDevice } from "./parts/checkup";
 import { ApiError } from "@/lib/api/errors";
 import { passkeyNameHere, usePasskeySupport } from "@/lib/passkey";
 import { firstPartySignInUrl } from "@/lib/query/session";
 import { paths } from "@/lib/navigation";
 import { asCarbon, describeError, msUntil, personLabel, spanText, useNow } from "./parts/common";
-import { useAddPasskey, useEveryCustodianRequest, useEverySession, useSignOutSession } from "./parts/queries";
+import { useAddPasskey, useEveryCustodianRequest, useEverySession, useKeepSessions, useSignOutSessions } from "./parts/queries";
 import { SiliconMark } from "./parts/silicon-mark";
-import { sessionName } from "./security/sessions";
 import { requestHref } from "./silicons/request-page";
 import styles from "./home-needs.module.css";
 
@@ -57,7 +57,7 @@ export function HomeNeeds() {
   if (!requests.data && !requests.error) return null;
   const waiting = requests.data?.items ?? [];
   const failed = !!requests.error && !requests.data;
-  const stale = staleSessions(sessions.data?.items, now, kept);
+  const stale = staleDevices(sessions.data?.items, now, kept);
   // An API that doesn't list passkeys yet (no `passkeys` field) never gets the offer.
   const offer = passkeysHere && !offerDismissed && carbon.passkeys !== undefined && carbon.passkeys.length === 0;
 
@@ -96,13 +96,14 @@ function timeLeft(request: CustodianRequest, now: number): { text: string; tone:
   return { text: `${spanText(left)} left`, tone: left < 3 * DAY ? "danger" : left <= 7 * DAY ? "warning" : "neutral", used };
 }
 
-function Requests({ id, title, limit, waiting, failed, error, retry, stale, offer = false, now }: { id: string; title: string; limit?: number; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: SessionInfo[]; offer?: boolean; now: number }) {
-  const signOut = useSignOutSession();
+function Requests({ id, title, limit, waiting, failed, error, retry, stale, offer = false, now }: { id: string; title: string; limit?: number; waiting: CustodianRequest[]; failed: boolean; error: unknown; retry: () => void; stale: StaleDevice[]; offer?: boolean; now: number }) {
+  const signOut = useSignOutSessions();
+  const keep = useKeepSessions();
   // Paging (only with a limit): which item leads, and the way the last step went, so the new one slides in from there.
   const [page, setPage] = useState<{ start: number; step: "next" | "previous" | null }>({ start: 0, step: null });
   const items = [
     ...waiting.map(request => ({ kind: "request" as const, id: request.id, date: Date.parse(request.created_at), request })),
-    ...stale.map(session => ({ kind: "device" as const, id: session.id, date: Date.parse(session.last_seen_at ?? session.created_at) + STALE_MS, session })),
+    ...stale.map(device => ({ kind: "device" as const, id: device.name, date: device.lastSeen + STALE_MS, device })),
     // The passkey offer waits on nothing, so it comes after everything that does.
     ...(offer ? [{ kind: "passkey" as const, id: "passkey-offer", date: 0 }] : []),
   ].sort((a, b) => b.date - a.date || a.id.localeCompare(b.id));
@@ -133,11 +134,12 @@ function Requests({ id, title, limit, waiting, failed, error, retry, stale, offe
         {items.slice(start, limit ? start + limit : undefined).map(item => {
           if (item.kind === "passkey") return <PasskeyOffer key="passkey-offer" enter={page.step} />;
           if (item.kind === "device") {
-            const session = item.session;
+            const device = item.device;
+            const text = staleDeviceText(device, now);
             return (
-              <Row key={`device-${session.id}`} enter={page.step} lead={<DeviceIcon session={session} />} title={`Still using ${sessionName(session)}?`} detail={`Last active ${spanText(now - Date.parse(session.last_seen_at ?? session.created_at))} ago`}>
-                <Button variant="soft" size="sm" onClick={() => keepSession(session.id)}>Keep</Button>
-                <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => void signOut.mutateAsync(session.id).catch(() => undefined)}>Sign Out</Button>
+              <Row key={`device-${device.name}`} enter={page.step} lead={<DeviceIcon session={device.sessions[0]} />} title={text.title} detail={text.detail}>
+                <Button variant="soft" size="sm" loading={keep.isPending} onClick={() => void keep.mutateAsync(device.sessions).catch(() => undefined)}>Keep</Button>
+                <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => void signOut.mutateAsync(device.sessions.map(session => session.id)).catch(() => undefined)}>Sign Out</Button>
               </Row>
             );
           }

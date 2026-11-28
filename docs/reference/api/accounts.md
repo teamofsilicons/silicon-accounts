@@ -486,6 +486,7 @@ first.
       "created_at": "2026-10-07T02:35:15.492Z",
       "last_seen_at": "2026-10-07T02:35:15.492Z",
       "expires_at": "2029-03-25T02:35:15.492Z",
+      "kept_at": null,
       "current": true
     },
     {
@@ -497,7 +498,8 @@ first.
       "user_agent": "curl/8.7.1",
       "created_at": "2026-10-07T02:32:51.018Z",
       "last_seen_at": "2026-10-07T02:32:51.018Z",
-      "expires_at": "2029-03-25T02:32:51.018Z",
+      "expires_at": "2026-12-06T02:32:51.018Z",
+      "kept_at": "2026-10-20T09:12:03.110Z",
       "current": false
     }
   ],
@@ -507,7 +509,17 @@ first.
 
 `kind` is `browser`, `cli` or `developer` (a developer-platform sign-in, labelled "Silicon
 Developer (developers.teamofsilicons.com)"). `origin` for CLI sign-ins is `cli_code`, `device` or
-`silicon_login`. `current` marks the session making the request.
+`silicon_login`. `current` marks the session making the request. A browser session ends 60 days
+after its last use (each use moves `expires_at` 60 days ahead), and at most 900 days after it
+began. `kept_at` is when you chose to keep the sign-in although it wasn't used lately (below), or
+null.
+
+### `POST /v1/me/sessions/{id}/keep`
+
+**204.** You still use this browser, CLI or developer-platform sign-in although it wasn't used
+lately: the account site stops asking "Still using …?" about it, on every browser, until it is used
+and goes quiet again. It changes nothing else. 404 `session_not_found` for an unknown session,
+another account's, or one that has ended.
 
 ### `DELETE /v1/me/sessions/{id}`
 

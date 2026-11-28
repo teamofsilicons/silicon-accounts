@@ -70,6 +70,7 @@ export function defaultRoutes(signedIn: boolean): MockRoute[] {
     ["GET /v1/me/identities", auth(() => ({ json: data.carbon.identities }))],
     ["GET /v1/me/apps", auth(() => ({ json: data.page(data.myApps) }))],
     ["GET /v1/me/sessions", auth(() => ({ json: data.page(data.sessions) }))],
+    ["POST /v1/me/sessions/:id/keep", auth(() => ({ status: 204 }))],
     ["GET /v1/me/history", auth(() => ({ json: data.page(data.history) }))],
     ["GET /v1/me/proofs", auth(() => ({ json: data.page(data.proofs) }))],
     ["GET /v1/me/interface-sessions", auth(() => ({ json: { sessions: [] } }))],

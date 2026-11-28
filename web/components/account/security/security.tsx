@@ -35,9 +35,9 @@ import { formatPhone, formatRelative } from "@/lib/format";
 import { paths } from "@/lib/navigation";
 import { useMe, useMeta } from "@/lib/query/session";
 import { browserLogo, browserOf } from "../parts/browser";
-import { keepSession, readKept, staleSessions, subscribeKept } from "../parts/checkup";
-import { asCarbon, asSilicon, describeError, spanText, stkRotatedAt, useNow } from "../parts/common";
-import { useConnectProvider, useEverySession, useEverySilicon, useSignOutSession, useUnlinkProvider } from "../parts/queries";
+import { readKept, staleDevices, staleDeviceText, subscribeKept } from "../parts/checkup";
+import { asCarbon, asSilicon, describeError, stkRotatedAt, useNow } from "../parts/common";
+import { useConnectProvider, useEverySession, useEverySilicon, useKeepSessions, useSignOutSession, useSignOutSessions, useUnlinkProvider } from "../parts/queries";
 import { PageBar } from "../parts/page-bar";
 import { SiliconMark } from "../parts/silicon-mark";
 import { ChangeKeyDialog } from "../silicons/change-key";
@@ -129,10 +129,12 @@ export function Security() {
 
 function Checkup({ carbon, onAddPhone }: { carbon: CarbonMe; onAddPhone: () => void }) {
   const sessions = useEverySession();
-  const signOut = useSignOutSession();
+  const signOut = useSignOutSessions();
+  const keep = useKeepSessions();
   const now = useNow(30_000);
   const kept = useSyncExternalStore(subscribeKept, readKept, () => "");
-  const [stale] = staleSessions(sessions.data?.items, now, kept);
+  const [stale] = staleDevices(sessions.data?.items, now, kept);
+  const text = stale ? staleDeviceText(stale, now) : null;
   const noPhone = carbon.phones.length === 0;
   const count = Number(noPhone) + Number(!!stale);
   if (!count) return null;
@@ -143,10 +145,10 @@ function Checkup({ carbon, onAddPhone }: { carbon: CarbonMe; onAddPhone: () => v
           <Button variant="secondary" size="sm" onClick={onAddPhone}>Add</Button>
         </Row>
       ) : null}
-      {stale ? (
-        <Row lead={<DeviceIcon session={stale} />} title={`Still using ${sessionName(stale)}?`} detail={`Last active ${spanText(now - Date.parse(stale.last_seen_at ?? stale.created_at))} ago`} wide>
-          <span className={styles.keep}><Button variant="soft" size="sm" onClick={() => keepSession(stale.id)}>Keep</Button></span>
-          <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => void signOut.mutateAsync(stale.id).catch(() => undefined)}>Sign Out</Button>
+      {stale && text ? (
+        <Row lead={<DeviceIcon session={stale.sessions[0]} />} title={text.title} detail={text.detail} wide>
+          <span className={styles.keep}><Button variant="soft" size="sm" loading={keep.isPending} onClick={() => void keep.mutateAsync(stale.sessions).catch(() => undefined)}>Keep</Button></span>
+          <Button variant="secondary" size="sm" loading={signOut.isPending} onClick={() => void signOut.mutateAsync(stale.sessions.map(session => session.id)).catch(() => undefined)}>Sign Out</Button>
         </Row>
       ) : null}
     </Section>

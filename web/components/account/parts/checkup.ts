@@ -1,19 +1,24 @@
 /**
  * The prototype's security checkup as Home's "Finish setting up" steps (Anil, 2026-10-30, picked in /__needs): a second
- * way in (Google or Apple), a verified email, a recovery phone, and only devices still in use. A device counts as not
- * used lately after 7 days; Keep remembers the choice in this browser. Home (home-needs.tsx) asks about such a device
- * in Needs you and shows no checklist for now (Anil, 2026-10-31); the previous Home (overview/overview.tsx) still uses
- * the steps.
+ * way in (Google or Apple), a verified email, a recovery phone, and only devices still in use. Home (home-needs.tsx)
+ * asks about such a device in Needs you and shows no checklist for now (Anil, 2026-10-31); the previous Home
+ * (overview/overview.tsx) still uses the steps.
+ *
+ * Devices not used lately (Anil, 2026-11-26, after the question came back every day): a sign-in counts after 30 days
+ * unused (it was 7), one question per device (every old sign-in with the same name, "Chrome on macOS", together), and
+ * Keep is stored on the sign-ins (`kept_at`, POST /v1/me/sessions/{id}/keep), so no browser asks again until one is used
+ * and goes quiet again. An API without `kept_at` (one deployed before it) falls back to the list kept in this browser.
  */
 import { AtSign, KeyRound, Laptop, Smartphone } from "lucide-react";
 import type { CarbonMe, SessionInfo } from "@/lib/api/types";
 import { formatPhone, formatRelative } from "@/lib/format";
 import { sessionName } from "../security/sessions";
+import { spanText } from "./common";
 
-/** A device not used for this long is "not used lately" (Anil, 2026-10-30). */
-export const STALE_MS = 7 * 86_400_000;
+/** A sign-in not used for this long is "not used lately" (Anil, 2026-11-26; 7 days from 2026-10-30). */
+export const STALE_MS = 30 * 86_400_000;
 
-/** Sessions the Carbon chose to keep although they are not used lately, remembered in this browser. */
+/** Sessions the Carbon chose to keep, remembered in this browser, for an API without `kept_at`. */
 const KEPT_KEY = "accounts.home.kept-sessions";
 const keptListeners = new Set<() => void>();
 
@@ -76,10 +81,54 @@ export interface Step {
   stale?: SessionInfo;
 }
 
-/** A device signed in here but not used lately (7 days), unless the Carbon chose to keep it; undefined while loading. */
+const lastUse = (session: SessionInfo) => Date.parse(session.last_seen_at ?? session.created_at);
+
+/** Kept, and not used since: Keep holds until the sign-in is used again. */
+function isKept(session: SessionInfo, keptHere: Set<string>): boolean {
+  if (session.kept_at === undefined) return keptHere.has(session.id);
+  return !!session.kept_at && Date.parse(session.kept_at) >= lastUse(session);
+}
+
+/** Sign-ins (not this one) not used lately (30 days) that the Carbon didn't keep; empty while loading. */
 export function staleSessions(sessions: SessionInfo[] | undefined, now: number, kept: string): SessionInfo[] {
-  const keptIds = new Set(kept.split(",").filter(Boolean));
-  return (sessions ?? []).filter(item => !item.current && !keptIds.has(item.id) && now - Date.parse(item.last_seen_at ?? item.created_at) > STALE_MS);
+  const keptHere = new Set(kept.split(",").filter(Boolean));
+  return (sessions ?? []).filter(item => !item.current && !isKept(item, keptHere) && now - lastUse(item) > STALE_MS);
+}
+
+/** Every old sign-in on one device, asked about together. */
+export interface StaleDevice {
+  /** Its name, as Security names a session ("Chrome on macOS"). */
+  name: string;
+  /** The old sign-ins, most recently used first. */
+  sessions: SessionInfo[];
+  /** The most recent use of any of them. */
+  lastSeen: number;
+  /** True when the sign-in making this request has the same name: these are older sign-ins on this device. */
+  here: boolean;
+}
+
+/** staleSessions grouped by device name, the most recently used device first. */
+export function staleDevices(sessions: SessionInfo[] | undefined, now: number, kept: string): StaleDevice[] {
+  const names = new Set((sessions ?? []).filter(item => item.current).map(sessionName));
+  const groups = new Map<string, SessionInfo[]>();
+  for (const session of staleSessions(sessions, now, kept)) {
+    const name = sessionName(session);
+    groups.set(name, [...(groups.get(name) ?? []), session]);
+  }
+  return [...groups].map(([name, list]) => {
+    const sorted = [...list].sort((a, b) => lastUse(b) - lastUse(a));
+    return { name, sessions: sorted, lastSeen: lastUse(sorted[0]), here: names.has(name) };
+  }).sort((a, b) => b.lastSeen - a.lastSeen);
+}
+
+/** What a device's question says: "Still using Safari on iOS?", or for older sign-ins on this device, "2 old sign-ins on Chrome on macOS". */
+export function staleDeviceText(device: StaleDevice, now: number): { title: string; detail: string } {
+  const count = device.sessions.length;
+  const ago = `${spanText(now - device.lastSeen)} ago`;
+  if (device.here) {
+    return { title: count > 1 ? `${count} old sign-ins on ${device.name}` : `An old sign-in on ${device.name}`, detail: `Last active ${ago}` };
+  }
+  return { title: `Still using ${device.name}?`, detail: count > 1 ? `${count} sign-ins · last active ${ago}` : `Last active ${ago}` };
 }
 
 /** The prototype's checkup (Security), in its order: a second way in, a verified email, a recovery phone, devices. */

@@ -13,7 +13,7 @@
 //! | `/v1/me/emails…`, `/v1/me/phones…` | session (Carbon) | add (code), verify, primary, remove |
 //! | `/v1/me/identities…` | session (Carbon) | linked Google/Apple identities |
 //! | `/v1/me/apps…` | session | apps I signed into; remove an app's access |
-//! | `/v1/me/sessions…` | session | browser sessions and first-party sign-ins; revoke |
+//! | `/v1/me/sessions…` | session | browser sessions and first-party sign-ins; keep, revoke |
 //! | `GET /v1/me/history` | session | one timeline over sign-ins, id changes, custodians, proofs, app access and account changes |
 //!
 //! Everything shared (auth extractors, repositories, webhook events, errors) comes from
@@ -102,6 +102,7 @@ pub fn router() -> Router<AppState> {
         .route("/v1/me/apps/{app_id}", delete(my_apps::remove_access))
         .route("/v1/me/sessions", get(sessions::list))
         .route("/v1/me/sessions/{id}", delete(sessions::revoke))
+        .route("/v1/me/sessions/{id}/keep", post(sessions::keep))
         .route("/v1/me/history", get(history::list))
 }
 

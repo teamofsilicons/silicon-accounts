@@ -7,12 +7,16 @@ use uuid::Uuid;
 use crate::crypto::{Pepper, prefix, random_token};
 use crate::error::{ApiError, ApiResult};
 
-/// Browser sessions (and their cookie) last this long.
+/// Browser sessions (and their cookie) last at most this long.
 pub const SESSION_DAYS: i64 = 900;
+
+/// A browser session nobody uses ends this long after its last use (Anil, 2026-11-26): every use
+/// moves `expires_at` to this many days ahead, never past [`SESSION_DAYS`] from its creation.
+pub const SESSION_IDLE_DAYS: i64 = 60;
 
 macro_rules! session_columns {
     () => {
-        "id, account_uuid, created_at, last_seen_at, expires_at, revoked_at, ip, user_agent, authenticated_at"
+        "id, account_uuid, created_at, last_seen_at, expires_at, revoked_at, ip, user_agent, authenticated_at, kept_at"
     };
 }
 
@@ -31,6 +35,8 @@ pub struct BrowserSession {
     /// finished sign-up): the session's creation, moved by [`mark_authenticated`] when the same
     /// account signs in again in the browser. Authorization codes carry it as `auth_time`.
     pub authenticated_at: OffsetDateTime,
+    /// When the Carbon chose to keep this sign-in although it was not used lately ([`keep`]).
+    pub kept_at: Option<OffsetDateTime>,
 }
 
 /// Creates a session; returns the cookie value (`sas_…`) and the row.
@@ -50,7 +56,7 @@ pub async fn create(
     .bind(Uuid::now_v7())
     .bind(pepper.hash(&token))
     .bind(account_uuid)
-    .bind(SESSION_DAYS as i32)
+    .bind(SESSION_IDLE_DAYS.min(SESSION_DAYS) as i32)
     .bind(ip)
     .bind(user_agent.map(|u| u.chars().take(400).collect::<String>()))
     .fetch_one(&mut *conn)
@@ -113,13 +119,35 @@ pub async fn get(conn: &mut PgConnection, id: Uuid) -> ApiResult<Option<BrowserS
     .await?)
 }
 
-/// Updates `last_seen_at` at most every 5 minutes (keeps writes cheap).
+/// Updates `last_seen_at` at most every 5 minutes (keeps writes cheap), and moves `expires_at` to
+/// [`SESSION_IDLE_DAYS`] ahead, within [`SESSION_DAYS`] of the session's creation.
 pub async fn touch(conn: &mut PgConnection, id: Uuid) -> ApiResult<()> {
-    sqlx::query("update browser_sessions set last_seen_at = now() where id = $1 and last_seen_at < now() - interval '5 minutes'")
-        .bind(id)
-        .execute(&mut *conn)
-        .await?;
+    sqlx::query(
+        "update browser_sessions set last_seen_at = now(), \
+           expires_at = least(created_at + make_interval(days => $2), now() + make_interval(days => $3)) \
+         where id = $1 and last_seen_at < now() - interval '5 minutes'",
+    )
+    .bind(id)
+    .bind(SESSION_DAYS as i32)
+    .bind(SESSION_IDLE_DAYS as i32)
+    .execute(&mut *conn)
+    .await?;
     Ok(())
+}
+
+/// Records that the Carbon keeps a live session of theirs although it was not used lately.
+/// Returns false when no live session `id` belongs to the account.
+pub async fn keep(conn: &mut PgConnection, account_uuid: &str, id: Uuid) -> ApiResult<bool> {
+    Ok(sqlx::query(
+        "update browser_sessions set kept_at = now() \
+         where id = $1 and account_uuid = $2 and revoked_at is null and expires_at > now()",
+    )
+    .bind(id)
+    .bind(account_uuid)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected()
+        > 0)
 }
 
 /// Revokes one session of an account. Error: 404 `session_not_found`.

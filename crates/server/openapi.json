@@ -11786,6 +11786,94 @@
         }
       }
     },
+    "/v1/me/sessions/{id}/keep": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "operationId": "keepMySession",
+        "summary": "Keep a sign-in",
+        "description": "Records that you still use this browser, CLI or developer-platform sign-in although it was not used lately, so the account site stops asking about it on every browser until it is used and goes quiet again. It changes nothing else: the sign-in still ends 60 days after its last use (browser sessions).",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The session's id, as `GET /v1/me/sessions` lists it.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/AccountsVersionHeader"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Kept.",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Not found.\n\n- `session_not_found`: not a live session of yours",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
+              "Accounts-Version": {
+                "$ref": "#/components/headers/AccountsVersion"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "session_not_found",
+                    "message": "Not a live session of yours."
+                  }
+                }
+              }
+            },
+            "x-error-codes": [
+              "session_not_found"
+            ]
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
     "/v1/me/interface-sessions": {
       "get": {
         "tags": [
@@ -31245,7 +31333,16 @@
           },
           "expires_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When it ends unless used again or signed out. A browser session ends 60 days after its last use, and at most 900 days after it began."
+          },
+          "kept_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When you chose to keep this sign-in although it was not used lately (`POST /v1/me/sessions/{id}/keep`); null if you never did."
           },
           "current": {
             "type": "boolean",

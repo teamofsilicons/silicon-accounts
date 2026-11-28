@@ -611,6 +611,13 @@ pub struct SessionInfo {
         skip_serializing_if = "Option::is_none"
     )]
     pub expires_at: Option<OffsetDateTime>,
+    /// When the account chose to keep it although it was not used lately (`keep_session`).
+    #[serde(
+        default,
+        with = "crate::serde_util::rfc3339_ms::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub kept_at: Option<OffsetDateTime>,
     /// True for the session making this request.
     #[serde(default, deserialize_with = "lenient_bool")]
     pub current: bool,

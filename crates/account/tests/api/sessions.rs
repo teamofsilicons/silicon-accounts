@@ -255,3 +255,143 @@ async fn developer_platform_sign_ins_are_listed_and_can_be_signed_out() {
         r.json
     );
 }
+
+/// "Keep" on Home's "Still using …?" is stored on the sign-in itself, so every browser stops
+/// asking (Anil, 2026-11-26). Only your own live sign-ins can be kept.
+#[tokio::test]
+async fn keeping_a_sign_in_is_recorded_on_it() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let other = ctx.carbon().await;
+    let cookie = ctx.browser_session(&carbon).await;
+    let tok = token(&ctx, &carbon).await;
+    let other_tok = token(&ctx, &other).await;
+    let listed = call(&ctx, Req::get("/v1/me/sessions").bearer(&tok)).await;
+    for s in sessions_of(&listed.json) {
+        assert!(s["kept_at"].is_null(), "{s}");
+    }
+    let id_of = |kind: &str| {
+        sessions_of(&listed.json)
+            .into_iter()
+            .find(|s| s["kind"] == kind)
+            .and_then(|s| s["id"].as_str().map(str::to_string))
+            .expect("session id")
+    };
+    for id in [id_of("browser"), id_of("cli")] {
+        let r = call(
+            &ctx,
+            Req::post(&format!("/v1/me/sessions/{id}/keep")).bearer(&tok),
+        )
+        .await;
+        assert_status(&r, 204);
+    }
+    let r = call(
+        &ctx,
+        Req::get("/v1/me/sessions").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    for s in sessions_of(&r.json) {
+        assert!(s["kept_at"].as_str().is_some(), "{s}");
+    }
+
+    // Someone else's sign-in, an unknown id and a signed-out one are not found.
+    let browser_id = id_of("browser");
+    let r = call(
+        &ctx,
+        Req::post(&format!("/v1/me/sessions/{browser_id}/keep")).bearer(&other_tok),
+    )
+    .await;
+    assert_error(&r, 404, "session_not_found");
+    let r = call(
+        &ctx,
+        Req::post("/v1/me/sessions/not-a-uuid/keep").bearer(&tok),
+    )
+    .await;
+    assert_error(&r, 404, "session_not_found");
+    let r = call(
+        &ctx,
+        Req::delete(&format!("/v1/me/sessions/{browser_id}")).bearer(&tok),
+    )
+    .await;
+    assert_status(&r, 204);
+    let r = call(
+        &ctx,
+        Req::post(&format!("/v1/me/sessions/{browser_id}/keep")).bearer(&tok),
+    )
+    .await;
+    assert_error(&r, 404, "session_not_found");
+}
+
+/// A browser session ends 60 days after its last use, within its 900-day limit (Anil, 2026-11-26).
+#[tokio::test]
+async fn browser_sessions_end_after_sixty_days_unused() {
+    let ctx = TestContext::new().await;
+    let carbon = ctx.carbon().await;
+    let cookie = ctx.browser_session(&carbon).await;
+    let id: uuid::Uuid = sqlx::query_scalar(
+        "select id from browser_sessions where account_uuid = $1 order by created_at desc limit 1",
+    )
+    .bind(&carbon.uuid)
+    .fetch_one(&ctx.state.db)
+    .await
+    .expect("session");
+    let days_left = |ctx: &TestContext| {
+        let db = ctx.state.db.clone();
+        async move {
+            sqlx::query_scalar::<_, f64>(
+                "select extract(epoch from expires_at - now())::float8 / 86400 from browser_sessions where id = $1",
+            )
+            .bind(id)
+            .fetch_one(&db)
+            .await
+            .expect("expires_at")
+        }
+    };
+    let left = days_left(&ctx).await;
+    assert!((59.9..=60.0).contains(&left), "new session: {left} days");
+
+    // Used again after a quiet week: 60 days from now again.
+    sqlx::query("update browser_sessions set last_seen_at = now() - interval '7 days', expires_at = now() + interval '53 days' where id = $1")
+        .bind(id)
+        .execute(&ctx.state.db)
+        .await
+        .expect("age");
+    let r = call(
+        &ctx,
+        Req::get("/v1/me").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_status(&r, 200);
+    let left = days_left(&ctx).await;
+    assert!((59.9..=60.0).contains(&left), "after use: {left} days");
+
+    // Never past 900 days from its creation.
+    sqlx::query("update browser_sessions set created_at = now() - interval '880 days', last_seen_at = now() - interval '1 day' where id = $1")
+        .bind(id)
+        .execute(&ctx.state.db)
+        .await
+        .expect("age");
+    let r = call(
+        &ctx,
+        Req::get("/v1/me").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_status(&r, 200);
+    let left = days_left(&ctx).await;
+    assert!((19.9..=20.0).contains(&left), "near the limit: {left} days");
+
+    // Unused past its 60 days: signed out.
+    sqlx::query(
+        "update browser_sessions set expires_at = now() - interval '1 second' where id = $1",
+    )
+    .bind(id)
+    .execute(&ctx.state.db)
+    .await
+    .expect("expire");
+    let r = call(
+        &ctx,
+        Req::get("/v1/me").session(&ctx.state.settings, &cookie),
+    )
+    .await;
+    assert_error(&r, 401, "session_expired");
+}

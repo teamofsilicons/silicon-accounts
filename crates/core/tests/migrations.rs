@@ -325,7 +325,17 @@ async fn accounts_rename_preserves_credentials_sessions_and_token_boundaries() {
         db,
     };
     let carbon = ctx.carbon().await;
+    // Today's session code reads kept_at (migration 0046): add it only while signing in, as
+    // org_id is below.
+    sqlx::query("alter table browser_sessions add column kept_at timestamptz")
+        .execute(&ctx.db.pool)
+        .await
+        .unwrap();
     let session = ctx.browser_session(&carbon).await;
+    sqlx::query("alter table browser_sessions drop column kept_at")
+        .execute(&ctx.db.pool)
+        .await
+        .unwrap();
     // The current issuance helper reads work identity metadata, which did not
     // exist in migration 0011. Supply an empty personal-only projection solely
     // while minting this legacy credential, then restore the exact old schema.

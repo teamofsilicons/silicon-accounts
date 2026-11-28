@@ -16,6 +16,7 @@
  * - `useChangeOwnId`, `useChangeSiliconIdInForm`: id changes whose refusals the id form explains in place (no toast).
  * - `useAddPasskey`, `useRenamePasskey`, `useRemovePasskey`: /v1/me/passkeys (adding runs the browser ceremony in
  *   lib/passkey.ts between the two calls).
+ * - `useKeepSessions`, `useSignOutSessions`: a device's old sign-ins, kept or signed out together.
  */
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +27,7 @@ import type { CustodianRequest, EmailView, IdAvailability, ManagedSilicon, Me, M
 import { createPasskey } from "@/lib/passkey";
 import { queryKeys } from "@/lib/query/keys";
 import { setMe } from "@/lib/query/session";
+import { keepSession } from "./checkup";
 
 /** `GET /v1/ids/available?id=…[&for=…]`, cached per id and subject. Disabled while `id` is null. */
 export function useIdCheckQuery(id: string | null, forUuid?: string | null) {
@@ -214,6 +216,43 @@ export function useSignOutSession() {
       void client.invalidateQueries({ queryKey: queryKeys.me.sessions });
     },
     { errorTitle: "That session is still signed in" },
+  );
+}
+
+/**
+ * Signs out every old sign-in on one device (Needs you asks about them together, Anil 2026-11-26).
+ */
+export function useSignOutSessions() {
+  return useSettledMutation(
+    (ids: string[]) => Promise.all(ids.map(id => api.me.sessions.revoke(id))),
+    (client, _data, ids) => {
+      client.setQueryData<Page<SessionInfo>>(queryKeys.me.sessions, page => (page ? { ...page, items: page.items.filter(item => !ids.includes(item.id)) } : page));
+      void client.invalidateQueries({ queryKey: queryKeys.me.sessions });
+    },
+    { errorTitle: "Those sign-ins are still signed in" },
+  );
+}
+
+/**
+ * Keeps sign-ins that weren't used lately (POST /v1/me/sessions/{id}/keep), so no browser asks about them again until
+ * one is used. An API without `kept_at` doesn't have the route: there the choice is kept in this browser.
+ */
+export function useKeepSessions() {
+  return useSettledMutation(
+    async (sessions: SessionInfo[]) => {
+      if (sessions.some(session => session.kept_at === undefined)) {
+        sessions.forEach(session => keepSession(session.id));
+        return;
+      }
+      await Promise.all(sessions.map(session => api.me.sessions.keep(session.id)));
+    },
+    (client, _data, sessions) => {
+      const at = new Date().toISOString();
+      const ids = new Set(sessions.map(session => session.id));
+      client.setQueryData<Page<SessionInfo>>(queryKeys.me.sessions, page => (page ? { ...page, items: page.items.map(item => (ids.has(item.id) && item.kept_at !== undefined ? { ...item, kept_at: at } : item)) } : page));
+      void client.invalidateQueries({ queryKey: queryKeys.me.sessions });
+    },
+    { errorTitle: "Those sign-ins weren't kept" },
   );
 }
 

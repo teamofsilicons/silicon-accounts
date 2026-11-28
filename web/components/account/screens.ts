@@ -193,6 +193,8 @@ const shown: ScreenSpec[] = [
   } },
   { name: "account-home-review", path: "/", waitFor: "[data-home]", fullPage: false, prepare: async page => { await page.getByRole("link", { name: "Review" }).first().click(); await wait(page, 900); } },
   { name: "account-home-new", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me/apps", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, phones: [], custodian_of: 0 } })]], prepare: async page => { await expect(page.getByText("One Account for Your Silicons & Apps", { exact: true })).toBeVisible(); await expect(page.getByRole("button", { name: "Dismiss", exact: true })).toHaveCount(0); } },
+  // Old sign-ins, one question per device (Anil, 2026-11-26): the two Safari on iOS sign-ins together.
+  { name: "account-home-devices", path: "/", waitFor: "[data-home]", fullPage: false, routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })]], prepare: async page => { await page.getByRole("button", { name: "Next", exact: true }).click(); await expect(page.getByText("Still using Safari on iOS?", { exact: true })).toBeVisible(); await expect(page.getByText(/^2 sign-ins · last active/)).toBeVisible(); await wait(page, 600); } },
   { name: "account-home-clear", path: "/", waitFor: "[data-home]", routes: [["GET /v1/me/custodian-requests", () => ({ json: data.page([]) })], ["GET /v1/me/silicons", () => ({ json: data.page([]) })]], prepare: async page => { await click(page, "Dismiss"); await wait(page, 400); } },
   // Identity: the card, its back, the photo menu, the editors and the id dialog with a taken id.
   { name: "account-identity", path: "/personal", waitFor: card },
@@ -328,7 +330,7 @@ const shown: ScreenSpec[] = [
   // Settings: sessions, and deleting blocked by the Silicons in your care; then free to delete.
   { name: "account-privacy", path: "/privacy" },
   // Sessions are on the Security pillar since 2026-10-17 (components/account/security/sessions.tsx).
-  { name: "account-security-signout", path: "/sign-in-methods", prepare: async page => { await page.getByRole("button", { name: "Sign out", exact: true }).nth(1).click(); await wait(page, 600); } },
+  { name: "account-security-signout", path: "/sign-in-methods", prepare: async page => { await page.getByRole("button", { name: "Sign Out", exact: true }).nth(1).click(); await wait(page, 600); } },
   { name: "account-privacy-delete", path: "/privacy/delete" },
   { name: "account-privacy-deletable", path: "/privacy/delete", routes: [["GET /v1/me/silicons", () => ({ json: data.page([]) })], ["GET /v1/me", () => ({ json: { ...data.carbon, custodian_of: 0 } })]] },
 

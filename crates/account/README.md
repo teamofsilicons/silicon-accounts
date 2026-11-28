@@ -110,7 +110,7 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
   app gets `membership.access_removed`. Repeating it does nothing (no second webhook). 404
   `membership_not_found`, 400 `first_party_app` for `silicon-accounts` and `developer` (Silicon
   Accounts' own apps hold sessions, not access: the hint points to `DELETE /v1/me/sessions/{id}`).
-- `GET /v1/me/sessions?limit&cursor` → items `{"id","kind":"browser"|"cli"|"developer","label","origin","ip","user_agent","created_at","last_seen_at","expires_at","current"}`
+- `GET /v1/me/sessions?limit&cursor` → items `{"id","kind":"browser"|"cli"|"developer","label","origin","ip","user_agent","created_at","last_seen_at","expires_at","kept_at","current"}`
   (browser sessions, live `aud=silicon-accounts` token families as `cli` and live `aud=developer` ones
   as `developer`, labelled "Silicon Developer (developers.teamofsilicons.com)"), newest first. A browser session's
   `label` describes its user agent the way sign-in history does (`sessions::describe_user_agent`):
@@ -119,6 +119,11 @@ primary that gets verified (apps see `email_verified` / `phone_verified` change)
   (`accounts-cli/<v> silicon-accounts-client/<v>`), "Silicon Accounts Rust package 0.1.0" for
   the package (after the program's own product when it names one: "dm 2.0 (Silicon Accounts Rust
   package 0.1.0)"), any other program by its product ("curl 8.4.0"), else "An unknown client".
+- A browser session ends `SESSION_IDLE_DAYS` (60) after its last use: `sessions::touch` moves
+  `expires_at` that far ahead on each use, never past `SESSION_DAYS` (900) from its creation
+  (migration 0046 ended the live ones already quiet longer).
+- `POST /v1/me/sessions/{id}/keep` → 204: sets `kept_at` on a live browser session or
+  first-party/developer token family of yours (Home's "Still using …?" Keep). 404 `session_not_found`.
 - `DELETE /v1/me/sessions/{id}` → 204; revoking the calling cookie session also clears the
   cookie. 404 `session_not_found` (unknown, another account's, or another app's sign-in).
 

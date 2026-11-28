@@ -339,8 +339,10 @@ export interface SessionInfo {
   user_agent: string | null;
   created_at: Timestamp;
   last_seen_at: Timestamp | null;
-  /** When it ends unless used or revoked. */
+  /** When it ends unless used or revoked: a browser session 60 days after its last use (at most 900 days in all). */
   expires_at: Timestamp | null;
+  /** When the Carbon chose to keep it although it wasn't used lately; absent from an API deployed before Keep. */
+  kept_at?: Timestamp | null;
   /** The session this request was made with. */
   current: boolean;
 }

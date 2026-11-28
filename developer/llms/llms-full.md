@@ -2435,6 +2435,7 @@ These are the endpoints for looking up accounts and for an account managing itse
 | `DELETE /v1/me/apps/{app_id}` | account | `apps remove` | Remove an app's access |
 | `GET /v1/me/sessions` | account | `sessions list` | Your sessions |
 | `DELETE /v1/me/sessions/{id}` | account | `sessions revoke` | Sign one out |
+| `POST /v1/me/sessions/{id}/keep` | account | | Stop being asked about one |
 | `GET /v1/me/history` | account | `history` | Everything that happened to the account |
 | `DELETE /v1/me` | account (Carbon) | `delete-account --confirm` | Delete your account |
 
@@ -2564,10 +2565,14 @@ Adding and verifying are idempotent. Every add attempt counts before any 409 or 
 
 ## Sessions
 
-`GET /v1/me/sessions` lists browser sessions, live first-party sign-ins and developer platform sign-ins, newest first. Each is `{id, kind, label, origin, ip, user_agent, created_at, last_seen_at, expires_at, current}`:
+`GET /v1/me/sessions` lists browser sessions, live first-party sign-ins and developer platform sign-ins, newest first. Each is `{id, kind, label, origin, ip, user_agent, created_at, last_seen_at, expires_at, kept_at, current}`:
 - `kind` - `browser`, `cli` or `developer` (a sign-in to `developers.teamofsilicons.com`).
 - `origin` - for CLI sign-ins, `cli_code`, `device` or `silicon_login`.
 - `current` - marks the session making this request.
+- `expires_at` - a browser session ends 60 days after its last use, and at most 900 days after it began.
+- `kept_at` - when you chose to keep it although it wasn't used lately, or null.
+
+`POST /v1/me/sessions/{id}/keep` answers 204 and records that you still use that sign-in, so the account site stops asking about it until it is used and goes quiet again. `404 session_not_found` for an unknown, ended or someone else's session.
 
 `DELETE /v1/me/sessions/{id}` answers 204 and signs that session out at once. A revoked cookie then answers `401 session_expired` and a revoked token `401 token_revoked`; revoking the cookie session you are calling with also clears the cookie. `404 session_not_found` means it is unknown, another account's, or an app's sign-in (remove an app with `DELETE /v1/me/apps/{app_id}`).
 
@@ -7701,7 +7706,7 @@ A signed-in Carbon or Silicon. Where a method returns a `Vec`, the pages are fol
 | `phones()`, `add_phone(phone, country)`, `verify_phone(..)`, `make_phone_primary(..)`, `remove_phone(..)` | `/v1/me/phones…` | `Vec<PhoneNumber>` / `ContactChallenge` |
 | `identities()`, `remove_identity(provider, subject)` | `/v1/me/identities…` | `Vec<Identity>` / `()` |
 | `apps()`, `remove_app_access(app_id)`, `owned_apps()` | `/v1/me/apps…`, `GET /v1/me/owned-apps` | `Vec<MyApp>` / `()` / `Vec<OwnedApp>` |
-| `sessions()`, `revoke_session(id)`, `signout(refresh_token)` | `/v1/me/sessions…`, `POST /v1/oauth/revoke` | `Vec<SessionInfo>` / `()` |
+| `sessions()`, `revoke_session(id)`, `keep_session(id)`, `signout(refresh_token)` | `/v1/me/sessions…`, `POST /v1/oauth/revoke` | `Vec<SessionInfo>` / `()` |
 | `history(&HistoryQuery)` | `GET /v1/me/history` | `Page<HistoryItem>` |
 | `short_lived_token(app_id)` | `POST /v1/me/short-lived-tokens` | `ShortLivedToken` (`slt`, `app_id`, `expires_at`) |
 | `identity_token(audience, ttl_seconds)` | `POST /v1/me/identity-tokens` (Silicons) | `IdentityToken` (`identity_token`, `audience`, `subject`, `jti`, `kid`, `expires_at`, …) |
