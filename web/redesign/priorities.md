@@ -5,7 +5,7 @@ move done items to Done (with the commit), add what came up, keep Now to one ite
 Decisions are in [decisions.md](decisions.md); every change is in [log.md](log.md). The product contract is
 `../../understanding/UNDERSTANDING.md` (never edited); the design brief is `../../Silicon Accounts Redesign Design Review.md`.
 
-Last updated: 2026-11-23
+Last updated: 2026-11-28
 
 ## Now
 1. developer-site e2e suites still use the old hosted sign-in words ("Email", "Create account": j-pages, b-bff-session,
@@ -15,6 +15,8 @@ Last updated: 2026-11-23
    menu and docs search can then drop direct Radix).
 2. Clear the remaining tolerated exceptions (eslint-suppressions.json, CSS baseline) as each screen is rebuilt.
 3. Identity screens: `pnpm screens --only account-identity` fails while a real API runs on 8589; run with it stopped.
+
+Done 2026-11-28: the shell on Silicon UI 0.7's AppShell, the account row on AccountMenu (Switcher), tokens.css without what 0.7.0 ships.
 
 Done since 2026-11-10 (ab05095 and after): Home without Your apps (2026-11-12), Silicons, Connected apps and Permissions, Security (Unlink dialog, row links,
 Change key on the page), Personal info, Data & privacy with the delete page, sign-in and sign-up, /goodbye.

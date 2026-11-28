@@ -82,10 +82,10 @@ const foundationScreens: ScreenSpec[] = [
   { name: "kitchen-squircle-fallback", path: "/__kitchen?squircle=fallback", waitFor: "[data-kitchen-ready]", widths: [1440], themes: ["light"], settle: 1200 },
   { name: "landing", path: "/", as: "signed-out" },
   { name: "shell-home", path: "/", waitFor: "[data-home]" },
-  { name: "shell-palette", path: "/personal", waitFor: "#personal-profile", fullPage: false, prepare: async page => {
+  { name: "shell-palette", path: "/personal", waitFor: "#personal-profile", widths: [1440], fullPage: false, prepare: async page => {
     const trigger = page.locator("button[aria-keyshortcuts]").filter({ visible: true }).first();
     await trigger.click();
-    const dialog = page.getByRole("dialog", { name: "Search and jump" });
+    const dialog = page.getByRole("dialog", { name: "Search pages and actions" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Close dialog" })).toHaveCount(0);
     const close = dialog.getByRole("button", { name: "Esc, close command palette" });
@@ -107,9 +107,25 @@ const foundationScreens: ScreenSpec[] = [
     await trigger.click();
     await page.waitForTimeout(600);
   } },
+  // On a phone Search is in the Menu sheet (AppShell): the sheet closes and the palette opens.
+  { name: "shell-palette-phone", path: "/personal", waitFor: "#personal-profile", widths: [390], fullPage: false, prepare: async page => {
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: "Search" }).click();
+    const dialog = page.getByRole("dialog", { name: "Search pages and actions" });
+    await expect(dialog.getByRole("combobox", { name: "Search pages and actions" })).toBeFocused();
+    await expect(page.getByRole("dialog", { name: "Menu" })).toHaveCount(0);
+    await page.waitForTimeout(600);
+  } },
   { name: "shell-nav-sheet", path: "/silicons", widths: [390], fullPage: false, prepare: async page => {
-    await page.getByRole("button", { name: "Account sections" }).click();
+    await page.getByRole("button", { name: "Menu" }).click();
+    await expect(page.getByRole("dialog", { name: "Menu" }).getByRole("button", { name: "Add another account" })).toBeVisible();
     await page.waitForTimeout(900);
+  } },
+  // The account switcher at the sidebar's foot (AppShell's account slot, AccountMenu), beside the page.
+  { name: "shell-account-menu", path: "/", waitFor: "[data-home]", widths: [1440], fullPage: false, prepare: async page => {
+    await page.getByRole("button", { name: /^Accounts, signed in as/ }).click();
+    await expect(page.getByRole("button", { name: "Add another account" })).toBeVisible();
+    await page.waitForTimeout(600);
   } },
   { name: "embed-buttons", path: `/embed/v1/buttons?${EMBED_QUERY("briefcase", "http://127.0.0.1:8593/briefcase/callback")}`, as: "signed-out", waitFor: "#silicon-accounts-embed[data-ready]", widths: [390] },
   { name: "embed-buttons-branded", path: `/embed/v1/buttons?${EMBED_QUERY("pixel-studio", "http://127.0.0.1:8593/pixel-studio/callback")}&theme=light`, as: "signed-out", waitFor: "#silicon-accounts-embed[data-ready]", widths: [390], themes: ["light"] },

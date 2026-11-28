@@ -1,12 +1,11 @@
 /*
  * The Silicon look, mapped onto Silicon UI's semantic tokens (@teamofsilicons/silicon-ui/styles.css, imported first):
- * Silicon UI's typography as it ships, in Hanken Grotesk for titles too (Anil, 2026-11-09, after Radix was tried and
- * undone), and our colours: a neutral #FCFCFC page and Silicon UI's grey scale, near-black ink and the prototype's blue
- * accent. In development the dev panel's type lab sets the type tokens live and Edit text restyles one kind of text.
+ * Silicon UI's typography and colours as they ship (its defaults are the account site's since 0.7.0: a neutral #FCFCFC
+ * page, near-black ink and the prototype's blue accent), with Allo as the face. In development the dev panel's type lab sets the type tokens live and Edit text restyles one kind of text.
  *
- * The account site is light only: lib/theme.ts pins <html data-theme="light">. The dark block below is kept for app
- * branding that forces dark on an app's own hosted sign-in pages or embedded buttons (lib/branding/apply.ts sets
- * data-theme on that subtree); it is Silicon UI's neutral dark.
+ * The account site is light only: lib/theme.ts pins <html data-theme="light">. The subtree blocks below repeat Silicon
+ * UI's light and dark for app branding that forces a theme on an app's own hosted sign-in pages or embedded buttons
+ * (lib/branding/apply.ts sets data-theme on that subtree); Silicon UI sets its themes on :root only.
  *
  * Contrast (WCAG 2.2): every text token clears 4.5:1 on --background, --surface and --surface-muted in its mode
  * (light --text-muted #6B6B6B since 2026-11-12: 5.3:1 on white, 4.7:1 on --surface-muted).
@@ -14,75 +13,13 @@
  *   --accent-ink   accent-coloured text (links): the prototype's blue, a lighter blue in dark.
  *   --primary*     the filled button: ink under page-coloured text in light, the reverse in dark.
  */
-:root, [data-theme="light"] {
-  color-scheme: light;
-
-  /* Neutral, never beige (2026-10-18): the page is #FCFCFC and the rest is Silicon UI's own grey scale. */
-  --background: #FCFCFC;
-  --surface: var(--neutral-0);
-  --surface-raised: var(--neutral-0);
-  --surface-muted: var(--neutral-3);
-  /* The quiet fill of the page's blocks (Home's tiles) on the flat white shell. neutral-2, one step under
-     --surface-muted, so a tile's hover (--surface-muted) still shows on it. */
-  --canvas: var(--neutral-2);
-  /* The nav pill's current item and quiet fills. */
-  --surface-pressed: var(--neutral-4);
-  /* The text greys, ladder C from /__text (Anil, 2026-11-10): even steps of about 12 in lightness (L*), after comparing
-     with Refactoring UI's palette. OpenAI's text was 4 → 40 (#0D0D0D → #5D5D5D), too big a jump.
-       --foreground      #1B1B1B  L 10  names, titles, headings (17:1 on white; ≈ the primary button, #181818)
-       --text-soft       #353535  L 22  the line under a name: an app's description or address (new)
-       --text-secondary  #505050  L 34  facts and quiet links: "Signed in…", "See all" (8:1)
-       --text-muted      #6B6B6B  L 45  ids (si:zap), hints (was #8E8E8E, L 59; under 4.5:1, Anil 2026-11-12)
-     Before: OpenAI's #0D0D0D, #5D5D5D, #8F8F8F (2026-11-09); ours #1E1E1C, var(--neutral-8), #666666 before that. */
-  --foreground: #1B1B1B;
-  --text-soft: #353535;
-  --text-secondary: #505050;
-  /* The lightest grey that clears 4.5:1 on every light surface (overlays audit, Anil 2026-11-12): 5.3:1 on white,
-     5.0:1 on the shell's grey, 4.7:1 on --surface-muted. */
-  --text-muted: #6B6B6B;
-  --text-faint: var(--neutral-6);
-  --border: oklch(93.5% 0 0);
-  --border-subtle: oklch(96.5% 0 0);
-  --border-strong: oklch(82% 0 0);
-
-  /* The prototype's blue (v7: --accent #3460F0, --accent-soft #EEF2FE) for links, focus and selected fields; filled
-     buttons stay ink (--primary), as in the prototype. #3460F0 is 5.2:1 on white. */
-  --accent: #3460F0;
-  --accent-strong: #2449C9;
-  --accent-subtle: #EEF2FE;
-  --accent-foreground: #FFFFFF;
-  --accent-ink: #3460F0;
-
-  /* Trying platform.openai.com's buttons (Anil, 2026-11-10): its filled button is #181818 under white. Ours were
-     --primary #1E1E1C, --primary-hover #33322F, --primary-pressed #0F0F0E, --primary-foreground var(--background). */
-  --primary: #181818;
-  --primary-hover: #2E2E2E;
-  --primary-pressed: #0D0D0D;
-  --primary-foreground: #FFFFFF;
-
-  --control-on: #1E1E1C;
-  --control-glyph: #FFFFFF;
-  --control-track: oklch(89.5% 0 0);
-  --control-track-hover: oklch(86% 0 0);
-  --control-thumb: #FFFFFF;
-  --control-thumb-on: #FFFFFF;
-  --control-thumb-shadow: 0 0 0 .5px rgb(30 30 28 / .08), 0 1px 2px rgb(30 30 28 / .14), 0 2px 6px rgb(30 30 28 / .06);
-  --control-fill: var(--control-on);
-  --control-on-subtle: color-mix(in oklab, var(--control-on) 10%, transparent);
-  /* The prototype's soft blue halo around a focused field. */
+:root {
+  /* Silicon UI 0.7.0 ships the account site's colours as its defaults (the neutral #FCFCFC page, the text ladder with
+     --text-soft, the TOS blue accent and --accent-ink, the ink primary, --surface-muted neutral-3 and --surface-pressed
+     neutral-4, --canvas neutral-2, the status colours, --star, the warm shadows), so they are no longer set here
+     (2026-11-28). What stays is the account site's own: the focus halo, the series, the Silicon marks, the sky. */
+  /* The prototype's soft blue halo around a focused field (Silicon UI's is transparent). */
   --focus-ring: var(--accent-subtle);
-
-  --success: #2B7148;
-  --warning: #8F560D;
-  --danger: #B42318;
-  /* Stars and the rating bars: an ochre that sits on paper. */
-  --star: #B7791F;
-
-  /* Warm, faint shadows, as on teamofsilicons.com. Only floating layers and the nav pill use them. */
-  --shadow-resting: 0 1px 2px rgb(30 30 28 / .04);
-  --shadow-raised: 0 6px 18px rgb(30 30 28 / .06), 0 1px 3px rgb(30 30 28 / .04);
-  --shadow-floating: 0 20px 48px rgb(30 30 28 / .1), 0 3px 10px rgb(30 30 28 / .05);
-
   --series-1: #1F5CB1; --series-2: #7A4FC4; --series-3: #B7791F; --series-4: #2B7148;
 
   /* A Silicon's mark: its own two-colour gradient under a white spark (the prototype's SIG colours). parts/silicon-mark
@@ -149,15 +86,87 @@
   --page-end: calc(var(--space-page) + env(safe-area-inset-bottom, 0px));
 }
 
+/* A light subtree inside a dark page (an app's branding, lib/branding/apply.ts sets data-theme on its own subtree):
+   Silicon UI sets its light colours on :root only, so they are repeated for the subtree. Same values as Silicon UI's. */
+[data-theme="light"]:not(:root) {
+  color-scheme: light;
+  /* Neutral, never beige (2026-10-18): the page is #FCFCFC and the rest is Silicon UI's own grey scale. */
+  --background: #FCFCFC;
+  --surface: var(--neutral-0);
+  --surface-raised: var(--neutral-0);
+  --surface-muted: var(--neutral-3);
+  /* The quiet fill of the page's blocks (Home's tiles) on the flat white shell. neutral-2, one step under
+     --surface-muted, so a tile's hover (--surface-muted) still shows on it. */
+  --canvas: var(--neutral-2);
+  /* The nav pill's current item and quiet fills. */
+  --surface-pressed: var(--neutral-4);
+  /* The text greys, ladder C from /__text (Anil, 2026-11-10): even steps of about 12 in lightness (L*), after comparing
+     with Refactoring UI's palette. OpenAI's text was 4 → 40 (#0D0D0D → #5D5D5D), too big a jump.
+       --foreground      #1B1B1B  L 10  names, titles, headings (17:1 on white; ≈ the primary button, #181818)
+       --text-soft       #353535  L 22  the line under a name: an app's description or address (new)
+       --text-secondary  #505050  L 34  facts and quiet links: "Signed in…", "See all" (8:1)
+       --text-muted      #6B6B6B  L 45  ids (si:zap), hints (was #8E8E8E, L 59; under 4.5:1, Anil 2026-11-12)
+     Before: OpenAI's #0D0D0D, #5D5D5D, #8F8F8F (2026-11-09); ours #1E1E1C, var(--neutral-8), #666666 before that. */
+  --foreground: #1B1B1B;
+  --text-soft: #353535;
+  --text-secondary: #505050;
+  /* The lightest grey that clears 4.5:1 on every light surface (overlays audit, Anil 2026-11-12): 5.3:1 on white,
+     5.0:1 on the shell's grey, 4.7:1 on --surface-muted. */
+  --text-muted: #6B6B6B;
+  --text-faint: var(--neutral-6);
+  --border: oklch(93.5% 0 0);
+  --border-subtle: oklch(96.5% 0 0);
+  --border-strong: oklch(82% 0 0);
+
+  /* The prototype's blue (v7: --accent #3460F0, --accent-soft #EEF2FE) for links, focus and selected fields; filled
+     buttons stay ink (--primary), as in the prototype. #3460F0 is 5.2:1 on white. */
+  --accent: #3460F0;
+  --accent-strong: #2449C9;
+  --accent-subtle: #EEF2FE;
+  --accent-foreground: #FFFFFF;
+  --accent-ink: #3460F0;
+
+  /* Trying platform.openai.com's buttons (Anil, 2026-11-10): its filled button is #181818 under white. Ours were
+     --primary #1E1E1C, --primary-hover #33322F, --primary-pressed #0F0F0E, --primary-foreground var(--background). */
+  --primary: #181818;
+  --primary-hover: #2E2E2E;
+  --primary-pressed: #0D0D0D;
+  --primary-foreground: #FFFFFF;
+
+  --control-on: #1E1E1C;
+  --control-glyph: #FFFFFF;
+  --control-track: oklch(89.5% 0 0);
+  --control-track-hover: oklch(86% 0 0);
+  --control-thumb: #FFFFFF;
+  --control-thumb-on: #FFFFFF;
+  --control-thumb-shadow: 0 0 0 .5px rgb(30 30 28 / .08), 0 1px 2px rgb(30 30 28 / .14), 0 2px 6px rgb(30 30 28 / .06);
+  --control-fill: var(--control-on);
+  --control-on-subtle: color-mix(in oklab, var(--control-on) 10%, transparent);
+  /* The prototype's soft blue halo around a focused field. */
+  --focus-ring: var(--accent-subtle);
+
+  --success: #2B7148;
+  --warning: #8F560D;
+  --danger: #B42318;
+  /* Stars and the rating bars: an ochre that sits on paper. */
+  --star: #B7791F;
+
+  /* Warm, faint shadows, as on teamofsilicons.com. Only floating layers and the nav pill use them. */
+  --shadow-resting: 0 1px 2px rgb(30 30 28 / .04);
+  --shadow-raised: 0 6px 18px rgb(30 30 28 / .06), 0 1px 3px rgb(30 30 28 / .04);
+  --shadow-floating: 0 20px 48px rgb(30 30 28 / .1), 0 3px 10px rgb(30 30 28 / .05);
+}
+
 /* Trying platform.openai.com's outlined button (Anil, 2026-11-10): its edge is ink at 16%, clearer than our --border.
    Silicon UI's secondary Button reads --border for its edge, so only the token is set, on that variant. */
 [data-theme="light"] [data-variant="secondary"], :root:not([data-theme="dark"]) [data-variant="secondary"] {
   --border: color-mix(in oklab, var(--foreground) 16%, transparent);
 }
 
-:root[data-theme="dark"], [data-theme="dark"] {
+/* A dark subtree (an app's branding forcing dark on its hosted sign-in pages or embedded buttons): Silicon UI sets its
+   dark colours on :root[data-theme="dark"] only, so they are repeated for the subtree. Same values as Silicon UI's. */
+[data-theme="dark"]:not(:root) {
   color-scheme: dark;
-  /* Silicon UI's neutral dark, repeated here so a dark subtree (an app's branding) gets it too, not only :root. */
   --background: oklch(19% 0 0);
   --surface: oklch(21.5% 0 0);
   --surface-raised: oklch(24% 0 0);
@@ -192,8 +201,6 @@
   --control-thumb-shadow: 0 0 0 .5px rgb(0 0 0 / .3), 0 1px 2px rgb(0 0 0 / .35), 0 2px 6px rgb(0 0 0 / .2);
   --control-fill: oklch(62% 0 0);
   --control-on-subtle: color-mix(in oklab, var(--control-on) 16%, transparent);
-  --focus-ring: var(--accent-subtle);
-
   --success: #7FC79A;
   --warning: #E3B55A;
   --danger: #F4968C;
@@ -203,8 +210,12 @@
   --shadow-raised: 0 8px 22px rgb(0 0 0 / .35);
   --shadow-floating: 0 22px 55px rgb(0 0 0 / .5), 0 3px 10px rgb(0 0 0 / .25);
 
-  --series-1: #86AEEA; --series-2: #B99AE6; --series-3: #E3B55A; --series-4: #7FC79A;
+}
 
+/* The account site's own tokens in dark, on the page and on a dark subtree. */
+:root[data-theme="dark"], [data-theme="dark"] {
+  --focus-ring: var(--accent-subtle);
+  --series-1: #86AEEA; --series-2: #B99AE6; --series-3: #E3B55A; --series-4: #7FC79A;
   --overlay: rgb(0 0 0 / .5);
 }
 
@@ -221,23 +232,9 @@
    draw circles, and the prototype's avatars are round). */
 
 
-/* Compact (Anil, 2026-11-10, branch compact): TOS apps share one interface, designed for compactness, and home stays
-   simple. Text stays at a 16 base; what tightens is the space around it and the controls:
-   - controls one step shorter: sm 32 (was 36), md 36 (was 44), lg 40 (was 50); xs stays 24;
-   - the larger spacing steps one step down: --space-comfort 16 (20), --space-section 16 (24), --space-block 24 (32),
-     --space-page 32 (48). The small steps (2 to 16) stay, so components keep their insides; sections, pages and
-     panels close up. Home's sections are 32 apart (was 48; 48 tried again 2026-11-10, back to 32);
-   - the title roles one step down (the roles above).
-   The dev panel's Density switch puts <html data-density="comfortable">, the scale before, to compare. */
-:root {
-  --control-height-sm: 2rem; --control-height-md: 2.25rem; --control-height-lg: 2.5rem;
-  --space-comfort: 16px; --space-section: 16px; --space-block: 24px; --space-page: 32px;
-}
-:root[data-density="comfortable"] {
-  --control-height-sm: 2.25rem; --control-height-md: 2.75rem; --control-height-lg: 3.125rem;
-  --space-comfort: 20px; --space-section: 24px; --space-block: 32px; --space-page: 48px;
-  /* The headings step up through Silicon UI's own data-density="comfortable" rule. */
-}
+/* Compact (Anil, 2026-11-10) is Silicon UI's default from 0.7.0 (controls 32 · 36 · 40; --space-comfort and
+   --space-section 16, --space-block 24, --space-page 32), and its data-density="comfortable" brings back the roomier
+   scale, so neither is set here (2026-11-28). */
 
 /* Dialogs (Anil, 2026-11-11: the CarbonID dialog's fixes, for every dialog): the description under the title is
    --text-soft; what sits under a field (its hint, its live status, a note) is small, 14/400, in --text-secondary. Set
